@@ -1,0 +1,21 @@
+name = "MimeticFEM"
+uuid = "126e3871-de10-4940-9d8e-7d36bf127749"
+authors = ["Artur Palha <artur.palha@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MeshCore = "43a99bba-f459-4d0e-8139-f3df11d847d4"
+PolynomialBases = "c74db56a-226d-5e98-8bb0-a6049094aeea"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+PolynomialBases = "0.4"
+MeshCore = "1"
+julia = "1.8"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
