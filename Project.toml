@@ -1,6 +1,9 @@
-name = "MimeticFEM"
-uuid = "126e3871-de10-4940-9d8e-7d36bf127749"
-authors = ["Artur Palha <artur.palha@gmail.com>"]
+name = "FEMtastic"
+uuid = "45fd81cf-4570-4cb4-b51d-06adeaefc15d"
+authors = ["Diogo Costa Cabanas <d.costacabanas@tudelft.nl>", 
+           "Joey Dekker <j.dekker-2@tudelft.nl>", 
+           "Deepesh Toshniwal <d.toshniwal@tudelft.nl>",
+           "Artur Palha <a.palha@tudelft.nl>"]
 version = "0.1.0"
 
 [deps]

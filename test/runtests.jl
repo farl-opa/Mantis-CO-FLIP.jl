@@ -1,4 +1,4 @@
-module MimeticFEMTests
+module FEMtasticTests
 
 using Test
 
