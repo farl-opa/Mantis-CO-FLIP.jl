@@ -1,4 +1,4 @@
-module MimeticFEM
+module FEMtastic
 
 # Write your package code here.
 
