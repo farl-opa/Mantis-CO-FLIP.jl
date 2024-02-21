@@ -10,6 +10,7 @@ module Polynomials
 abstract type GenericPolynomials end
 
 include("NodalPolynomials.jl")
+include("BernsteinPolynomial.jl")
 
 
 end
