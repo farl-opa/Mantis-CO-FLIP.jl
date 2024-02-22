@@ -15,7 +15,10 @@ are written out. Beyond that the definition is used, as is the build-in
 - `x::Float64`: location to evaluate the polynomial at (``x \\in [0.0, 1.0]``).
 """
 function polynomial_bernstein(p::Int, l::Int, x::Float64)::Float64
-    if l > p
+    if p < 0
+        msg = "The Bernstein polynomial must be of degree at least 0."
+        throw(ArgumentError(msg))
+    elseif l > p
         msg = "Only the polynomials for l = 0, 1, ..., $p exist for p = $p."
         msg2 = " You asked for l = $l."
         throw(ArgumentError(msg*msg2))
