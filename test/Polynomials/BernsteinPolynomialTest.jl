@@ -21,9 +21,9 @@ degrees_to_test = [0, 1, 2, 3, 5, 7, 10, 25]
 for p in degrees_to_test
     # Lobatto quadrature includes the endpoints, which can also be used
     # for additional test. The degree is more than large enough anyway.
-    # The + is needed to have more than 0 when p = 0. Note that the 
-    # standard quadrature rule is defined on [-1, 1], while we need it 
-    # on [0, 1].
+    # The + is needed to have more than 0 roots when p = 0. Note that 
+    # the standard quadrature rule is defined on [-1, 1], while we need 
+    # it on [0, 1].
     x, w = FastGaussQuadrature.gausslobatto(3*p+3)
     @. x = (x + 1.0)/2.0
     @. w = 0.5 * w
@@ -32,9 +32,6 @@ for p in degrees_to_test
     sum_all2 = zeros(size(x))
     for l in 0:1:p
         b_lp = [FEMtastic.Polynomials.polynomial_bernstein(p, l, xi) for xi in x]
-        
-        sum_all .+= b_lp
-        sum_all2 .+= l .* b_lp
 
         # Positivity of the polynomials
         @test minimum(b_lp) >= 0.0
@@ -47,14 +44,23 @@ for p in degrees_to_test
         @test isapprox(b_lp, b_plp)
 
         # Root at zero
-        if l != 0
+        if l == 0
+            # The zero-th polynomial is one at x=0.0
+            @test isapprox(b_lp[1], 1.0)
+        else
             @test isapprox(b_lp[1], 0.0)
         end
 
         # Root at one
-        if l != p
+        if l == p
+            # The last polynomial is one at x=1.0
+            @test isapprox(b_lp[end], 1.0)
+        else
             @test isapprox(b_lp[end], 0.0)
         end
+
+        sum_all .+= b_lp
+        sum_all2 .+= l .* b_lp
 
     end
 
