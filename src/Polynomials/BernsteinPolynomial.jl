@@ -62,3 +62,20 @@ function polynomial_bernstein(p::Int, l::Int, x::Float64)::Float64
     end
 end
 
+# Possible Alternative
+
+function bernstein_polynomial(p::Int, l::Int, x::Float64, der=0::Int)::Float64
+    @assert p>=0 "The Bernstein polynomial must be of degree at least 0."
+    @assert l<=p "Only the polynomials for l = 0, 1, ..., $p exist for p = $p. You asked for l = $l."
+    @assert x >= 0.0 && x <= 1.0 "x = $x is outside the interval [0.0, 1.0]."
+
+    if der == 1
+        if l == p
+            return binomial(p, l)*l*x^(l-1)
+        end
+        return p*(bernstein_polynomial(p-1, l-1, x, 0) - bernstein_polynomial(p-1, l, x, 0))
+    end
+
+    return binomial(p, l) * x^l * (1.0 - x)^(p-l)
+end
+
