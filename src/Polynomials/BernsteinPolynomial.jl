@@ -1,4 +1,20 @@
 
+
+
+struct Bernstein <: AbstractPolynomials
+    p::Int  # Polynomial degree
+end
+
+function evaluate(polynomial::Bernstein, xi::Vector{Float64}, derivatives)
+    # For Deepesh to implement.
+    return
+end
+
+
+
+
+
+
 """
     polynomial_bernstein(p::Int, l::Int, x::Float64)::Float64
 
