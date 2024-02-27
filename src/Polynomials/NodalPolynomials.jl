@@ -45,6 +45,6 @@ package.
 - `polynomials::AbstractLagrangePolynomials`: polynomials to evaluate.
 - `ξ::Vector{Float64}`: location to evaluate the polynomials at.
 """
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})
+function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})::Matrix{Float64}
     return PolynomialBases.interpolation_matrix(ξ, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
 end

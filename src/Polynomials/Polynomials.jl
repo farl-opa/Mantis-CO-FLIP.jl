@@ -26,7 +26,7 @@ include("BernsteinPolynomial.jl")
 # evaluate function implemented. Some of these methods may have 
 # additional arguments, such as the additional derivatives to evaluate, 
 # so this version should allow that as well.
-function (polynomial::AbstractPolynomials)(xi::Vector{Float64}, args...)
+function (polynomial::AbstractPolynomials)(xi::Vector{Float64}, args...)::Matrix{Float64}
     return evaluate(polynomial, xi, args...)
 end
 
