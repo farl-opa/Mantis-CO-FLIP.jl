@@ -1,4 +1,4 @@
-module FEMtastic
+module Mantis
 
 # Write your package code here.
 

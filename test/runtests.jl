@@ -1,4 +1,4 @@
-module FEMtasticTests
+module MantisTests
 
 using Test
 

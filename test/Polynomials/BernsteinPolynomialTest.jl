@@ -5,7 +5,7 @@ https://en.wikipedia.org/wiki/Bernstein_polynomial#Properties.
 """
 
 
-import FEMtastic
+import Mantis
 
 using Test
 
@@ -31,7 +31,7 @@ for p in degrees_to_test
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))
     for l in 0:1:p
-        b_lp = [FEMtastic.Polynomials.polynomial_bernstein(p, l, xi) for xi in x]
+        b_lp = [Mantis.Polynomials.polynomial_bernstein(p, l, xi) for xi in x]
 
         # Positivity of the polynomials
         @test minimum(b_lp) >= 0.0
@@ -40,7 +40,7 @@ for p in degrees_to_test
         @test isapprox(sum(w .* b_lp), 1.0/(p + 1))
 
         # Symmetry
-        b_plp = [FEMtastic.Polynomials.polynomial_bernstein(p, p-l, 1.0-xi) for xi in x]
+        b_plp = [Mantis.Polynomials.polynomial_bernstein(p, p-l, 1.0-xi) for xi in x]
         @test isapprox(b_lp, b_plp)
 
         # Root at zero
