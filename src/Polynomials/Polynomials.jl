@@ -1,16 +1,35 @@
 """
-This module provides a collection of polynomial bases.
+This (sub-)module provides a collection of polynomial bases.
 
 The exported names are:
 """
 module Polynomials
 
-# Write your package code here.
 
-abstract type GenericPolynomials end
 
-include("NodalPolynomials.jl")
+
+"""
+    AbstractPolynomials
+
+Supertype for all polynomials.
+"""
+abstract type AbstractPolynomials end
+
+
+
+include("LagrangePolynomials.jl")
 include("BernsteinPolynomial.jl")
+
+
+# Ensures that all polynomials can be evaluated by calling an instance. 
+# Automatically throws a MethodError if the subtype does not have an 
+# evaluate function implemented. Some of these methods may have 
+# additional arguments, such as the additional derivatives to evaluate, 
+# so this version should allow that as well.
+function (polynomial::AbstractPolynomials)(xi::Vector{Float64}, args...)::Array{Float64}
+    return evaluate(polynomial, xi, args...)
+end
+
 
 
 end

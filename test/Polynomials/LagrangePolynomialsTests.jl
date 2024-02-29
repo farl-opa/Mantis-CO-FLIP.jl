@@ -1,6 +1,6 @@
-module NodalPolynomialsTests
+module LagrangePolynomialsTests
 
-import FEMtastic
+import Mantis
 
 import LinearAlgebra
 using Test
@@ -102,16 +102,16 @@ ll_evaluation = [
 # Perform the tests 
 for p_idx in eachindex(p_reference)
     p = p_reference[p_idx]
-    ll_polynomial = FEMtastic.Polynomials.LobattoLegendre(p)
+    ll_polynomial = Mantis.Polynomials.LobattoLegendre(p)
 
     # Test that nodes are generate as expected
     @test ll_polynomial.nodes ≈ ll_nodes_reference[p_idx] atol = 1e-12
 
     # Test if polynomial basis evaluation at nodes gives an identity matrix
-    @test FEMtastic.Polynomials.evaluate(ll_polynomial, ll_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
+    @test Mantis.Polynomials.evaluate(ll_polynomial, ll_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
 
     # Test if polynomial basis evaluation at evenly spaces nodes gives expected results
-    @test FEMtastic.Polynomials.evaluate(ll_polynomial, [range(-1.0, 1.0, length=11)...]) ≈ ll_evaluation[p_idx] atol = 1e-11
+    @test Mantis.Polynomials.evaluate(ll_polynomial, [range(-1.0, 1.0, length=11)...]) ≈ ll_evaluation[p_idx] atol = 1e-11
 end
 
 # ---------------------------------------------------------------------------------------
@@ -210,16 +210,16 @@ gl_evaluation = [
 # Test nodes
 for p_idx in eachindex(p_reference)
     p = p_reference[p_idx]
-    gl_polynomial = FEMtastic.Polynomials.GaussLegendre(p)
+    gl_polynomial = Mantis.Polynomials.GaussLegendre(p)
 
     # Test that nodes are generate as expected
     @test gl_polynomial.nodes ≈ gl_nodes_reference[p_idx] atol = 1e-12
 
     # Test if polynomial basis evaluation at nodes gives an identity matrix
-    @test FEMtastic.Polynomials.evaluate(gl_polynomial, gl_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
+    @test Mantis.Polynomials.evaluate(gl_polynomial, gl_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
 
     # Test if polynomial basis evaluation at evenly spaces nodes gives expected results
-    @test FEMtastic.Polynomials.evaluate(gl_polynomial, [range(-1.0, 1.0, length=11)...]) ≈ gl_evaluation[p_idx] atol = 1e-11
+    @test Mantis.Polynomials.evaluate(gl_polynomial, [range(-1.0, 1.0, length=11)...]) ≈ gl_evaluation[p_idx] atol = 1e-11
 end
 # ---------------------------------------------------------------------------------------
 

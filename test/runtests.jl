@@ -1,7 +1,7 @@
-module FEMtasticTests
+module MantisTests
 
 using Test
 
-@time @testset "Polynomials" begin include("Polynomials/runtests.jl") end
+@testset "Polynomials" begin include("Polynomials/runtests.jl") end
 
 end
