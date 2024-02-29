@@ -17,7 +17,7 @@ abstract type AbstractPolynomials end
 
 
 
-include("NodalPolynomials.jl")
+include("LagrangePolynomials.jl")
 include("BernsteinPolynomial.jl")
 
 

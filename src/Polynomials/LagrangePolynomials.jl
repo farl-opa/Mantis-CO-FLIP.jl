@@ -4,8 +4,6 @@ import PolynomialBases
 abstract type AbstractLagrangePolynomials <: AbstractPolynomials end
 
 
-
-
 struct LobattoLegendre <: AbstractLagrangePolynomials
     p::Int  # Polynomial degree
     nodes::Vector{Float64}  # Polynomial grid nodes, there are p+1 nodes
@@ -33,7 +31,7 @@ end
 
 
 """
-    evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})
+    evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})::Array{Float64}
 
 Evaluate all `polynomials` at `ξ`.
 
@@ -45,6 +43,6 @@ package.
 - `polynomials::AbstractLagrangePolynomials`: polynomials to evaluate.
 - `ξ::Vector{Float64}`: location to evaluate the polynomials at.
 """
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})::Matrix{Float64}
+function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})::Array{Float64}
     return PolynomialBases.interpolation_matrix(ξ, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
 end

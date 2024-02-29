@@ -1,4 +1,4 @@
-module NodalPolynomialsTests
+module LagrangePolynomialsTests
 
 import Mantis
 
