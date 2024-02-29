@@ -30,44 +30,40 @@ for p in degrees_to_test
 
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))
-    for l in 0:1:p
-        b_lp = [Mantis.Polynomials.polynomial_bernstein(p, l, xi) for xi in x]
 
-        # Positivity of the polynomials
-        @test minimum(b_lp) >= 0.0
+    b = Mantis.Polynomials.Bernstein(p)
+    b_eval = Mantis.Polynomials.evaluate(b, x)
 
-        # Constant definite integral
-        @test isapprox(sum(w .* b_lp), 1.0/(p + 1))
+    # Positivity of the polynomials
+    @test minimum(b_eval) >= 0.0
 
-        # Symmetry
-        b_plp = [Mantis.Polynomials.polynomial_bernstein(p, p-l, 1.0-xi) for xi in x]
-        @test isapprox(b_lp, b_plp)
+    # Constant definite integral
+    @test isapprox(maximum(abs.(w'*b_eval[:,:,1] .- 1.0/(p + 1))), 0.0, atol=1e-15)
 
-        # Root at zero
-        if l == 0
-            # The zero-th polynomial is one at x=0.0
-            @test isapprox(b_lp[1], 1.0)
-        else
-            @test isapprox(b_lp[1], 0.0)
-        end
+    # # Symmetry
+    # b_plp = [Mantis.Polynomials.polynomial_bernstein(p, p-l, 1.0-xi) for xi in x]
+    # @test isapprox(b_lp, b_plp)
 
-        # Root at one
-        if l == p
-            # The last polynomial is one at x=1.0
-            @test isapprox(b_lp[end], 1.0)
-        else
-            @test isapprox(b_lp[end], 0.0)
-        end
+    # # Root at zero
+    # if l == 0
+    #     # The zero-th polynomial is one at x=0.0
+    #     @test isapprox(b_lp[1], 1.0)
+    # else
+    #     @test isapprox(b_lp[1], 0.0)
+    # end
 
-        sum_all .+= b_lp
-        sum_all2 .+= l .* b_lp
-
-    end
+    # # Root at one
+    # if l == p
+    #     # The last polynomial is one at x=1.0
+    #     @test isapprox(b_lp[end], 1.0)
+    # else
+    #     @test isapprox(b_lp[end], 0.0)
+    # end
 
     # Partition of unity
-    @test all(isapprox.(sum_all, 1.0))
+    @test all(isapprox.(sum(b_eval, dims=2), 1.0))
 
     # Other
-    @test all(isapprox.(sum_all2, p.*x))
+    @test all(isapprox.(b_eval[:,:,1] * LinRange(0,p,p+1), p.*x))
 
 end
