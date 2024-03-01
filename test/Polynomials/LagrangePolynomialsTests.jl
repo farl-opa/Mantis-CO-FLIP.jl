@@ -15,6 +15,11 @@ ll_nodes_reference = [[-1.0, 1.0],  # p = 1
                       [-1.0, -0.7650553239294646, -0.2852315164806451, 0.2852315164806451, 0.7650553239294646, 1.0], # p = 5
                       [-1.0, -0.982572296604548, -0.9419762969597455, -0.8792947553235905, -0.7960019260777124, -0.6940510260622232, -0.5758319602618307, -0.4441157832790021, -0.3019898565087649, -0.15278551580218547, 0.0, 0.15278551580218547, 0.3019898565087649, 0.4441157832790021, 0.5758319602618307, 0.6940510260622232, 0.7960019260777124, 0.8792947553235905, 0.9419762969597455, 0.982572296604548, 1.0]  # p = 20
                      ]
+# Convert to ξ ∈ [0, 1] from ξ ∈ [-1, 1]
+for nodes in ll_nodes_reference
+  @. nodes = (nodes + 1.0)/2.0
+end
+
 ll_evaluation = [
                   # p = 1
                   [
@@ -111,7 +116,7 @@ for p_idx in eachindex(p_reference)
     @test Mantis.Polynomials.evaluate(ll_polynomial, ll_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
 
     # Test if polynomial basis evaluation at evenly spaces nodes gives expected results
-    @test Mantis.Polynomials.evaluate(ll_polynomial, [range(-1.0, 1.0, length=11)...]) ≈ ll_evaluation[p_idx] atol = 1e-11
+    @test Mantis.Polynomials.evaluate(ll_polynomial, [range(0.0, 1.0, length=11)...]) ≈ ll_evaluation[p_idx] atol = 1e-11
 end
 
 # ---------------------------------------------------------------------------------------
@@ -125,6 +130,11 @@ gl_nodes_reference = [[-0.5773502691896258, 0.5773502691896258],  # p = 1
                       [-0.932469514203152, -0.6612093864662645, -0.2386191860831969, 0.2386191860831969, 0.6612093864662645, 0.932469514203152], # p = 5
                       [-0.9937521706203895, -0.9672268385663063, -0.9200993341504008, -0.8533633645833173, -0.7684399634756779, -0.6671388041974123, -0.5516188358872198, -0.4243421202074388, -0.2880213168024011, -0.1455618541608951, 0.0, 0.1455618541608951, 0.2880213168024011, 0.4243421202074388, 0.5516188358872198, 0.6671388041974123, 0.7684399634756779, 0.8533633645833173, 0.9200993341504008, 0.9672268385663063, 0.9937521706203895]  # p = 20
                      ]
+# Convert to ξ ∈ [0, 1] from ξ ∈ [-1, 1]
+for nodes in gl_nodes_reference
+  @. nodes = (nodes + 1.0)/2.0
+end
+
 gl_evaluation = [
                   [
                     1.366025403784  -0.366025403784;
@@ -219,7 +229,7 @@ for p_idx in eachindex(p_reference)
     @test Mantis.Polynomials.evaluate(gl_polynomial, gl_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
 
     # Test if polynomial basis evaluation at evenly spaces nodes gives expected results
-    @test Mantis.Polynomials.evaluate(gl_polynomial, [range(-1.0, 1.0, length=11)...]) ≈ gl_evaluation[p_idx] atol = 1e-11
+    @test Mantis.Polynomials.evaluate(gl_polynomial, [range(0.0, 1.0, length=11)...]) ≈ gl_evaluation[p_idx] atol = 1e-11
 end
 # ---------------------------------------------------------------------------------------
 
