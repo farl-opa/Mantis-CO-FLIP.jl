@@ -4,6 +4,7 @@ authors = ["Diogo Costa Cabanas <d.costacabanas@tudelft.nl>", "Joey Dekker <j.de
 version = "0.1.0"
 
 [deps]
+ArgCheck = "dce04be8-c92d-5529-be00-80e4d2c0e197"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MeshCore = "43a99bba-f459-4d0e-8139-f3df11d847d4"
