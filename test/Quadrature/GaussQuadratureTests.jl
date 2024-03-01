@@ -8,7 +8,7 @@ using Test
 
 # Perform the tests 
 for p in range(2, 20)
-  ξ, w = Mantis.Quadrature.GaussLobatto(p)
+  ξ, w = Mantis.Quadrature.gauss_lobatto(p)
 
   # Test that sum of weights is one
   @test sum(w) ≈ 1.0 atol = 1e-12
@@ -23,7 +23,7 @@ end
 
 # Perform the tests 
 for p in range(1, 20)
-  ξ, w = Mantis.Quadrature.GaussLegendre(p)
+  ξ, w = Mantis.Quadrature.gauss_legendre(p)
 
   # Test that sum of weights is one
   @test sum(w) ≈ 1.0 atol = 1e-12
