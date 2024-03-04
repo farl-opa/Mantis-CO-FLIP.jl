@@ -21,9 +21,11 @@ import FastGaussQuadrature
 @doc raw"""
     gauss_lobatto(p::Integer) -> ξ, w  # nodes ∈ [0, 1], weights
 
-Return nodes `ξ` and weights `w` of [Gauss-Lobatto quadrature](https://mathworld.wolfram.com/LobattoQuadrature.html).
+Return nodes `ξ` and weights `w` of 
+[Gauss-Lobatto quadrature](https://mathworld.wolfram.com/LobattoQuadrature.html).
 
-Note that here the quadrature is valid for the interval ξ ∈ [0, 1], instead of ξ ∈ [-1, 1] as usual.
+Note that here the quadrature is valid for the interval ξ ∈ [0, 1], 
+instead of ξ ∈ [-1, 1] as usual.
 
 ```math
 \int_{0}^{1} f(x) dx \approx \sum_{i=1}^{p} w_i f(x_i)
@@ -39,9 +41,11 @@ end
 @doc raw"""
     gauss_legendre(p::Integer) -> ξ, w  # nodes ∈ [0, 1], weights
 
-Return nodes `ξ` and weights `w` of [Gauss-Legendre quadrature](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature).
+Return nodes `ξ` and weights `w` of 
+[Gauss-Legendre quadrature](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature).
 
-Note that here the quadrature is valid for the interval ξ ∈ [0, 1], instead of ξ ∈ [-1, 1] as usual.
+Note that here the quadrature is valid for the interval ξ ∈ [0, 1], 
+instead of ξ ∈ [-1, 1] as usual.
 
 ```math
 \int_{0}^{1} f(x) dx \approx \sum_{i=1}^{p} w_i f(x_i)

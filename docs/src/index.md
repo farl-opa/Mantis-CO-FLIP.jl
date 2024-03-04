@@ -5,7 +5,8 @@ Welcome to the documentation for `MANTIS.jl`, a package for high-order
 structure-preserving finite element methods. This package is designed 
 around structure-preserving/mimetic methods. It has extensive support for
 basis functions; 'standard' mimetic finite elements, multi-patch splines, and
-hierarchical splines.
+hierarchical splines. It is free and open source 
+([MIT license](https://github.com/MantisFEM/Mantis.jl/blob/main/LICENSE)).
 
 !!! note "Note"
     This is just a test!
