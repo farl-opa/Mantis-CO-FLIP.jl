@@ -9,6 +9,11 @@ on parts of the code that are not designed for public access.
     and that may change without warning. For the public documentation, see the
     [MANTIS.jl Documentation](@ref)
 
+!!! note "Suggestion"
+    I would suggest that the developer documentation has the same 
+    structure as the source code, while the user docs can have a 
+    different structure.
+
 
 ## All functions and stuff from Mantis.Polynomials
 ```@autodocs

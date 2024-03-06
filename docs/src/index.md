@@ -20,8 +20,10 @@ Self-hype with footnote[^myFootNote1].
 !!! danger "Danger Zone"
     Kenny? Is that you?
 
+## Contents
 
 ```@contents
+Depth = 2
 ```
 
 ## Functions

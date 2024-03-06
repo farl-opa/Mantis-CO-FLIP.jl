@@ -2,12 +2,13 @@ using Documenter
 using Mantis
 
 Manual = [
-
+    "Manual/InstallGuide.md",
 ]
 
 Tutorials = [
-    "Documents" => [
+    "Documentation" => [
         "Tutorials/CreatingDocs.md",
+        "Tutorials/CreatingDocsPage.md",
     ],
     "Running MANTIS" => [
         "Tutorials/Test.md",
@@ -15,7 +16,7 @@ Tutorials = [
 ]
 
 DevelDocs = [
-    "DevelDocs/main.md",
+    "DevelDocs/MainPageDevelDocs.md",
     "Documents" => [
         "DevelDocs/Documentation.md",
     ],
