@@ -1,7 +1,7 @@
 """
-Tests for the Bezier extraction. These tests are based on the 
-standard properties of Bezier curves. See 
-https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Properties.
+Tests for the B-Spline bases. These tests are based on the 
+standard properties of the B-Spline basses functions. See 
+https://en.wikipedia.org/wiki/B-spline#Properties.
 """
 
 import Mantis
@@ -27,7 +27,12 @@ for p in degrees_to_test
     for k in -1:p-1
         # Extract the coefficients
         E = Mantis.ExtractionCoefficients.bezier_extraction([0.0, 1.0], n_els, p, k)
-        @test all(E .>= 0.0)
-        @test E[1] == 1.0 && E[end] == 1.0
+        for el in 1:n_els
+            # Evaluate basis functions on the element
+            N = Mantis.Bases.evalute(E, el, b_eval)
+            
+            # Test for partition for unity
+            @test all(sum(N, dims=2) .≈ 1.0)
+        end
     end
 end
