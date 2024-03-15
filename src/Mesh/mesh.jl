@@ -87,21 +87,18 @@ function get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
     return Element(NTuple{n,Interval}(Interval(patch.breakpoints[d][element_id[d]], patch.breakpoints[d][element_id[d]+1]) for d in 1:1:n))
 end
 
-
-
-
 n1 = 5
 n2 = 8
 n3 = 6
-n4 = 3
+#n4 = 3
 test_brk = collect(LinRange(0.0, 1.0, n1))
 test_brk2 = collect(LinRange(-0.25, 2.25, n2))
 test_brk3 = collect(LinRange(-1.0, 0.0, n3))
-test_brk4 = collect(LinRange(-10.0, -8.0, n4))
+#test_brk4 = collect(LinRange(-10.0, -8.0, n4))
 #test_patch = Patch(test_brk)
 #test_patch = Patch((test_brk, test_brk2))
-#test_patch = Patch((test_brk, test_brk2, test_brk3))
-test_patch = Patch((test_brk, test_brk2, test_brk3, test_brk4))
+test_patch = Patch((test_brk, test_brk2, test_brk3))
+#test_patch = Patch((test_brk, test_brk2, test_brk3, test_brk4))
 println("All breakpoints:")
 println(get_breakpoints(test_patch))
 println("Element IDs with the Element:")
@@ -113,5 +110,6 @@ end
 println("Size of the patch:")
 println(size(test_patch))
 
+BSpline(test_patch)
 
 end

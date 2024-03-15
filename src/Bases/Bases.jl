@@ -41,5 +41,7 @@ function evalute(E::Array{Float64,3}, el::Int, B::Array{Float64,3})::Matrix{Floa
     return N
 end
 
+patch = Patch
+BSpline()
 
 end
