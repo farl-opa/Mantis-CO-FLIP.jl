@@ -42,16 +42,32 @@ end
 Simple struct for an n-dimensional **structured** tensor-product patch.
 
 # Fields
-- `breakpoints::NTuple{n, Vector{Float64}}`: Breakpoints per dimension.
+- `breakpoints::NTuple{n, Vector{Float64}}`: Breakpoints per dimension. Should be strictly increasing.
 
 # Extended help
 
 # Implementation
 The patch is assumed to be a tensor-product patch of quadilaterals. This 
 is also reflected in the implementation.
+
+# Error behaviour
+The strictly increasing property of the breakpoints is checked. An 
+`ArgumentError` is raised if the breakpoints are not strictly increasing.
 """
 struct Patch{n}
     breakpoints::NTuple{n, Vector{Float64}}
+    function Patch(breakpoints::NTuple{n, Vector{Float64}}) where {n}
+        for d in 1:1:n
+            for i in eachindex(breakpoints[d])[begin:end-1]
+                if breakpoints[d][i] >= breakpoints[d][i+1]
+                    msg1 = "Breakpoints should be strictly increasing, "
+                    msg2 = "but the breakpoints in dimension $d are not."
+                    throw(ArgumentError(msg1*msg2))
+                end
+            end
+        end
+        new{n}(breakpoints)        
+    end
 end
 
 # 1D convenience constructor
@@ -66,7 +82,18 @@ function get_intervals(element::Element{n}) where {n}
     return element.intervals
 end
 
-function size(element::Element{n}) where {n}
+"""
+    size(element::Element{n}) where {n}
+
+Returns the number of Intervals in an Element. This is the same as the dimension of the Element.
+
+# Arguments
+- `element::Element{n}`: Element of which to get the size.
+
+# Returns
+- `n::Int`: Number of intervals in the element.
+"""
+function Base.size(element::Element{n}) where {n}
     return n 
 end
 
@@ -75,7 +102,21 @@ function get_breakpoints(patch::Patch{n}) where {n}
     return patch.breakpoints
 end
 
-function size(patch::Patch{n}) where {n}
+"""
+    size(patch::Patch{n}) where {n}
+
+Returns the number of elements in a Patch.
+
+Redefinition of Base.size for a Patch. This ensure that one can call 
+size(patch) to get the size of the patch.
+
+# Arguments
+- `patch::Patch{n}`: Patch of which to get the size.
+
+# Returns
+- `::NTuple{n, Int}`: Tuple of the number of elements per dimension.
+"""
+function Base.size(patch::Patch{n}) where {n}
     return NTuple{n, Int}(length(get_breakpoints(patch)[i]) - 1 for i = 1:1:n)   
 end
 
@@ -87,29 +128,5 @@ function get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
     return Element(NTuple{n,Interval}(Interval(patch.breakpoints[d][element_id[d]], patch.breakpoints[d][element_id[d]+1]) for d in 1:1:n))
 end
 
-n1 = 5
-n2 = 8
-n3 = 6
-#n4 = 3
-test_brk = collect(LinRange(0.0, 1.0, n1))
-test_brk2 = collect(LinRange(-0.25, 2.25, n2))
-test_brk3 = collect(LinRange(-1.0, 0.0, n3))
-#test_brk4 = collect(LinRange(-10.0, -8.0, n4))
-#test_patch = Patch(test_brk)
-#test_patch = Patch((test_brk, test_brk2))
-test_patch = Patch((test_brk, test_brk2, test_brk3))
-#test_patch = Patch((test_brk, test_brk2, test_brk3, test_brk4))
-println("All breakpoints:")
-println(get_breakpoints(test_patch))
-println("Element IDs with the Element:")
-println("Size of the patch:")
-for elem_id in get_element_ids(test_patch)
-    elem = get_element(test_patch, elem_id)
-    println(elem_id, " ", elem, " ", size(elem))
-end
-println("Size of the patch:")
-println(size(test_patch))
-
-BSpline(test_patch)
 
 end
