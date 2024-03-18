@@ -31,21 +31,25 @@ end
 
 
 """
-    evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})::Array{Float64}
+    evaluate(polynomial::AbstractLagrangePolynomial, ξ::Vector{Float64})::Array{Float64}
 
-Evaluate all `polynomials` at `ξ`.
-
-All polynomials that are subtypes of the `AbstractLagrangePolynomials`-
-type can be evaluated using the same method from the `PolynomialBases`
-package.
+Evaluate the `polynomial` at `ξ`.
 
 # Arguments
 - `polynomials::AbstractLagrangePolynomials`: polynomials to evaluate.
 - `ξ::Vector{Float64}`: location to evaluate the polynomials at.
+
+# Extended help
+
+# Implementation
+Uses the `PolynomialBases` package to evaluate the `polynomial`. This 
+uses the attribute `_core_polynomials` in the `polynomial` struct. This 
+allows every Lagrange polynomial to be evaluated by calling the same 
+method from `PolynomialBases`.
 """
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})::Array{Float64}
+function evaluate(polynomial::AbstractLagrangePolynomials, ξ::Vector{Float64})::Array{Float64}
     @. ξ = 2.0*ξ - 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
-    return PolynomialBases.interpolation_matrix(ξ, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
+    return PolynomialBases.interpolation_matrix(ξ, polynomial._core_polynomials.nodes, polynomial._core_polynomials.baryweights)
 end
 
 
