@@ -1,39 +1,4 @@
-# Mantis
-
-[![Build Status](https://github.com/MantisFEM/Mantis.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MantisFEM/Mantis.jl/actions/workflows/CI.yml?query=branch%3Amain)
-
-
-Welcome to `MANTIS.jl`, a package for high-order structure-preserving 
-finite element methods. This package is designed around 
-structure-preserving/mimetic methods. It has extensive support for basis 
-functions; 'standard' mimetic finite elements, multi-patch splines, and
-hierarchical splines.
-
-
-## Contents
-A brief description of what you can find in the `README.md`.
-- A brief description of the Authors.
-- A step-by-step guide on how to build and view the `Mantis` docs.
-- An overview of the source code organisation.
-
-
-## Authors
-The `Mantis` package was created by
-- Diogo Costa Cabanas,
-- Joey Dekker,
-- Deepesh Toshniwal,
-- Artur Palha,
-
-from TU Delft's Institute of Applied Mathematics (DIAM).
-
-## Related publications.
-One can hope.
-
-
-## How to build the MANTIS docs.
-As the documentation is not (yet) hosted online, you will have to build 
-and view the documentation locally. How to do this is described here.
-
+# How to build the MANTIS docs.
 The main file structure of the the docs has now been created, so you 
 only have to build the documentation. Fortunately, the heavy lifting 
 will be done by `Julia` and `Python`.
@@ -75,14 +40,3 @@ To create the docs, follow these steps:
     The `docs/build/`-folder should **never** be gitted. (See also the 
     warning in the [Documenter Docs](https://documenter.juliadocs.org/stable/man/guide/)). 
     The `.gitignore`-file is already setup to prevent this.
-
-
-## Source Code Organization
-
-The Mantis source code is organized as follows:
-
-| Directory         | Contents                                         |
-| -                 | -                                                |
-| `docs/`           | source for the user and developer manuals        |
-| `src/`            | source for the all Mantis code                   |
-| `test/`           | test suites                                      |
