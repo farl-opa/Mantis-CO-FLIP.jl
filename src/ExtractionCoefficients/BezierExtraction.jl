@@ -2,13 +2,15 @@
     create_identity(nel::Int, d::Int)::Array{Float64, 3}
 
 Creates a `(d, d, n)` array where each slice along the first dimension is a `(d, d)` identity matrix.
+
 # Arguments 
 - `n::Int`: number of identity matrices in the array.
 - `d::Int`: size of the identity matrices in the array.
+
 # Returns
 - `Id::Array{Float64, 3}`: array of identity matrices.
 """
-function create_identity(n::Int, d::Int)::Array{Float64, 3}
+function create_identity(n::Int, d::Int)
     Id = zeros((d,d,n))
     for i in 1:n
         for j in 1:d
@@ -17,21 +19,6 @@ function create_identity(n::Int, d::Int)::Array{Float64, 3}
     end
 
     return Id
-end
-
-
-"""
-    check_unique(v::Vector{Int})
-
-Checks whether all elements in vector `v` are the same.
-# Arguments 
-- `v::Vector{Int}`: vector to check.
-# Returns
-- `check::Bool`: true if and only if all values are equal.
-"""
-function check_unique(v::Vector{Int})
-    check = length(unique(v)) == 1
-    return check
 end
 
 """
@@ -44,7 +31,7 @@ Counts the number of elements `n_els` in a knot vector `knt`.
 # Returns
 - `n_els::Int`: number of elements in the knot vector.
 """
-function count_knot_elements(knt::Vector{Float64})::Int
+function count_knot_elements(knt::Vector{Float64})
     n_els = 0
     for i = 1:length(knt)-1
         if  knt[i+1] - knt[i] != 0.0
@@ -58,19 +45,24 @@ end
 """
     uniform_knot_vector(endpoints::Vector{Float64}, n::Int, p::Int, k::Int)Tuple{Vector{Float64}, Int64}
 
-Creates a uniform knot vector corresponding to `n(p+1)-(n-1)(k+1)` B-splines basis functions of polynomial degree `p` and continuity `k` over `n` equally spaced elements in the interval `[endpoints[1], endpoints[2]]`. See https://en.wikipedia.org/wiki/B-spline#Definition.
+Creates a uniform knot vector corresponding to `n(p+1)-(n-1)(k+1)` 
+B-splines basis functions of polynomial degree `p` and continuity `k` over `n` 
+equally spaced elements in the interval `[endpoints[1], endpoints[2]]`. 
+See https://en.wikipedia.org/wiki/B-spline#Definition.
+
 # Arguments
 - `endpoints::Vector{Float64}`: the first and last value of the knot vector.
 - `n::Int`: number of elements.
 - `p::Int`: degree of the polynomial (``p \\geq 0``).
 - `k::Int`: continuity at the interfaces between elements. (`` -1 \\leq k \\leq p``).
+
 # Returns 
 - `knt::Vector{Float64}`: knot vector.
 """
 function uniform_knot_vector(endpoints::Vector{Float64}, n::Int, p::Int, k::Int)::Vector{Float64}
     mesh = range(endpoints[1], endpoints[2], n+1)
     n_knt = 2*(p+1)+(p-k)*(n-1)
-    knt = ones(n_knt) .* endpoints[1]
+    knt = fill(endpoints[1], n_knt)
 
     curr_idx = p+1
     for i = 2:n
@@ -85,7 +77,10 @@ end
 """
     bezier_extraction(endpoints::Vector{Float64}, n::Int, p::Int, k::Int)::Array{Float64, 3}
 
-Computes the extraction coefficients of the B-Spline basis functions defined between `[endpoints[1], endpoints[2]]`, subdivided into `n` elements, with piece-wise polynomial degree `p` and C^`k`continuity at the interfaces between elements.\n 
+Computes the extraction coefficients of the B-Spline basis functions defined 
+between `[endpoints[1], endpoints[2]]`, subdivided into `n` elements, 
+with piece-wise polynomial degree `p` and C^`k`continuity at the interfaces between elements.
+
 `E[:, j, el]` contains the coefficients of the linear combination of reference bernstein polynomials determining the `j`-th basis function on element `el`.
 
 # Arguments
@@ -93,10 +88,11 @@ Computes the extraction coefficients of the B-Spline basis functions defined bet
 - `n::Int`: number of elements.
 - `p::Int`: piece-wise degree of the basis functions (``p \\geq 0``).
 - `k::Int`: continuity of the basis functions at the interfaces (``k < p``).
+
 # Returns
 - `E::Array{Float64, 3}`: extraction coefficients of the b-splines basis functions on every element.
 """
-function bezier_extraction(endpoints::Vector{Float64}, nel::Int, p::Int, k::Int)::Array{Float64, 3}
+function bezier_extraction(endpoints::Vector{Float64}, nel::Int, p::Int, k::Int)
     knt = uniform_knot_vector(endpoints, nel, p, k)
     n_knt = length(knt)
 
@@ -164,10 +160,14 @@ Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis 
 - `E::Array{Float64, 3}`: extraction coefficients of the b-splines basis functions on every element in dimension `d`.
 """
 function bezier_extraction(bspline::FunctionSpaces.BSplineSpace{n,k}, d) where {n, k}
-    if check_unique(bspline.polynomial_degree[d]) && check_unique(bspline.regularity[d])
-        return bezier_extraction([bspline.patch.breakpoints[d][1], bspline.patch.breakpoints[d][end]], size(bspline.patch)[d], bspline.polynomial_degree[d][1], bspline.regularity[d][1])
+    if allunique(bspline.polynomial_degree[d]) && allunique(bspline.regularity[d])
+        return bezier_extraction([bspline.patch.breakpoints[d][1], 
+                                  bspline.patch.breakpoints[d][end]], 
+                                  size(bspline.patch)[d], 
+                                  bspline.polynomial_degree[d][1], 
+                                  bspline.regularity[d][1])
     else
-        nothing #Add more general algorithm here.
+        error("Not implemented yet...") #Add more general algorithm here.
     end
 end
 
