@@ -26,7 +26,7 @@ for p in degrees_to_test
     N = zeros(nx, p+1)
     for k in -1:p-1
         # Extract the coefficients
-        E = Mantis.ExtractionCoefficients.bezier_extraction([0.0, 1.0], n_els, p, k)
+        E = Mantis.ExtractionCoefficients.extract_bezier_representation([0.0, 1.0], n_els, p, k)
         @test all(E .>= 0.0)
         @test E[1] == 1.0 && E[end] == 1.0
     end

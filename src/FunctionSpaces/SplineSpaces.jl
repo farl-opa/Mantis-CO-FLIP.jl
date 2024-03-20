@@ -1,4 +1,4 @@
-struct BSplineSpace{n, k}<:FunctionSpace{n, k} 
+struct BSplineSpace{n, k}<:FunctionSpace{n, k}
     patch::Mesh.Patch{n}
     polynomial_degree::NTuple{n, Vector{Int}}
     regularity::NTuple{n, Vector{Int}}
