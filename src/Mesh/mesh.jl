@@ -9,6 +9,8 @@ without warning**, even those not preceded with an underscore.
 """
 module Mesh
 
+export Patch
+
 
 """
     struct Interval

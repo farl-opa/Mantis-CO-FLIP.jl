@@ -163,7 +163,7 @@ Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis 
 # Returns
 - `E::Array{Float64, 3}`: extraction coefficients of the b-splines basis functions on every element in dimension `d`.
 """
-function bezier_extraction(bspline::Main.Mantis.FunctionSpaces.BSplineSpace{n,k}, d) where {n, k}
+function bezier_extraction(bspline::FunctionSpaces.BSplineSpace{n,k}, d) where {n, k}
     if check_unique(bspline.polynomial_degree[d]) && check_unique(bspline.regularity[d])
         return bezier_extraction([bspline.patch.breakpoints[d][1], bspline.patch.breakpoints[d][end]], size(bspline.patch)[d], bspline.polynomial_degree[d][1], bspline.regularity[d][1])
     else
@@ -182,7 +182,7 @@ Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis 
 # Returns
 - `E::NTuple{n, Array{Float64, 3}`: extraction coefficients of the b-splines basis functions on every element across all dimensions.
 """
-function bezier_extraction(bspline::Main.Mantis.FunctionSpaces.BSplineSpace{n,k}) where {n,k}
+function bezier_extraction(bspline::FunctionSpaces.BSplineSpace{n,k}) where {n,k}
     return NTuple{n, Array{Float64, 3}}(bezier_extraction(bspline,d) for d in 1:1:n)
 end
 

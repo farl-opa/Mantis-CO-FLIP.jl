@@ -1,8 +1,8 @@
 struct BSplineSpace{n, k}<:FunctionSpace{n, k} 
-    patch::Main.Mantis.Mesh.Patch{n}
+    patch::Mesh.Patch{n}
     polynomial_degree::NTuple{n, Vector{Int}}
     regularity::NTuple{n, Vector{Int}}
-    function BSplineSpace(patch::Main.Mantis.Mesh.Patch{n}, polynomial_degree::NTuple{n, Vector{Int}}, regularity::NTuple{n, Vector{Int}}, k::Int) where {n}
+    function BSplineSpace(patch::Mesh.Patch{n}, polynomial_degree::NTuple{n, Vector{Int}}, regularity::NTuple{n, Vector{Int}}, k::Int) where {n}
         for d in 1:1:n, i in eachindex(polynomial_degree[d])
             if size(patch)[d] != length(polynomial_degree[d])
                 msg1 = "Number of elements and given degrees are not the same."

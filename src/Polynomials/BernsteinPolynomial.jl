@@ -84,7 +84,7 @@ polynomial.
 """
 function evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)::Array{Float64}
     # degree
-    p = polynomials.p
+    p = polynomial.p
 
     # arg checks
     if p < 0

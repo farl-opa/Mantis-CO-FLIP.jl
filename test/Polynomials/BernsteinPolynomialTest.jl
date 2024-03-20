@@ -22,7 +22,7 @@ for p in degrees_to_test
     # the standard quadrature rule is defined on [-1, 1], while we need 
     # it on [0, 1].
     q = max(2, ceil(Int, (p+1)/2))
-    x, w = Mantis.Quadrature.GaussLegendre(q)
+    x, w = Mantis.Quadrature.gauss_legendre(q)
     
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))

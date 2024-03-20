@@ -6,6 +6,8 @@ The exported names are:
 
 module ExtractionCoefficients
 
+import .. FunctionSpaces
+
 include("BezierExtraction.jl")
 
 end
