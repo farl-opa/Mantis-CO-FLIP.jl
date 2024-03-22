@@ -9,8 +9,6 @@ without warning**, even those not preceded with an underscore.
 """
 module Mesh
 
-export Patch
-
 
 """
     struct Interval
@@ -39,9 +37,9 @@ struct Element{n}
 end
 
 """
-    struct Patch{n}
+    Patch{n}
 
-Simple struct for an n-dimensional **structured** tensor-product patch.
+Is an n-dimensional **structured** tensor-product patch.
 
 # Fields
 - `breakpoints::NTuple{n, Vector{Float64}}`: Breakpoints per dimension. Should be strictly increasing.
@@ -57,7 +55,16 @@ The strictly increasing property of the breakpoints is checked. An
 `ArgumentError` is raised if the breakpoints are not strictly increasing.
 """
 struct Patch{n}
+
+    # Field(s)
+
+    # Only the 1D breakpoints are stored, as a tensor-product structure 
+    # is assumed.
     breakpoints::NTuple{n, Vector{Float64}}
+
+    # Inner constructor(s)
+    # The inner constructor only tests if the breakpoints in each 
+    # dimension are strictly increasing.
     function Patch(breakpoints::NTuple{n, Vector{Float64}}) where {n}
         for d in 1:1:n
             for i in eachindex(breakpoints[d])[begin:end-1]
@@ -80,26 +87,34 @@ end
 
 
 # Getters (and setters) for an Element
+"""
+    get_intervals(element::Element{n}) where {n}
+
+Returns the `Intervals` per dimension.
+
+# Arguments
+- `element::Element{n}`: Element of which to get the Intervals.
+
+# Returns
+- `::NTuple{n, Interval}`: Interval per dimension.
+"""
 function get_intervals(element::Element{n}) where {n}
     return element.intervals
 end
 
-"""
-    size(element::Element{n}) where {n}
-
-Returns the number of Intervals in an Element. This is the same as the dimension of the Element.
-
-# Arguments
-- `element::Element{n}`: Element of which to get the size.
-
-# Returns
-- `n::Int`: Number of intervals in the element.
-"""
-function Base.size(element::Element{n}) where {n}
-    return n 
-end
 
 # Getters (and setters) for a Patch
+"""
+    get_breakpoints(patch::Patch{n}) where {n}
+
+Returns the breakpoints per dimension.
+
+# Arguments
+- `patch::Patch{n}`: Patch of which to get the breakpoints.
+
+# Returns
+- `::NTuple{n, Vector{Float64}}`: Breakpoints per dimension.
+"""
 function get_breakpoints(patch::Patch{n}) where {n}
     return patch.breakpoints
 end
@@ -107,10 +122,10 @@ end
 """
     size(patch::Patch{n}) where {n}
 
-Returns the number of elements in a Patch.
+Returns the number of elements in the `patch`.
 
-Redefinition of Base.size for a Patch. This ensure that one can call 
-size(patch) to get the size of the patch.
+Redefinition of `Base.size` for a `Patch`. This ensures that one can 
+call `size(patch)` to get the size of the patch.
 
 # Arguments
 - `patch::Patch{n}`: Patch of which to get the size.
@@ -122,10 +137,39 @@ function Base.size(patch::Patch{n}) where {n}
     return NTuple{n, Int}(length(get_breakpoints(patch)[i]) - 1 for i = 1:1:n)   
 end
 
+"""
+    get_element_ids(patch::Patch{n}) where {n}
+
+Returns an iterator of the valid element ids for this `patch`.
+
+The element ids are computed on-the-fly by the iterator and are neither 
+precomputed nor stored.
+
+# Arguments
+- `patch::Patch{n}`: Patch to get the element ids for.
+
+# Returns
+- `::Base.Iterators.ProductIterator{NTuple{n, StepRange{Int, Int}}}`: Iterator of NTuples of element ids.
+"""
 function get_element_ids(patch::Patch{n}) where {n}
     return Iterators.product(NTuple{n,StepRange{Int,Int}}(1:1:nei for nei in size(patch))...)
 end
 
+"""
+    get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
+
+Returns the `Element` that is referred to by `element_id`.
+
+Note that this function creates the `Element` on-the-fly, so it is 
+neither precomputed not stored.
+
+# Arguments
+- `patch::Patch{n}`: Patch on which to look.
+- `element_id::NTuple{n, Int}`: Element which is to be returned.
+
+# Returns
+- `::Element`: Element object containing the intervals per dimension.
+"""
 function get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
     return Element(NTuple{n,Interval}(Interval(patch.breakpoints[d][element_id[d]], patch.breakpoints[d][element_id[d]+1]) for d in 1:1:n))
 end

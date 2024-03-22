@@ -29,25 +29,56 @@ test_brk_wrong_order2 = [0.0, 0.0, 1.0]
 @test_throws ArgumentError Patch((test_brk_wrong_order, test_brk_wrong_order2))
 @test_throws ArgumentError Patch((test_brk, test_brk2, test_brk_wrong_order2))
 
-# Test if the size of a Patch or element are correctly computed. Note 
-# that these are redefinitions of Base.size so that one can simply call 
-# size() on either an Element or Patch.
+# Patch creation
+test_patch_1d = Patch(test_brk)
 test_patch = Patch((test_brk, test_brk2, test_brk3, test_brk4))
-@test size(test_patch) == (n1-1, n2-1, n3-1, n4-1)
-@test size(Mantis.Mesh.get_element(test_patch, (4,1,3,1))) == 4
 
-#test_patch = Patch(test_brk)
-#test_patch = Patch((test_brk, test_brk2))
-# test_patch = Mantis.Mesh.Patch((test_brk, test_brk2, test_brk3))
-# #test_patch = Patch((test_brk, test_brk2, test_brk3, test_brk4))
-# println("All breakpoints:")
-# println(get_breakpoints(test_patch))
-# println("Element IDs with the Element:")
-# println("Size of the patch:")
-# for elem_id in get_element_ids(test_patch)
-#     elem = get_element(test_patch, elem_id)
-#     println(elem_id, " ", elem, " ", size(elem))
-# end
-# println("Size of the patch:")
-# println(size(test_patch))
+# Tests for the breakpoints getter
+@test Mantis.Mesh.get_breakpoints(test_patch_1d) == (test_brk,)
+@test Mantis.Mesh.get_breakpoints(test_patch) == (test_brk, test_brk2, test_brk3, test_brk4)
+
+# Test if the size of a Patch is correctly computed. Note that these are 
+# redefinitions of Base.size so that one can simply call size() on a Patch.
+@test size(test_patch_1d) == (n1-1,)
+@test size(test_patch) == (n1-1, n2-1, n3-1, n4-1)
+
+# Test if the element ids are correctly created.
+check_ids = NTuple{4, Int}[]
+for i in 1:1:n4-1
+    for j in 1:1:n3-1
+        for k in 1:1:n2-1
+            for l in 1:1:n1-1
+                push!(check_ids, (l, k, j, i))
+            end
+        end
+    end
+end
+for (i, elem_id) in enumerate(Mantis.Mesh.get_element_ids(test_patch))
+    @test elem_id == check_ids[i]
+end
+
+# Tests for get_element. Note that the getters are the same for any 
+# dimension, so an extra test for the multi-d case simply checks the 
+# same function.
+for i in 1:1:n1-1
+    @test Mantis.Mesh.get_element(test_patch_1d, (i,)) == Mantis.Mesh.Element((Mantis.Mesh.Interval(test_brk[i], test_brk[i+1]),))
+end
+@test Mantis.Mesh.get_element(test_patch, (3,5,4,2)) == Mantis.Mesh.Element((Mantis.Mesh.Interval(test_brk[3], test_brk[4]),
+                                                                             Mantis.Mesh.Interval(test_brk2[5], test_brk2[6]), 
+                                                                             Mantis.Mesh.Interval(test_brk3[4], test_brk3[5]), 
+                                                                             Mantis.Mesh.Interval(test_brk4[2], test_brk4[3])))
+
+
+# Tests for get_intervals. Note that the getters are the same for any 
+# dimension, so an extra test for the multi-d case simply checks the 
+# same function.
+for i in 1:1:n1-1
+    elem = Mantis.Mesh.get_element(test_patch_1d, (i,))
+    @test Mantis.Mesh.get_intervals(elem) == (Mantis.Mesh.Interval(test_brk[i], test_brk[i+1]),)
+end
+elem = Mantis.Mesh.get_element(test_patch, (3,5,4,2))
+@test Mantis.Mesh.get_intervals(elem) == (Mantis.Mesh.Interval(test_brk[3], test_brk[4]),
+                                          Mantis.Mesh.Interval(test_brk2[5], test_brk2[6]), 
+                                          Mantis.Mesh.Interval(test_brk3[4], test_brk3[5]), 
+                                          Mantis.Mesh.Interval(test_brk4[2], test_brk4[3]))
 
