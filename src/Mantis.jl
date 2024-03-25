@@ -7,6 +7,5 @@ include("Mesh/mesh.jl")  # Creates Module Mesh
 include("Polynomials/Polynomials.jl")  # Creates Module Polynomials
 include("Quadrature/Quadrature.jl")  # Creates Module Quadrature
 include("FunctionSpaces/FunctionSpaces.jl")  # Creates Module FunctionSpaces
-include("ExtractionCoefficients/ExtractionCoefficients.jl")  # Creates Module ExtractionCoefficients
 
 end

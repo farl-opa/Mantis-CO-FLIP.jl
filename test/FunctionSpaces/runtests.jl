@@ -1,4 +1,4 @@
-module ExtractionCoefficientsTests
+module FunctionSpacesTests
 
 using Test
 

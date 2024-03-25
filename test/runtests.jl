@@ -5,6 +5,6 @@ using Test
 @testset "Mesh" begin include("Mesh/runtests.jl") end
 @testset "Polynomials" begin include("Polynomials/runtests.jl") end
 @testset "Quadrature" begin include("Quadrature/runtests.jl") end
-@testset "ExtractionCoefficients" begin include("ExtractionCoefficients/runtests.jl") end
+@testset "FunctionSpaces" begin include("FunctionSpaces/runtests.jl") end
 
 end; nothing
