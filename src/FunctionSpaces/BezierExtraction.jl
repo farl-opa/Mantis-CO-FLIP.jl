@@ -24,9 +24,9 @@ end
 """
     create_uniform_knot_vector(left_endpoint::Float64, right_endpoint::Float64, nel::Int, p::Int, k::Vector{Int})
 
-Creates a uniform knot vector corresponding to `nel(p+1)-(nel-1)(k+1)` 
-B-splines basis functions of polynomial degree `p` and continuity `k` over `nel` 
-equally spaced elements in the interval `[endpoints[1], endpoints[2]]`. 
+Creates a uniform knot vector corresponding to `nel*p - sum(k) + 1` 
+B-splines basis functions of polynomial degree `p` and continuity `k[i]` over `nel` 
+equally spaced elements in the interval between`left_endpoint` and `right_endpoint`. 
 See https://en.wikipedia.org/wiki/B-spline#Definition.
 
 # Arguments
@@ -34,7 +34,7 @@ See https://en.wikipedia.org/wiki/B-spline#Definition.
 - `right_endpoint::Float64`: last value of the knot vector.
 - `nel::Int`: number of elements.
 - `p::Int`: degree of the polynomial (``p \\geq 0``).
-- `k::Vector{Int}`: continuity at the interfaces between elements. (`` -1 \\leq k \\leq p``).
+- `k::Vector{Int}`: continuity at the interfaces between elements. (`` -1 \\leq k[i] \\leq p``).
 
 # Returns 
 - `::KnotVector`: uniform knot vector.

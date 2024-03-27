@@ -66,7 +66,7 @@ struct BSplineSpace{n, k}<:AbstractFunctionSpace{n, k}
             for i in 1:1:length(regularity[d])
                 if polynomial_degree[d] <= regularity[d][i]
                     msg1 = "Polynomial degree must be greater than regularity."
-                    msg2 = " In dimension $d,  the degree $polynomial_degree[d] and there is regularity $regularity[d][i]"
+                    msg2 = " In dimension $d,  the degree is $polynomial_degree[d] and there is regularity $regularity[d][i]"
                     throw(ArgumentError(msg1*msg2))
                 end
             end

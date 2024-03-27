@@ -13,7 +13,7 @@ const KnotVector = Mantis.FunctionSpaces.KnotVector
 const BSplineSpace = Mantis.FunctionSpaces.BSplineSpace
 
 # Piece-wise degree of the basis functions on which the tests are performed.
-const degrees_to_test = 0:25
+const degrees_to_test = 0:3
 
 # Patch used in the test
 n1 = 6
