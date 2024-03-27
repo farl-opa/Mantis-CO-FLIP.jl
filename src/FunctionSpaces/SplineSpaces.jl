@@ -106,6 +106,8 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
             end
         end
 
+        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
+
         supported_basis = zeros(Int, (length(breakpoints)-1, polynomial_degree+1))
         supported_basis[1,:] = 1:polynomial_degree+1
 
@@ -113,7 +115,6 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
             supported_basis[el,:] .= (@view supported_basis[el-1,:]) .+ knot_vector.multiplicity[el]
         end
         
-        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
         new(knot_vector, extract_bezier_representation(knot_vector), Polynomials.Bernstein(polynomial_degree), supported_basis)        
     end
 end
