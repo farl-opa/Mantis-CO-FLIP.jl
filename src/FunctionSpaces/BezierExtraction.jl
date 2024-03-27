@@ -22,37 +22,6 @@ function create_identity(ni::Int, d::Int)
 end
 
 """
-    create_uniform_knot_vector(left_endpoint::Float64, right_endpoint::Float64, nel::Int, p::Int, k::Vector{Int})
-
-Creates a uniform knot vector corresponding to `nel*p - sum(k) + 1` 
-B-splines basis functions of polynomial degree `p` and continuity `k[i]` over `nel` 
-equally spaced elements in the interval between`left_endpoint` and `right_endpoint`. 
-See https://en.wikipedia.org/wiki/B-spline#Definition.
-
-# Arguments
-- `left_endpoint::Float64`: first value of the knot vector.
-- `right_endpoint::Float64`: last value of the knot vector.
-- `nel::Int`: number of elements.
-- `p::Int`: degree of the polynomial (``p \\geq 0``).
-- `k::Vector{Int}`: continuity at the interfaces between elements. (`` -1 \\leq k[i] \\leq p``).
-
-# Returns 
-- `::KnotVector`: uniform knot vector.
-"""
-function create_uniform_knot_vector(left_endpoint::Float64, right_endpoint::Float64, nel::Int, p::Int, k::Vector{Int})
-    breakpoints = collect(range(left_endpoint, right_endpoint, nel+1))
-    multiplicity = ones(Int, length(breakpoints))
-
-    multiplicity[1] = p+1
-    multiplicity[end] = p+1
-    for i in eachindex(k)
-        multiplicity[i+1] = p - k[i]
-    end
-    
-    return KnotVector(breakpoints, multiplicity)
-end
-
-"""
     extract_bezier_representation(left_endpoint::Float64, right_endpoint::Float64, nel::Int, p::Int, k::Int)::Array{Float64, 3}
 
 Computes the extraction coefficients of the B-Spline basis functions defined 
@@ -92,23 +61,23 @@ by the knot vector `knot_vector` and polynomial degree `p`.
 # Returns
 - `E::Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
 """
-function extract_bezier_representation(knot_vector::KnotVector, p::Int)
+function extract_bezier_representation(knot_vector::KnotVector)
     # number of elements
     nel = length(knot_vector.breakpoints)-1
 
     # first extraction matrix
-    E = create_identity(nel, p+1)
+    E = create_identity(nel, knot_vector.polynomial_degree+1)
     # this is where knot-insertion coefficients are saved
     alphas = zeros(max(p - 1, 0))
 
     for el in 1:1:nel
         mult = knot_vector.multiplicity[el+1]
 
-        if mult < p
+        if mult < knot_vector.polynomial_degree
             numer = knot_vector.breakpoints[el+1] - knot_vector.breakpoints[el]
-            r = p - mult
+            r = knot_vector.polynomial_degree - mult
 
-            for j in p-1:-1:mult
+            for j in knot_vector.polynomial_degree-1:-1:mult
                 idx = el+1+floor(Int, j/mult)
 
                 if idx > nel+1
@@ -121,14 +90,14 @@ function extract_bezier_representation(knot_vector::KnotVector, p::Int)
 
             for j in 1:r
                 s = mult + j - 1
-                for k in p:-1:s+1
+                for k in knot_vector.polynomial_degree:-1:s+1
                     alpha = alphas[k-s]
                     E[k+1, :, el] .=  (@view E[k+1, :, el]).* alpha  .+  (@view E[k, :, el]) .* (1.0-alpha)
                 end
 
                 save = r - j + 1
                 if el < nel
-                    E[save, save:save+j, el+1] .= (@view E[p+1, p-j+1:p+1, el])
+                    E[save, save:save+j, el+1] .= (@view E[knot_vector.polynomial_degree+1, knot_vector.polynomial_degree-j+1:knot_vector.polynomial_degree+1, el])
                 end
             end
         end
@@ -149,25 +118,6 @@ Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis 
 # Returns
 - `E::Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
 """
-function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace{n}, d) where {n}
-        return extract_bezier_representation(bspline.patch.breakpoints[d][1], 
-                                  bspline.patch.breakpoints[d][end], 
-                                  size(bspline.patch)[d], 
-                                  bspline.polynomial_degree[d], 
-                                  bspline.regularity[d])
-end
-
-"""
-    extract_bezier_representation(bspline::BSplineSpace{n,k})  where {n, k}
-
-Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis functions. Defined by the elements in `bspline.patch`, with piece-wise polynomial degree `bspline.polynomial_degree` and C^`bspline.regularity`continuity at the interfaces between elements.\n 
-`E[d][:,j, el]` contains the coefficients of the linear combination of reference bernstein polynomials determining the `j`-th basis function on element `el` in dimension `d`.
-
-# Arguments
-- `bspline::BSplineSpace{n,k}`: B-Spline.
-# Returns
-- `E::NTuple{n, Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
-"""
-function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace{n}) where {n}
-    return NTuple{n, Array{Float64, 3}}(extract_bezier_representation(bspline,d) for d in 1:1:n)
+function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace)
+        return extract_bezier_representation(bspline.knot_vector)
 end

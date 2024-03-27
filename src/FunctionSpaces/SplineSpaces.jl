@@ -10,9 +10,10 @@
 """
 struct KnotVector
     breakpoints::Vector{Float64}
+    polynomial_degree::Int
     multiplicity::Vector{Int}
 
-    function KnotVector(breakpoints::Vector{Float64}, multiplicity::Vector{Int})
+    function KnotVector(breakpoints::Vector{Float64}, polynomial_degree::Int, multiplicity::Vector{Int})
         if length(breakpoints) != length(multiplicity)
             msg1 = "Number of breakpoints and multiplicity must be the same."
             msg2 = " breakpoints as length $(length(breakpoints)) and multiplicity has length $(length(multiplicity))."
@@ -26,12 +27,44 @@ struct KnotVector
             throw(ArgumentError(msg1*msg2))
         end
 
-        new(breakpoints, multiplicity)
+        new(breakpoints, polynomial_degree, multiplicity)
     end
 end
 
 """
-    struct BSplineSpace{n}
+    create_knot_vector(breakpoints::Vector{Float64}, p::Int, regularity::Vector{Int})
+
+Creates a uniform knot vector corresponding to `nel*p - sum(k) + 1` 
+B-splines basis functions of polynomial degree `p` and continuity `k[i]` over `nel` 
+equally spaced elements in the interval between`left_endpoint` and `right_endpoint`. 
+See https://en.wikipedia.org/wiki/B-spline#Definition.
+
+# Arguments
+- `left_endpoint::Float64`: first value of the knot vector.
+- `right_endpoint::Float64`: last value of the knot vector.
+- `nel::Int`: number of elements.
+- `p::Int`: degree of the polynomial (``p \\geq 0``).
+- `k::Vector{Int}`: continuity at the interfaces between elements. (`` -1 \\leq k[i] \\leq p``).
+
+# Returns 
+- `::KnotVector`: uniform knot vector.
+"""
+function create_knot_vector(breakpoints::Vector{Float64}, p::Int, regularity::Vector{Int})
+    multiplicity = ones(Int, length(breakpoints))
+
+    for i in eachindex(regularity)
+        multiplicity[i+1] = p - regularity[i]
+    end
+
+    return KnotVector(breakpoints, p, multiplicity)
+end
+
+function create_knot_vector(breakpoints::Vector{Float64}, p::Int, multiplicity::Vector{Int})
+    return KnotVector(breakpoints, p::Int, multiplicity)
+end
+
+"""
+    struct BSplineSpace
 
 Structure containing information about scalar `n`-dimensional B-Spline basis functions defined on `patch`,
 with given `polynomial_degree` and `regularity` conditions in each dimension. Note that the
@@ -47,31 +80,29 @@ extraction coefficients.
 - `polynomial_degree::NTuple{n, Int}`: Polynomial degree in each dimension.
 - `regularity::NTuple{n, Vector{Int}}`: Regularity for each element interface and dimension.
 """
-struct BSplineSpace{n}<:AbstractFunctionSpace{n}
-    patch::Mesh.Patch{n}
-    polynomial_degree::NTuple{n, Int}
-    regularity::NTuple{n, Vector{Int}}
-    function BSplineSpace(patch::Mesh.Patch{n}, polynomial_degree::NTuple{n, Int}, regularity::NTuple{n, Vector{Int}}) where {n}
-        for d in 1:1:n
-            if polynomial_degree[d] <0
-                msg1 = "Polynomial degree must be greater or equal than 0."
-                msg2 = " In dimension $d, the degree is $(polynomial_degree[d])."
+struct BSplineSpace<:AbstractFunctionSpace{1}
+    knot_vector::KnotVector
+
+    function BSplineSpace(breakpoints::Vector{Float64}, polynomial_degree::Int, regularity::Vector{Int})
+        # Check for errors in the construction 
+        if polynomial_degree <0
+            msg1 = "Polynomial degree must be greater or equal than 0."
+            msg2 = " The degree is $polynomial_degree."
+            throw(ArgumentError(msg1*msg2))
+        end
+        if length(breakpoints) != length(regularity)
+            msg1 = "Number of regularity conditions should be equal to the number of breakpoints."
+            msg2 = " You have $(length(breakpoints)) breakpoints and $(length(regularity)) regularity conditions."
+            throw(ArgumentError(msg1*msg2))
+        end
+        for i in eachindex(regularity)
+            if polynomial_degree <= regularity[i]
+                msg1 = "Polynomial degree must be greater than regularity."
+                msg2 = " The degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
                 throw(ArgumentError(msg1*msg2))
-            end
-            if size(patch)[d] - 1 != length(regularity[d])
-                msg1 = "Number of regularity conditions should be one less than the number of elements."
-                msg2 = " You have $(size(patch)[d]) elements and $(length(regularity[d])) regularity conditions in dimension $d"
-                throw(ArgumentError(msg1*msg2))
-            end
-            for i in 1:1:length(regularity[d])
-                if polynomial_degree[d] <= regularity[d][i]
-                    msg1 = "Polynomial degree must be greater than regularity."
-                    msg2 = " In dimension $d,  the degree is $polynomial_degree[d] and there is regularity $regularity[d][i]"
-                    throw(ArgumentError(msg1*msg2))
-                end
             end
         end
-
-        new{n}(patch, polynomial_degree, regularity)        
+        
+        new(create_knot_vector(breakpoints, p, regularity))        
     end
 end
