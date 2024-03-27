@@ -82,6 +82,9 @@ extraction coefficients.
 """
 struct BSplineSpace<:AbstractFunctionSpace{1}
     knot_vector::KnotVector
+    extraction_coefficients::Array{Float64, 3}
+    polynomials::Polynomials.Bernstein
+    supported_basis::Matrix{Int}
 
     function BSplineSpace(breakpoints::Vector{Float64}, polynomial_degree::Int, regularity::Vector{Int})
         # Check for errors in the construction 
@@ -102,7 +105,28 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
                 throw(ArgumentError(msg1*msg2))
             end
         end
+
+        supported_basis = zeros(Int, (length(breakpoints)-1, polynomial_degree+1))
+        supported_basis[1,:] = 1:polynomial_degree+1
+
+        for el = 2:length(breakpoints)-1
+            supported_basis[el,:] .= (@view supported_basis[el-1,:]) .+ knot_vector.multiplicity[el]
+        end
         
-        new(create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity"))        
+        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
+        new(knot_vector, extract_bezier_representation(knot_vector), Polynomials.Bernstein(polynomial_degree), supported_basis)        
     end
+end
+
+function get_extraction_coefficients_and_indicies(bspline::BSplineSpace, element_id::Int)
+    return @views bspline.extraction_coefficients[:,:,element_id], bspline.supported_basis[el,:]
+end
+function get_polynomials(bspline::BSplineSpace)
+    return bspline.polynomials
+end
+
+function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64})
+    extraction_coefficients, supported_bases = get_extraction_coefficients_and_indicies(bspline, element_id)
+
+    return extraction_coefficients  * get_polynomials(bspline)(xi), supported_bases
 end

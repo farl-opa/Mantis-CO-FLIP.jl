@@ -80,19 +80,3 @@ function extract_bezier_representation(knot_vector::KnotVector)
 
     return E
 end
-
-"""
-    extract_bezier_representation(bspline::BSplineSpace{n,k}, d) where {n, k}
-
-Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis functions on dimension `d`. Defined by the elements in `bspline.patch`, with piece-wise polynomial degree `bspline.polynomial_degree` and C^`bspline.regularity`continuity at the interfaces between elements.\n 
-`E[:,j, el]` contains the coefficients of the linear combination of reference bernstein polynomials determining the `j`-th basis function on element `el` in dimension `d`.
-
-# Arguments
-- `bspline::BSplineSpace{n,k}`: B-Spline.
-- `d::Int`: Dimension.
-# Returns
-- `E::Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
-"""
-function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace)
-        return extract_bezier_representation(bspline.knot_vector)
-end

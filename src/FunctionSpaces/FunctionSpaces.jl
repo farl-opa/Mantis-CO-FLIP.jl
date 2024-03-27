@@ -6,6 +6,7 @@ The exported names are:
 module FunctionSpaces
 
 import .. Mesh
+import .. Polynomial
 
 """
     AbstractFunctionSpace
@@ -19,11 +20,13 @@ include("ExtractionCoefficients.jl")
 
 # Getter for the function spaces
 
-#=
+
 # B-Spline getters
+#=
 function get_space_dim(bspline::BSplineSpace)
     return NTuple{n, Int}(get_space_dim(bspline, d) for d in 1:1:n)
 end
+=#
 
 """
     TensorProductSpace{n} <: AbstractFunctionSpace{n} 
@@ -36,7 +39,7 @@ end
 """
 struct TensorProductSpace{n} <: AbstractFunctionSpace{n} 
     patch::Mesh.Patch{n}
-    function_spaces::NTuple{n, F} where {F <: AbstractFunctionSpace{1}}
+    function_spaces::NTuple{m, F} where {m, F <: AbstractFunctionSpace}
 end
 
 
@@ -57,6 +60,6 @@ function create_bspline_space(patch::Mesh.Patch{n}, degree::Vector{Int}, regular
     f_spaces = NTuple{n, BSplineSpace}(BSplineSpace(Mesh.get_breakpoints(patch, i), degree[i], regularity[i]) for i in 1:1:n)
     return TensorProductSpace{n}(patch, f_spaces)
 end
-=#
+
 
 end
