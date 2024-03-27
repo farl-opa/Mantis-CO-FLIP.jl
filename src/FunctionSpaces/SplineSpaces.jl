@@ -105,6 +105,8 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
         
         knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
 
+        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
+
         supported_basis = zeros(Int, (length(breakpoints)-1, polynomial_degree+1))
         supported_basis[1,:] = 1:polynomial_degree+1
 

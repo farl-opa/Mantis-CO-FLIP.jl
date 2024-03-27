@@ -15,6 +15,8 @@ Supertype for all scalar function spaces.
 """
 abstract type AbstractFunctionSpace{n} end
 
+get_n(f::AbstractFunctionSpace{n}) where {n} = n
+
 include("SplineSpaces.jl")
 include("ExtractionCoefficients.jl")
 
@@ -47,7 +49,13 @@ end
 """
 struct TensorProductSpace{n} <: AbstractFunctionSpace{n} 
     patch::Mesh.Patch{n}
-    function_spaces::NTuple{m, F} where {m, F <: AbstractFunctionSpace}
+    function_spaces::NTuple{m, AbstractFunctionSpace} where {m}
+    function TensorProductSpace(patch::Mesh.Patch{n}, function_spaces::NTuple{m, AbstractFunctionSpace}) where {n,m}
+        if sum([get_n(function_spaces[i]) for i in 1:1:m]) != n
+            throw(ArgumentError("The sum of the dimensions of the input spaces does not match the dimension of the patch!"))
+        end
+        new{n}(patch, function_spaces)
+    end
 end
 
 """
