@@ -120,6 +120,22 @@ function get_breakpoints(patch::Patch{n}) where {n}
 end
 
 """
+    get_breakpoints(patch::Patch{n}, d::Int) where {n}
+
+Returns the breakpoints in dimension `d`.
+
+# Arguments
+- `patch::Patch{n}`: Patch of which to get the breakpoints.
+- `d::Int`: Dimension in which to get the size.
+
+# Returns
+- `::Vector{Float64}`: Breakpoints in dimension `d`.
+"""
+function get_breakpoints(patch::Patch{n}, d::Int) where {n}
+    return patch.breakpoints[d]
+end
+
+"""
     size(patch::Patch{n}) where {n}
 
 Returns the number of elements in the `patch`.
@@ -135,6 +151,25 @@ call `size(patch)` to get the size of the patch.
 """
 function Base.size(patch::Patch{n}) where {n}
     return NTuple{n, Int}(length(get_breakpoints(patch)[i]) - 1 for i = 1:1:n)   
+end
+
+"""
+    size(patch::Patch{n}, d::Int) where {n}
+
+Returns the number of elements in the `patch` in dimension `d`.
+
+Redefinition of `Base.size` for a `Patch`. This ensures that one can 
+call `size(patch, d)` to get the size of the patch.
+
+# Arguments
+- `patch::Patch{n}`: Patch of which to get the size.
+- `d::Int`: Dimension in which to get the size.
+
+# Returns
+- `::Int`: Number of elements in dimension `d`.
+"""
+function Base.size(patch::Patch{n}, d::Int) where {n}
+    return length(get_breakpoints(patch)[d]) - 1
 end
 
 """

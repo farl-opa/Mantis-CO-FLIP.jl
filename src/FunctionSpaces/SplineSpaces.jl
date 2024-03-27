@@ -60,7 +60,7 @@ function create_knot_vector(breakpoints::Vector{Float64}, p::Int, regularity::Ve
 end
 
 function create_knot_vector(breakpoints::Vector{Float64}, p::Int, multiplicity::Vector{Int})
-    return KnotVector(breakpoints, p::Int, multiplicity)
+    return KnotVector(breakpoints, p, multiplicity)
 end
 
 """
