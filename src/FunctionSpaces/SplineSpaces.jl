@@ -52,7 +52,7 @@ function create_knot_vector(breakpoints::Vector{Float64}, p::Int, breakpoint_con
     if condition_type == "regularity"
         multiplicity = ones(Int, length(breakpoints))
 
-        for i in eachindex(vec)
+        for i in eachindex(breakpoint_condition)
             multiplicity[i] = p - breakpoint_condition[i]
         end
 

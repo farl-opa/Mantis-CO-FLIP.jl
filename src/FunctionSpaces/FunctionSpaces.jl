@@ -15,12 +15,11 @@ Supertype for all scalar function spaces.
 """
 abstract type AbstractFunctionSpace{n} end
 
-get_n(f::AbstractFunctionSpace{n}) where {n} = n
-
 include("SplineSpaces.jl")
 include("ExtractionCoefficients.jl")
 
 # Getters for the function spaces
+get_n(f::AbstractFunctionSpace{n}) where {n} = n
 
 # B-Spline getters
 
@@ -37,6 +36,8 @@ Returns the dimension of the univarite function space `bspline`.
 function get_space_dim(bspline::BSplineSpace)
     return length(bspline.knot_vector.breakpoints-1)*bspline.knot_vector.polynomial_degree - sum(bspline.knot_vector.multiplicity) + 1
 end
+
+# TensorProductSpace constructors
 
 """
     TensorProductSpace{n} <: AbstractFunctionSpace{n} 
