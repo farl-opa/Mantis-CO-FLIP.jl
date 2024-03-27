@@ -13,7 +13,7 @@ const KnotVector = Mantis.FunctionSpaces.KnotVector
 const BSplineSpace = Mantis.FunctionSpaces.BSplineSpace
 
 # Piece-wise degree of the basis functions on which the tests are performed.
-const degrees_to_test = 0:3
+const degrees_to_test = 0:25
 
 # Patch used in the test
 n1 = 6
@@ -46,16 +46,16 @@ negative_degree_test = (2,1,-3)
 length_regularity_test = (fill(3, n1-2), fill(-1, n2), fill(3, n3-2))
 higher_regularity_test = (fill(3, n1-2), fill(-1, n2-2), fill(3, n3-2))
 
-@test_throws ArgumentError BSplineSpace(test_patch, negative_degree_test, regularity, 0)
-@test_throws ArgumentError BSplineSpace(test_patch, negative_degree_test, length_regularity_test, 0)
-@test_throws ArgumentError BSplineSpace(test_patch, negative_degree_test, higher_regularity_test, 0)
+@test_throws ArgumentError BSplineSpace(test_patch, negative_degree_test, regularity)
+@test_throws ArgumentError BSplineSpace(test_patch, negative_degree_test, length_regularity_test)
+@test_throws ArgumentError BSplineSpace(test_patch, negative_degree_test, higher_regularity_test)
 
 # Tests for known properties of B-Spline basis extraction coefficients
 
 for p in degrees_to_test, k in -1:p-1
     local polynomial_degree = (p,p,p)
     local regularity = (fill(k, n1-2), fill(k, n2-2), fill(k, n3-2))
-    b_spline = BSplineSpace(test_patch, polynomial_degree, regularity, 0)
+    b_spline = BSplineSpace(test_patch, polynomial_degree, regularity)
     # Extract the coefficients
     E = Mantis.FunctionSpaces.extract_bezier_representation(b_spline)
     for d in 1:1:3

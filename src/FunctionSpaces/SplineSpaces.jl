@@ -31,7 +31,7 @@ struct KnotVector
 end
 
 """
-    struct BSplineSpace{n,k}
+    struct BSplineSpace{n}
 
 Structure containing information about scalar `n`-dimensional B-Spline basis functions defined on `patch`,
 with given `polynomial_degree` and `regularity` conditions in each dimension. Note that the
@@ -47,11 +47,11 @@ extraction coefficients.
 - `polynomial_degree::NTuple{n, Int}`: Polynomial degree in each dimension.
 - `regularity::NTuple{n, Vector{Int}}`: Regularity for each element interface and dimension.
 """
-struct BSplineSpace{n, k}<:AbstractFunctionSpace{n, k}
+struct BSplineSpace{n}<:AbstractFunctionSpace{n}
     patch::Mesh.Patch{n}
     polynomial_degree::NTuple{n, Int}
     regularity::NTuple{n, Vector{Int}}
-    function BSplineSpace(patch::Mesh.Patch{n}, polynomial_degree::NTuple{n, Int}, regularity::NTuple{n, Vector{Int}}, k::Int) where {n}
+    function BSplineSpace(patch::Mesh.Patch{n}, polynomial_degree::NTuple{n, Int}, regularity::NTuple{n, Vector{Int}}) where {n}
         for d in 1:1:n
             if polynomial_degree[d] <0
                 msg1 = "Polynomial degree must be greater or equal than 0."
@@ -72,6 +72,6 @@ struct BSplineSpace{n, k}<:AbstractFunctionSpace{n, k}
             end
         end
 
-        new{n, k}(patch, polynomial_degree, regularity)        
+        new{n}(patch, polynomial_degree, regularity)        
     end
 end

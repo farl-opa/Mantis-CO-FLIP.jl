@@ -149,7 +149,7 @@ Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis 
 # Returns
 - `E::Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
 """
-function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace{n,k}, d) where {n, k}
+function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace{n}, d) where {n}
         return extract_bezier_representation(bspline.patch.breakpoints[d][1], 
                                   bspline.patch.breakpoints[d][end], 
                                   size(bspline.patch)[d], 
@@ -168,6 +168,6 @@ Computes the extraction coefficients of `n`-dimensional `k`-form B-Spline basis 
 # Returns
 - `E::NTuple{n, Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
 """
-function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace{n,k}) where {n,k}
+function extract_bezier_representation(bspline::FunctionSpaces.BSplineSpace{n}) where {n}
     return NTuple{n, Array{Float64, 3}}(extract_bezier_representation(bspline,d) for d in 1:1:n)
 end
