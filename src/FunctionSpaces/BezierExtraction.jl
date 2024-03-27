@@ -22,31 +22,6 @@ function create_identity(ni::Int, d::Int)
 end
 
 """
-    extract_bezier_representation(left_endpoint::Float64, right_endpoint::Float64, nel::Int, p::Int, k::Int)::Array{Float64, 3}
-
-Computes the extraction coefficients of the B-Spline basis functions defined 
-between `left_endpoint` and `right_endpoint`, subdivided into `nel` elements, 
-with piece-wise polynomial degree `p` and C^`k`continuity at the interfaces between elements.
-
-`E[:, j, el]` contains the coefficients of the linear combination of reference bernstein polynomials determining the `j`-th basis function on element `el`.
-
-# Arguments
-- `left_endpoint::Float64`: first value of the domain.
-- `right_endpoint::Float64`: last value of the domain.
-- `nel::Int`: number of elements.
-- `p::Int`: piece-wise degree of the basis functions (``p \\geq 0``).
-- `k::Int`: continuity of the basis functions at the interfaces (``k < p``).
-
-# Returns
-- `E::Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
-"""
-function extract_bezier_representation(left_endpoint::Float64, right_endpoint::Float64, nel::Int, p::Int, k::Vector{Int})
-    # create uniform knotvector using the provided parameters
-    knot_vector = create_uniform_knot_vector(left_endpoint, right_endpoint, nel, p, k)
-    return extract_bezier_representation(knot_vector, p)
-end
-
-"""
     extract_bezier_representation(knot_vector::KnotVector, p::Int)
 
 Computes the extraction coefficients of the B-Spline basis functions defined 
@@ -68,7 +43,7 @@ function extract_bezier_representation(knot_vector::KnotVector)
     # first extraction matrix
     E = create_identity(nel, knot_vector.polynomial_degree+1)
     # this is where knot-insertion coefficients are saved
-    alphas = zeros(max(p - 1, 0))
+    alphas = zeros(max(knot_vector.polynomial_degree - 1, 0))
 
     for el in 1:1:nel
         mult = knot_vector.multiplicity[el+1]

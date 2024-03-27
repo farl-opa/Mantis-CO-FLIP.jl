@@ -19,13 +19,11 @@ include("ExtractionCoefficients.jl")
 
 # Getter for the function spaces
 
+#=
 # B-Spline getters
-function get_space_dim(bspline::BSplineSpace, d::Int)
-    return (length(bspline.patch.breakpoints[d])-1) * bspline.polynomial_degree[d] - sum(bspline.regularity[d]) + 1
-end
-
 function get_space_dim(bspline::BSplineSpace)
-    return NTuple{n, Int}( get_space_dim(bspline, d) for d in 1:1:n)
+    return (length(bspline.patch.breakpoints)-1) * bspline.knot_vector.polynomial_degree - sum(bspline.regularity) + 1
 end
+=#
 
 end

@@ -49,18 +49,18 @@ See https://en.wikipedia.org/wiki/B-spline#Definition.
 # Returns 
 - `::KnotVector`: uniform knot vector.
 """
-function create_knot_vector(breakpoints::Vector{Float64}, p::Int, regularity::Vector{Int})
-    multiplicity = ones(Int, length(breakpoints))
+function create_knot_vector(breakpoints::Vector{Float64}, p::Int, vec::Vector{Int}, condition_type::String)
+    if condition_type == "regularity"
+        multiplicity = ones(Int, length(breakpoints))
 
-    for i in eachindex(regularity)
-        multiplicity[i+1] = p - regularity[i]
+        for i in eachindex(vec)
+            multiplicity[i] = p - vec[i]
+        end
+
+        return KnotVector(breakpoints, p, multiplicity)
+    elseif condition_type == "multiplicity"
+        return KnotVector(breakpoints, p, vec)
     end
-
-    return KnotVector(breakpoints, p, multiplicity)
-end
-
-function create_knot_vector(breakpoints::Vector{Float64}, p::Int, multiplicity::Vector{Int})
-    return KnotVector(breakpoints, p::Int, multiplicity)
 end
 
 """
@@ -103,6 +103,6 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
             end
         end
         
-        new(create_knot_vector(breakpoints, p, regularity))        
+        new(create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity"))        
     end
 end
