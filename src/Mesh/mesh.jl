@@ -37,45 +37,55 @@ struct Element{n}
 end
 
 """
+    Patch1D
+
+Is a 1-dimensional patch, so only the breakpoints.
+
+# Fields
+- `breakpoints::Vector{Float64}`: Breakpoints. Should be strictly increasing.
+
+# Extended help
+
+# Error behaviour
+The strictly increasing property of the breakpoints is checked. An 
+`ArgumentError` is raised if the breakpoints are not strictly increasing.
+"""
+struct Patch1D
+    breakpoints::Vector{Float64}
+    function Patch1D(breakpoints::Vector{Float64})
+        for i in eachindex(breakpoints)[begin:end-1]
+            if breakpoints[i] >= breakpoints[i+1]
+                throw(ArgumentError("Breakpoints should be strictly increasing but they are not."))
+            end
+        end
+        new(breakpoints)
+    end
+end
+
+function get_breakpoints(patch::Patch1D)
+    return patch.breakpoints
+end
+
+"""
     Patch{n}
 
 Is an n-dimensional **structured** tensor-product patch.
 
 # Fields
-- `breakpoints::NTuple{n, Vector{Float64}}`: Breakpoints per dimension. Should be strictly increasing.
+- `patches_per_dim::NTuple{n, Patch1D}`: Patches per dimension. Should be strictly increasing.
 
 # Extended help
 
 # Implementation
 The patch is assumed to be a tensor-product patch of quadilaterals. This 
 is also reflected in the implementation.
-
-# Error behaviour
-The strictly increasing property of the breakpoints is checked. An 
-`ArgumentError` is raised if the breakpoints are not strictly increasing.
 """
 struct Patch{n}
-
-    # Field(s)
-
-    # Only the 1D breakpoints are stored, as a tensor-product structure 
-    # is assumed.
-    breakpoints::NTuple{n, Vector{Float64}}
+    patches_per_dim::NTuple{n, Patch1D}
 
     # Inner constructor(s)
-    # The inner constructor only tests if the breakpoints in each 
-    # dimension are strictly increasing.
     function Patch(breakpoints::NTuple{n, Vector{Float64}}) where {n}
-        for d in 1:1:n
-            for i in eachindex(breakpoints[d])[begin:end-1]
-                if breakpoints[d][i] >= breakpoints[d][i+1]
-                    msg1 = "Breakpoints should be strictly increasing, "
-                    msg2 = "but the breakpoints in dimension $d are not."
-                    throw(ArgumentError(msg1*msg2))
-                end
-            end
-        end
-        new{n}(breakpoints)        
+        new{n}(NTuple{n, Patch1D}(Patch1D(breakpoints[d]) for d in 1:1:n))        
     end
 end
 
@@ -116,7 +126,7 @@ Returns the breakpoints per dimension.
 - `::NTuple{n, Vector{Float64}}`: Breakpoints per dimension.
 """
 function get_breakpoints(patch::Patch{n}) where {n}
-    return patch.breakpoints
+    return NTuple{n, Vector{Float64}}(get_breakpoints(patch.patches_per_dim[d]) for d in 1:1:n)
 end
 
 """
@@ -132,7 +142,7 @@ Returns the breakpoints in dimension `d`.
 - `::Vector{Float64}`: Breakpoints in dimension `d`.
 """
 function get_breakpoints(patch::Patch{n}, d::Int) where {n}
-    return patch.breakpoints[d]
+    return get_breakpoints(patch.patches_per_dim[d])
 end
 
 """
@@ -169,7 +179,7 @@ call `size(patch, d)` to get the size of the patch.
 - `::Int`: Number of elements in dimension `d`.
 """
 function Base.size(patch::Patch{n}, d::Int) where {n}
-    return length(get_breakpoints(patch)[d]) - 1
+    return length(get_breakpoints(patch, d)) - 1
 end
 
 """
@@ -206,7 +216,7 @@ neither precomputed not stored.
 - `::Element`: Element object containing the intervals per dimension.
 """
 function get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
-    return Element(NTuple{n,Interval}(Interval(patch.breakpoints[d][element_id[d]], patch.breakpoints[d][element_id[d]+1]) for d in 1:1:n))
+    return Element(NTuple{n,Interval}(Interval(get_breakpoints(patch, d)[element_id[d]], get_breakpoints(patch, d)[element_id[d]+1]) for d in 1:1:n))
 end
 
 
