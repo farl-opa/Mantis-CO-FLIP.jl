@@ -6,6 +6,7 @@
 
 # Fields
 - `breakpoints::Vector{Float64}`: Location of each knot.
+- `polynomial_degree::Int`: Polynomial degree.
 - `multiplicity::Vector{Int}`: Repetition of each knot.
 """
 struct KnotVector
@@ -34,51 +35,47 @@ end
 """
     create_knot_vector(breakpoints::Vector{Float64}, p::Int, regularity::Vector{Int})
 
-Creates a uniform knot vector corresponding to `nel*p - sum(k) + 1` 
-B-splines basis functions of polynomial degree `p` and continuity `k[i]` over `nel` 
-equally spaced elements in the interval between`left_endpoint` and `right_endpoint`. 
+Creates a uniform knot vector corresponding to B-splines basis functions of polynomial degree `p` 
+and continuity `regularity[i]` on `breakpoint[i]`. 
 See https://en.wikipedia.org/wiki/B-spline#Definition.
 
 # Arguments
-- `left_endpoint::Float64`: first value of the knot vector.
-- `right_endpoint::Float64`: last value of the knot vector.
-- `nel::Int`: number of elements.
+- `breakpoints::Vector{Float64}`: Location of each breakpoint.
 - `p::Int`: degree of the polynomial (``p \\geq 0``).
-- `k::Vector{Int}`: continuity at the interfaces between elements. (`` -1 \\leq k[i] \\leq p``).
+- `breakpoint_condition::Vector{Int}`: Either the regularity or multiplicity of each breakpoint.
+- `condition_type::String`: Determines whether `breakpoint_condition` determines the regularity or multiplicity.
 
 # Returns 
-- `::KnotVector`: uniform knot vector.
+- `::KnotVector`: Uniform knot vector.
 """
-function create_knot_vector(breakpoints::Vector{Float64}, p::Int, vec::Vector{Int}, condition_type::String)
+function create_knot_vector(breakpoints::Vector{Float64}, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
     if condition_type == "regularity"
         multiplicity = ones(Int, length(breakpoints))
 
         for i in eachindex(vec)
-            multiplicity[i] = p - vec[i]
+            multiplicity[i] = p - breakpoint_condition[i]
         end
 
         return KnotVector(breakpoints, p, multiplicity)
     elseif condition_type == "multiplicity"
         return KnotVector(breakpoints, p, vec)
+    else 
+        msg1 = "Allowed breakpoint conditions are `regularity` or `multiplicity`."
+        msg2 = " The given condition is $condition_type."
+        throw(ArgumentError(msg1*msg2))
     end
 end
 
 """
     struct BSplineSpace
 
-Structure containing information about scalar `n`-dimensional B-Spline basis functions defined on `patch`,
-with given `polynomial_degree` and `regularity` conditions in each dimension. Note that the
-`polynomial_degree` is the same for every element in each dimension, but the `regularity` is
-specific to each element interface. Also, an open knot vector is assumed for this structure, so,
-`length(regularity)` should be equal to `size(patch)[d] - 1`.
-
-`extract_bezier_representation()` can be called on this structure to retrieve the corresponding
-extraction coefficients.
+Structure containing information about a univariate B-Spline function space defined on `breakpoints`,
+with given `polynomial_degree` and `regularity` per breakpoint.
 
 # Fields
-- `patch::Mesh.Patch{n}`: Patch where the B-Spline basis functions are defined.
-- `polynomial_degree::NTuple{n, Int}`: Polynomial degree in each dimension.
-- `regularity::NTuple{n, Vector{Int}}`: Regularity for each element interface and dimension.
+- `breakpoints::Vector{Float64}`: Location of each breakpoint.
+- `polynomial_degree::Int`: Polynomial degree.
+- `regularity::Vector{Int}`: Regularity of each breakpoint.
 """
 struct BSplineSpace<:AbstractFunctionSpace{1}
     knot_vector::KnotVector
@@ -105,6 +102,8 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
                 throw(ArgumentError(msg1*msg2))
             end
         end
+        
+        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
 
         supported_basis = zeros(Int, (length(breakpoints)-1, polynomial_degree+1))
         supported_basis[1,:] = 1:polynomial_degree+1
@@ -113,20 +112,53 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
             supported_basis[el,:] .= (@view supported_basis[el-1,:]) .+ knot_vector.multiplicity[el]
         end
         
-        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
         new(knot_vector, extract_bezier_representation(knot_vector), Polynomials.Bernstein(polynomial_degree), supported_basis)        
     end
 end
 
-function get_extraction_coefficients_and_indicies(bspline::BSplineSpace, element_id::Int)
+""" 
+    get_extraction_coefficients_and_indices(bspline::BSplineSpace, element_id::Int)
+
+Returns the supported bases functions of `bspline` on the element specified by `element_id` and their extraction coefficients.
+
+# Arguments
+- `bspline::BSplineSpace`: A univariate B-Spline function space.
+- `element_id::Int`: The id of the element.
+# Returns
+- `::@views (Matrix{Float64}, Vector{Int})`: The extraction coefficients and supported bases.
+"""
+function get_extraction_coefficients_and_indices(bspline::BSplineSpace, element_id::Int)
     return @views bspline.extraction_coefficients[:,:,element_id], bspline.supported_basis[el,:]
 end
+
+""" 
+    get_polynomials(bspline::BSplineSpace)
+
+Returns the reference Bernstein polynomials of `bspline`.
+
+# Arguments
+- `bspline::BSplineSpace`: A univariate B-Spline function space.
+# Returns
+- `::Polynomials.Bernstein`: Bernstein polynomials.
+"""
 function get_polynomials(bspline::BSplineSpace)
     return bspline.polynomials
 end
 
+"""
+    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64})
+
+Evaluates the global basis functions of `bspline` on the element specified by `element_id` and points `xi`.
+
+# Arguments
+- `bspline::BSplineSpace`: A univariate B-Spline function space.
+- `element_id::Int`: The id of the element.
+- `xi::Vector{Float64}`: The points where the global basis is evaluated.
+# Returns
+- `::Matrix{Float64}`: Gloabal basis functions.
+"""
 function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64})
-    extraction_coefficients, supported_bases = get_extraction_coefficients_and_indicies(bspline, element_id)
+    extraction_coefficients, supported_bases = get_extraction_coefficients_and_indices(bspline, element_id)
 
     return extraction_coefficients  * get_polynomials(bspline)(xi), supported_bases
 end

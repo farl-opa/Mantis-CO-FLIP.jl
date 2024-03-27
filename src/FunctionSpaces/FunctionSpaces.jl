@@ -6,7 +6,7 @@ The exported names are:
 module FunctionSpaces
 
 import .. Mesh
-import .. Polynomial
+import .. Polynomials
 
 """
     AbstractFunctionSpace
@@ -18,30 +18,37 @@ abstract type AbstractFunctionSpace{n} end
 include("SplineSpaces.jl")
 include("ExtractionCoefficients.jl")
 
-# Getter for the function spaces
-
+# Getters for the function spaces
 
 # B-Spline getters
-#=
+
+"""
+    get_space_dim(bspline::BSplineSpace)
+
+Returns the dimension of the univarite function space `bspline`.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-Spline function space.
+# Returns
+- `::Int`: The dimension of the B-Spline space.
+"""
 function get_space_dim(bspline::BSplineSpace)
-    return NTuple{n, Int}(get_space_dim(bspline, d) for d in 1:1:n)
+    return length(bspline.knot_vector.breakpoints-1)*bspline.knot_vector.polynomial_degree - sum(bspline.knot_vector.multiplicity) + 1
 end
-=#
 
 """
     TensorProductSpace{n} <: AbstractFunctionSpace{n} 
 
-`n`-dimensional tensor-product space.
+`n`-variate tensor-product space.
 
 # Fields
 - `patch::Patch{n}`: Patch on which the tensor product space is defined.
-- `function_spaces::NTuple{n, F} where {F <: AbstractFunctionSpace{1}}`: collection of univariate function spaces per dimension.
+- `function_spaces::NTuple{m, F} where {m, F <: AbstractFunctionSpace}`: collection of uni or multivariate function spaces.
 """
 struct TensorProductSpace{n} <: AbstractFunctionSpace{n} 
     patch::Mesh.Patch{n}
     function_spaces::NTuple{m, F} where {m, F <: AbstractFunctionSpace}
 end
-
 
 """
     create_bspline_space(patch::Mesh.Patch{n}, degree::Vector{Int}, regularity::NTuple{n, Vector{Int}}) where {n}
@@ -60,6 +67,5 @@ function create_bspline_space(patch::Mesh.Patch{n}, degree::Vector{Int}, regular
     f_spaces = NTuple{n, BSplineSpace}(BSplineSpace(Mesh.get_breakpoints(patch, i), degree[i], regularity[i]) for i in 1:1:n)
     return TensorProductSpace{n}(patch, f_spaces)
 end
-
 
 end

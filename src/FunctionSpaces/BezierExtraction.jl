@@ -25,16 +25,15 @@ end
     extract_bezier_representation(knot_vector::KnotVector, p::Int)
 
 Computes the extraction coefficients of the B-Spline basis functions defined 
-by the knot vector `knot_vector` and polynomial degree `p`.
+by `knot_vector`.
 
 `E[:, j, el]` contains the coefficients of the linear combination of reference bernstein polynomials determining the `j`-th basis function on element `el`.
 
 # Arguments
-- `knot_vector::KnotVector`: knot vector definied the extraction coefficients.
-- `p::Int`: piece-wise degree of the basis functions (``p \\geq 0``).
+- `knot_vector::KnotVector`: knot vector defining the B-Spline basis.
 
 # Returns
-- `E::Array{Float64, 3}`: a `(p+1, p+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
+- `E::Array{Float64, 3}`: a `(knot_vector.polynomial_degree+1, knot_vector.polynomial_degree+1, nel)` matrix with the extraction coefficients of the b-splines basis functions on every element.
 """
 function extract_bezier_representation(knot_vector::KnotVector)
     # number of elements
