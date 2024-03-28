@@ -243,10 +243,10 @@ end
     struct GTBSplineSpace
 
 """
-struct GTBSplineSpace<:MultiPatchSpace{1,m} where {m}
-    bsplines::NTuple{m,BSplineSpace}
+struct GTBSplineSpace<:AbstractFunctionSpace{1}
+    bsplines::NTuple{m,BSplineSpace} where {m}
     regularity::Vector{Int}
-    extraction_op::ExtractionOp
+    extraction_op::ExtractionOperator
 
     function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
         if length(regulariy) != m
