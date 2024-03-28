@@ -1,23 +1,23 @@
 """
     struct KnotVector
 
-1-dimensional knot vector. 'breakpoints' determines the location of the knots and
+1-dimensional knot vector. 'patch_1d' determines the location of the knots and
 'multiplicity' the number of times each of them is repeated.
 
 # Fields
-- `breakpoints::Vector{Float64}`: Location of each knot.
+- `patch_1d::Mesh.Patch1D`: Location of each knot.
 - `polynomial_degree::Int`: Polynomial degree.
 - `multiplicity::Vector{Int}`: Repetition of each knot.
 """
 struct KnotVector
-    breakpoints::Vector{Float64}
+    patch_1d::Mesh.Patch1D
     polynomial_degree::Int
     multiplicity::Vector{Int}
 
-    function KnotVector(breakpoints::Vector{Float64}, polynomial_degree::Int, multiplicity::Vector{Int})
-        if length(breakpoints) != length(multiplicity)
-            msg1 = "Number of breakpoints and multiplicity must be the same."
-            msg2 = " breakpoints as length $(length(breakpoints)) and multiplicity has length $(length(multiplicity))."
+    function KnotVector(patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Vector{Int})
+        if (size(patch_1d)+1) != length(multiplicity)
+            msg1 = "Number of knots and multiplicity must be the same."
+            msg2 = " Knots as length $(size(patch_1d)+1) and multiplicity has length $(length(multiplicity))."
             throw(ArgumentError(msg1*msg2))
         end
 
@@ -28,19 +28,19 @@ struct KnotVector
             throw(ArgumentError(msg1*msg2))
         end
 
-        new(breakpoints, polynomial_degree, multiplicity)
+        new(patch_1d, polynomial_degree, multiplicity)
     end
 end
 
 """
-    create_knot_vector(breakpoints::Vector{Float64}, p::Int, regularity::Vector{Int})
+    create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, regularity::Vector{Int})
 
 Creates a uniform knot vector corresponding to B-splines basis functions of polynomial degree `p` 
-and continuity `regularity[i]` on `breakpoint[i]`. 
+and continuity `regularity[i]` on `patch_1d.breakpoint[i]`. 
 See https://en.wikipedia.org/wiki/B-spline#Definition.
 
 # Arguments
-- `breakpoints::Vector{Float64}`: Location of each breakpoint.
+- `patch_1d::Mesh.Patch1D`: Location of each breakpoint.
 - `p::Int`: degree of the polynomial (``p \\geq 0``).
 - `breakpoint_condition::Vector{Int}`: Either the regularity or multiplicity of each breakpoint.
 - `condition_type::String`: Determines whether `breakpoint_condition` determines the regularity or multiplicity.
@@ -48,17 +48,17 @@ See https://en.wikipedia.org/wiki/B-spline#Definition.
 # Returns 
 - `::KnotVector`: Knot vector.
 """
-function create_knot_vector(breakpoints::Vector{Float64}, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
+function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
     if condition_type == "regularity"
-        multiplicity = ones(Int, length(breakpoints))
+        multiplicity = ones(Int, size(patch_1d)+1)
 
         for i in eachindex(breakpoint_condition)
             multiplicity[i] = p - breakpoint_condition[i]
         end
 
-        return KnotVector(breakpoints, p, multiplicity)
+        return KnotVector(patch_1d, p, multiplicity)
     elseif condition_type == "multiplicity"
-        return KnotVector(breakpoints, p, vec)
+        return KnotVector(patch_1d, p, vec)
     else 
         msg1 = "Allowed breakpoint conditions are `regularity` or `multiplicity`."
         msg2 = " The given condition is $condition_type."
@@ -69,29 +69,29 @@ end
 """
     struct BSplineSpace
 
-Structure containing information about a univariate B-Spline function space defined on `breakpoints`,
+Structure containing information about a univariate B-Spline function space defined on `patch_1d::Mesh.Patch1D`,
 with given `polynomial_degree` and `regularity` per breakpoint.
 
 # Fields
-- `breakpoints::Vector{Float64}`: Location of each breakpoint.
-- `polynomial_degree::Int`: Polynomial degree.
-- `regularity::Vector{Int}`: Regularity of each breakpoint.
+- `knot_vector::KnotVector`: 1-dimensional knot vector.
+- `extraction_op::ExtractionOperator`: Stores extraction coefficients and basis indices.
+- `polynomials::Polynomials.Bernstein`: Refence Bernstein polynomials.
 """
 struct BSplineSpace<:AbstractFunctionSpace{1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::Polynomials.Bernstein
     
-    function BSplineSpace(breakpoints::Vector{Float64}, polynomial_degree::Int, regularity::Vector{Int})
+    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
         # Check for errors in the construction 
         if polynomial_degree <0
             msg1 = "Polynomial degree must be greater or equal than 0."
             msg2 = " The degree is $polynomial_degree."
             throw(ArgumentError(msg1*msg2))
         end
-        if length(breakpoints) != length(regularity)
+        if (size(patch_1d)+1) != length(regularity)
             msg1 = "Number of regularity conditions should be equal to the number of breakpoints."
-            msg2 = " You have $(length(breakpoints)) breakpoints and $(length(regularity)) regularity conditions."
+            msg2 = " You have $(size(patch_1d)+1) breakpoints and $(length(regularity)) regularity conditions."
             throw(ArgumentError(msg1*msg2))
         end
         for i in eachindex(regularity)
@@ -102,7 +102,7 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
             end
         end
         
-        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
+        knot_vector = create_knot_vector(patch_1d, polynomial_degree, regularity, "regularity")
 
         new(knot_vector, extract_bspline_to_bernstein(knot_vector), Polynomials.Bernstein(polynomial_degree))
     end
@@ -162,7 +162,7 @@ Returns the dimension of the univariate function space `bspline`.
 - `::Int`: The dimension of the B-Spline space.
 """
 function get_dim(bspline::BSplineSpace)
-    return (length(bspline.knot_vector.breakpoints) - 1)*(bspline.knot_vector.polynomial_degree+1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree+1))
+    return size(bspline.knot_vector.patch_1d)*(bspline.knot_vector.polynomial_degree+1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree+1))
 end
 
 """
@@ -176,7 +176,7 @@ Returns the number of elements in the underlying partition.
 - `::Int`: The number of elements.
 """
 function get_num_elements(bspline::BSplineSpace)
-    return length(bspline.knot_vector.breakpoints)-1
+    return size(bspline.knot_vector.patch_1d)
 end
 
 """
@@ -196,7 +196,7 @@ function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, n
     extraction_coefficients, basis_indices = get_extraction(bspline, element_id)
     local_basis = get_local_basis(bspline, xi, nderivatives)
     for r = 0:nderivatives
-        local_basis[:,:,r+1] .= local_basis[:,:,r+1] * extraction_coefficients'
+        local_basis[:,:,r+1] .= @views local_basis[:,:,r+1] * extraction_coefficients'
     end
 
     return local_basis, basis_indices
