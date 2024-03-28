@@ -45,9 +45,10 @@ for p in degrees_to_test, k in -1:p-1
     regularity[end] = -1
     b_spline = BSplineSpace(test_brk, p, regularity)
     # Extract the coefficients
-    E = Mantis.FunctionSpaces.extract_bezier_representation(b_spline.knot_vector)
-    @test all(E .>= 0.0) # Test for non-negativity
+    E = Mantis.FunctionSpaces.extract_bspline_to_bernstein(b_spline.knot_vector)
     for el in 1:1:n-1
-        @test all(isapprox.(sum((@view E[:,:,el]), dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
+        ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(E, el)
+        @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+        @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
     end
 end

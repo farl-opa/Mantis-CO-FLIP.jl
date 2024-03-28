@@ -46,7 +46,7 @@ See https://en.wikipedia.org/wiki/B-spline#Definition.
 - `condition_type::String`: Determines whether `breakpoint_condition` determines the regularity or multiplicity.
 
 # Returns 
-- `::KnotVector`: Uniform knot vector.
+- `::KnotVector`: Knot vector.
 """
 function create_knot_vector(breakpoints::Vector{Float64}, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
     if condition_type == "regularity"
@@ -79,10 +79,9 @@ with given `polynomial_degree` and `regularity` per breakpoint.
 """
 struct BSplineSpace<:AbstractFunctionSpace{1}
     knot_vector::KnotVector
-    extraction_coefficients::Array{Float64, 3}
+    extraction_op::ExtractionOperator
     polynomials::Polynomials.Bernstein
-    supported_basis::Matrix{Int}
-
+    
     function BSplineSpace(breakpoints::Vector{Float64}, polynomial_degree::Int, regularity::Vector{Int})
         # Check for errors in the construction 
         if polynomial_degree <0
@@ -105,16 +104,7 @@ struct BSplineSpace<:AbstractFunctionSpace{1}
         
         knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
 
-        knot_vector = create_knot_vector(breakpoints, polynomial_degree, regularity, "regularity")
-
-        supported_basis = zeros(Int, (length(breakpoints)-1, polynomial_degree+1))
-        supported_basis[1,:] = 1:polynomial_degree+1
-
-        for el = 2:length(breakpoints)-1
-            supported_basis[el,:] .= (@view supported_basis[el-1,:]) .+ knot_vector.multiplicity[el]
-        end
-        
-        new(knot_vector, extract_bezier_representation(knot_vector), Polynomials.Bernstein(polynomial_degree), supported_basis)        
+        new(knot_vector, extract_bspline_to_bernstein(knot_vector), Polynomials.Bernstein(polynomial_degree))
     end
 end
 
@@ -129,11 +119,11 @@ Returns the supported bases functions of `bspline` on the element specified by `
 # Returns
 - `::@views (Matrix{Float64}, Vector{Int})`: The extraction coefficients and supported bases.
 """
-function get_extraction_coefficients_and_indices(bspline::BSplineSpace, element_id::Int)
-    return @views bspline.extraction_coefficients[:,:,element_id], bspline.supported_basis[el,:]
+function get_extraction(bspline::BSplineSpace, element_id::Int)
+    return get_extraction(bspline.extraction_op, element_id)
 end
 
-""" 
+"""
     get_polynomials(bspline::BSplineSpace)
 
 Returns the reference Bernstein polynomials of `bspline`.
@@ -143,24 +133,141 @@ Returns the reference Bernstein polynomials of `bspline`.
 # Returns
 - `::Polynomials.Bernstein`: Bernstein polynomials.
 """
-function get_polynomials(bspline::BSplineSpace)
-    return bspline.polynomials
+function get_local_basis(bspline::BSplineSpace, xi::Vector{Float64}, nderivatives::Int)
+    return bspline.polynomials(xi, nderivatives)
 end
 
 """
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64})
+    get_polynomial_degree(bspline::BSplineSpace)
 
-Evaluates the global basis functions of `bspline` on the element specified by `element_id` and points `xi`.
+Returns the degree of Bsplines
+
+# Arguments
+- `bspline::BSplineSpace`: A univariate B-Spline function space.
+# Returns
+- `polynomial_degree`: Polynomial degree.
+"""
+function get_polynomial_degree(bspline::BSplineSpace)
+    return bspline.knot_vector.polynomial_degree
+end
+
+"""
+    get_dim(bspline::BSplineSpace)
+
+Returns the dimension of the univariate function space `bspline`.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-Spline function space.
+# Returns
+- `::Int`: The dimension of the B-Spline space.
+"""
+function get_dim(bspline::BSplineSpace)
+    return (length(bspline.knot_vector.breakpoints) - 1)*(bspline.knot_vector.polynomial_degree+1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree+1))
+end
+
+"""
+    get_num_elements(bspline::BSplineSpace)
+
+Returns the number of elements in the underlying partition.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-Spline function space.
+# Returns
+- `::Int`: The number of elements.
+"""
+function get_num_elements(bspline::BSplineSpace)
+    return length(bspline.knot_vector.breakpoints)-1
+end
+
+"""
+    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
+
+Evaluates the non-zero `bspline` basis functions on the element specified by `element_id` and points `xi` and all derivatives up to nderivatives.
 
 # Arguments
 - `bspline::BSplineSpace`: A univariate B-Spline function space.
 - `element_id::Int`: The id of the element.
 - `xi::Vector{Float64}`: The points where the global basis is evaluated.
+- `nderivatives::Int`: The order upto which derivatives need to be computed.
 # Returns
-- `::Matrix{Float64}`: Gloabal basis functions.
+- `::Array{Float64}`: Global basis functions, size = n_eval_points x degree+1 x nderivatives+1
 """
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64})
-    extraction_coefficients, supported_bases = get_extraction_coefficients_and_indices(bspline, element_id)
+function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
+    extraction_coefficients, basis_indices = get_extraction(bspline, element_id)
+    local_basis = get_local_basis(bspline, xi, nderivatives)
+    for r = 0:nderivatives
+        local_basis[:,:,r+1] .= local_basis[:,:,r+1] * extraction_coefficients'
+    end
 
-    return extraction_coefficients  * get_polynomials(bspline)(xi), supported_bases
+    return local_basis, basis_indices
 end
+
+function evaluate(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
+    return evaluate(bspline, element_id, [xi], nderivatives)
+end
+
+"""
+evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
+
+Evaluates all derivatives upto order `nderivatives` for all `bspline` basis functions at a given point `xi` in the element `element_id`.
+
+# Arguments
+- `bspline::BSplineSpace`: A univariate B-Spline function space.
+- `element_id::Int`: The id of the element.
+- `xi::Float64`: The point where all global basis functiuons are evaluated.
+- `nderivatives::Int`: The order upto which derivatives need to be computed.
+# Returns
+- `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
+"""
+function evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
+    local_basis, basis_indices = evaluate(bspline, element_id, xi, nderivatives)
+    nloc = length(basis_indices)
+    ndofs = get_dim(bspline)
+    I = zeros(Int, nloc * (nderivatives + 1))
+    J = zeros(Int, nloc * (nderivatives + 1))
+    V = zeros(Float64, nloc * (nderivatives + 1))
+    count = 0
+    for r = 0:nderivatives
+        for i = 1:nloc
+            I[count+1] = basis_indices[i]
+            J[count+1] = r+1
+            V[count+1] = local_basis[1, i, r+1]
+            count += 1
+        end
+    end
+
+    return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
+end
+
+# """
+#     struct GTBSplineSpace
+
+# """
+# struct GTBSplineSpace<:MultiPatchSpace{1,m} where {m}
+#     bsplines::NTuple{m,BSplineSpace}
+#     regularity::Vector{Int}
+#     extraction_op::ExtractionOp
+
+#     function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
+#         if length(regulariy) != m
+#             msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
+#             msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
+#             throw(ArgumentError(msg1*msg2))
+#         end
+#         for i in 1:m
+#             j = i
+#             k = i+1
+#             if i == m
+#                 k = 1
+#             end
+#             polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
+#             if polynomial_degree < regularity[i]
+#                 msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
+#                 msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
+#                 throw(ArgumentError(msg1*msg2))
+#             end
+#         end
+
+#         new(bsplines, regularity, extract_gtbspline_to_bspline(bsplines, regularity))
+#     end
+# end
