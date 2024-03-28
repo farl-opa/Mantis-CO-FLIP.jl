@@ -109,18 +109,18 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
     nel = sum(bspl_nels)
 
     # initialize global extraction matrix
-    H = sparse(Matrix(1.0I, bspl_dims[m+1], bspl_dims[m+1]))
+    H = SparseArrays.sparse(1:bspl_dims[m+1], 1:bspl_dims[m+1], ones(Float64,bspl_dims[m+1]), bspl_dims[m+1], bspl_dims[m+1])
     # loop over all internal patch interfaces and update extraction by imposing smoothness
     for i = 1:m-1
         # regularity at this interface
         r = regularity[i]
         # smoothness constraint matrix
-        KL = SparseArrays.findnz(evaluate_all_at_endpoints(bsplines[i], bspl_nels[i], 1.0, r))
-        KR = SparseArrays.findnz(evaluate_all_at_endpoints(bsplines[i+1], 1, 0.0, r))
-        I = [KL[1]; KR[1] .+ (bspl_dims[i+1] - bspl_dims[i])]
-        J = [KL[2]; KR[2]]
-        V = [-KL[3]; KR[3]]
-        K = SparseArrays.sparse(I,J,V,(bspl_dims[i+2] - bspl_dims[i]),r+1)
+        KL = SparseArrays.findnz(evaluate_all_at_point(bsplines[i], bspl_nels[i], 1.0, r))
+        KR = SparseArrays.findnz(evaluate_all_at_point(bsplines[i+1], 1, 0.0, r))
+        rows = [KL[1]; KR[1] .+ (bspl_dims[i+1] - bspl_dims[i])]
+        cols = [KL[2]; KR[2]]
+        vals = [-KL[3]; KR[3]]
+        K = SparseArrays.sparse(rows,cols,vals,(bspl_dims[i+2] - bspl_dims[i]),r+1)
         # update local extraction matrix by building double-diagonal nullspace of constraints
         L = H[:, bspl_dims[i]+1:bspl_dims[i+2]] * K;
         for j = 0:r
@@ -137,6 +137,7 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
     for i = 1:m
         for j = 1:bspl_nels[i]
             _, cols_ij = get_extraction(bsplines[i], j)
+            cols_ij .+= bspl_dims[i]
             eij = SparseArrays.findnz(H[:,cols_ij])
             # unique indices for non-zero rows and columns
             basis_indices[count+1] = unique(eij[1])
@@ -158,18 +159,18 @@ Builds sparsest possible nullspace of a constraint vector with no zero entries.
 
 # Returns
 """
-function build_sparse_nullspace(constraint::Vector{Float64})
+function build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
     q = length(constraint)
-    nz_flag = isapprox.(constraint, 0.0, atol=1e-13)
+    nz_flag = .!isapprox.(constraint, 0.0, atol=1e-13)
     i1 = findfirst(nz_flag)
     i2 = findlast(nz_flag)
     dd = zeros(Float64, q-1, 2)
-    dd[1:i1, 1] = 1
+    dd[1:i1, 1] .= 1.0
     for j = i1:i2-2
         dd[j, 2] = -constraint[j] / constraint[j+1] * dd[j, 1]
         dd[j+1, 1] = 1 - dd[j, 2]
     end
-    dd[i2-1:q-1, 2] = 1
+    dd[i2-1:q-1, 2] .= 1.0
 
-    return SparseArrays.spdiagm(q-1, q, 0 => dd[:,1], 1 => [0 1], q-1, q)
+    return SparseArrays.spdiagm(q-1, q, 0 => dd[:,1], 1 => dd[:,2])
 end

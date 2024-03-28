@@ -10,8 +10,7 @@
 """
 struct MultiPatchSpace{n,m} <: AbstractFunctionSpace{n} where {m}
     function_spaces::NTuple{m, AbstractFunctionSpace{n}}
-    extraction_coefficients::Vector{Array{Float64}}
-    supported_basis::Vector{Vector{Int}}
+    extraction_operator::ExtractionOperator
 end
 
 # TensorProductSpace constructors

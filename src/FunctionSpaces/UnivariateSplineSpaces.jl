@@ -244,12 +244,11 @@ end
 
 """
 struct GTBSplineSpace<:AbstractFunctionSpace{1}
-    bsplines::NTuple{m,BSplineSpace} where {m}
+    gtb_splines::MultiPatchSpace{1,m} where {m}
     regularity::Vector{Int}
-    extraction_op::ExtractionOperator
 
     function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
-        if length(regulariy) != m
+        if length(regularity) != m
             msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
             msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
             throw(ArgumentError(msg1*msg2))
@@ -268,6 +267,6 @@ struct GTBSplineSpace<:AbstractFunctionSpace{1}
             end
         end
 
-        new(bsplines, regularity, extract_gtbspline_to_bspline(bsplines, regularity))
+        new(MultiPatchSpace(bsplines, extract_gtbspline_to_bspline(bsplines, regularity)), regularity)
     end
 end
