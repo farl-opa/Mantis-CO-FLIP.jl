@@ -239,35 +239,35 @@ function evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float
     return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
 end
 
-# """
-#     struct GTBSplineSpace
+"""
+    struct GTBSplineSpace
 
-# """
-# struct GTBSplineSpace<:MultiPatchSpace{1,m} where {m}
-#     bsplines::NTuple{m,BSplineSpace}
-#     regularity::Vector{Int}
-#     extraction_op::ExtractionOp
+"""
+struct GTBSplineSpace<:MultiPatchSpace{1,m} where {m}
+    bsplines::NTuple{m,BSplineSpace}
+    regularity::Vector{Int}
+    extraction_op::ExtractionOp
 
-#     function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
-#         if length(regulariy) != m
-#             msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
-#             msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
-#             throw(ArgumentError(msg1*msg2))
-#         end
-#         for i in 1:m
-#             j = i
-#             k = i+1
-#             if i == m
-#                 k = 1
-#             end
-#             polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
-#             if polynomial_degree < regularity[i]
-#                 msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
-#                 msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
-#                 throw(ArgumentError(msg1*msg2))
-#             end
-#         end
+    function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
+        if length(regulariy) != m
+            msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
+            msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
+            throw(ArgumentError(msg1*msg2))
+        end
+        for i in 1:m
+            j = i
+            k = i+1
+            if i == m
+                k = 1
+            end
+            polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
+            if polynomial_degree < regularity[i]
+                msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
+                msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
+                throw(ArgumentError(msg1*msg2))
+            end
+        end
 
-#         new(bsplines, regularity, extract_gtbspline_to_bspline(bsplines, regularity))
-#     end
-# end
+        new(bsplines, regularity, extract_gtbspline_to_bspline(bsplines, regularity))
+    end
+end
