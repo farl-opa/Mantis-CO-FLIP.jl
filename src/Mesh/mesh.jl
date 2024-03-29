@@ -66,6 +66,10 @@ function get_breakpoints(patch::Patch1D)
     return patch.breakpoints
 end
 
+function get_element_size(patch::Patch1D, element_id::Int)
+    return patch.breakpoints[element_id+1]-patch.breakpoints[element_id]
+end
+
 """
     Patch{n}
 
