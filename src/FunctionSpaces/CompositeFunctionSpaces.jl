@@ -10,7 +10,15 @@
 """
 struct MultiPatchSpace{n,m} <: AbstractFunctionSpace{n} where {m}
     function_spaces::NTuple{m, AbstractFunctionSpace{n}}
-    extraction_operator::ExtractionOperator
+    extraction_op::ExtractionOperator
+end
+
+function get_num_elements(mp_space::MultiPatchSpace)
+    return get_num_elements(mp_space.extraction_op)
+end
+
+function get_extraction(mp_space::MultiPatchSpace, element_id::Int)
+    return get_extraction(mp_space.extraction_op, element_id)
 end
 
 # TensorProductSpace constructors
