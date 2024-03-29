@@ -36,6 +36,10 @@ function get_extraction(extraction_op::ExtractionOperator, element_id::Int)
     return @views extraction_op.extraction_coefficients[element_id], extraction_op.basis_indices[element_id]
 end
 
+function get_num_elements(extraction_op::ExtractionOperator)
+    return extraction_op.num_elements
+end
+
 include("CompositeFunctionSpaces.jl")
 include("UnivariateSplineSpaces.jl")
 include("UnivariateSplineExtractions.jl")
