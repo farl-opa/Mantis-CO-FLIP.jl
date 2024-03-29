@@ -38,7 +38,7 @@ by `knot_vector`.
 """
 function extract_bspline_to_bernstein(knot_vector::KnotVector)
     # number of elements
-    nel = length(knot_vector.breakpoints)-1
+    nel = size(knot_vector.patch_1d)
 
     # first extraction matrix
     E = create_identity(nel, knot_vector.polynomial_degree+1)
@@ -49,18 +49,18 @@ function extract_bspline_to_bernstein(knot_vector::KnotVector)
         mult = knot_vector.multiplicity[el+1]
 
         if mult < knot_vector.polynomial_degree
-            numer = knot_vector.breakpoints[el+1] - knot_vector.breakpoints[el]
+            numer = knot_vector.patch_1d.breakpoints[el+1] - knot_vector.patch_1d.breakpoints[el]
             r = knot_vector.polynomial_degree - mult
 
             for j in knot_vector.polynomial_degree-1:-1:mult
                 idx = el+1+floor(Int, j/mult)
 
                 if idx > nel+1
-                    alphas[j-mult+1] = numer / (knot_vector.breakpoints[end] - knot_vector.breakpoints[el])
+                    alphas[j-mult+1] = numer / (knot_vector.patch_1d.breakpoints[end] - knot_vector.patch_1d.breakpoints[el])
                     continue
                 end
 
-                alphas[j-mult+1] = numer / (knot_vector.breakpoints[idx] - knot_vector.breakpoints[el])
+                alphas[j-mult+1] = numer / (knot_vector.patch_1d.breakpoints[idx] - knot_vector.patch_1d.breakpoints[el])
             end
 
             for j in 1:r

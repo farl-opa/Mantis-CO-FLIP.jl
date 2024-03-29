@@ -183,6 +183,24 @@ function Base.size(patch::Patch{n}, d::Int) where {n}
 end
 
 """
+    size(patch_1d::Patch1D)
+
+Returns the number of elements in the `patch_1d`.
+
+Redefinition of `Base.size` for a `Patch1D`. This ensures that one can 
+call `size(patch_1d)` to get the size of the patch.
+
+# Arguments
+- `patch_1d::Patch1D`: Patch of which to get the size.
+
+# Returns
+- `::Int`: Number of elements in the patch.
+"""
+function Base.size(patch_1d::Patch1D)
+    return length(get_breakpoints(patch_1d)) - 1
+end
+
+"""
     get_element_ids(patch::Patch{n}) where {n}
 
 Returns an iterator of the valid element ids for this `patch`.
