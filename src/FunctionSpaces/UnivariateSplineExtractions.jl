@@ -81,11 +81,11 @@ function extract_bspline_to_bernstein(knot_vector::KnotVector)
     # get indices of supported basis functions on each element
     basis_indices = Vector{Vector{Int}}(undef, nel)
     basis_indices[1] = 1:knot_vector.polynomial_degree+1
-    for el = 2:length(knot_vector.breakpoints)-1
+    for el = 2:nel
         basis_indices[el] = basis_indices[el-1] .+ knot_vector.multiplicity[el]
     end
 
-    return ExtractionOperator(E, basis_indices)
+    return ExtractionOperator(E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree+1])
 end
 
 """
@@ -147,7 +147,7 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
         end
     end
 
-    return ExtractionOperator(extraction_coefficients, basis_indices)
+    return ExtractionOperator(extraction_coefficients, basis_indices, nel, size(H,1))
 end
 
 """
