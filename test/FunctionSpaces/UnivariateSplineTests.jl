@@ -8,6 +8,55 @@ import Mantis
 
 using Test
 
-B1 = Mantis.FunctionSpaces.BSplineSpace([0.0, 0.5, 1.0], 3, [-1, 1, -1])
-B2 = Mantis.FunctionSpaces.BSplineSpace([0.0, 0.5, 1.0], 4, [-1, 1, -1])
+deg = 3
+breakpoints = [0.0, 0.5, 1.0]
+patch1 = Mantis.Mesh.Patch1D(breakpoints)
+B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg, [-1, 1, -1])
+x, _ = Mantis.Quadrature.gauss_legendre(deg+1)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B1)
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B1, el)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
+
+    # check B-spline evaluation
+    B1_eval, _ = Mantis.FunctionSpaces.evaluate(B1, el, x, 1)
+    # Positivity of the polynomials
+    @test minimum(B1_eval[:,:,1]) >= 0.0
+
+    # Partition of unity
+    @test all(isapprox.(sum(B1_eval[:,:,1], dims=2), 1.0))
+
+    # Zero sum of derivatives
+    @test all(isapprox.(abs.(sum(B1_eval[:,:,2], dims=2)), 0.0, atol=1e-14))
+end
+
+breakpoints = [0.0, 0.5, 0.6, 1.0]
+patch2 = Mantis.Mesh.Patch1D(breakpoints)
+B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, 4, [-1, 1, 3, -1])
+x, _ = Mantis.Quadrature.gauss_legendre(deg+1)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B2)
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B2, el)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
+
+    # check B-spline evaluation
+    B2_eval, _ = Mantis.FunctionSpaces.evaluate(B2, el, x, 1)
+    # Positivity of the polynomials
+    @test minimum(B2_eval[:,:,1]) >= 0.0
+
+    # Partition of unity
+    @test all(isapprox.(sum(B2_eval[:,:,1], dims=2), 1.0))
+
+    # Zero sum of derivatives
+    @test all(isapprox.(abs.(sum(B2_eval[:,:,2], dims=2)), 0.0, atol=1e-14))
+end
+
 GB = Mantis.FunctionSpaces.GTBSplineSpace((B1, B2), [1, -1])
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(GB, el)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
+end
