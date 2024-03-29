@@ -13,41 +13,41 @@ struct Bernstein <: AbstractPolynomials
 end
 
 @doc raw"""
-    evaluate(polynomial::Bernstein, xi::Vector{Float64}, nderivatives::Int64)::Array{Float64}
+    evaluate(polynomial::Bernstein, ξ::Vector{Float64}, nderivatives::Int64)::Array{Float64}
 
 Compute derivatives up to order `nderivatives` for all Bernstein 
-polynomials of degree `p` at ``\xi`` for ``\xi \in [0.0, 1.0]``. 
+polynomials of degree `p` at `ξ` for ``\xi \in [0.0, 1.0]``. 
 
 # Arguments
 - `polynomial::Bernstein`: Bernstein polynomial
-- `xi::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
+- `ξ::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
 - `nderivatives::Int64`: maximum order of derivatives to be computed (nderivatives ``\leq p``).
 
-See also [`evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)`](@ref).
+See also [`evaluate(polynomial::Bernstein, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::Bernstein, xi::Vector{Float64}, nderivatives::Int64)::Array{Float64}
+function evaluate(polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int64)::Array{Float64}
     # store the values and derivatives here
-    neval = length(xi)
+    neval = length(ξ)
     ders = zeros(Float64, neval, polynomials.p + 1, nderivatives + 1)
     for i = 1:neval
-        ders[i,:,:] = evaluate(polynomials, xi[i], nderivatives)
+        ders[i,:,:] = evaluate(polynomials, ξ[i], nderivatives)
     end
     return ders
 end
 
 @doc raw"""
-    evaluate(polynomial::Bernstein, xi::Vector{Float64})::Array{Float64}
+    evaluate(polynomial::Bernstein, ξ::Vector{Float64})::Array{Float64}
 
-Compute all Bernstein polynomials of degree `p` at ``\xi`` for ``\xi \in [0.0, 1.0]``.
+Compute all Bernstein polynomials of degree `p` at `ξ` for ``\xi \in [0.0, 1.0]``.
 
 # Arguments
 - `polynomial::Bernstein`: Bernstein polynomial
 - `xi::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
 
-See also [`evaluate(polynomial::Bernstein, xi::Vector{Float64}, nderivatives::Int64)`](@ref).
+See also [`evaluate(polynomial::Bernstein, ξ::Vector{Float64}, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomial::Bernstein, xi::Vector{Float64})::Array{Float64}
-    return evaluate(polynomial, xi, 0)
+function evaluate(polynomial::Bernstein, ξ::Vector{Float64})::Array{Float64}
+    return evaluate(polynomial, ξ, 0)
 end
 
 
