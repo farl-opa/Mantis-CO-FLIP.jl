@@ -12,8 +12,6 @@ struct Bernstein <: AbstractPolynomials
     p::Int  # Polynomial degree
 end
 
-
-
 @doc raw"""
     evaluate(polynomial::Bernstein, xi::Vector{Float64}, nderivatives::Int64)::Array{Float64}
 
@@ -27,16 +25,15 @@ polynomials of degree `p` at ``\xi`` for ``\xi \in [0.0, 1.0]``.
 
 See also [`evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomial::Bernstein, xi::Vector{Float64}, nderivatives::Int64)::Array{Float64}
+function evaluate(polynomials::Bernstein, xi::Vector{Float64}, nderivatives::Int64)::Array{Float64}
     # store the values and derivatives here
     neval = length(xi)
-    ders = zeros(Float64, neval, polynomial.p + 1, nderivatives + 1)
+    ders = zeros(Float64, neval, polynomials.p + 1, nderivatives + 1)
     for i = 1:neval
-        ders[i,:,:] = evaluate(polynomial, xi[i], nderivatives)
+        ders[i,:,:] = evaluate(polynomials, xi[i], nderivatives)
     end
     return ders
 end
-
 
 @doc raw"""
     evaluate(polynomial::Bernstein, xi::Vector{Float64})::Array{Float64}
@@ -89,14 +86,16 @@ function evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)::Arra
     # degree
     p = polynomial.p
 
+    # arg checks
     if p < 0
-        msg = "The Bernstein polynomial must be of degree at least 0."
+        msg = "The Bernstein polynomials must be of degree at least 0."
         throw(ArgumentError(msg))
     elseif xi < 0.0 || xi > 1.0
         msg = "x = $x is outside the interval [0.0, 1.0]."
         throw(ArgumentError(msg))
     end
     
+    # compute upper and lower triangular values that combine to form values and derivatives
     ndu = zeros(Float64, p+1, p+1)
     left = zeros(Float64, p+1)
     right = zeros(Float64, p+1)
