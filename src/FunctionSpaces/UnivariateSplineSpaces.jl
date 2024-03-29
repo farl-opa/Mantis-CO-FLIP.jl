@@ -66,6 +66,12 @@ function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition
     end
 end
 
+function get_element_size(knot_vector::KnotVector, element_id::Int)
+    return Mesh.get_element_size(knot_vector.patch_1d, element_id)
+end
+
+
+
 """
     struct BSplineSpace
 
@@ -179,6 +185,10 @@ function get_num_elements(bspline::BSplineSpace)
     return size(bspline.knot_vector.patch_1d)
 end
 
+function get_element_size(bspline::BSplineSpace, element_id::Int)
+    return get_element_size(bspline.knot_vector, element_id)
+end
+
 """
     evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
 
@@ -195,8 +205,9 @@ Evaluates the non-zero `bspline` basis functions on the element specified by `el
 function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
     extraction_coefficients, basis_indices = get_extraction(bspline, element_id)
     local_basis = get_local_basis(bspline, xi, nderivatives)
+    el_size = get_element_size(bspline, element_id)
     for r = 0:nderivatives
-        local_basis[:,:,r+1] .= @views local_basis[:,:,r+1] * extraction_coefficients'
+        local_basis[:,:,r+1] .= @views local_basis[:,:,r+1] * extraction_coefficients ./ el_size^r
     end
 
     return local_basis, basis_indices
@@ -269,4 +280,12 @@ struct GTBSplineSpace<:AbstractFunctionSpace{1}
 
         new(MultiPatchSpace(bsplines, extract_gtbspline_to_bspline(bsplines, regularity)), regularity)
     end
+end
+
+function get_num_elements(gtb_space::GTBSplineSpace)
+    return get_num_elements(gtb_space.gtb_splines)
+end
+
+function get_extraction(gtb_space::GTBSplineSpace, element_id::Int)
+    return get_extraction(gtb_space.gtb_splines, element_id)
 end
