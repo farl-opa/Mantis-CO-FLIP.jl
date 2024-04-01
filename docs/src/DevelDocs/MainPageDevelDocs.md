@@ -15,9 +15,9 @@ on parts of the code that are not designed for public access.
     different structure.
 
 
-## All functions and stuff from Mantis.Polynomials
+## All functions and stuff from Mantis.ElementLocalBases
 ```@autodocs
-Modules = [Mantis.Polynomials]
+Modules = [Mantis.ElementLocalBases]
 ```
 
 ## All functions and stuff from Mantis.Quadrature

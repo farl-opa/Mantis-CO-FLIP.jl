@@ -50,7 +50,7 @@ format_setup = Documenter.HTML(
 # The modules option will raise an error when some docstrings from the 
 # listed modules are not included in the docs.
 makedocs(
-    modules  = [Mantis.Polynomials, Mantis.Quadrature], 
+    modules  = [Mantis.ElementLocalBases, Mantis.Quadrature], 
     format   = format_setup,
     sitename = "MANTIS.jl",
     authors  = "Diogo Costa Cabanas, Joey Dekker, Deepesh Toshniwal, Artur Palha",
