@@ -6,7 +6,7 @@ The exported names are:
 module FunctionSpaces
 
 import .. Mesh
-import .. Polynomials
+import .. ElementLocalBases
 import SparseArrays
 
 """

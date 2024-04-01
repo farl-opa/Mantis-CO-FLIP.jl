@@ -27,8 +27,8 @@ for p in degrees_to_test
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))
 
-    b = Mantis.Polynomials.Bernstein(p)
-    b_eval = Mantis.Polynomials.evaluate(b, x, 1)
+    b = Mantis.ElementLocalBases.Bernstein(p)
+    b_eval = Mantis.ElementLocalBases.evaluate(b, x, 1)
 
     # Positivity of the polynomials
     @test minimum(b_eval[:,:,1]) >= 0.0
@@ -46,7 +46,7 @@ for p in degrees_to_test
     @test all(isapprox.(b_eval[:,:,1] * LinRange(0,p,p+1), p.*x))
 
     # # Symmetry
-    # b_plp = [Mantis.Polynomials.polynomial_bernstein(p, p-l, 1.0-xi) for xi in x]
+    # b_plp = [Mantis.ElementLocalBases.polynomial_bernstein(p, p-l, 1.0-xi) for xi in x]
     # @test isapprox(b_lp, b_plp)
 
     # # Root at zero

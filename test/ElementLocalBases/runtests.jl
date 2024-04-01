@@ -1,4 +1,4 @@
-module PolynomialsTests
+module ElementLocalBasesTests
 
 using Test
 
