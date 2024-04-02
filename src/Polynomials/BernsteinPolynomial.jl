@@ -171,3 +171,33 @@ function evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)::Arra
     return ders
 end
 
+@doc raw"""
+extract_monomial_to_bernstein(polynomial::Bernstein)::Array{Float64}
+
+Computes transformation matrix T that transforms coefficients of
+a polynomial in terms of the monomial basis into coefficients of
+in terms of the Bernstein basis.
+
+# Arguments
+- `polynomial::Bernstein`: Bernstein polynomial
+"""
+function extract_monomial_to_bernstein(polynomial::Bernstein)::Array{Float64}
+    # degree
+    p = polynomial.p
+
+    # arg checks
+    if p < 0
+        msg = "The Bernstein polynomials must be of degree at least 0."
+        throw(ArgumentError(msg))
+    end
+    
+    # build transformation matrix for mapping coefficients of a polynomial in monomial basis to that of Bernstein
+    T = zeros(Float64, p+1, p+1)
+	for i = 0:p
+		for j = 0:i
+			T[i+1,j+1] = binomial(i, j) / binomial(p, j)
+		end
+	end
+    
+    return T
+end
