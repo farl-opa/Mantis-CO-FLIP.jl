@@ -1,15 +1,15 @@
 # MultiPatchSpace constructors
 
 """
-    MultiPatchSpace{n, m} <: AbstractFunctionSpace{n}
+    MultiPatchSpace{n, m} <: AbstractFiniteElementSpace{n}
 
 `n`-variate multi-patch space with m patches
 
 # Fields
-- `function_spaces::NTuple{m, F} where {m, F <: AbstractFunctionSpace}`: collection of uni or multivariate function spaces.
+- `function_spaces::NTuple{m, F} where {m, F <: AbstractFiniteElementSpace}`: collection of uni or multivariate function spaces.
 """
-struct MultiPatchSpace{n,m} <: AbstractFunctionSpace{n} where {m}
-    function_spaces::NTuple{m, AbstractFunctionSpace{n}}
+struct MultiPatchSpace{n,m} <: AbstractFiniteElementSpace{n} where {m}
+    function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}
     extraction_op::ExtractionOperator
 end
 
@@ -24,18 +24,18 @@ end
 # TensorProductSpace constructors
 
 """
-    TensorProductSpace{n} <: AbstractFunctionSpace{n} 
+    TensorProductSpace{n} <: AbstractFiniteElementSpace{n} 
 
 `n`-variate tensor-product space.
 
 # Fields
 - `patch::Patch{n}`: Patch on which the tensor product space is defined.
-- `function_spaces::NTuple{m, F} where {m, F <: AbstractFunctionSpace}`: collection of uni or multivariate function spaces.
+- `function_spaces::NTuple{m, F} where {m, F <: AbstractFiniteElementSpace}`: collection of uni or multivariate function spaces.
 """
-struct TensorProductSpace{n} <: AbstractFunctionSpace{n} 
+struct TensorProductSpace{n} <: AbstractFiniteElementSpace{n} 
     patch::Mesh.Patch{n}
-    function_spaces::NTuple{m, AbstractFunctionSpace} where {m}
-    function TensorProductSpace(patch::Mesh.Patch{n}, function_spaces::NTuple{m, AbstractFunctionSpace}) where {n,m}
+    function_spaces::NTuple{m, AbstractFiniteElementSpace} where {m}
+    function TensorProductSpace(patch::Mesh.Patch{n}, function_spaces::NTuple{m, AbstractFiniteElementSpace}) where {n,m}
         if sum([get_n(function_spaces[i]) for i in 1:1:m]) != n
             throw(ArgumentError("The sum of the dimensions of the input spaces does not match the dimension of the patch!"))
         end

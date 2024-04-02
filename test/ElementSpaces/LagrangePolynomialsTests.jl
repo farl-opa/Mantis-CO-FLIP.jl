@@ -1,4 +1,4 @@
-module LagrangeElementLocalBasesTests
+module LagrangeElementSpacesTests
 
 import Mantis
 
@@ -107,16 +107,16 @@ ll_evaluation = [
 # Perform the tests 
 for p_idx in eachindex(p_reference)
     p = p_reference[p_idx]
-    ll_polynomial = Mantis.ElementLocalBases.LobattoLegendre(p)
+    ll_polynomial = Mantis.ElementSpaces.LobattoLegendre(p)
 
     # Test that nodes are generate as expected
     @test ll_polynomial.nodes ≈ ll_nodes_reference[p_idx] atol = 1e-12
 
     # Test if polynomial basis evaluation at nodes gives an identity matrix
-    @test Mantis.ElementLocalBases.evaluate(ll_polynomial, ll_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
+    @test Mantis.ElementSpaces.evaluate(ll_polynomial, ll_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
 
     # Test if polynomial basis evaluation at evenly spaces nodes gives expected results
-    @test Mantis.ElementLocalBases.evaluate(ll_polynomial, [range(0.0, 1.0, length=11)...]) ≈ ll_evaluation[p_idx] atol = 1e-11
+    @test Mantis.ElementSpaces.evaluate(ll_polynomial, [range(0.0, 1.0, length=11)...]) ≈ ll_evaluation[p_idx] atol = 1e-11
 end
 
 # ---------------------------------------------------------------------------------------
@@ -220,16 +220,16 @@ gl_evaluation = [
 # Test nodes
 for p_idx in eachindex(p_reference)
     p = p_reference[p_idx]
-    gl_polynomial = Mantis.ElementLocalBases.GaussLegendre(p)
+    gl_polynomial = Mantis.ElementSpaces.GaussLegendre(p)
 
     # Test that nodes are generate as expected
     @test gl_polynomial.nodes ≈ gl_nodes_reference[p_idx] atol = 1e-12
 
     # Test if polynomial basis evaluation at nodes gives an identity matrix
-    @test Mantis.ElementLocalBases.evaluate(gl_polynomial, gl_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
+    @test Mantis.ElementSpaces.evaluate(gl_polynomial, gl_polynomial.nodes) == LinearAlgebra.Diagonal(ones(p+1))
 
     # Test if polynomial basis evaluation at evenly spaces nodes gives expected results
-    @test Mantis.ElementLocalBases.evaluate(gl_polynomial, [range(0.0, 1.0, length=11)...]) ≈ gl_evaluation[p_idx] atol = 1e-11
+    @test Mantis.ElementSpaces.evaluate(gl_polynomial, [range(0.0, 1.0, length=11)...]) ≈ gl_evaluation[p_idx] atol = 1e-11
 end
 # ---------------------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 
 import PolynomialBases
 
-abstract type AbstractLagrangePolynomials <: AbstractFunctions end
+abstract type AbstractLagrangePolynomials <: AbstractElementSpace end
 
 
 struct LobattoLegendre <: AbstractLagrangePolynomials

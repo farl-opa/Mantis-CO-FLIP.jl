@@ -1,4 +1,4 @@
-module ElementLocalBasesTests
+module ElementSpacesTests
 
 using Test
 

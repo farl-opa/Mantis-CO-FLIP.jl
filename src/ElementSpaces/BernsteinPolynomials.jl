@@ -1,13 +1,13 @@
 
 @doc raw"""
-    struct Bernstein <: AbstractFunctions
+    struct Bernstein <: AbstractElementSpace
 
 Concrete type for Bernstein polynomials.
 
 # Fields
 - `p::Int`: Degree of the Bernstein polynomial.
 """
-struct Bernstein <: AbstractFunctions
+struct Bernstein <: AbstractElementSpace
     "Degree of the polynomial."
     p::Int  # Polynomial degree
 end
