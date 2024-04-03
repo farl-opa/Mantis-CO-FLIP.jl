@@ -81,11 +81,11 @@ function extract_bspline_to_bernstein(knot_vector::KnotVector)
     # get indices of supported basis functions on each element
     basis_indices = Vector{Vector{Int}}(undef, nel)
     basis_indices[1] = 1:knot_vector.polynomial_degree+1
-    for el = 2:size(knot_vector.patch_1d)
+    for el = 2:nel
         basis_indices[el] = basis_indices[el-1] .+ knot_vector.multiplicity[el]
     end
 
-    return ExtractionOperator(E, basis_indices)
+    return ExtractionOperator(E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree+1])
 end
 
 """
@@ -130,7 +130,11 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
         end
     end
 
+    # remove small values obtained as a result of round-off errors
+    SparseArrays.fkeep!(H, (i,j,x) -> abs(x) > 1e-14)
+
     # convert global extraction matrix to element local extractions
+    # (here, the matrix is transposed so that [Bsplines] * [extraction] = [GTB-splines])
     extraction_coefficients = Vector{Array{Float64}}(undef, nel)
     basis_indices = Vector{Vector{Int}}(undef, nel)
     count = 0
@@ -142,12 +146,12 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
             # unique indices for non-zero rows and columns
             basis_indices[count+1] = unique(eij[1])
             # matrix of coefficients
-            extraction_coefficients[count+1] = Array(H[basis_indices[count+1], cols_ij])
+            extraction_coefficients[count+1] = Array(H[basis_indices[count+1], cols_ij])'
             count += 1
         end
     end
 
-    return ExtractionOperator(extraction_coefficients, basis_indices)
+    return ExtractionOperator(extraction_coefficients, basis_indices, nel, size(H,1))
 end
 
 """

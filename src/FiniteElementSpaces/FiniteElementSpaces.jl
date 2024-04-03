@@ -3,21 +3,21 @@ This (sub-)module provides a collection of scalar function spaces.
 
 The exported names are:
 """
-module FunctionSpaces
+module FiniteElementSpaces
 
 import .. Mesh
-import .. Polynomials
+import .. ElementSpaces
 import SparseArrays
 
 """
-    AbstractFunctionSpace
+    AbstractFiniteElementSpace
 
 Supertype for all scalar function spaces.
 """
-abstract type AbstractFunctionSpace{n} end
+abstract type AbstractFiniteElementSpace{n} end
 
 # Getters for the function spaces
-get_n(f::AbstractFunctionSpace{n}) where {n} = n
+get_n(f::AbstractFiniteElementSpace{n}) where {n} = n
 
 """
     struct ExtractionOperator
@@ -27,11 +27,17 @@ Structure to store extraction operators and coefficients.
 struct ExtractionOperator
     extraction_coefficients::Vector{Array{Float64}}
     basis_indices::Vector{Vector{Int}}
+    num_elements::Int
+    space_dim::Int
 end
 
 # Getters for extraction operators
 function get_extraction(extraction_op::ExtractionOperator, element_id::Int)
     return @views extraction_op.extraction_coefficients[element_id], extraction_op.basis_indices[element_id]
+end
+
+function get_num_elements(extraction_op::ExtractionOperator)
+    return extraction_op.num_elements
 end
 
 include("CompositeFunctionSpaces.jl")
