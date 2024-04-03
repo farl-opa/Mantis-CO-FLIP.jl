@@ -63,5 +63,4 @@ for p in degrees_to_test
             @test isapprox(maximum(abs.(b_eval[:,:,3] * coeff_b .- d2f_dx2_eval)), 0.0, atol = 2e-13)
         end
     end
-
 end
