@@ -162,7 +162,7 @@ The derivative of the Lagrange interpolating basis functions
 ```
 
 For computation at the nodes a more efficient and accurate formula can
-be used, see [1]:
+be used, see [Costa2000](@cite):
 
 ```math
 d_{k,j} = \left\{
@@ -176,7 +176,7 @@ with
 
 ```math
 c_{k} = \prod_{l=1,l\neq k}^{p+1} (x_{k}-x_{l})   
-````
+```
 
 It returns a 2-dimensional matrix, `D`, with the values of the derivative of
 the polynomials, $B_{j}$, of order `p`
@@ -197,11 +197,6 @@ D_{k,j} = \frac{\mathrm{d}B_{j}(x_{k})}{\mathrm{d}x}
 - `D::Array{Float64, 2}` :: The derivatives of the `(p+1)` polynomials evaluated at the `(p+1)` nodal points.
    ``D_{k,j} = \frac{\mathrm{d}B_{j}(x_{k})}{\mathrm{d}x}``.
    (size: [p+1, p+1])
-
-
-[1] Costa, B., Don, W. S.: On the computation of high order
-    pseudospectral derivatives, Applied Numerical Mathematics, vol.33
-    (1-4), pp. 151-159
 """
 function _derivative_matrix(polynomials::AbstractLagrangePolynomials; algorithm::Int64=1)
     #   Revisions:  2009-11-25 (apalha) First implementation.
@@ -301,7 +296,7 @@ _derivative_matrix_next!(D_m::Array{Float64, 2}, m::Int64, D::Array{Float64, 2},
 Given the derivative matrix (of order 1), `D`, and the derivative matrix of order `n`, `D_m`,
 compute the derivative of order `(n+1)`.
 
-We follow the algorithm proposed in section 4 of [1].
+We follow the algorithm proposed in section 4 of [Costa2000](@cite).
 
 # Arguments
 - `D_m::Array{float64, 2}`: Derivative matrix of order `m` for the ``(p+1)`` `polynomials`` of degree ``p``,
@@ -318,10 +313,6 @@ We follow the algorithm proposed in section 4 of [1].
    ``D^{(m)}_{k,j} = \frac{\mathrm{d}^{m}B_{j}(x_{k})}{\mathrm{d}x^{m}}``. `D_m` given as input argument is updated with the new value.
    (size: [p+1, p+1])
 
-
-[1] Costa, B., Don, W. S.: On the computation of high order
-    pseudospectral derivatives, Applied Numerical Mathematics, vol.33
-    (1-4), pp. 151-159
 """
 function _derivative_matrix_next!(D_m::Array{Float64, 2}, m::Int64, D::Array{Float64, 2}, polynomials::AbstractLagrangePolynomials)
     # Get the nodes of the polynomial basis and the number of roots (degree p + 1)
