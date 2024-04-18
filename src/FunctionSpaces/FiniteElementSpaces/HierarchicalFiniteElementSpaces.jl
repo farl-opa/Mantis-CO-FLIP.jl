@@ -6,16 +6,11 @@ The exported names are:
 
 include("HierarchicalRelations.jl")
 
-
 """
 This (sub-)module provides functionality related with hierarchical refinment.
 
 The exported names are:
 """
-
-module HierarchicalFiniteElementSpaces
-
-import .. FiniteElementSpaces
 
 """
     struct HierarchicalActiveInfo
@@ -35,25 +30,25 @@ struct HierarchicalActiveInfo
 end
 
 """
-    struct HierarchicalFiniteElementSpace{n} <: FiniteElementSpaces.AbstractFiniteElementSpace{n}
+    struct HierarchicalFiniteElementSpace{n} <: AbstractFiniteElementSpace{n}
 
 A hierarchical space that is built from a nested hierarchy of `n`–variate function spaces. 
 
 # Fields
-- `spaces::Vector{FiniteElementSpaces.AbstractFiniteElementSpace{n}} `: collection of `n`–variate 
+- `spaces::Vector{AbstractFiniteElementSpace{n}} `: collection of `n`–variate 
 function spaces.
-- `two_scale_operators::Vector{FiniteElementSpaces.TwoScaleOperator}`: collection of two–scale operators
+- `two_scale_operators::Vector{TwoScaleOperator}`: collection of two–scale operators
 relating each consequtive pair of function spaces.
 - `active_elements::HierarchicalActiveInfo`: information about the active elements in each level.
 - `active_functions::HierarchicalActiveInfo`: information about the active functions in each level.
 """
-struct HierarchicalFiniteElementSpace{n} <: FiniteElementSpaces.AbstractFiniteElementSpace{n}
-    spaces::Vector{FiniteElementSpaces.AbstractFiniteElementSpace{n}} 
-    two_scale_operators::Vector{FiniteElementSpaces.TwoScaleOperator}
+struct HierarchicalFiniteElementSpace{n} <: AbstractFiniteElementSpace{n}
+    spaces::Vector{AbstractFiniteElementSpace{n}} 
+    two_scale_operators::Vector{TwoScaleOperator}
     active_elements::HierarchicalActiveInfo
     active_functions::HierarchicalActiveInfo
 
-    function HierarchicalFiniteElementSpace(spaces::Vector{T}, two_scale_operators::Vector{FiniteElementSpaces.TwoScaleOperator}, active_elements::HierarchicalActiveInfo, active_functions::HierarchicalActiveInfo) where {n, T <: FiniteElementSpaces.AbstractFiniteElementSpace{n}}
+    function HierarchicalFiniteElementSpace(spaces::Vector{T}, two_scale_operators::Vector{TwoScaleOperator}, active_elements::HierarchicalActiveInfo, active_functions::HierarchicalActiveInfo) where {n, T <: AbstractFiniteElementSpace{n}}
         L = length(spaces)
 
         # Checks for incompatible arguments
@@ -249,7 +244,7 @@ Returns the function space at `level`.
 - `hierarchical_space::HierarchicalFiniteElementSpace{n}`: Hierarchical function space.
 - `level::Int`: refinement level.
 # Returns
-- `::FiniteElementSpaces.AbstractFiniteElementSpace{n}`: function space at `level`.
+- `::AbstractFiniteElementSpace{n}`: function space at `level`.
 """
 function get_space(hierarchical_space::HierarchicalFiniteElementSpace{n}, index::Int) where {n}
     return hierarchical_space.spaces[index]
@@ -298,6 +293,4 @@ Returns the active functions of `hierarchical_space` at `level`.
 """
 function get_level_functions(hierarchical_space::HierarchicalFiniteElementSpace{n}, level::Int) where {n}
     return get_level_active(hierarchical_space.active_functions, level)
-end
-
 end
