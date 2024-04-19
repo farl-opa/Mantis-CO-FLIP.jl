@@ -99,7 +99,7 @@ Returns the number of active elements in `hierarchical_space`.
 - `::Int`: number of active elements.
 """
 function get_n_elements(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
-    return get_n_active(hierarchical_space.elements)
+    return get_n_active(hierarchical_space.active_elements)
 end
 
 """
@@ -113,7 +113,7 @@ Returns the number of active functions in `hierarchical_space`.
 - `::Int`: number of active functions.
 """
 function get_n_functions(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
-    return get_n_active(hierarchical_space.functions)
+    return get_n_active(hierarchical_space.active_functions)
 end
 
 """
@@ -141,7 +141,7 @@ Returns the number of levels in `hierarchical_space`.
 - `::Int`: number of levels.
 """
 function get_n_levels(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
-    return get_n_levels(hierarchical_space.elements)
+    return get_n_levels(hierarchical_space.active_elements)
 end
 
 """
