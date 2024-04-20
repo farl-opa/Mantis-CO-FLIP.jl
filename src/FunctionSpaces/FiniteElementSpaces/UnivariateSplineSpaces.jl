@@ -376,6 +376,39 @@ function get_element_size(bspline::BSplineSpace, element_id::Int)
 end
 
 """
+    get_support(bspline::BSplineSpace, basis_id::Int)
+
+Returns the elements where the B-spline given by `basis_id` is supported.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-Spline function space.
+- `basis_id::Int`: The id of the basis function.
+# Returns
+- `::UnitRange{Int}`: The support of the basis function.
+"""
+function get_support(bspline::BSplineSpace, basis_id::Int)
+    first_element = get_breakpoint_index(bspline.knot_vector, basis_id)
+    last_element = get_breakpoint_index(bspline.knot_vector, basis_id+bspline.knot_vector.polynomial_degree+1) - 1
+
+    return first_element:last_element
+end
+
+"""
+    get_support(bspline::NTuple{n, BSplineSpace}, basis_id::NTuple{n, Int})
+
+Returns the elements where the B-spline given by `basis_id` is supported.
+
+# Arguments
+- `bspline::NTuple{n, BSplineSpace}`: The B-Spline function space.
+- `basis_id::NTuple{n, Int})`: The id of the basis function.
+# Returns
+- `::NTuple{n, UnitRange{Int}}`: The support of the basis function.
+"""
+function get_support(bspline::NTuple{n, BSplineSpace}, basis_id::NTuple{n, Int}) where {n}
+    return ntuple(d -> get_support(bspline[d], basis_id[d]), n)
+end
+
+"""
     evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
 
 Evaluates the non-zero `bspline` basis functions on the element specified by `element_id` and points `xi` and all derivatives up to nderivatives.

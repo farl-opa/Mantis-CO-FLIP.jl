@@ -2,14 +2,14 @@ import Mantis
 
 using Test
 
-nq = 11
-p = 2
-nlevels = 6
+nq = 7
+p = 3
+nlevels = 3
 subdiv = 2
 
 brk = collect(LinRange(0,1,nq))
 patch = Mantis.Mesh.Patch1D(brk)
-regularity = fill(1, nq)
+regularity = fill(p-1, nq)
 regularity[1]=regularity[nq] = -1
 bspline1 = Mantis.FunctionSpaces.BSplineSpace(patch, p, regularity)
 
@@ -40,4 +40,31 @@ hierarchical_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplin
 
 for l in 1:nlevels
     @test Mantis.FunctionSpaces.get_space(hierarchical_space, l) == bsplines[l]
+end
+
+# Test according to the example in Fig 9. of https://doi.org/10.1007/s11831-022-09752-5
+refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1,6,3,4,5,6,7,8,9,10,7,8,9,10,11,12,13,14,15,16],[0,2,10,20])
+hierarchical_space = Mantis.FunctionSpaces.get_hierarchical_space(bsplines, two_scale_operators, refined_domains, fill(2, nlevels))
+
+# test if active elements are correct   
+@test Mantis.FunctionSpaces.get_level_elements(hierarchical_space, 1)[2] == [1,6]
+@test Mantis.FunctionSpaces.get_level_elements(hierarchical_space, 2)[2] == [3,9,10]
+@test Mantis.FunctionSpaces.get_level_elements(hierarchical_space, 3)[2] == collect(7:16)
+
+# test if active functions are correct   
+@test Mantis.FunctionSpaces.get_level_functions(hierarchical_space, 1)[2] == [1,2,3,4,6,7,8,9]
+@test Mantis.FunctionSpaces.get_level_functions(hierarchical_space, 2)[2] == [6,9,10]
+@test Mantis.FunctionSpaces.get_level_functions(hierarchical_space, 3)[2] == collect(10:16)
+
+# Tests for coefficients and evaluation
+for el in 1:1:Mantis.FunctionSpaces.get_n_elements(hierarchical_space)
+
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hierarchical_space, el)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+
+    # check Hierarchical B-spline evaluation
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hierarchical_space, el, brk, 0)
+    # Positivity of the basis
+    @test minimum(h_eval[:,:,1]) >= 0.0
 end

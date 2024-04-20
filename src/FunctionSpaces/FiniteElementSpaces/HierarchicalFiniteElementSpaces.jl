@@ -253,16 +253,16 @@ end
 """
     get_level_active(active_info::HierarchicalActiveInfo, level::Int)
 
-Returns the active objects of `active_info` at `level`.
+Returns the indices and active objects of `active_info` at `level`.
 
 # Arguments 
 - `active_info::HierarchicalActiveInfo`: information about active objects.
 - `level::Int`: refinement level.
 # Returns
-- `::@view Vector{Int}`: active objects at `level`.
+- `::Tuple{UnitRange{Int}, @view Vector{Int}}`: indices and active objects at `level`.
 """
 function get_level_active(active_info::HierarchicalActiveInfo, level::Int)
-    return @view active_info.ids[active_info.levels[level]+1:active_info.levels[level+1]]
+    return active_info.levels[level]+1:active_info.levels[level+1], @view active_info.ids[active_info.levels[level]+1:active_info.levels[level+1]]
 end
 
 """
@@ -293,4 +293,84 @@ Returns the active functions of `hierarchical_space` at `level`.
 """
 function get_level_functions(hierarchical_space::HierarchicalFiniteElementSpace{n}, level::Int) where {n}
     return get_level_active(hierarchical_space.active_functions, level)
+end
+
+function get_active_indices(active_info::HierarchicalActiveInfo, ids::UnitRange{Int}, level::Int)
+    ids_range = active_info.levels[level]+1:active_info.levels[level+1]
+
+    return ids_range[active_info.ids[ids_range] .∈ [ids]]
+end
+
+function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace, element::Int)
+    level = get_element_level(hierarchical_space, element)
+    element_id = hierarchical_space.active_elements.ids[element]
+    return get_extraction(hierarchical_space.spaces[level], element_id)
+end
+
+function evaluate(hierarchical_space::HierarchicalFiniteElementSpace, element::Int, xi::Vector{Float64}, nderivatives::Int)
+    level = get_element_level(hierarchical_space, element)
+    element_id = hierarchical_space.active_elements.ids[element]
+    return evaluate(hierarchical_space.spaces[level], element_id, xi, nderivatives)
+end
+
+# Updaters for the Hierarcical Active information
+
+function remove_active!(active_info::HierarchicalActiveInfo, indices::Vector{Int}, level::Int)
+    indices = sort!(unique(indices))
+    deleteat!(active_info.ids, indices)
+    active_info.levels[level+1] -= length(indices)
+
+    return active_info
+end
+
+function add_active!(active_info::HierarchicalActiveInfo, ids::Vector{Int}, level::Int)
+    ids = sort!(unique(ids))
+    if level <= get_n_levels(active_info)
+        index = active_info.levels[level+1]+1
+        active_info.ids = [active_info.ids[1:index-1]; ids; active_info.ids[index:end]]
+        levels[level+1] += length(ids)
+    else
+        append!(active_info.ids, ids)
+        append!(active_info.levels, active_info.levels[end]+length(ids))
+    end
+
+    return active_info
+end
+
+# Hierarchical space constructor
+
+function get_hierarchical_space(fe_spaces::Vector{T}, two_scale_operators::Vector{TwoScaleOperator}, refined_domains::HierarchicalActiveInfo, nsubdivisions::Vector{Int}) where {T<:AbstractFiniteElementSpace{n} where n}
+    L = length(fe_spaces)
+
+    # Initialize active functions and elements
+    active_elements = HierarchicalActiveInfo(collect(1:get_num_elements(fe_spaces[1])),[0, get_num_elements(fe_spaces[1])])
+    active_functions = HierarchicalActiveInfo(collect(1:get_dim(fe_spaces[1])),[0, get_dim(fe_spaces[1])])
+
+    for level in 1:L-1 # Loop over levels
+        _, next_level_domain = get_level_active(refined_domains, level+1)
+
+        element_indices_to_remove = Int[]
+        elements_to_add = Int[]
+        function_indices_to_remove = Int[]
+        functions_to_add = Int[]
+
+        index, Ni = get_level_active(active_functions, level)
+        for i in 1:length(Ni) # Loop over active functions in level
+            support_check, support, finer_support = check_support(fe_spaces[level], Ni[i], next_level_domain, nsubdivisions[level]) # gets support in both levels
+
+            if support_check
+                append!(element_indices_to_remove, get_active_indices(active_elements, support, level))
+                append!(elements_to_add, finer_support)
+                append!(function_indices_to_remove, index[i])
+                append!(functions_to_add, collect(get_finer_basis_id(Ni[i], two_scale_operators[level]))[1])
+            end
+        end
+
+        remove_active!(active_elements, element_indices_to_remove, level)
+        add_active!(active_elements, elements_to_add, level+1)
+        remove_active!(active_functions, function_indices_to_remove, level)
+        add_active!(active_functions, functions_to_add, level+1)
+    end
+
+    return HierarchicalFiniteElementSpace(fe_spaces, two_scale_operators, active_elements, active_functions)
 end

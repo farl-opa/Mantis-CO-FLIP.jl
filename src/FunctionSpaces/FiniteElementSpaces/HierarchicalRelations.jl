@@ -121,3 +121,32 @@ the change of basis.
 function get_finer_basis_id(coarse_basis_id::Int, two_scale_operator::TwoScaleOperator)
     return @view two_scale_operator.coarse_to_fine[coarse_basis_id]
 end
+
+"""
+    get_finer_support(support::UnitRange{Int}, nsubdivision::Int)
+
+Returns the ids of the child B-splines of `coarse_basis_id`, in terms of the change of basis
+provided by `two_scale_operator`.
+
+# Arguments
+- `support::UnitRange{Int}`: the support of a basis function.
+- `nsubdivisions::Int`: The number of subdivisions.
+# Returns
+- `::Vector{Int}`: the finer elements of the support.
+"""
+function get_finer_support(support::UnitRange{Int}, nsubdivision::Int)
+    return reduce(vcat, get_finer_elements.(support, nsubdivision))
+end
+
+# Checks for spaces
+function check_support(fe_space::F, basis_id::Int, next_level_domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true}, nsubdivision::Int) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+    basis_support = FunctionSpaces.get_support(fe_space, basis_id)
+    finer_support = get_finer_support(basis_support, nsubdivision)
+
+    if Mesh.check_contained(finer_support, next_level_domain)
+        return true, basis_support, finer_support
+    else
+        return false, basis_support, finer_support
+    end
+
+end
