@@ -43,3 +43,5 @@ include("KnotInsertion.jl")
 include("UnstructuredSpaces.jl")
 include("TensorProductSpaces.jl")
 include("HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
+# rational version of finite element spaces
+include("RationalSpaces.jl")
