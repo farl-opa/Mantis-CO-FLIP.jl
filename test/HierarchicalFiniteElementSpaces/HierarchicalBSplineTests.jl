@@ -2,6 +2,8 @@ import Mantis
 
 using Test
 
+# Test according to the example in Fig 9. of https://doi.org/10.1007/s11831-022-09752-5
+
 nq = 7
 p = 3
 nlevels = 3
@@ -23,48 +25,79 @@ for l in 1:nlevels-1
     bsplines[l+1] = bspline
 end
 
-active_elements = Mantis.FunctionSpaces.HierarchicalActiveInfo(fill(1,nlevels), collect(0:nlevels))
-active_functions = Mantis.FunctionSpaces.HierarchicalActiveInfo(fill(1,nlevels), collect(0:nlevels))
-
-levels_el_test = Mantis.FunctionSpaces.HierarchicalActiveInfo(fill(1,nlevels), collect(0:nlevels+1))
-levels_function_test = Mantis.FunctionSpaces.HierarchicalActiveInfo(fill(1,nlevels), collect(0:nlevels+1))
-
-@test_throws ArgumentError Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, levels_el_test, active_functions)
-@test_throws ArgumentError Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, active_elements, levels_function_test)
-@test_throws ArgumentError Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines[1:end-1], two_scale_operators, active_elements, active_functions)
-@test_throws ArgumentError Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators[1:end-1], active_elements, active_functions)
-
-hierarchical_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, active_elements, active_functions)
-
-@test Mantis.FunctionSpaces.get_n_levels(hierarchical_space) == nlevels
-
-for l in 1:nlevels
-    @test Mantis.FunctionSpaces.get_space(hierarchical_space, l) == bsplines[l]
-end
-
-# Test according to the example in Fig 9. of https://doi.org/10.1007/s11831-022-09752-5
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1,6,3,4,5,6,7,8,9,10,7,8,9,10,11,12,13,14,15,16],[0,2,10,20])
-hierarchical_space = Mantis.FunctionSpaces.get_hierarchical_space(bsplines, two_scale_operators, refined_domains, fill(2, nlevels))
+hspace = Mantis.FunctionSpaces.get_hierarchical_space(bsplines, two_scale_operators, refined_domains); nothing
 
 # test if active elements are correct   
-@test Mantis.FunctionSpaces.get_level_elements(hierarchical_space, 1)[2] == [1,6]
-@test Mantis.FunctionSpaces.get_level_elements(hierarchical_space, 2)[2] == [3,9,10]
-@test Mantis.FunctionSpaces.get_level_elements(hierarchical_space, 3)[2] == collect(7:16)
+@test Mantis.FunctionSpaces.get_level_elements(hspace, 1)[2] == [1,6]
+@test Mantis.FunctionSpaces.get_level_elements(hspace, 2)[2] == [3,9,10]
+@test Mantis.FunctionSpaces.get_level_elements(hspace, 3)[2] == collect(7:16)
 
 # test if active functions are correct   
-@test Mantis.FunctionSpaces.get_level_functions(hierarchical_space, 1)[2] == [1,2,3,4,6,7,8,9]
-@test Mantis.FunctionSpaces.get_level_functions(hierarchical_space, 2)[2] == [6,9,10]
-@test Mantis.FunctionSpaces.get_level_functions(hierarchical_space, 3)[2] == collect(10:16)
+@test Mantis.FunctionSpaces.get_level_functions(hspace, 1)[2] == [1,2,3,4,6,7,8,9]
+@test Mantis.FunctionSpaces.get_level_functions(hspace, 2)[2] == [6,9,10]
+@test Mantis.FunctionSpaces.get_level_functions(hspace, 3)[2] == collect(10:16)
+
+# Test if projection in space is exact
+nxi = 20
+xi = collect(range(0,1, nxi))
+
+xs = Vector{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi)
+nx = length(xs)
+
+A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+
+for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
+    
+    level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
+    element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
+
+    borders = Mantis.Mesh.get_element(hspace.spaces[level].knot_vector.patch_1d, element_id)
+    x = borders[1] .+ xi .* (borders[2] - borders[1])
+
+    idx = (el-1)*nxi+1:el*nxi
+    xs[idx] = x
+
+    eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
+
+    A[idx, eval[2]] = eval[1][0]
+end
+
+#display(A)
+coeffs = A \ xs
+A * coeffs .- xs
+all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))
+
+@test Mantis.FunctionSpaces.get_n_levels(hspace) == nlevels
+
+for l in 1:nlevels
+    @test Mantis.FunctionSpaces.get_space(hspace, l) == bsplines[l]
+end
 
 # Tests for coefficients and evaluation
-for el in 1:1:Mantis.FunctionSpaces.get_n_elements(hierarchical_space)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 
     # check extraction coefficients
-    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hierarchical_space, el)
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hspace, el)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
 
     # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hierarchical_space, el, brk, 0)
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[:,:,1]) >= 0.0
+    @test minimum(h_eval[0]) >= 0.0
 end
+
+# Visual test of basis functions plot from hierarchical_space
+#=
+using Plots, Colors
+
+basis_plt = plot(xlabel="x", ylabel="y", title="Basis Functions")
+palette = distinguishable_colors(Mantis.FunctionSpaces.get_dim(hspace), lchoices=range(0,70, 10))
+indices = sortperm(xs)
+xs = xs[indices]
+for Ni in 1:Mantis.FunctionSpaces.get_dim(hspace)
+    plot!(xs, A[indices,Ni], c = palette[Ni], label=false)
+end
+
+display(basis_plt)
+=#

@@ -103,50 +103,21 @@ function get_coarser_element(fine_element_id::NTuple{n, Int}, nsubdivisions::NTu
     return ntuple(d -> get_coarser_element(fine_element_id[d], nsubdivisions[d]), n)
 end
 
-# Getters for basis splines
-
-"""
-    get_finer_basis_id(coarse_basis_id::Int, two_scale_operator::FunctionSpaces.TwoScaleOperator)
-
-Returns the ids of the child B-splines of `coarse_basis_id`, in terms of the change of basis
-provided by `two_scale_operator`.
-
-# Arguments
-- `basis_id::Int`: Id of the parent B-spline.
-- `two_scale_operator::TwoScaleOperator`: The two-scale operator for
-the change of basis.
-# Returns
-- `::@view Vector{Int}`: Ids of the child B-splines.
-"""
-function get_finer_basis_id(coarse_basis_id::Int, two_scale_operator::TwoScaleOperator)
-    return @view two_scale_operator.coarse_to_fine[coarse_basis_id]
-end
-
-"""
-    get_finer_support(support::UnitRange{Int}, nsubdivision::Int)
-
-Returns the ids of the child B-splines of `coarse_basis_id`, in terms of the change of basis
-provided by `two_scale_operator`.
-
-# Arguments
-- `support::UnitRange{Int}`: the support of a basis function.
-- `nsubdivisions::Int`: The number of subdivisions.
-# Returns
-- `::Vector{Int}`: the finer elements of the support.
-"""
-function get_finer_support(support::UnitRange{Int}, nsubdivision::Int)
-    return reduce(vcat, get_finer_elements.(support, nsubdivision))
-end
-
-# Checks for spaces
-function check_support(fe_space::F, basis_id::Int, next_level_domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true}, nsubdivision::Int) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
-    basis_support = FunctionSpaces.get_support(fe_space, basis_id)
-    finer_support = get_finer_support(basis_support, nsubdivision)
-
-    if Mesh.check_contained(finer_support, next_level_domain)
-        return true, basis_support, finer_support
-    else
-        return false, basis_support, finer_support
+function get_coarse_to_fine(bspline_space::BSplineSpace, nsubdivisions::Int)
+    coarse_to_fine = Vector{Vector{Int}}(undef, get_num_elements(bspline_space))
+    for el in 1:get_num_elements(bspline_space)
+        coarse_to_fine[el] = get_finer_elements(el, nsubdivisions)
     end
 
+    return coarse_to_fine
 end
+
+function get_fine_to_coarse(bspline_space::BSplineSpace, nsubdivisions::Int)
+    fine_to_coarse = Vector{Int}(undef, get_num_elements(bspline_space))
+    for el in 1:get_num_elements(bspline_space)
+        fine_to_coarse[el] = get_coarser_element(el, nsubdivisions)
+    end
+
+    return fine_to_coarse
+end
+

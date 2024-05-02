@@ -241,8 +241,13 @@ function get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
     return Element(NTuple{n,Interval}(Interval(get_breakpoints(patch, d)[element_id[d]], get_breakpoints(patch, d)[element_id[d]+1]) for d in 1:1:n))
 end
 
-function check_contained(support::Vector{Int}, domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true})
-    return all(support .∈ [domain])
+function get_element(patch::Patch1D, element_id::Int)
+    return @view get_breakpoints(patch)[element_id:element_id+1]
+end
+
+function check_contained(support::Union{UnitRange{Int}, Vector{Int}}, domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true})
+    element_checks = support .∈ [domain] 
+    return all(element_checks), element_checks
 end
 
 end
