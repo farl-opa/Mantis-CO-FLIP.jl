@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VTKFile type="UnstructuredGrid" version="2.2" byte_order="LittleEndian" header_type="UInt64">
+  <UnstructuredGrid>
+    <Piece NumberOfPoints="32" NumberOfCells="4">
+      <Points>
+        <DataArray type="Float64" Name="Points" NumberOfComponents="3" format="binary">
+AAMAAAAAAAA=ug3SyDd9lbz////////vv7vcysRcLni8/P//////7z8AAAAAAACQPP7//////9c/f0UC45B7zD9p6VgFnDLvv61yUNhYFq4/vatxTcDE2z9wXMupvNTsv0xPpqMD8L4/z+2L4qDz4z9L3gV1wwTpv6r+CCg/ccc/Sd4FdcME6T/S7YvioPPjv2DnvwPzCs8/blzLqbzU7D/Cq3FNwMTbv754N0vG8dI/ZulYBZwy7z+CRQLjkHvMv1tQfPSU0dU/////////7z8IeMbfJ4llvP///////9c/AAAAAAAAkLz8///////vPwAAAAAAAOQ/aelYBZwy7z+ARQLjkHvMP/3p2QwS+9k/cFzLqbzU7D+9q3FNwMTbP1peO99oQ9w/S94FdcME6T/P7YvioPPjP+GDYVu3u94/0e2L4qDz4z9J3gV1wwTpPw8+T1IkouA/wqtxTcDE2z9vXMupvNTsP9FQYpBL3uE/fkUC45B7zD9m6VgFnDLvPwALk/l2AuM/CHjG3yeJZTz////////vP////////+M//P//////778AAAAAAACQvAAAAAAAAOw/gEUC45B7zL9p6VgFnDLvP/70bAaJ/eQ/vatxTcDE279wXMupvNTsPyyvnW+0IeY/z+2L4qDz479L3gV1wwTpP/DBsK3bXec/Sd4FdcME6b/R7YvioPPjPw4+T1Ikoug/b1zLqbzU7L/Cq3FNwMTbP9FQYpBL3uk/ZulYBZwy779+RQLjkHvMPwALk/l2Aus/////////778IeMbfJ4l1PP///////+s/EIUV97gcY7z9///////vvwAAAAAAAPQ/aOlYBZwy77+CRQLjkHvMv9HXwYU1F+0/cFzLqbzU7L++q3FNwMTbv59DZNoch+4/S94FdcME6b/Q7YvioPPjvxMDiJ+hHvA/0e2L4qDz479J3gV1wwTpvyrg/hrYEfE/wqtxTcDE279vXMupvNTsvwqbxcX/EPI/gkUC45B7zL9m6VgFnDLvv2p8PTlND/M/
+</DataArray>
+      </Points>
+      <Cells>
+        <DataArray type="Int64" Name="connectivity" NumberOfComponents="1" format="binary">
+AAEAAAAAAAA=AAAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAUAAAAAAAAABgAAAAAAAAAHAAAAAAAAAAgAAAAAAAAACQAAAAAAAAAKAAAAAAAAAAsAAAAAAAAADAAAAAAAAAANAAAAAAAAAA4AAAAAAAAADwAAAAAAAAAQAAAAAAAAABEAAAAAAAAAEgAAAAAAAAATAAAAAAAAABQAAAAAAAAAFQAAAAAAAAAWAAAAAAAAABcAAAAAAAAAGAAAAAAAAAAZAAAAAAAAABoAAAAAAAAAGwAAAAAAAAAcAAAAAAAAAB0AAAAAAAAAHgAAAAAAAAAfAAAAAAAAAA==
+</DataArray>
+        <DataArray type="Int64" Name="offsets" NumberOfComponents="1" format="binary">
+IAAAAAAAAAA=CAAAAAAAAAAQAAAAAAAAABgAAAAAAAAAIAAAAAAAAAA=
+</DataArray>
+        <DataArray type="UInt8" Name="types" NumberOfComponents="1" format="binary">
+BAAAAAAAAAA=RERERA==
+</DataArray>
+      </Cells>
+    </Piece>
+  </UnstructuredGrid>
+</VTKFile>
