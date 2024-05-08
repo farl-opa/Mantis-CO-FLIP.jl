@@ -1,7 +1,7 @@
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1) where {range_dim, F <: Fields.AbstractField{1, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{1, field_dim} where {field_dim}}
     # This function generates points per plotted 1D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
@@ -80,7 +80,7 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
         end
     end
 
-    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = true, vtkversion = :latest) do vtk 
+    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
         vtk.version == "2.2"
         if !isnothing(field)
             vtk["point_data", WriteVTK.VTKPointData()] = point_data
@@ -90,7 +90,7 @@ end
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1) where {range_dim, F <: Fields.AbstractField{2, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{2, field_dim} where {field_dim}}
     # This function generates points per plotted 2D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
@@ -247,7 +247,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
         end
     end
 
-    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = true, vtkversion = :latest) do vtk 
+    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
         vtk.version == "2.2"
         if !isnothing(field)
             vtk["point_data", WriteVTK.VTKPointData()] = point_data
