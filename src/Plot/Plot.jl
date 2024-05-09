@@ -8,6 +8,7 @@ module Plot
 import WriteVTK 
 
 import .. Geometry
+import .. Fields
 
 include("./PlotKernel.jl")
 
@@ -37,6 +38,10 @@ Nothing
 """
 function plot(geometry::Geometry.AbstractGeometry{n, m}; kwargs...) where {n, m}
     _plot(geometry; kwargs...)
+end
+
+function plot(geometry::Geometry.AbstractGeometry{n, m}, field::Fields.AbstractField{n,k}; kwargs...) where {n, m, k}
+  _plot(geometry, field; kwargs...)
 end
 
 

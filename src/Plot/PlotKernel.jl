@@ -1,7 +1,7 @@
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Function}
+function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{1, field_dim} where {field_dim}}
     # This function generates points per plotted 1D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
@@ -19,7 +19,12 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
     
     vertices = Array{Float64, 2}(undef, range_dim, n_vertices)
     cells = Vector{WriteVTK.MeshCell}(undef, n_total_cells)
-    point_data = zeros(n_vertices)
+    if isnothing(field)
+        field_dim = 0
+    else
+        field_dim = Fields.get_image_dim(field)
+    end
+    point_data = zeros(field_dim,n_vertices)
     
     vertex_idx = 1
     vertex_offset = 0
@@ -45,7 +50,7 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
             vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
             # Compute data to plot 
             if !isnothing(field)
-                point_data[vertex_idx] = evaluate(field, element_idx, ξ)
+                point_data[:,vertex_idx] = Fields.evaluate(field, element_idx, ξ)
             end
 
             # Right vertex
@@ -53,7 +58,7 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
             vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
             # Compute data to plot 
             if !isnothing(field)
-                point_data[vertex_idx + 1] = evaluate(field, element_idx, ξ)
+                point_data[:,vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
             end
 
             # Add interior vertices 
@@ -62,7 +67,7 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
                 vertices[:, vertex_idx + interior_vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[vertex_idx + interior_vertex_idx + 1] = evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + interior_vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
                 end
             end
 
@@ -85,7 +90,7 @@ end
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Function}
+function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{2, field_dim} where {field_dim}}
     # This function generates points per plotted 2D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
@@ -103,7 +108,12 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
     
     vertices = Array{Float64, 2}(undef, range_dim, n_vertices)
     cells = Vector{WriteVTK.MeshCell}(undef, n_total_cells)
-    point_data = zeros(n_vertices)
+    if isnothing(field)
+        field_dim = 0
+    else
+        field_dim = Fields.get_image_dim(field)
+    end
+    point_data = zeros(field_dim,n_vertices)
     
     vertex_idx = 1
     vertex_offset = 0
@@ -130,7 +140,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
             # Compute data to plot 
             if !isnothing(field)
-                point_data[vertex_idx] = evaluate(field, element_idx, ξ)
+                point_data[:,vertex_idx] = Fields.evaluate(field, element_idx, ξ)
             end
 
             # Second point (bottom right)
@@ -138,7 +148,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
             # Compute data to plot 
             if !isnothing(field)
-                point_data[vertex_idx + 1] = evaluate(field, element_idx, ξ)
+                point_data[:,vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
             end
 
             # Third point (top right)
@@ -146,7 +156,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             vertices[:, vertex_idx + 2] .= Geometry.evaluate(geometry, element_idx, ξ)
             # Compute data to plot 
             if !isnothing(field)
-                point_data[vertex_idx + 2] = evaluate(field, element_idx, ξ)
+                point_data[:,vertex_idx + 2] = Fields.evaluate(field, element_idx, ξ)
             end 
 
             # Fourth point (top left)
@@ -154,7 +164,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             vertices[:, vertex_idx + 3] .= Geometry.evaluate(geometry, element_idx, ξ)
             # Compute data to plot
             if !isnothing(field) 
-                point_data[vertex_idx + 3] = evaluate(field, element_idx, ξ)
+                point_data[:,vertex_idx + 3] = Fields.evaluate(field, element_idx, ξ)
             end 
 
             vertex_offset += 3  # update point index for next step, we added four points so add 3, so that we can start adding 1 to get the next point
@@ -167,7 +177,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                 vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[vertex_idx + vertex_offset + edge_vertex_idx] = evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
                 end
             end
 
@@ -180,7 +190,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                 vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[vertex_idx + vertex_offset + edge_vertex_idx] = evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
                 end
             end
 
@@ -193,7 +203,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                 vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[vertex_idx + vertex_offset + edge_vertex_idx] = evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
                 end
             end
 
@@ -206,7 +216,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                 vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[vertex_idx + vertex_offset + edge_vertex_idx] = evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
                 end
             end
 
@@ -220,7 +230,7 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                     vertices[:, vertex_idx + vertex_offset + interior_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
                     # Compute data to plot 
                     if !isnothing(field)
-                        point_data[vertex_idx + vertex_offset + interior_vertex_idx] = evaluate(field, element_idx, ξ)
+                        point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
                     end
                 end
             end
