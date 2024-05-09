@@ -6,6 +6,9 @@ module Mantis
 include("Mesh/Mesh.jl")  # Creates Module Mesh
 include("Quadrature/Quadrature.jl")  # Creates Module Quadrature
 include("FunctionSpaces/FunctionSpaces.jl")  # Creates Module FunctionSpaces
+include("Geometry/Geometry.jl")  # Creates Module Mesh
+include("Plot/Plot.jl")  # Creates Module Mesh
+# include("HierarchicalFiniteElementSpaces/HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
 
 x = 1
 
