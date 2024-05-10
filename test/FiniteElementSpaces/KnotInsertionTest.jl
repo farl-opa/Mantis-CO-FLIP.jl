@@ -27,9 +27,9 @@ for p in degrees_for_test
     for nsubdivision in subdivisions_to_test
         coarse_x = collect(range(0, 1, nq * nsubdivision + 1))
         
-        two_scale_operator, fine_bspline = Mantis.FunctionSpaces.subdivide_bspline(coarse_bspline, nsubdivision)
+        twoscale_operator, fine_bspline = Mantis.FunctionSpaces.subdivide_bspline(coarse_bspline, nsubdivision)
 
-        fine_coeffs = Mantis.FunctionSpaces.subdivide_coeffs(coarse_coeffs, two_scale_operator)
+        fine_coeffs = Mantis.FunctionSpaces.subdivide_coeffs(coarse_coeffs, twoscale_operator)
         
         for fine_el in 1:size(fine_bspline.knot_vector.patch_1d)
             coarse_el = Mantis.FunctionSpaces.get_coarser_element(fine_el, nsubdivision)
@@ -38,7 +38,7 @@ for p in degrees_for_test
 
             fine_spline_eval = Mantis.FunctionSpaces.evaluate(fine_bspline, fine_el, fine_x, 0, fine_coeffs)
             
-            @test all(isapprox.(fine_spline_eval .- coarse_spline_eval[1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
+            @test all(isapprox.(fine_spline_eval[0] .- coarse_spline_eval[0][1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
         end
     end
 end

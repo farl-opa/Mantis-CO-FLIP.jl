@@ -9,8 +9,5 @@ include("FunctionSpaces/FunctionSpaces.jl")  # Creates Module FunctionSpaces
 include("Fields/Fields.jl")  # Creates Module FunctionSpaces
 include("Geometry/Geometry.jl")  # Creates Module Mesh
 include("Plot/Plot.jl")  # Creates Module Mesh
-# include("HierarchicalFiniteElementSpaces/HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
-
-x = 1
 
 end

@@ -25,7 +25,7 @@ for l in 1:nlevels-1
     bsplines[l+1] = bspline
 end
 
-refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1,6,3,4,5,6,7,8,9,10,7,8,9,10,11,12,13,14,15,16],[0,2,10,20])
+refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1,2,3,4,5,6,3,4,5,6,7,8,9,10,7,8,9,10,11,12,13,14,15,16],[0,6,14,24])
 hspace = Mantis.FunctionSpaces.get_hierarchical_space(bsplines, two_scale_operators, refined_domains); nothing
 
 # test if active elements are correct   
@@ -86,18 +86,3 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # Positivity of the basis
     @test minimum(h_eval[0]) >= 0.0
 end
-
-# Visual test of basis functions plot from hierarchical_space
-#=
-using Plots, Colors
-
-basis_plt = plot(xlabel="x", ylabel="y", title="Basis Functions")
-palette = distinguishable_colors(Mantis.FunctionSpaces.get_dim(hspace), lchoices=range(0,70, 10))
-indices = sortperm(xs)
-xs = xs[indices]
-for Ni in 1:Mantis.FunctionSpaces.get_dim(hspace)
-    plot!(xs, A[indices,Ni], c = palette[Ni], label=false)
-end
-
-display(basis_plt)
-=#

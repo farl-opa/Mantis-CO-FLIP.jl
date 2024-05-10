@@ -58,6 +58,24 @@ function _evaluate_all_at_point(space::CanonicalFiniteElementSpace, ::Int, xi::F
     return _evaluate_all_at_point(space, xi, nderivatives)
 end
 
+function get_local_basis(space::CanonicalFiniteElementSpace,::Int, xi::Vector{Float64}, nderivatives::Int)
+    return evaluate(space.canonical_space, xi, nderivatives)
+end
+
+function get_basis_indices(space::CanonicalFiniteElementSpace,::Int)
+    return collect(1:get_dim(space))
+end
+
+
+function get_extraction(space::CanonicalFiniteElementSpace,::Int)
+    basis_indices = get_basis_indices(space, 1)
+    nbasis = length(basis_indices)
+    return Matrix(I, nbasis, nbasis), basis_indices
+end
+
 function evaluate(space::CanonicalFiniteElementSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
-    return evaluate(space.canonical_space, xi, nderivatives), collect(1:get_dim(space))
+    local_basis = get_local_basis(space, 1, xi, nderivatives)
+    basis_indices = get_basis_indices(space, 1)
+
+    return local_basis, basis_indices
 end

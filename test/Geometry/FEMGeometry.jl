@@ -18,7 +18,7 @@ b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Gene
 B = ntuple( i -> b, 4)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(1))
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1, Dict())
+TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
 1.0   1.0
@@ -57,7 +57,7 @@ b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Loba
 B = ntuple( i -> b, 4)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [0,0,0,0])
 b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(1))
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1, Dict())
+TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
 1.0   1.0
@@ -134,7 +134,7 @@ b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Gene
 B = ntuple( i -> b, 4)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(1))
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1, Dict())
+TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
     1.0   1.0

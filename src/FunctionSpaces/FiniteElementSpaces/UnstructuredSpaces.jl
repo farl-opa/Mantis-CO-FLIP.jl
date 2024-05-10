@@ -116,7 +116,7 @@ function get_local_basis(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::
 
     # implement geometric transformation
 
-    return evaluate(us_space.function_spaces[space_id], space_element_id, xi, nderivatives)
+    return evaluate(us_space.function_spaces[space_id], space_element_id, xi, nderivatives)[1]
 end
 
 @doc raw"""
@@ -136,7 +136,7 @@ For given global element id `element_id` for a given 1D unstructured space, eval
 """
 function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {m}
     extraction_coefficients, basis_indices = get_extraction(us_space, element_id)
-    local_basis, _ = get_local_basis(us_space, element_id, xi, nderivatives)
+    local_basis = get_local_basis(us_space, element_id, xi, nderivatives)
     for r = 0:nderivatives
         local_basis[r] .= @views local_basis[r] * extraction_coefficients
     end
