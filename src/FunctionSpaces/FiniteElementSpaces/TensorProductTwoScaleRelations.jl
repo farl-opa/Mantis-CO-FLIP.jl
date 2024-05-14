@@ -37,28 +37,28 @@ function get_global_subdiv_matrix(gm1::SparseArrays.SparseMatrixCSC{Tv1, Ti1}, g
     Nc2 = gm2.n
     Nf2 = gm2.m 
 
-    max_indc = [Nc2, Nc1]
-    max_indf = [Nf2, Nf1]
+    max_indc = [Nc1, Nc2]
+    max_indf = [Nf1, Nf2]
     
     gm_rows = Vector{Int}(undef, n_nonzero)
     gm_cols = Vector{Int}(undef, n_nonzero)
     gm_vals = Vector{Float64}(undef, n_nonzero)
 
     idx_count = 1
-    for j2 ∈ 1:1:Nc2, i2 ∈ SparseArrays.nzrange(gm2, j2)
-        r2 = gm2_rows[i2]
-        fc = gm2_vals[i2]
+    for j1 ∈ 1:1:Nc1, i1 ∈ SparseArrays.nzrange(gm1, j1)
+        r1 = gm1_rows[i1]
+        fc = gm1_vals[i1]
         
-        idx1_count = 1
-        for j1 in 1:1:Nc1, i1 in SparseArrays.nzrange(gm1, j1)
-            r1 = gm1_rows[i1]
+        idx2_count = 1
+        for j2 in 1:1:Nc2, i2 in SparseArrays.nzrange(gm2, j2)
+            r2 = gm2_rows[i2]
 
-            gm_rows[idx_count] = ordered_to_linear_index([r2,r1], max_indf)
-            gm_cols[idx_count] = ordered_to_linear_index([j2,j1], max_indc)
-            gm_vals[idx_count] = fc * gm1_vals[idx1_count]
+            gm_rows[idx_count] = ordered_to_linear_index([r1,r2], max_indf)
+            gm_cols[idx_count] = ordered_to_linear_index([j1,j2], max_indc)
+            gm_vals[idx_count] = fc * gm2_vals[idx2_count]
 
             idx_count += 1
-            idx1_count += 1
+            idx2_count += 1
         end
     end
 

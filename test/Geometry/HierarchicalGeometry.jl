@@ -1,8 +1,11 @@
 import Mantis
 
+import ReadVTK
+using Printf
 using Test
+using LinearAlgebra
 
-# Tests for a tensor product HierarchicalSplineSpace
+# Create the space
 
 ne1 = 5
 ne2 = 5
@@ -36,25 +39,6 @@ refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse
 
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
 hspace = Mantis.FunctionSpaces.get_hierarchical_space(spaces, [CTS], refined_domains)
-
-x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
-x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
-xi = (x1, x2)
-
-# Tests for coefficients and evaluation
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
-
-    # check extraction coefficients
-    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hspace, el)
-    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
-
-    # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
-    # Positivity of the basis
-    @test minimum(h_eval[0,0]) >= 0.0
-end
-
-hspace.active_elements
 
 # Test if projection in space is exact
 nxi_per_dim = 3
@@ -94,4 +78,19 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 end
 
 coeffs = A \ xs
-all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))
+
+line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
+line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
+hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
+
+field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_dim(hspace), Mantis.FunctionSpaces.get_dim(hspace))
+tensor_field = Mantis.Fields.FEMField(hspace, field_coeffs)
+
+# Generate the Plot
+Mantis_folder =  dirname(dirname(pathof(Mantis)))
+data_folder = joinpath(Mantis_folder, "test", "data")
+output_data_folder = joinpath(data_folder, "output", "Geometry")
+
+output_filename = "fem_geometry_tensor_hbsplines.vtu"
+output_file = joinpath(output_data_folder, output_filename)
+Mantis.Plot.plot(hierarchical_geo, tensor_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)

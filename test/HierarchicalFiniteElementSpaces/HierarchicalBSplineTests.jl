@@ -58,17 +58,16 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     idx = (el-1)*nxi+1:el*nxi
     xs[idx] = x
 
-    eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
+    local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
 
     A[idx, eval[2]] = eval[1][0]
 end
 
-#display(A)
 coeffs = A \ xs
 A * coeffs .- xs
 all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))
 
-@test Mantis.FunctionSpaces.get_n_levels(hspace) == nlevels
+@test Mantis.FunctionSpaces.get_num_levels(hspace) == nlevels
 
 for l in 1:nlevels
     @test Mantis.FunctionSpaces.get_space(hspace, l) == bsplines[l]
