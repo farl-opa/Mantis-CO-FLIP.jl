@@ -99,3 +99,17 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
     @test all(isapprox.(maximum(abs.(GB_eval[0]*coeffs_C[inds] - cos.(Wt * (x .+ (el - 1))))), 0.0, atol=1e-14))
     @test all(isapprox.(maximum(abs.(GB_eval[0]*coeffs_S[inds] - sin.(Wt * (x .+ (el - 1))))), 0.0, atol=1e-14))
 end
+
+breakpoints = [0.0, 0.5, 0.6, 1.0]
+deg = 2
+patch = Mantis.Mesh.Patch1D(breakpoints)
+Bsp_univariate = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, 1, 1, -1])
+weights = [1.0, 2.0, 2.0, 3.0, 1.0]
+Nurbs_univariate = Mantis.FunctionSpaces.RationalSpace(Bsp_univariate, weights)
+x, _ = Mantis.Quadrature.gauss_legendre(deg+1)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)
+    # check Nurbs evaluation
+    Nurbs_eval, _ = Mantis.FunctionSpaces.evaluate(Nurbs_univariate, el, (x,), 0)
+    # Positivity of the polynomials
+    @test minimum(Nurbs_eval[0]) >= 0.0
+end
