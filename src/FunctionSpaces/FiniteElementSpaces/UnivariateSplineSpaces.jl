@@ -411,7 +411,7 @@ Evaluates all derivatives upto order `nderivatives` for all `bspline` basis func
 - `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
 """
 function _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-    local_basis, basis_indices = evaluate(bspline, element_id, [xi], nderivatives)
+    local_basis, basis_indices = evaluate(bspline, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
     ndofs = get_dim(bspline)
     I = zeros(Int, nloc * (nderivatives + 1))

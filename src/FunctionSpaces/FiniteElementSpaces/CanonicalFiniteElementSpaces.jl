@@ -62,6 +62,10 @@ function get_local_basis(space::CanonicalFiniteElementSpace,::Int, xi::Vector{Fl
     return evaluate(space.canonical_space, xi, nderivatives)
 end
 
+function get_local_basis(space::CanonicalFiniteElementSpace,::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
+    return evaluate(space.canonical_space, xi[1], nderivatives)
+end
+
 function get_basis_indices(space::CanonicalFiniteElementSpace,::Int)
     return collect(1:get_dim(space))
 end

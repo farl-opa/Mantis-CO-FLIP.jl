@@ -20,7 +20,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B1_univariate_bs)
     @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
 
     # check B-spline evaluation
-    B1_eval, _ = Mantis.FunctionSpaces.evaluate(B1_univariate_bs, el, x, 1)
+    B1_eval, _ = Mantis.FunctionSpaces.evaluate(B1_univariate_bs, el, (x,), 1)
     # Positivity of the polynomials
     @test minimum(B1_eval[0]) >= 0.0
 
@@ -43,7 +43,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B2_univariate_bs)
     @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
 
     # check B-spline evaluation
-    B2_eval, _ = Mantis.FunctionSpaces.evaluate(B2_univariate_bs, el, x, 1)
+    B2_eval, _ = Mantis.FunctionSpaces.evaluate(B2_univariate_bs, el, (x,), 1)
     # Positivity of the polynomials
     @test minimum(B2_eval[0]) >= 0.0
 
@@ -62,7 +62,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
     @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
     # check GTB-spline evaluation
-    GB_eval, _ = Mantis.FunctionSpaces.evaluate(GB, el, x, 1)
+    GB_eval, _ = Mantis.FunctionSpaces.evaluate(GB, el, (x,), 1)
 end
 
 # Test C1-smooth TrigonometricSplineSpace ----------------------------------------------------
@@ -86,7 +86,7 @@ LHS = zeros(npatch,npatch)
 RHS_C = zeros(npatch)
 RHS_S = zeros(npatch)
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
-    GB_eval, inds = Mantis.FunctionSpaces.evaluate(GB, el, x, 0)
+    GB_eval, inds = Mantis.FunctionSpaces.evaluate(GB, el, (x,), 0)
     LHS[el,inds] = GB_eval[0]
     RHS_C[el] = cos(Wt * (x[1] + el - 1))
     RHS_S[el] = sin(Wt * (x[1] + el - 1))
@@ -95,7 +95,7 @@ coeffs_C = LHS \ RHS_C
 coeffs_S = LHS \ RHS_S
 x, _ = Mantis.Quadrature.gauss_legendre(max(deg1,deg2)+1)
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
-    GB_eval, inds = Mantis.FunctionSpaces.evaluate(GB, el, x, 0)
+    GB_eval, inds = Mantis.FunctionSpaces.evaluate(GB, el, (x,), 0)
     @test all(isapprox.(maximum(abs.(GB_eval[0]*coeffs_C[inds] - cos.(Wt * (x .+ (el - 1))))), 0.0, atol=1e-14))
     @test all(isapprox.(maximum(abs.(GB_eval[0]*coeffs_S[inds] - sin.(Wt * (x .+ (el - 1))))), 0.0, atol=1e-14))
 end
@@ -105,7 +105,7 @@ deg = 2
 patch = Mantis.Mesh.Patch1D(breakpoints)
 Bsp_univariate = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, 1, 1, -1])
 weights = [1.0, 2.0, 2.0, 3.0, 1.0]
-Nurbs_univariate = Mantis.FunctionSpaces.RationalSpace(Bsp_univariate, weights)
+Nurbs_univariate = Mantis.FunctionSpaces.RationalFiniteElementSpace(Bsp_univariate, weights)
 x, _ = Mantis.Quadrature.gauss_legendre(deg+1)
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)
     # check Nurbs evaluation
