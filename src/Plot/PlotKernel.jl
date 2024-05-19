@@ -45,22 +45,15 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
             ξ_0 = dξ * (subcell_idx - 1)
 
             # Boundary vertices
-            # Left vertex
-            ξ = ξ_0
-            vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
-            # Compute data to plot 
-            if !isnothing(field)
-                point_data[:,vertex_idx] = Fields.evaluate(field, element_idx, ξ)
+            for bnd_idx = 0:1
+                ξ = ξ_0 + bnd_idx * dξ
+                vertices[:, vertex_idx + bnd_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
+                # Compute data to plot 
+                if !isnothing(field)
+                    point_data[:,vertex_idx + bnd_idx] = Fields.evaluate(field, element_idx, ξ)
+                end
             end
-
-            # Right vertex
-            ξ = ξ_0 + dξ
-            vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
-            # Compute data to plot 
-            if !isnothing(field)
-                point_data[:,vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
-            end
-
+            
             # Add interior vertices 
             for interior_vertex_idx in 1:(degree-1)
                 ξ = ξ_0 + dξ_sub * interior_vertex_idx
@@ -127,102 +120,52 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
     # el_vertex_offset += prod(n_eval)
     # vertices_el[:,i,j,k] .= vector_output_of_evaluate
 
-
-
     for element_idx in 1:n_total_elements
         # vertices_el = geometry.evaluate(..., NTuple_of_directional_points)
         # then, loop to store things in vtk format
 
         for subcell_idx in 1:(n_subcells^2)
             # Corner vertices
-            # First point (bottom left)
-            ξ = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- 1))
-            vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
-            # Compute data to plot 
-            if !isnothing(field)
-                point_data[:,vertex_idx] = Fields.evaluate(field, element_idx, ξ)
-            end
-
-            # Second point (bottom right)
-            ξ = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- [0, 1]))
-            vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
-            # Compute data to plot 
-            if !isnothing(field)
-                point_data[:,vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
-            end
-
-            # Third point (top right)
-            ξ = collect(dξ .* Tuple(subcell_cartesian_idx[subcell_idx]))
-            vertices[:, vertex_idx + 2] .= Geometry.evaluate(geometry, element_idx, ξ)
-            # Compute data to plot 
-            if !isnothing(field)
-                point_data[:,vertex_idx + 2] = Fields.evaluate(field, element_idx, ξ)
-            end 
-
-            # Fourth point (top left)
-            ξ = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- [1, 0]))
-            vertices[:, vertex_idx + 3] .= Geometry.evaluate(geometry, element_idx, ξ)
-            # Compute data to plot
-            if !isnothing(field) 
-                point_data[:,vertex_idx + 3] = Fields.evaluate(field, element_idx, ξ)
-            end 
-
-            vertex_offset += 3  # update point index for next step, we added four points so add 3, so that we can start adding 1 to get the next point
-
-            # Edge vertices 
-            # Bottom edge 
-            ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- 1))
-            for edge_vertex_idx in 1:(degree-1)
-                ξ = ξ_0 .+ [dξ_sub * edge_vertex_idx, 0.0]
-                vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
-                # Compute data to plot 
-                if !isnothing(field)
-                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
+            corner_idx = [0, 1, 3, 2]
+            count = 0
+            for v_idx = 0:1
+                for h_idx = 0:1
+                    ξ = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  (1-h_idx, 1-v_idx)))
+                    vertices[:, vertex_idx + corner_idx[count+1]] .= Geometry.evaluate(geometry, element_idx, ξ)
+                    # Compute data to plot 
+                    if !isnothing(field)
+                        point_data[:,vertex_idx + corner_idx[count+1]] = Fields.evaluate(field, element_idx, ξ)
+                    end
+                    count += 1
                 end
             end
-
-            vertex_offset += (degree-1)  # add the number of points added
-
-            # Right edge 
-            ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- [0, 1]))
-            for edge_vertex_idx in 1:(degree-1)
-                ξ = ξ_0 .+ [0.0, dξ_sub * edge_vertex_idx]
-                vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
-                # Compute data to plot 
-                if !isnothing(field)
-                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
+            
+            # Edge vertices
+            edge_endpts = [(1,1), (0,1), (1,0), (1,1)]
+            edge_ornt = [0, 1, 0, 1]
+            step = [0.0, 0.0]
+            for e = 1:4
+                # starting point on edge
+                ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- edge_endpts[e]))
+                if edge_ornt[e] == 0
+                    step = [dξ_sub, 0.0]
+                elseif edge_ornt[e] == 1
+                    step = [0.0, dξ_sub]
+                end
+                for edge_vertex_idx in 1:(degree-1)
+                    ξ = ξ_0 + edge_vertex_idx .* step
+                    vertices[:, vertex_idx + count] .= Geometry.evaluate(geometry, element_idx, ξ)
+                    # Compute data to plot 
+                    if !isnothing(field)
+                        point_data[:,vertex_idx + count] = Fields.evaluate(field, element_idx, ξ)
+                    end
+                    count += 1
                 end
             end
+            vertex_offset += count - 1
 
-            vertex_offset += (degree-1)  # add the number of points added
-
-            # Top edge 
-            ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- [1, 0]))
-            for edge_vertex_idx in 1:(degree-1)
-                ξ = ξ_0 .+ [dξ_sub * edge_vertex_idx, 0.0]
-                vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
-                # Compute data to plot 
-                if !isnothing(field)
-                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
-                end
-            end
-
-            vertex_offset += (degree-1)  # add the number of points added
-
-            # Left edge
-            ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- 1))
-            for edge_vertex_idx in 1:(degree-1)
-                ξ = ξ_0 .+ [0.0, dξ_sub * edge_vertex_idx]
-                vertices[:, vertex_idx + vertex_offset + edge_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
-                # Compute data to plot 
-                if !isnothing(field)
-                    point_data[:,vertex_idx + vertex_offset + edge_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
-                end
-            end
-
-            vertex_offset += (degree-1)  # add the number of vertices added
-
-            # Add interior vertices 
+            # Add interior vertices
+            ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- (1,1)))
             for vertex_column_idx in 1:(degree-1)
                 for vertex_row_idx in 1:(degree-1)
                     interior_vertex_idx = vertex_row_idx + (vertex_column_idx - 1) * (degree - 1)
@@ -234,12 +177,11 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                     end
                 end
             end
-
             vertex_offset += (degree-1)*(degree-1)  # add the number of interior vertices added
             
             # Add cell
             cell_idx = (element_idx - 1) * (n_subcells^2) + subcell_idx
-            cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL, collect(vertex_idx:(vertex_idx+vertex_offset)))  
+            cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL, collect(vertex_idx:(vertex_idx+vertex_offset))) 
 
             # Update vertex_idx to start again
             vertex_idx += vertex_offset + 1
