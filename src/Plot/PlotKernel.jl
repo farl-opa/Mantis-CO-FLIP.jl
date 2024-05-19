@@ -47,20 +47,20 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
             # Boundary vertices
             for bnd_idx = 0:1
                 ξ = ξ_0 + bnd_idx * dξ
-                vertices[:, vertex_idx + bnd_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
+                vertices[:, vertex_idx + bnd_idx] .= vec(Geometry.evaluate(geometry, element_idx, ([ξ],)))
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[:,vertex_idx + bnd_idx] = Fields.evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + bnd_idx] = vec(Fields.evaluate(field, element_idx, ([ξ],)))
                 end
             end
             
             # Add interior vertices 
             for interior_vertex_idx in 1:(degree-1)
                 ξ = ξ_0 + dξ_sub * interior_vertex_idx
-                vertices[:, vertex_idx + interior_vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
+                vertices[:, vertex_idx + interior_vertex_idx + 1] .= vec(Geometry.evaluate(geometry, element_idx, ([ξ],)))
                 # Compute data to plot 
                 if !isnothing(field)
-                    point_data[:,vertex_idx + interior_vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
+                    point_data[:,vertex_idx + interior_vertex_idx + 1] = vec(Fields.evaluate(field, element_idx, ([ξ],)))
                 end
             end
 
@@ -130,11 +130,12 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             count = 0
             for v_idx = 0:1
                 for h_idx = 0:1
-                    ξ = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  (1-h_idx, 1-v_idx)))
-                    vertices[:, vertex_idx + corner_idx[count+1]] .= Geometry.evaluate(geometry, element_idx, ξ)
+                    ξ = (dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  (1-h_idx, 1-v_idx)))
+                    ξ = Tuple([ξi] for ξi in ξ)
+                    vertices[:, vertex_idx + corner_idx[count+1]] .= vec(Geometry.evaluate(geometry, element_idx, ξ))
                     # Compute data to plot 
                     if !isnothing(field)
-                        point_data[:,vertex_idx + corner_idx[count+1]] = Fields.evaluate(field, element_idx, ξ)
+                        point_data[:,vertex_idx + corner_idx[count+1]] = vec(Fields.evaluate(field, element_idx, ξ))
                     end
                     count += 1
                 end
@@ -143,21 +144,22 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             # Edge vertices
             edge_endpts = [(1,1), (0,1), (1,0), (1,1)]
             edge_ornt = [0, 1, 0, 1]
-            step = [0.0, 0.0]
+            step = (0.0, 0.0)
             for e = 1:4
                 # starting point on edge
-                ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- edge_endpts[e]))
+                ξ_0 = dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- edge_endpts[e])
                 if edge_ornt[e] == 0
-                    step = [dξ_sub, 0.0]
+                    step = (dξ_sub, 0.0)
                 elseif edge_ornt[e] == 1
-                    step = [0.0, dξ_sub]
+                    step = (0.0, dξ_sub)
                 end
                 for edge_vertex_idx in 1:(degree-1)
-                    ξ = ξ_0 + edge_vertex_idx .* step
-                    vertices[:, vertex_idx + count] .= Geometry.evaluate(geometry, element_idx, ξ)
+                    ξ = ξ_0 .+ edge_vertex_idx .* step
+                    ξ = Tuple([ξi] for ξi in ξ)
+                    vertices[:, vertex_idx + count] .= vec(Geometry.evaluate(geometry, element_idx, ξ))
                     # Compute data to plot 
                     if !isnothing(field)
-                        point_data[:,vertex_idx + count] = Fields.evaluate(field, element_idx, ξ)
+                        point_data[:,vertex_idx + count] = vec(Fields.evaluate(field, element_idx, ξ))
                     end
                     count += 1
                 end
@@ -165,15 +167,16 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
             vertex_offset += count - 1
 
             # Add interior vertices
-            ξ_0 = collect(dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- (1,1)))
+            ξ_0 = (dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .- (1,1)))
             for vertex_column_idx in 1:(degree-1)
                 for vertex_row_idx in 1:(degree-1)
                     interior_vertex_idx = vertex_row_idx + (vertex_column_idx - 1) * (degree - 1)
-                    ξ = ξ_0 .+ [dξ_sub * vertex_row_idx, dξ_sub * vertex_column_idx]
-                    vertices[:, vertex_idx + vertex_offset + interior_vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
+                    ξ = ξ_0 .+ (dξ_sub * vertex_row_idx, dξ_sub * vertex_column_idx)
+                    ξ = Tuple([ξi] for ξi in ξ)
+                    vertices[:, vertex_idx + vertex_offset + interior_vertex_idx] .= vec(Geometry.evaluate(geometry, element_idx, ξ))
                     # Compute data to plot 
                     if !isnothing(field)
-                        point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] = Fields.evaluate(field, element_idx, ξ)
+                        point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] = vec(Fields.evaluate(field, element_idx, ξ))
                     end
                 end
             end
