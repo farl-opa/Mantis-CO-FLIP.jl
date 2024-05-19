@@ -435,30 +435,8 @@ function _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Floa
 end
 
 """
-    GTBSplineSpace constructor
+    GTBSplineSpace constructors
 """
-# function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
-#     if length(regularity) != m
-#         msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
-#         msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
-#         throw(ArgumentError(msg1*msg2))
-#     end
-#     for i in 1:m
-#         j = i
-#         k = i+1
-#         if i == m
-#             k = 1
-#         end
-#         polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
-#         if polynomial_degree < regularity[i]
-#             msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
-#             msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
-#             throw(ArgumentError(msg1*msg2))
-#         end
-#     end
-#     return UnstructuredSpace(bsplines, extract_gtbspline_to_nurbs(bsplines, regularity), Dict("regularity" => regularity))
-# end
-
 function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}, regularity::Vector{Int}) where {m}
     if length(regularity) != m
         msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."

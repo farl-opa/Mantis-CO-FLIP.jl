@@ -211,8 +211,6 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
 
     ordered_index = linear_to_ordered_index(el_id, max_ind_el)
 
-    # length(xi[1:n1]) == 1 ? xi_1 = xi[1:n1][1] : xi_1 = xi[1:n1]
-    # length(xi[n1+1:n]) == 1 ? xi_2 = xi[n1+1:n][1] : xi_2 = xi[n1+1:n]
     xi_1 = xi[1:n1]
     xi_2 = xi[n1+1:n]
 

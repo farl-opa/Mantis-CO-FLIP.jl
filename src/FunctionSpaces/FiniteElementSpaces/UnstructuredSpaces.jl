@@ -150,7 +150,3 @@ function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{
 
     return local_basis, basis_indices
 end
-
-function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Float64, nderivatives::Int) where {m}
-    return evaluate(us_space, element_id, ([xi],), nderivatives)
-end
