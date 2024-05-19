@@ -307,6 +307,10 @@ function get_polynomial_degree(bspline::BSplineSpace)
     return bspline.knot_vector.polynomial_degree
 end
 
+function get_polynomial_degree(bspline::BSplineSpace, ::Int)
+    return bspline.knot_vector.polynomial_degree
+end
+
 """
     get_dim(bspline::BSplineSpace)
 
@@ -433,27 +437,27 @@ end
 """
     GTBSplineSpace constructor
 """
-function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
-    if length(regularity) != m
-        msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
-        msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
-        throw(ArgumentError(msg1*msg2))
-    end
-    for i in 1:m
-        j = i
-        k = i+1
-        if i == m
-            k = 1
-        end
-        polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
-        if polynomial_degree < regularity[i]
-            msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
-            msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
-            throw(ArgumentError(msg1*msg2))
-        end
-    end
-    return UnstructuredSpace(bsplines, extract_gtbspline_to_bspline(bsplines, regularity), Dict("regularity" => regularity))
-end
+# function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
+#     if length(regularity) != m
+#         msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
+#         msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
+#         throw(ArgumentError(msg1*msg2))
+#     end
+#     for i in 1:m
+#         j = i
+#         k = i+1
+#         if i == m
+#             k = 1
+#         end
+#         polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
+#         if polynomial_degree < regularity[i]
+#             msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
+#             msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
+#             throw(ArgumentError(msg1*msg2))
+#         end
+#     end
+#     return UnstructuredSpace(bsplines, extract_gtbspline_to_nurbs(bsplines, regularity), Dict("regularity" => regularity))
+# end
 
 function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}, regularity::Vector{Int}) where {m}
     if length(regularity) != m
@@ -475,4 +479,26 @@ function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace},
         end
     end
     return UnstructuredSpace(canonical_spaces, extract_gtbspline_to_canonical(canonical_spaces, regularity), Dict("regularity" => regularity))
+end
+
+function GTBSplineSpace(nurbs::NTuple{m,T}, regularity::Vector{Int}) where {m, T <: Union{BSplineSpace, RationalFiniteElementSpace{1,F} where {F <: Union{BSplineSpace, CanonicalFiniteElementSpace}}}}
+    if length(regularity) != m
+        msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
+        msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
+        throw(ArgumentError(msg1*msg2))
+    end
+    for i in 1:m
+        j = i
+        k = i+1
+        if i == m
+            k = 1
+        end
+        polynomial_degree = min(get_polynomial_degree(nurbs[j], 1), get_polynomial_degree(nurbs[k], 1))
+        if polynomial_degree < regularity[i]
+            msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
+            msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
+            throw(ArgumentError(msg1*msg2))
+        end
+    end
+    return UnstructuredSpace(nurbs, extract_gtbspline_to_nurbs(nurbs, regularity), Dict("regularity" => regularity))
 end

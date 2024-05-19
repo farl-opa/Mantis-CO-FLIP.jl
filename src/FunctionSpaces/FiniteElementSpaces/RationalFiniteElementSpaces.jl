@@ -17,6 +17,10 @@ function get_num_elements(rat_space::RationalFiniteElementSpace{n,F}) where {n, 
     return get_num_elements(rat_space.function_space)
 end
 
+function get_polynomial_degree(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int) where {n, F <: AbstractFiniteElementSpace{n}}
+    return get_polynomial_degree(rat_space.function_space, element_id)
+end
+
 function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n, F <: AbstractFiniteElementSpace{n}}
     homog_basis, basis_indices = evaluate(rat_space.function_space, element_id, xi, nderivatives)
     n_eval = prod(length.(xi))
@@ -31,6 +35,26 @@ function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, x
     end
     
     return homog_basis, basis_indices
+end
+
+function _evaluate_all_at_point(rat_space::RationalFiniteElementSpace{1,F}, element_id::Int, xi::Float64, nderivatives::Int) where {F <: AbstractFiniteElementSpace{1}}
+    local_basis, basis_indices = evaluate(rat_space, element_id, ([xi],), nderivatives)
+    nloc = length(basis_indices)
+    ndofs = get_dim(rat_space)
+    I = zeros(Int, nloc * (nderivatives + 1))
+    J = zeros(Int, nloc * (nderivatives + 1))
+    V = zeros(Float64, nloc * (nderivatives + 1))
+    count = 0
+    for r = 0:nderivatives
+        for i = 1:nloc
+            I[count+1] = basis_indices[i]
+            J[count+1] = r+1
+            V[count+1] = local_basis[r][1, i]
+            count += 1
+        end
+    end
+
+    return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
 end
 
 # dummy getters

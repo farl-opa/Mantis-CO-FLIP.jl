@@ -44,7 +44,7 @@ Returns the dimension of the unstructured function space `us_space`.
 - `::Int`: The dimension of the space.
 """
 function get_dim(us_space::UnstructuredSpace)
-    return get_num_elements(us_space.extraction_op)
+    return get_dim(us_space.extraction_op)
 end
 
 @doc raw"""
@@ -60,6 +60,13 @@ Returns number of total number of elements for the partition over which the func
 """
 function get_num_elements(us_space::UnstructuredSpace)
     return get_num_elements(us_space.extraction_op)
+end
+
+function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
+    space_id = get_space_id(us_space, element_id)
+    space_element_id = element_id - us_space.us_config["patch_nels"][space_id]
+    
+    return get_polynomial_degree(us_space.function_spaces[space_id], space_element_id)
 end
 
 @doc raw"""

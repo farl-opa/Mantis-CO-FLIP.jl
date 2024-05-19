@@ -6,11 +6,15 @@ Wrapper that allows treating a canonical space as a finite element space.
 # Fields
 - `canonical_space::AbstractCanonicalSpace` : canonical space.
 """
-struct CanonicalFiniteElementSpace <: AbstractFiniteElementSpace{1}
-    canonical_space::AbstractCanonicalSpace
+struct CanonicalFiniteElementSpace{F} <: AbstractFiniteElementSpace{1}
+    canonical_space::F
 end
 
 function get_polynomial_degree(space::CanonicalFiniteElementSpace)
+    return space.canonical_space.p
+end
+
+function get_polynomial_degree(space::CanonicalFiniteElementSpace, ::Int)
     return space.canonical_space.p
 end
 

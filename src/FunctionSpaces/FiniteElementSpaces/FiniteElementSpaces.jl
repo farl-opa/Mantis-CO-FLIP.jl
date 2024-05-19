@@ -75,6 +75,8 @@ function get_num_elements(extraction_op::ExtractionOperator)
     return extraction_op.num_elements
 end
 
+# rational version of finite element spaces
+include("RationalFiniteElementSpaces.jl")
 # canonical finite element space wrapper
 include("CanonicalFiniteElementSpaces.jl")
 # univariate function spaces
@@ -86,5 +88,3 @@ include("UnstructuredSpaces.jl")
 include("TensorProductSpaces.jl")
 include("TensorProductTwoScaleRelations.jl")
 include("HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
-# rational version of finite element spaces
-include("RationalFiniteElementSpaces.jl")
