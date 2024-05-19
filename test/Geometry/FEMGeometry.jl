@@ -291,3 +291,51 @@ Mantis.Plot.plot(nurbs_wavy_surface; vtk_filename = output_file[1:end-4], n_subc
 # @test reference_points ≈ output_points atol = 1e-14
 # @test reference_cells == output_cells
 # -----------------------------------------------------------------------------
+
+# Test FEMGeometry (NURBS vs GTB basis) ---------------------------------------------
+deg = 2
+b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(deg))
+br = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1/sqrt(2), 1])
+B = ntuple( i -> b, 4)
+Br = ntuple( i -> br, 4)
+Bsp = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
+Nurbs = Mantis.FunctionSpaces.GTBSplineSpace(Br, [1, 1, 1, 1])
+
+Wt = pi/2
+gt = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt))
+GT = ntuple( i -> gt, 4)
+GTB = Mantis.FunctionSpaces.GTBSplineSpace(GT, [1, 1, 1, 1])
+
+b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(1))
+
+TP_bsp = Mantis.FunctionSpaces.TensorProductSpace(Bsp, b1)
+TP_nurbs = Mantis.FunctionSpaces.TensorProductSpace(Nurbs, b1)
+TP_gtb = Mantis.FunctionSpaces.TensorProductSpace(GTB, b1)
+
+# control points for geometry
+geom_coeffs_0 =   [1.0  -1.0
+    1.0   1.0
+    -1.0   1.0
+    -1.0  -1.0]
+r0 = 1
+r1 = 2
+geom_coeffs = [geom_coeffs_0.*r0 zeros(4)
+               geom_coeffs_0.*r1 zeros(4)]
+nurbs_annulus = Mantis.Geometry.FEMGeometry(TP_nurbs, geom_coeffs)
+gtb_annulus = Mantis.Geometry.FEMGeometry(TP_gtb, geom_coeffs)
+
+# field on the annulus
+import LinearAlgebra
+field_coeffs = Matrix{Float64}(LinearAlgebra.I, 8, 8)
+bsp_field = Mantis.Fields.FEMField(TP_bsp, field_coeffs)
+gtb_field = Mantis.Fields.FEMField(TP_gtb, field_coeffs)
+
+# Generate the plot - NURBS + BSP
+output_filename = "fem_geometry_nurbs_bsp_basis_test.vtu"
+output_file = joinpath(output_data_folder, output_filename)
+Mantis.Plot.plot(nurbs_annulus, bsp_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+
+# Generate the plot - GTB
+output_filename = "fem_geometry_gtb_basis_test.vtu"
+output_file = joinpath(output_data_folder, output_filename)
+Mantis.Plot.plot(gtb_annulus, gtb_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
