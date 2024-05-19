@@ -259,6 +259,10 @@ function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Floa
     return local_basis
 end
 
+function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
+    return get_local_basis(bspline, element_id, xi[1], nderivatives)
+end
+
 """
     get_local_knot_vector(bspline::BSplineSpace, basis_id::Int)
 
