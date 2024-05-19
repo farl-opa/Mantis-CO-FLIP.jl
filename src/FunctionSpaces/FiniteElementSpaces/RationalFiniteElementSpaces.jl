@@ -26,11 +26,20 @@ function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, x
     n_eval = prod(length.(xi))
     for key in keys(homog_basis)
         if sum(key) == 0
-            homog_basis[key] .= homog_basis[key] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-            weight = reshape(sum(homog_basis[key], dims=2), n_eval)
-            homog_basis[key] .= LinearAlgebra.Diagonal(weight) \ homog_basis[key]
+            temp = homog_basis[key] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+            weight = reshape(sum(temp, dims=2), n_eval)
+            homog_basis[key] .= LinearAlgebra.Diagonal(weight) \ temp
+
+        elseif sum(key) == 1
+            key_zero = Tuple(zeros(Float64,n))
+            temp = homog_basis[key_zero...] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+            dtemp = homog_basis[key] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+            weight = reshape(sum(temp, dims=2), n_eval)
+            dweight = reshape(sum(dtemp, dims=2), n_eval)
+            homog_basis[key] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
+
         else
-            error("High order derivatives of rational spaces not implemented")
+            error("Derivatives of rational spaces of order  not implemented")
         end
     end
     
