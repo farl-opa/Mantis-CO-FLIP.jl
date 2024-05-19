@@ -193,7 +193,7 @@ with given `polynomial_degree` and `regularity` per breakpoint.
 - `extraction_op::ExtractionOperator`: Stores extraction coefficients and basis indices.
 - `polynomials::Bernstein`: Refence Bernstein polynomials.
 """
-struct BSplineSpace<:AbstractFiniteElementSpace{1}
+struct BSplineSpace <: AbstractFiniteElementSpace{1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::Bernstein
@@ -253,7 +253,7 @@ function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Floa
     local_basis = bspline.polynomials(xi, nderivatives)
     el_size = get_element_size(bspline, element_id)
     for r = 0:nderivatives
-        local_basis[:,:,r+1] .= @views local_basis[:,:,r+1] ./ el_size^r
+        local_basis[r] .= @views local_basis[r] ./ el_size^r
     end
     
     return local_basis
@@ -376,47 +376,25 @@ function get_element_size(bspline::BSplineSpace, element_id::Int)
 end
 
 """
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
+    get_support(bspline::BSplineSpace, basis_id::Int)
 
-Evaluates the non-zero `bspline` basis functions on the element specified by `element_id` and points `xi` and all derivatives up to nderivatives.
+Returns the elements where the B-spline given by `basis_id` is supported.
 
 # Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Vector{Float64}`: The points where the global basis is evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
+- `bspline::BSplineSpace`: The B-Spline function space.
+- `basis_id::Int`: The id of the basis function.
 # Returns
-- `::Array{Float64}`: Global basis functions, size = n_eval_points x degree+1 x nderivatives+1
+- `::UnitRange{Int}`: The support of the basis function.
 """
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
-    extraction_coefficients, basis_indices = get_extraction(bspline, element_id)
-    local_basis = get_local_basis(bspline, element_id, xi, nderivatives)
-    for r = 0:nderivatives
-        local_basis[:,:,r+1] .= @views local_basis[:,:,r+1] * extraction_coefficients
-    end
+function get_support(bspline::BSplineSpace, basis_id::Int)
+    first_element = get_breakpoint_index(bspline.knot_vector, basis_id)
+    last_element = get_breakpoint_index(bspline.knot_vector, basis_id+bspline.knot_vector.polynomial_degree+1) - 1
 
-    return local_basis, basis_indices
+    return first_element:last_element
 end
 
 """
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-
-Evaluates the non-zero `bspline` basis functions on the element specified by `element_id` on point `xi` and all derivatives up to nderivatives.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Float64`: The point where the global basis is evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
-# Returns
-- `::Array{Float64}`: Global basis functions, size = 1 x degree+1 x nderivatives+1
-"""
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-    return evaluate(bspline, element_id, [xi], nderivatives)
-end
-
-"""
-evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
+_evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
 
 Evaluates all derivatives upto order `nderivatives` for all `bspline` basis functions at a given point `xi` in the element `element_id`.
 
@@ -428,8 +406,8 @@ Evaluates all derivatives upto order `nderivatives` for all `bspline` basis func
 # Returns
 - `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
 """
-function evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-    local_basis, basis_indices = evaluate(bspline, element_id, xi, nderivatives)
+function _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
+    local_basis, basis_indices = evaluate(bspline, element_id, [xi], nderivatives)
     nloc = length(basis_indices)
     ndofs = get_dim(bspline)
     I = zeros(Int, nloc * (nderivatives + 1))
@@ -440,38 +418,12 @@ function evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float
         for i = 1:nloc
             I[count+1] = basis_indices[i]
             J[count+1] = r+1
-            V[count+1] = local_basis[1, i, r+1]
+            V[count+1] = local_basis[r][1, i]
             count += 1
         end
     end
 
     return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
-end
-
-"""
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int, coefficients::Vector{Float64})
-
-Evaluates a spline on the element specified by `element_id` and points `xi` and all derivatives up to nderivatives, form a 
-`bspline` basis with given `coefficients`.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Vector{Float64}`: The points where the global basis is evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
-- `coefficients::Vector{Float64}`: Coefficients of the spline with basis `bspline`.
-# Returns
-- `::Array{Float64}`: Spline evaluation (size = n_eval_points x nderivatives+1).
-"""
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int, coefficients::Vector{Float64})
-    local_basis, basis_indices = evaluate(bspline, element_id, xi, nderivatives)
-    evaluation = zeros(Float64, (size(local_basis)[1],nderivatives+1) )
-    
-    for r = 0:nderivatives
-        evaluation[:,r+1] .= @views sum(local_basis[:,:,r+1] .* coefficients[basis_indices]', dims=2)
-    end
-
-    return evaluation
 end
 
 """
