@@ -70,7 +70,7 @@ end
 function get_extraction(space::CanonicalFiniteElementSpace,::Int)
     basis_indices = get_basis_indices(space, 1)
     nbasis = length(basis_indices)
-    return Matrix(I, nbasis, nbasis), basis_indices
+    return Matrix(LinearAlgebra.I, nbasis, nbasis), basis_indices
 end
 
 function evaluate(space::CanonicalFiniteElementSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)

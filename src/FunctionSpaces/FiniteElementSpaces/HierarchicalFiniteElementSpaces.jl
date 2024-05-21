@@ -63,6 +63,13 @@ struct HierarchicalFiniteElementSpace{n} <: AbstractFiniteElementSpace{n}
         
         new{n}(spaces, two_scale_operators, active_elements, active_functions, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
     end
+
+    function HierarchicalFiniteElementSpace(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
+        active_elements, active_functions = get_active_objects(fe_spaces, two_scale_operators, refined_domains)
+        multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(fe_spaces, two_scale_operators, active_elements, active_functions)
+
+        return HierarchicalFiniteElementSpace(fe_spaces, two_scale_operators, active_elements, active_functions, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
+    end
 end
 
 # Getters for HierarchicalActiveInfo
@@ -81,13 +88,12 @@ function get_finer_active_elements(active_elements::HierarchicalActiveInfo, two_
     elements = [element_id]
     next_elements = Int[]
     for l ∈ level:get_num_levels(active_elements)-1
-        for element ∈ elements
-            for finer_element ∈ get_finer_elements(two_scale_operators[l], element)
-                if finer_element ∈ get_level_active(active_elements, l+1)[2]
-                    add_active!(finer_active_elements, finer_element, l+1)
-                end
+        for element ∈ elements, finer_element ∈ get_finer_elements(two_scale_operators[l], element)
+            if finer_element ∈ get_level_active(active_elements, l+1)[2]
+                add_active!(finer_active_elements, finer_element, l+1)
+            else
+                append!(next_elements, finer_element)
             end
-            append!(next_elements, get_finer_elements(two_scale_operators[l], element))
         end
         elements = next_elements
         next_elements = Int[]
@@ -332,7 +338,6 @@ function get_active_extraction(hierarchical_space::HierarchicalFiniteElementSpac
     return get_active_extraction(hierarchical_space.spaces[level], level, element_id, hierarchical_space.active_functions)
 end
 
-
 function get_active_extraction(space::S, level::Int, element_id::Int, active_functions::HierarchicalActiveInfo) where {S<:AbstractFiniteElementSpace}
 
     coeffs, basis_indices = get_extraction(space, element_id)
@@ -429,7 +434,7 @@ function add_multilevel_functions!(multilevel_basis_indices::Dict{Tuple{Int, Int
     return multilevel_basis_indices
 end
 
-# Hierarchical space constructor
+# getters for hierarchical space constructor
 
 function get_active_objects(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo) where {O<:AbstractTwoScaleOperator, T<:AbstractFiniteElementSpace{n} where n}
     L = get_num_levels(refined_domains)
@@ -530,9 +535,3 @@ function get_multilevel_extraction(fe_spaces::Vector{T}, two_scale_operators::Ve
     return multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices
 end
 
-function get_hierarchical_space(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
-    active_elements, active_functions = get_active_objects(fe_spaces, two_scale_operators, refined_domains)
-    multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(fe_spaces, two_scale_operators, active_elements, active_functions)
-
-    return HierarchicalFiniteElementSpace(fe_spaces, two_scale_operators, active_elements, active_functions, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
-end

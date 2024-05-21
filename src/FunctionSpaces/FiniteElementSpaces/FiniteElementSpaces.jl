@@ -35,10 +35,6 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::Uni
     return local_basis, basis_indices
 end
 
-function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::Float64, nderivatives::Int) where {n}
-   return evaluate(space, element_id, [xi], nderivatives)
-end
-
 function evaluate(function_space::AbstractFiniteElementSpace{1}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
     return evaluate(function_space, element_id, xi[1], nderivatives)
 end
@@ -88,9 +84,10 @@ include("CanonicalFiniteElementSpaces.jl")
 # univariate function spaces
 include("UnivariateSplineSpaces.jl")
 include("UnivariateSplineExtractions.jl")
-include("TwoScaleRelations.jl")
 # composite function spaces
 include("UnstructuredSpaces.jl")
 include("TensorProductSpaces.jl")
-include("TensorProductTwoScaleRelations.jl")
-include("HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
+# two scale relations
+include("TwoScaleRelations/TwoScaleRelations.jl")
+# hierarchical function spaces
+include("HierarchicalFiniteElementSpaces.jl")
