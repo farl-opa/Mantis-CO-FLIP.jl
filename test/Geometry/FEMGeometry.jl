@@ -146,10 +146,14 @@ geom_coeffs = [geom_coeffs_0.*r0 -[+1.0, -1.0, +1.0, -1.0]
                geom_coeffs_0.*r1 [+1.0, -1.0, +1.0, -1.0]]
 wavy_surface_geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 
+# field on the wavy surface
+field_coeffs = rand(Float64, 8, 1)
+wavy_surface_field = Mantis.Fields.FEMField(TP, field_coeffs)
+
 # Generate the plot
 output_filename = "fem_geometry_wavy_surface_test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
-Mantis.Plot.plot(wavy_surface_geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+Mantis.Plot.plot(wavy_surface_geom, wavy_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test geometry 
 # Read the cell data from the reference file
