@@ -319,6 +319,21 @@ function get_dim(bspline::BSplineSpace)
 end
 
 """
+    get_max_supported_basis(bspline::BSplineSpace)
+
+Returns the maximum number of basis functions that can be supported on 
+one element.
+
+# Arguments
+- `bspline::BSplineSpace`: A univariate B-Spline function space.
+# Returns
+- `::Int`: The maximum number of supported basis functions.
+"""
+function get_max_supported_basis(bspline::BSplineSpace)
+    return get_polynomial_degree(bspline) + 1
+end
+
+"""
     get_patch(bspline::BSplineSpace)
 
 Returns the patch of the univariate function space `bspline`.
