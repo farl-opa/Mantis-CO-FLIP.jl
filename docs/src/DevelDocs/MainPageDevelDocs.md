@@ -29,3 +29,8 @@ Modules = [Mantis.Quadrature]
 ```@autodocs
 Modules = [Mantis.Geometry]
 ```
+
+## All functions and stuff from Mantis.Assemblers
+```@autodocs
+Modules = [Mantis.Assemblers]
+```

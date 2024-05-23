@@ -4,15 +4,15 @@ import .. FunctionSpaces
 
 # We can consider parameterising on the dimension here as well.
 struct PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG} <: AbstractBilinearForms
-    forcing::Frhs #where F <: Function
+    forcing::Frhs
 
-    bilinear_form_function::Fbilinear #where Fb <: Function
-    linear_form_function::Flinear #where Fl <: Function
+    bilinear_form_function::Fbilinear
+    linear_form_function::Flinear
 
-    space_trial::Ttrial#FunctionSpaces.AbstractFunctionSpace#AbstractFiniteElementSpace{1}
-    space_test::Ttest#FunctionSpaces.AbstractFunctionSpace#AbstractFiniteElementSpace{1}
+    space_trial::Ttrial
+    space_test::Ttest
 
-    geometry::TG#Geometry.AbstractGeometry{1, m} where {m}
+    geometry::TG
 
     quad_nodes::Vector{Float64}
     quad_weights::Vector{Float64}
@@ -41,8 +41,8 @@ Compute the ``L^2``-inner product between f and g.
 # Arguments
 - `quad_nodes::Vector{Float64}`: (mapped) quadrature points.
 - `quad_weights::Vector{Float64}`: (mapped) quadrature weights.
-- `fxi::Function`: one of the two function to compute the inner product with. To be evaluated at the quadrature nodes.
-- `gxi::Function`: one of the two function to compute the inner product with. To be evaluated at the quadrature nodes.
+- `fxi<:Function`: one of the two function to compute the inner product with. To be evaluated at the quadrature nodes.
+- `gxi<:Function`: one of the two function to compute the inner product with. To be evaluated at the quadrature nodes.
 """
 function compute_inner_product_L2(quad_nodes, quad_weights, fxi::F, gxi::F) where {F <: Function}
     result = 0.0
@@ -79,7 +79,7 @@ Compute the ``L^2``-inner product between f and g.
 # Arguments
 - `quad_nodes::Vector{Float64}`: (mapped) quadrature points.
 - `quad_weights::Vector{Float64}`: (mapped) quadrature weights.
-- `fxi::Function`: one of the two function to compute the inner product with. To be evaluated at the quadrature nodes.
+- `fxi<:Function`: one of the two function to compute the inner product with. To be evaluated at the quadrature nodes.
 - `gxi<:AbstractArray{Float64, 1}`: one of the two function to compute the inner product with. Already evaluated at the quadrature nodes.
 """
 function compute_inner_product_L2(quad_nodes, quad_weights, fxi::F, gxi::T) where {F <: Function, T <: AbstractArray{Float64, 1}}
@@ -90,9 +90,33 @@ function compute_inner_product_L2(quad_nodes, quad_weights, fxi::F, gxi::T) wher
     return result
 end
 
+@doc raw"""
+    (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG} where {Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG})(element_id) 
+
+Bilinear form for the computation of the 1D Poisson equation on the given element.
+
+This function computes the contribution of the given element of both the 
+bilinear and linear form for the 1D Poisson equation. The associated 
+weak formulation is:
+
+For given ``f \in L^2(\Omega)``, find ``\phi \in H^1(\Omega)`` such that 
+```math
+\int_{L_{left}}^{L_{right}} \frac{d \varphi}{d x} \frac{d \phi}{d x} \;dx = \int_{L_{left}}^{L_{right}} \varphi f(x) \;dx \quad \forall \ \varphi \in H_0^1(\Omega)
+```
+
+Note that the global assembler is currently taking care of the boundary 
+contributions, and it ensures that the non-zero test functions on the 
+boundary are removed.
+
+# Arguments
+- `elem_id::Int`: element for which to compute the contribution.
+"""
 function (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG} where {Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG})(element_id) 
     # Computed bases and their derivatives on the current element and in 
-    # the physical domain, so no need to transform them!
+    # the physical domain, so no need to transform them! Because the 
+    # mesh is chosen such that all elements are of length 1, the 
+    # transformations do not change the results. A metric term is 
+    # currently included to show how this can be approached, but it too does not change the result.
     trial_basis_evals, trial_supported_bases = FunctionSpaces.evaluate(PB.space_trial, element_id, (PB.quad_nodes,), 1)
     test_basis_evals, test_supported_bases = FunctionSpaces.evaluate(PB.space_test, element_id, (PB.quad_nodes,), 1)
     
@@ -130,15 +154,6 @@ function (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG}
                                            view(metric_inv .* trial_basis_evals[1], :, trial_linear_idx), 
                                            view(test_basis_evals[1], :, test_linear_idx))
             
-            # # Inner product, can be done using a separate function.
-            # Aij = 0.0
-            # for node_idx in eachindex(PB.quad_weights)
-            #     trial_dxi = trial_basis_evals[1][node_idx, trial_linear_idx]
-            #     test_dxj = test_basis_evals[1][node_idx, test_linear_idx]
-            #     mapped_weights = jacobian[node_idx] * PB.quad_weights[node_idx]
-            #     Aij += mapped_weights * PB.bilinear_form_function(trial_dxi, test_dxj)
-            # end
-            
             A_elem[idx] = Aij
         end
 
@@ -149,15 +164,6 @@ function (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG}
                                       mapped_weights,
                                       PB.forcing, 
                                       view(test_basis_evals[0], :, test_linear_idx))
-        
-        # Inner product, can be done using a separate function.
-        # Li = 0.0
-        # for node_idx in eachindex(mapped_nodes, PB.quad_weights)
-        #     test_i = test_basis_evals[0][node_idx, test_linear_idx]
-        #     f_i = PB.forcing(mapped_nodes[node_idx])
-        #     mapped_weights = jacobian[node_idx] * PB.quad_weights[node_idx]
-        #     Li += mapped_weights * PB.linear_form_function(test_i, f_i)
-        # end
         
         b_elem[test_linear_idx] = bi
     end

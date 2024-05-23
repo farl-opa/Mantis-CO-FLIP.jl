@@ -62,7 +62,7 @@ format_setup = Documenter.HTML(
 # definitions as work-around.
 # Author names are ordered alphabetically on last name.
 makedocs(
-    modules  = [Mantis.FunctionSpaces, Mantis.Quadrature], 
+    modules  = [Mantis.Assemblers, Mantis.FunctionSpaces, Mantis.Quadrature], 
     format   = format_setup,
     sitename = "MANTIS.jl",
     authors  = "Diogo Costa Cabanas, Joey Dekker, Artur Palha, Deepesh Toshniwal",
