@@ -2,6 +2,17 @@
 struct Assembler <: AbstractAssemblers
     bc_left::Float64
     bc_right::Float64
+    set_bcs::Bool
+end
+
+# Construction if no boundary conditions are needed. The b.c.s will be 
+# set to zero, but won't be used.
+function Assembler()
+    return Assembler(0.0, 0.0, false)
+end
+# Construction if both boundary conditions are needed.
+function Assembler(bc_left::Float64, bc_right::Float64)
+    return Assembler(bc_left, bc_right, true)
 end
 
 @doc raw"""
@@ -65,14 +76,26 @@ function (assembler::Assembler)(bilinear_form::AbstractBilinearForms)
     #                    n_dofs_trial, n_dofs_test), 
     #         spa.sparsevec(b_idxs[1:counts_b], b_vals[1:counts_b], n_dofs_test))
 
-    Afull = spa.sparse(A_row_idxs[1:counts_A], 
+    if assembler.set_bcs
+        Afull = spa.sparse(A_row_idxs[1:counts_A], 
+                        A_column_idxs[1:counts_A], 
+                        A_vals[1:counts_A], 
+                        n_dofs_trial, n_dofs_test) 
+        bfull = spa.sparsevec(b_idxs[1:counts_b], b_vals[1:counts_b], n_dofs_test)
+
+        A = Afull[2:end-1,2:end-1]
+        b = bfull[2:end-1] - Afull[2:end-1,1]*assembler.bc_left - Afull[2:end-1,end]*assembler.bc_right
+    else
+        # println(A_row_idxs[1:counts_A])
+        # println(A_column_idxs[1:counts_A])
+        # println(A_vals[1:counts_A])
+        # println(n_dofs_trial, " ", n_dofs_test) 
+        A = spa.sparse(A_row_idxs[1:counts_A], 
                        A_column_idxs[1:counts_A], 
                        A_vals[1:counts_A], 
                        n_dofs_trial, n_dofs_test) 
-    bfull = spa.sparsevec(b_idxs[1:counts_b], b_vals[1:counts_b], n_dofs_test)
-
-    A = Afull[2:end-1,2:end-1]
-    b = bfull[2:end-1] - Afull[2:end-1,1]*assembler.bc_left - Afull[2:end-1,end]*assembler.bc_right
+        b = spa.sparsevec(b_idxs[1:counts_b], b_vals[1:counts_b], n_dofs_test)
+    end
 
     return A, b
 
