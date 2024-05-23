@@ -1,7 +1,7 @@
 struct CartesianGeometry{n,n} <: AbstractAnalGeometry{n, n}
     n_elements::NTuple{n,Int}
     breakpoints::NTuple{n,Vector{Float64}}
-    cartesian_idxs::CartesianIndices
+    cartesian_idxs::CartesianIndices{n, NTuple{n, Base.OneTo{Int}}}
 
     function CartesianGeometry(breakpoints::NTuple{n,Vector{Float64}}) where {n}
         n_elements = length.(breakpoints) .- 1
@@ -60,7 +60,10 @@ function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::Vector
 end
 
 function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
-    ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
+    ordered_idx = geometry.cartesian_idxs[element_idx]
     dx = prod(geometry.breakpoints[k][ordered_idx[k]+1] - geometry.breakpoints[k][ordered_idx[k]] for k = 1:n)
     return dx * ones(Float64, prod(length.(ξ)))
+    # ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
+    # dx = prod(geometry.breakpoints[k][ordered_idx[k]+1] - geometry.breakpoints[k][ordered_idx[k]] for k = 1:n)
+    # return dx * ones(Float64, prod(length.(ξ)))
 end

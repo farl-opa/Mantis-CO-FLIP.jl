@@ -47,7 +47,11 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
             # Boundary vertices
             # Left vertex
             ξ = ξ_0
-            vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
+            try
+                vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ξ)
+            catch
+                vertices[:, vertex_idx] .= Geometry.evaluate(geometry, element_idx, ([ξ],))[1]
+            end
             # Compute data to plot 
             if !isnothing(field)
                 point_data[:,vertex_idx] = Fields.evaluate(field, element_idx, ξ)
@@ -55,7 +59,11 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
 
             # Right vertex
             ξ = ξ_0 + dξ
-            vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
+            try
+                vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
+            catch
+                vertices[:, vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ([ξ],))[1]
+            end
             # Compute data to plot 
             if !isnothing(field)
                 point_data[:,vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)
@@ -64,7 +72,11 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
             # Add interior vertices 
             for interior_vertex_idx in 1:(degree-1)
                 ξ = ξ_0 + dξ_sub * interior_vertex_idx
-                vertices[:, vertex_idx + interior_vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
+                try
+                    vertices[:, vertex_idx + interior_vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ξ)
+                catch
+                    vertices[:, vertex_idx + interior_vertex_idx + 1] .= Geometry.evaluate(geometry, element_idx, ([ξ],))[1]
+                end
                 # Compute data to plot 
                 if !isnothing(field)
                     point_data[:,vertex_idx + interior_vertex_idx + 1] = Fields.evaluate(field, element_idx, ξ)

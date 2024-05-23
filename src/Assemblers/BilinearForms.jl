@@ -93,15 +93,15 @@ end
 function (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG} where {Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG})(element_id) 
     # Computed bases and their derivatives on the current element and in 
     # the physical domain, so no need to transform them!
-    trial_basis_evals, trial_supported_bases = FunctionSpaces.evaluate(PB.space_trial, element_id, PB.quad_nodes, 1)
-    test_basis_evals, test_supported_bases = FunctionSpaces.evaluate(PB.space_test, element_id, PB.quad_nodes, 1)
+    trial_basis_evals, trial_supported_bases = FunctionSpaces.evaluate(PB.space_trial, element_id, (PB.quad_nodes,), 1)
+    test_basis_evals, test_supported_bases = FunctionSpaces.evaluate(PB.space_test, element_id, (PB.quad_nodes,), 1)
     
     # Compute the quantities related to the geometry. We use the metric 
     # to prevent the need to invert the Jacobian.
     mapped_nodes = Geometry.evaluate(PB.geometry, element_id, (PB.quad_nodes,))
     jacobian = Geometry.jacobian(PB.geometry, element_id, (PB.quad_nodes,))
     #metric_inv = inv(transpose(jacobian) * jacobian)
-    # metric_inv = 1.0 ./ (jacobian .* jacobian)
+    metric_inv = 1.0 ./ (jacobian .* jacobian)
 
     mapped_weights = jacobian .* PB.quad_weights
     
@@ -127,7 +127,7 @@ function (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG}
 
             Aij = compute_inner_product_L2(mapped_nodes, 
                                            mapped_weights, 
-                                           view(trial_basis_evals[1], :, trial_linear_idx), 
+                                           view(metric_inv .* trial_basis_evals[1], :, trial_linear_idx), 
                                            view(test_basis_evals[1], :, test_linear_idx))
             
             # # Inner product, can be done using a separate function.
