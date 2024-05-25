@@ -274,10 +274,10 @@ Returns the reference Bernstein polynomials of `bspline`.
 """
 function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
     local_basis = bspline.polynomials(xi, nderivatives)
-    el_size = get_element_size(bspline, element_id)
-    for r = 0:nderivatives
-        local_basis[r] .= @views local_basis[r] ./ el_size^r
-    end
+    # el_size = get_element_size(bspline, element_id)
+    # for r = 0:nderivatives
+    #     local_basis[r] .= @views local_basis[r] ./ el_size^r
+    # end
     
     return local_basis
 end
