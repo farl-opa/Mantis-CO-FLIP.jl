@@ -53,7 +53,7 @@ function metric(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector
     sqrt_g = zeros(n_eval_points)
     for i = 1:n_eval_points
         g[i, :, :] .= reshape(J[i, :, :],m,n)' * reshape(J[i, :, :],m,n)
-        sqrt_g[i] = LinearAlgebra.det(reshape(g[i, :, :],n,n))
+        sqrt_g[i] = sqrt(LinearAlgebra.det(reshape(g[i, :, :],n,n)))
     end
     return g, sqrt_g
 end
@@ -65,7 +65,7 @@ function inv_metric(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Ve
     sqrt_g = zeros(n_eval_points)
     for i = 1:n_eval_points
         inv_g[i, :, :] .= inv(reshape(J[i, :, :],m,n)' * reshape(J[i, :, :],m,n))
-        sqrt_g[i] = 1.0/LinearAlgebra.det(reshape(inv_g[i, :, :],n,n))
+        sqrt_g[i] = sqrt(1.0/LinearAlgebra.det(reshape(inv_g[i, :, :],n,n)))
     end
     return inv_g, sqrt_g
 end
