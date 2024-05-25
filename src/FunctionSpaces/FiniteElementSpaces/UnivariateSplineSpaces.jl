@@ -182,6 +182,29 @@ function get_local_knot_vector(knot_vector::KnotVector, basis_id::Int)
     return KnotVector(local_patch, knot_vector.polynomial_degree, local_multiplicity)
 end
 
+function get_greville_points(knot_vector::KnotVector)
+    p = knot_vector.polynomial_degree
+    n = sum(knot_vector.multiplicity)-p-1
+    cm = cumsum(knot_vector.multiplicity)
+    greville_points = zeros(n)
+    for i = 1:n
+        # starting breakpoint index
+        id0 = findfirst(cm .>= i+1)
+        id1 = findfirst(cm .>= i+p)
+        if id1 > id0
+            pt = knot_vector.patch_1d.breakpoints[id0]*(cm[id0]-i)
+            for j = id0+1:id1-1
+                pt += knot_vector.patch_1d.breakpoints[j]*knot_vector.multiplicity[j]
+            end
+            pt += knot_vector.patch_1d.breakpoints[id1]*(i+p-cm[id1-1])
+        else
+            pt = knot_vector.patch_1d.breakpoints[id0]*p
+        end
+        greville_points[i] = pt / p
+    end
+    return greville_points
+end
+
 """
     struct BSplineSpace
 
@@ -399,6 +422,10 @@ function get_support(bspline::BSplineSpace, basis_id::Int)
     last_element = get_breakpoint_index(bspline.knot_vector, basis_id+bspline.knot_vector.polynomial_degree+1) - 1
 
     return first_element:last_element
+end
+
+function get_max_local_dim(bspline::BSplineSpace)
+    return bspline.knot_vector.polynomial_degree+1
 end
 
 """

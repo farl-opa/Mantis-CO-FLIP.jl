@@ -70,6 +70,10 @@ function get_basis_indices(space::CanonicalFiniteElementSpace,::Int)
     return collect(1:get_dim(space))
 end
 
+function get_max_local_dim(space::CanonicalFiniteElementSpace)
+    return get_dim(space)
+end
+
 function get_extraction(space::CanonicalFiniteElementSpace,::Int)
     basis_indices = get_basis_indices(space, 1)
     nbasis = length(basis_indices)

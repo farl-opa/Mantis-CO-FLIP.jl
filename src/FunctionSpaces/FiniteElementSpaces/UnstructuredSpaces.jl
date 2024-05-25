@@ -102,6 +102,10 @@ function get_space_id(us_space::UnstructuredSpace, element_id::Int)
     return findlast(us_space.us_config["patch_nels"] .< element_id)
 end
 
+function get_max_local_dim(us_space::UnstructuredSpace)
+    return maximum(get_max_local_dim.(us_space.function_spaces))
+end
+
 @doc raw"""
     get_local_basis(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {m}
 

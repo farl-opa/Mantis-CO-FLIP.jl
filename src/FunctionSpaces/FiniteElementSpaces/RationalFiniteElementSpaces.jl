@@ -46,6 +46,10 @@ function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, x
     return homog_basis, basis_indices
 end
 
+function get_max_local_dim(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <: AbstractFiniteElementSpace{n}}
+    return get_max_local_dim(rat_space.function_space)
+end
+
 function _evaluate_all_at_point(rat_space::RationalFiniteElementSpace{1,F}, element_id::Int, xi::Float64, nderivatives::Int) where {F <: AbstractFiniteElementSpace{1}}
     local_basis, basis_indices = evaluate(rat_space, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
