@@ -190,17 +190,17 @@ xi_1_fem_2_2 = collect(LinRange(0.0, 1.0, nx_evaluate + 1))
 xi_2_fem_2_2 = collect(LinRange(0.0, 1.0, ny_evaluate + 1))
 n_evaluation_points = nx_evaluate * ny_evaluate
 
-g, sqrt_g = Mantis.Geometry.metric(cartesian_geometry, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
-inv_g, sqrt_g = Mantis.Geometry.inv_metric(cartesian_geometry, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
+g_fem, sqrt_g_fem = Mantis.Geometry.metric(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
+inv_g_fem, sqrt_g_fem = Mantis.Geometry.inv_metric(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
 
-g_deepesh, sqrt_g_deepesh = Mantis.Geometry.metric_deepesh(cartesian_geometry, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
-inv_g_deepesh, sqrt_g_deepesh = Mantis.Geometry.inv_metric_deepesh(cartesian_geometry, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
+g_deepesh, sqrt_g_deepesh = Mantis.Geometry.metric_deepesh(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
+inv_g_deepesh, sqrt_g_deepesh = Mantis.Geometry.inv_metric_deepesh(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
 
 # Just checks if results are the same as Deepesh's 
 # This is not a test, is just to check that both implementations give the same results 
 # Must be deleted and replaced by a proper test and one of the implementations should
 # also be deleted.
-@test sum(abs.(g - g_deepesh)) ≈ 0.0 atol = 1e-14
-@test sum(abs.(sqrt_g - sqrt_g_deepesh)) ≈ 0.0 atol = 1e-14
-@test sum(abs.(inv_g - inv_g_deepesh)) ≈ 0.0 atol = 1e-14
+@test sum(abs.(g_fem - g_deepesh)) ≈ 0.0 atol = 2e-13
+@test sum(abs.(sqrt_g_fem - sqrt_g_deepesh)) ≈ 0.0 atol = 1e-13
+@test sum(abs.(inv_g_fem - inv_g_deepesh)) ≈ 0.0 atol = 1e-14
 # -----------------------------------------------------------------------------
