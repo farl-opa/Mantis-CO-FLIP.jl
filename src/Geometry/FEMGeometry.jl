@@ -1,3 +1,5 @@
+import LinearAlgebra
+
 struct FEMGeometry{n,m} <: AbstractGeometry{n, m}
     geometry_coeffs::Array{Float64,2}
     fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}
@@ -34,6 +36,7 @@ end
 import LinearAlgebra
 
 function jacobian(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
+    # Jᵢⱼ = ∂Φⁱ\∂ξⱼ
     # evaluate fem space
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(geometry.fem_space, element_id, xi, 1)
     # combine with coefficients and return
@@ -44,28 +47,4 @@ function jacobian(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vect
         J[:, :, k] .= fem_basis[Tuple(keys[k,:])...] * geometry.geometry_coeffs[fem_basis_indices,:]
     end
     return J #, fem_basis[Tuple(zeros(Float64,n))...] * geometry.geometry_coeffs[fem_basis_indices,:]
-end
-
-function metric(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
-    J = jacobian(geometry, element_id, xi)
-    n_eval_points = prod(length.(xi))
-    g = zeros(n_eval_points, n, n)
-    sqrt_g = zeros(n_eval_points)
-    for i = 1:n_eval_points
-        g[i, :, :] .= reshape(J[i, :, :],m,n)' * reshape(J[i, :, :],m,n)
-        sqrt_g[i] = sqrt(LinearAlgebra.det(reshape(g[i, :, :],n,n)))
-    end
-    return g, sqrt_g
-end
-
-function inv_metric(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
-    J = jacobian(geometry, element_id, xi)
-    n_eval_points = prod(length.(xi))
-    inv_g = zeros(n_eval_points, n, n)
-    sqrt_g = zeros(n_eval_points)
-    for i = 1:n_eval_points
-        inv_g[i, :, :] .= inv(reshape(J[i, :, :],m,n)' * reshape(J[i, :, :],m,n))
-        sqrt_g[i] = sqrt(1.0/LinearAlgebra.det(reshape(inv_g[i, :, :],n,n)))
-    end
-    return inv_g, sqrt_g
 end
