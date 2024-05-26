@@ -1,9 +1,6 @@
 import Mantis
 
-using Printf
 using Test
-
-using BenchmarkTools
 
 # CartesianGeometry (1, 1) homogeneous grid -----------------------------------
 dim = 1
