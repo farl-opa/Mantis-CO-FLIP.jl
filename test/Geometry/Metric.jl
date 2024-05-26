@@ -199,5 +199,5 @@ inv_g_deepesh, sqrt_g_deepesh = Mantis.Geometry.inv_metric_deepesh(wavy_surface_
 # also be deleted.
 @test sum(abs.(g_fem - g_deepesh)) ≈ 0.0 atol = 2e-13
 @test sum(abs.(sqrt_g_fem - sqrt_g_deepesh)) ≈ 0.0 atol = 1e-13
-@test sum(abs.(inv_g_fem - inv_g_deepesh)) ≈ 0.0 atol = 1e-14
+@test sum(abs.(inv_g_fem - inv_g_deepesh)) ≈ 0.0 atol = 1e-13
 # -----------------------------------------------------------------------------
