@@ -1,3 +1,5 @@
+import LinearAlgebra
+
 struct FEMGeometry{n,m} <: AbstractGeometry{n, m}
     geometry_coeffs::Array{Float64,2}
     fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}
@@ -55,9 +57,8 @@ function jacobian(geometry::FEMGeometry{n,m}, element_idx::Int, ξ::Vector{Float
     return collect(jacobian(geometry, element_idx, ntuple(i -> [ξ[i]], n))[1])
 end
 
-import LinearAlgebra
-
 function jacobian(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
+    # Jᵢⱼ = ∂Φⁱ\∂ξⱼ
     # evaluate fem space
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(geometry.fem_space, element_id, xi, 1)
     # combine with coefficients and return

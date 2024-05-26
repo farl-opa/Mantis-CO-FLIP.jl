@@ -1,3 +1,4 @@
+import LinearAlgebra
 struct CartesianGeometry{n,n} <: AbstractAnalGeometry{n, n}
     n_elements::NTuple{n,Int}
     breakpoints::NTuple{n,Vector{Float64}}
@@ -60,7 +61,24 @@ function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::Vector
 end
 
 function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
+    # Get the multi-index of the element
     ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
-    dx = prod(geometry.breakpoints[k][ordered_idx[k]+1] - geometry.breakpoints[k][ordered_idx[k]] for k = 1:n)
-    return dx * ones(Float64, prod(length.(ξ)))
+    
+    # Compute the spacing in every direction
+    dx = zeros(Float64, n)  # allocate the memory space 
+    for dim_idx in range(1, n)
+        start_breakpoint_idx = ordered_idx[dim_idx]
+        end_breakpoint_idx = ordered_idx[dim_idx] + 1
+        dx[dim_idx] = geometry.breakpoints[dim_idx][end_breakpoint_idx] - geometry.breakpoints[dim_idx][start_breakpoint_idx]
+    end
+    
+    # Generate the Jacobian for the Cartesian grid, which, for each point, 
+    # is just a diagonal matrix multiplied by the cell spacings in each direction
+    J = zeros(Float64, prod(length.(ξ)), n, n)
+    for dim_idx in range(1, n)
+        J[:, dim_idx, dim_idx] .= dx[dim_idx]
+    end
+    
+    return J
+    
 end
