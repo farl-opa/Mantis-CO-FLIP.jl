@@ -306,7 +306,7 @@ For more information, see [A note on the Oslo Algorithm](https://collections.lib
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knot.
 - `cf::Int`: Index of the coarse knot vector.
-- `rf::Int`: Index of the fine knot vector such that `get_knot_breakpoint(coarse_knot_vector,cf) <= get_knot_breakpoint(fine_knot_vector,rf) < get_knot_breakpoint(coarse_knot_vector,cf+1)`.
+- `rf::Int`: Index of the fine knot vector such that `get_knot_value(coarse_knot_vector,cf) <= get_knot_value(fine_knot_vector,rf) < get_knot_value(coarse_knot_vector,cf+1)`.
 # Returns 
 - `b::Vector{Float64}`: Coefficients for the change of basis.
 """
@@ -314,9 +314,9 @@ function single_knot_insertion_oslo(coarse_knot_vector::KnotVector, fine_knot_ve
     b = [1.0]
 
     for k in 1:coarse_knot_vector.polynomial_degree
-        t1 = get_knot_breakpoint.((coarse_knot_vector,), cf+1-k:cf)
-        t2 = get_knot_breakpoint.((coarse_knot_vector,), cf+1:cf+k)
-        x = get_knot_breakpoint(fine_knot_vector, rf+k)
+        t1 = get_knot_value.((coarse_knot_vector,), cf+1-k:cf)
+        t2 = get_knot_value.((coarse_knot_vector,), cf+1:cf+k)
+        x = get_knot_value(fine_knot_vector, rf+k)
 
         w =  (x .- t1) ./ (t2 .- t1)
 
@@ -344,7 +344,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
-    m = get_knot_length(fine_knot_vector)
+    m = get_knot_vector_length(fine_knot_vector)
     nel = size(fine_knot_vector.patch_1d)
     p = coarse_knot_vector.polynomial_degree
     nfine = m-p-1
@@ -366,7 +366,7 @@ function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vect
         mult = get_knot_multiplicity(fine_knot_vector, rf)
 
         lastcf = cf
-        while get_knot_breakpoint(coarse_knot_vector, cf+1) <= get_knot_breakpoint(fine_knot_vector, rf)
+        while get_knot_value(coarse_knot_vector, cf+1) <= get_knot_value(fine_knot_vector, rf)
             cf += 1
         end
 
