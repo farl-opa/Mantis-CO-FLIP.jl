@@ -44,7 +44,7 @@ Returns the dimension of the unstructured function space `us_space`.
 - `::Int`: The dimension of the space.
 """
 function get_dim(us_space::UnstructuredSpace)
-    return get_num_elements(us_space.extraction_op)
+    return get_dim(us_space.extraction_op)
 end
 
 @doc raw"""
@@ -60,6 +60,13 @@ Returns number of total number of elements for the partition over which the func
 """
 function get_num_elements(us_space::UnstructuredSpace)
     return get_num_elements(us_space.extraction_op)
+end
+
+function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
+    space_id = get_space_id(us_space, element_id)
+    space_element_id = element_id - us_space.us_config["patch_nels"][space_id]
+    
+    return get_polynomial_degree(us_space.function_spaces[space_id], space_element_id)
 end
 
 @doc raw"""
@@ -95,6 +102,10 @@ function get_space_id(us_space::UnstructuredSpace, element_id::Int)
     return findlast(us_space.us_config["patch_nels"] .< element_id)
 end
 
+function get_max_local_dim(us_space::UnstructuredSpace)
+    return maximum(get_max_local_dim.(us_space.function_spaces))
+end
+
 @doc raw"""
     get_local_basis(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {m}
 
@@ -103,20 +114,20 @@ For given global element id `element_id` for a given 1D unstructured space, find
 # Arguments 
 - `us_space::UnstructuredSpace`: unstructured space
 - `element_id::Int`: global element id
-- `xi::Vector{Float64}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated
+- `xi::NTuple{1,Vector{Float64}}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated
 - `nderivatives::Int`: number of derivatives to evaluate
 
 # Returns
 - `::Array{Float64}`: array of evaluated local basis (size: num_eval_points x num_funcs x nderivatives+1)
 - `::Vector{Int}`: vector of local basis indices (size: num_funcs)
 """
-function get_local_basis(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {m}
+function get_local_basis(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {m}
     space_id = get_space_id(us_space, element_id)
     space_element_id = element_id - us_space.us_config["patch_nels"][space_id]
 
     # implement geometric transformation
 
-    return evaluate(us_space.function_spaces[space_id], space_element_id, xi, nderivatives)
+    return evaluate(us_space.function_spaces[space_id], space_element_id, xi, nderivatives)[1]
 end
 
 @doc raw"""
@@ -127,27 +138,19 @@ For given global element id `element_id` for a given 1D unstructured space, eval
 # Arguments 
 - `us_space::UnstructuredSpace`: unstructured space
 - `element_id::Int`: global element id
-- `xi::Vector{Float64}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated
+- `xi::NTuple{1,Vector{Float64}}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated
 - `nderivatives::Int`: number of derivatives to evaluate
 
 # Returns
 - `::Array{Float64}`: array of evaluated global basis (size: num_eval_points x num_funcs x nderivatives+1)
 - `::Vector{Int}`: vector of global basis indices (size: num_funcs)
 """
-function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {m}
+function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {m}
     extraction_coefficients, basis_indices = get_extraction(us_space, element_id)
-    local_basis, _ = get_local_basis(us_space, element_id, xi, nderivatives)
+    local_basis = get_local_basis(us_space, element_id, xi, nderivatives)
     for r = 0:nderivatives
         local_basis[r] .= @views local_basis[r] * extraction_coefficients
     end
 
     return local_basis, basis_indices
-end
-
-function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {m}
-    return evaluate(us_space, element_id, xi[1], nderivatives)
-end
-
-function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Float64, nderivatives::Int) where {m}
-    return evaluate(us_space, element_id, [xi], nderivatives)
 end

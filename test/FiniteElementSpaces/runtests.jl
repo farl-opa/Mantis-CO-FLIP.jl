@@ -6,5 +6,6 @@ using Test
 @testset "KnotInsertion" begin include("KnotInsertionTest.jl") end
 @testset "UnivariateSplineSpaces" begin include("UnivariateSplineTests.jl") end
 @testset "TensorProductTests" begin include("TensorProductTests.jl") end
+@testset "TensorProductTwoScaleRelations" begin include("TensorProductTwoScaleRelationsTest.jl") end
 
 end
