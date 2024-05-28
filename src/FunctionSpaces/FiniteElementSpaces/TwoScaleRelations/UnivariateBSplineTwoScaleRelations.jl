@@ -1,38 +1,21 @@
-"""
-Functions and algorithms used for knot insertion.
-
-"""
-
-# TwoScaleOperator structure
-
-"""
-    struct TwoScaleOperator
-
-Two-scale operator for a change of basis between two finite element spaces.
-
-# Fields
-- `coarse_space::AbstractFiniteElementSpace`: Coarse finite element space.
-- `fine_space::AbstractFiniteElementSpace`: Fine finite element space.
-- `global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int64}`: Change of basis matrix.
-- `coarse_to_fine::Vector{Vector{Int}}`: Relation between coarser and finer basis functions.
-"""
-struct TwoScaleOperator
-    coarse_space::AbstractFiniteElementSpace
-    fine_space::AbstractFiniteElementSpace
-    global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    coarse_to_fine::Vector{Vector{Int}}
-
-    function TwoScaleOperator(coarse_space::S, fine_space::T, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int64}) where {S<:AbstractFiniteElementSpace, T<:AbstractFiniteElementSpace}
-        ncoarse = size(global_subdiv_matrix)[2]
-        coarse_to_fine = Vector{Vector{Int}}(undef, ncoarse)
-
-        for i in 1:1:ncoarse
-            coarse_to_fine[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(global_subdiv_matrix, i)]
-        end
-
-        new(coarse_space, fine_space, global_subdiv_matrix, coarse_to_fine)
+function get_coarse_to_fine(bspline_space::BSplineSpace, nsubdivisions::Int)
+    coarse_to_fine = Vector{Vector{Int}}(undef, get_num_elements(bspline_space))
+    for el in 1:get_num_elements(bspline_space)
+        coarse_to_fine[el] = get_finer_elements(el, nsubdivisions)
     end
+
+    return coarse_to_fine
 end
+
+function get_fine_to_coarse(bspline_space::BSplineSpace, nsubdivisions::Int)
+    fine_to_coarse = Vector{Int}(undef, get_num_elements(bspline_space))
+    for el in 1:get_num_elements(bspline_space)
+        fine_to_coarse[el] = get_coarser_element(el, nsubdivisions)
+    end
+
+    return fine_to_coarse
+end
+
 
 # Helper functions for knot insertion
 
@@ -253,7 +236,7 @@ function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fin
     p = coarse_bspline.knot_vector.polynomial_degree
     fine_bspline = BSplineSpace(fine_knot_vector.patch_1d, p, p .- fine_knot_vector.multiplicity)
 
-    return build_two_scale_operator(coarse_bspline, fine_bspline)
+    return build_two_scale_operator(coarse_bspline, fine_bspline, nsubdivisions)
 end
 
 """
@@ -323,7 +306,7 @@ For more information, see [A note on the Oslo Algorithm](https://collections.lib
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knot.
 - `cf::Int`: Index of the coarse knot vector.
-- `rf::Int`: Index of the fine knot vector such that `get_knot_breakpoint(coarse_knot_vector,cf) <= get_knot_breakpoint(fine_knot_vector,rf) < get_knot_breakpoint(coarse_knot_vector,cf+1)`.
+- `rf::Int`: Index of the fine knot vector such that `get_knot_value(coarse_knot_vector,cf) <= get_knot_value(fine_knot_vector,rf) < get_knot_value(coarse_knot_vector,cf+1)`.
 # Returns 
 - `b::Vector{Float64}`: Coefficients for the change of basis.
 """
@@ -331,9 +314,9 @@ function single_knot_insertion_oslo(coarse_knot_vector::KnotVector, fine_knot_ve
     b = [1.0]
 
     for k in 1:coarse_knot_vector.polynomial_degree
-        t1 = get_knot_breakpoint.((coarse_knot_vector,), cf+1-k:cf)
-        t2 = get_knot_breakpoint.((coarse_knot_vector,), cf+1:cf+k)
-        x = get_knot_breakpoint(fine_knot_vector, rf+k)
+        t1 = get_knot_value.((coarse_knot_vector,), cf+1-k:cf)
+        t2 = get_knot_value.((coarse_knot_vector,), cf+1:cf+k)
+        x = get_knot_value(fine_knot_vector, rf+k)
 
         w =  (x .- t1) ./ (t2 .- t1)
 
@@ -357,11 +340,11 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knots.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
-    m = get_knot_length(fine_knot_vector)
+    m = get_knot_vector_length(fine_knot_vector)
     nel = size(fine_knot_vector.patch_1d)
     p = coarse_knot_vector.polynomial_degree
     nfine = m-p-1
@@ -383,7 +366,7 @@ function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vect
         mult = get_knot_multiplicity(fine_knot_vector, rf)
 
         lastcf = cf
-        while get_knot_breakpoint(coarse_knot_vector, cf+1) <= get_knot_breakpoint(fine_knot_vector, rf)
+        while get_knot_value(coarse_knot_vector, cf+1) <= get_knot_value(fine_knot_vector, rf)
             cf += 1
         end
 
@@ -406,7 +389,7 @@ function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vect
         e += 1
     end
 
-    global_extraction_matrix = SparseArrays.sparse(gm_rows, gm_columns, gm_values, rf-1, cf)
+    global_extraction_matrix = SparseArrays.dropzeros(SparseArrays.sparse(gm_rows, gm_columns, gm_values, rf-1, cf))
     
     return global_extraction_matrix
 end
@@ -424,13 +407,18 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `fine_bspline::BSplineSpace`: Fine B-spline, with extra knots.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
-function build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace)
+function build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace, nsubdivisions::Int)
     gm = build_two_scale_operator(coarse_bspline.knot_vector, fine_bspline.knot_vector)
     
-    return TwoScaleOperator(coarse_bspline, fine_bspline, gm), fine_bspline
+    coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
+    fine_to_coarse_elements = get_fine_to_coarse(fine_bspline, nsubdivisions)
+
+    lm = get_local_subdiv_matrices(coarse_bspline, nsubdivisions)
+    
+    return TwoScaleOperator(coarse_bspline, fine_bspline, gm, lm, coarse_to_fine_elements, fine_to_coarse_elements), fine_bspline
 end
 
 """
@@ -447,7 +435,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 - `fine_multiplicity::Int`: Multiplicity of each new knot in refined knot vector.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
@@ -456,7 +444,7 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::I
 
     fine_bspline = subdivide_bspline(coarse_bspline, nsubdivisions, fine_multiplicity)
 
-    return build_two_scale_operator(coarse_bspline, fine_bspline)
+    return build_two_scale_operator(coarse_bspline, fine_bspline, nsubdivisions)
 end
 
 """
@@ -472,7 +460,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int)
@@ -538,39 +526,28 @@ function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, fine_
     return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]), n)
 end
 
-# Getters for change of basis
+function get_local_subdiv_matrices(bspline::BSplineSpace, nsubdivisions::Int)
+    base_patch = Mesh.Patch1D([0.0, 1.0])
+    single_el_spline = BSplineSpace(base_patch, bspline.knot_vector.polynomial_degree, [-1,-1]) 
+    fine_knot_vector = subdivide_knot_vector(single_el_spline.knot_vector, nsubdivisions, bspline.knot_vector.polynomial_degree+1)
+    finer_spline = BSplineSpace(fine_knot_vector.patch_1d, fine_knot_vector.polynomial_degree, fine_knot_vector.polynomial_degree .- fine_knot_vector.multiplicity)
 
-"""
-    subdivide_coeffs(coarse_basis_coeffs::Vector{Float64}, two_scale_operator::TwoScaleOperator)
+    gm = build_two_scale_operator(single_el_spline.knot_vector, fine_knot_vector)
 
-Returns the spline coefficients in a refined basis from coefficients in a coarser B-spline basis.
+    single_el_subdiv_matrices = Vector{Matrix{Float64}}(undef, nsubdivisions)
 
-# Arguments
-- `coarse_basis_coeffs::Vector{Float64}`: Coefficients in the coarser basis.
-- `two_scale_operator::TwoScaleOperator`: Two-scale operator the change of basis matrix.
-# Returns
--`::Vector{Float64}`: Coefficients in the finer basis.
-"""
-function subdivide_coeffs(coarse_basis_coeffs::Vector{Float64}, two_scale_operator::TwoScaleOperator)
-    return two_scale_operator.global_subdiv_matrix * coarse_basis_coeffs
-end
+    for fine_el ∈ 1:1:nsubdivisions
+        single_el_subdiv_matrices[fine_el] = get_element_basis_subdiv_matrices(gm, single_el_spline, finer_spline, 1, fine_el)
+    end
+    
+    local_subdiv_matrices = Vector{Matrix{Float64}}(undef, get_num_elements(bspline)*nsubdivisions)
 
-"""
-    get_local_subdiv_matrix(coarse_el_id::Int, fine_el_id::Int, two_scale_operator::TwoScaleOperator)
+    for element ∈ 1:1:get_num_elements(bspline)*nsubdivisions
+        finer_index = (element-1) % nsubdivisions + 1
 
-Returns the local subdivision matrix necessary to represent functions from a coarser space on
-`coarse_el_id` in terms of finer functions on element `fine_el_id`.
+        local_subdiv_matrices[element] = single_el_subdiv_matrices[finer_index]
+    end
 
-# Arguments 
-- `coarse_el_id::Int`: Id of the coarse element.
-- `fine_el_id::Int`: Id of the fine element.
-- `two_scale_operator::TwoScaleOperator`: Two-scale operator relating two B-spline spaces.
-# Returns
-- `::@views Array{Float64, 2}`: Local change of basis extraction matrix.
-"""
-function get_local_subdiv_matrix(coarse_el_id::Int, fine_el_id::Int, two_scale_operator::TwoScaleOperator)
-    _, rows = get_extraction(two_scale_operator.fine_space, fine_el_id)
-    _, columns = get_extraction(two_scale_operator.coarse_space, coarse_el_id)
 
-    @views two_scale_operator.global_subdiv_matrix[rows, columns]
+    return local_subdiv_matrices
 end

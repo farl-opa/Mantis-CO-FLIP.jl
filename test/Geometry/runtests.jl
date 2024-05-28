@@ -6,6 +6,6 @@ using Test
 @testset "MappedGeometry" begin include("MappedGeometry.jl") end
 @testset "FEMGeometry" begin include("FEMGeometry.jl") end
 @testset "TensorProductGeometry" begin include("TensorProductGeometry.jl") end
-
+@testset "HierarchicalGeometry" begin include("HierarchicalGeometry.jl") end
 
 end
