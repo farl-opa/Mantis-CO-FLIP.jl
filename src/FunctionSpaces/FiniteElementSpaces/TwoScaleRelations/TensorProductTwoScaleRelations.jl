@@ -10,11 +10,11 @@ struct TensorProductTwoScaleOperator{n, F1, F2, O1, O2} <: AbstractTwoScaleOpera
         coarse_space = TensorProductSpace(twoscale_operator_1.coarse_space, twoscale_operator_2.coarse_space)
         fine_space = TensorProductSpace(twoscale_operator_1.fine_space, twoscale_operator_2.fine_space)
 
-       get_n(coarse_space) == get_n(fine_space) ? nothing : throw(ArgumentError("Tensor product dimensions do not match."))
+        get_n(coarse_space) == get_n(fine_space) ? nothing : throw(ArgumentError("Tensor product dimensions do not match."))
 
         n = get_n(coarse_space)
         
-        gm = get_global_subdiv_matrix(twoscale_operator_2.global_subdiv_matrix, twoscale_operator_1.global_subdiv_matrix)
+        gm = kron(twoscale_operator_1.global_subdiv_matrix, twoscale_operator_2.global_subdiv_matrix)
 
         F1 = typeof(coarse_space); F2 = typeof(fine_space) 
 
@@ -23,47 +23,6 @@ struct TensorProductTwoScaleOperator{n, F1, F2, O1, O2} <: AbstractTwoScaleOpera
 end
 
 # Getters for TensorProductTwoScaleOperator
-
-function get_global_subdiv_matrix(gm1::SparseArrays.SparseMatrixCSC{Tv1, Ti1}, gm2::SparseArrays.SparseMatrixCSC{Tv2, Ti2}) where {Tv1, Ti1, Tv2, Ti2}
-    n_nonzero = SparseArrays.nnz(gm1) * SparseArrays.nnz(gm2)
-
-    gm1_rows = SparseArrays.rowvals(gm1)
-    gm1_vals = SparseArrays.nonzeros(gm1)
-    gm2_rows = SparseArrays.rowvals(gm2)
-    gm2_vals = SparseArrays.nonzeros(gm2)
-
-    Nc1 = gm1.n
-    Nf1 = gm1.m
-    Nc2 = gm2.n
-    Nf2 = gm2.m 
-
-    max_indc = [Nc1, Nc2]
-    max_indf = [Nf1, Nf2]
-    
-    gm_rows = Vector{Int}(undef, n_nonzero)
-    gm_cols = Vector{Int}(undef, n_nonzero)
-    gm_vals = Vector{Float64}(undef, n_nonzero)
-
-    idx_count = 1
-    for j1 ∈ 1:1:Nc1, i1 ∈ SparseArrays.nzrange(gm1, j1)
-        r1 = gm1_rows[i1]
-        fc = gm1_vals[i1]
-        
-        idx2_count = 1
-        for j2 in 1:1:Nc2, i2 in SparseArrays.nzrange(gm2, j2)
-            r2 = gm2_rows[i2]
-
-            gm_rows[idx_count] = ordered_to_linear_index([r1,r2], max_indf)
-            gm_cols[idx_count] = ordered_to_linear_index([j1,j2], max_indc)
-            gm_vals[idx_count] = fc * gm2_vals[idx2_count]
-
-            idx_count += 1
-            idx2_count += 1
-        end
-    end
-
-    return SparseArrays.sparse(gm_rows, gm_cols, gm_vals, Nf2*Nf1, Nc2*Nc1)
-end
 
 function get_local_subdiv_matrix(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, O1, O2}, fine_el_id::Int) where{n, F1<:TensorProductSpace{n, T1, T2} where{T1, T2},  F2<:TensorProductSpace{n, T3, T4} where{T3, T4}, O1<:AbstractTwoScaleOperator, O2<:AbstractTwoScaleOperator }
     ordered_index = linear_to_ordered_index(fine_el_id, _get_num_elements_per_space(twoscale_operator.fine_space))

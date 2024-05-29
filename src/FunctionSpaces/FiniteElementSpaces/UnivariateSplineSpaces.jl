@@ -82,7 +82,7 @@ function get_element_size(knot_vector::KnotVector, element_id::Int)
 end
 
 """
-    get_knot_length(knot_vector::KnotVector)
+    get_knot_vector_length(knot_vector::KnotVector)
 
 Determines the length of `knot_vector` by summing the multiplicites of each knot vector.
 
@@ -91,35 +91,23 @@ Determines the length of `knot_vector` by summing the multiplicites of each knot
 # Returns
 - `::Int`: Length of the knot vector.
 """
-function get_knot_length(knot_vector::KnotVector)
+function get_knot_vector_length(knot_vector::KnotVector)
     return sum(knot_vector.multiplicity)
 end
 
 """
-    get_breakpoint_index(knot_vector::KnotVector, full_index::Int)
+    convert_knot_to_breakpoint_idx(knot_vector::KnotVector, knot_index::Int)
 
-Retrives the breakpoint index corresponding to `knot_vector` at `full_index`, i.e. the index 
+Retrives the breakpoint index corresponding to `knot_vector` at `knot_index`, i.e. the index 
 of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
 # Arguments
 - `knot_vector::KnotVector`: Knot vector for length calculation.
-- `full_index::Int`: Index in the knot vector.
+- `knot_index::Int`: Index in the knot vector.
 # Returns
-- `index::Int`: Index of breakpoint corresponding to `full_index`.
+- `::Int`: Index of breakpoint corresponding to `knot_index`.
 """
-function get_breakpoint_index(knot_vector::KnotVector, full_index::Int)
-    index = 1
-
-    for i in 1:(size(knot_vector.patch_1d)+1)
-        for _ in 1:knot_vector.multiplicity[i]
-            if index == full_index
-                return i
-            end
-
-            index += 1
-        end
-    end
-
-    return error("Index out of bounds.")
+function convert_knot_to_breakpoint_idx(knot_vector::KnotVector, knot_index::Int)
+    return findfirst(idx -> idx >= knot_index, cumsum(knot_vector.multiplicity))
 end
 
 function get_first_knot_index(knot_vector::KnotVector, breakpoint_index::Int)
@@ -131,34 +119,34 @@ function get_last_knot_index(knot_vector::KnotVector, breakpoint_index::Int)
 end
 
 """
-    get_knot_breakpoint(knot_vector::KnotVector, full_index::Int)
+    get_knot_value(knot_vector::KnotVector, knot_index::Int)
 
-Retrives the breakpoint corresponding to `knot_vector` at `full_index`, i.e. the index 
+Retrives the breakpoint corresponding to `knot_vector` at `knot_index`, i.e. the index 
 of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
 # Arguments
 - `knot_vector::KnotVector`: Knot vector for length calculation.
-- `full_index::Int`: Index in the knot vector.
+- `knot_index::Int`: Index in the knot vector.
 # Returns
-- `::Float64`: Breakpoint corresponding to `full_index`.
+- `::Float64`: Breakpoint corresponding to `knot_index`.
 """
-function get_knot_breakpoint(knot_vector::KnotVector, full_index::Int)
-    index = get_breakpoint_index(knot_vector, full_index)
-    return Mesh.get_breakpoints(knot_vector.patch_1d)[index]
+function get_knot_value(knot_vector::KnotVector, knot_index::Int)
+    idx = convert_knot_to_breakpoint_idx(knot_vector, knot_index)
+    return Mesh.get_breakpoints(knot_vector.patch_1d)[idx]
 end
 
 """
-    get_knot_multiplicity(knot_vector::KnotVector, full_index::Int)
+    get_knot_multiplicity(knot_vector::KnotVector, knot_index::Int)
 
-Retrives the multiplicity of the breakpoint corresponding to `knot_vector` at `full_index`, i.e. the index 
+Retrives the multiplicity of the breakpoint corresponding to `knot_vector` at `knot_index`, i.e. the index 
 of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
 # Arguments
 - `knot_vector::KnotVector`: Knot vector for length calculation.
-- `full_index::Int`: Index in the knot vector.
+- `knot_index::Int`: Index in the knot vector.
 # Returns
-- `::Int`: Multiplicity of the breakpoint corresponding to `full_index`.
+- `::Int`: Multiplicity of the breakpoint corresponding to `knot_index`.
 """
-function get_knot_multiplicity(knot_vector::KnotVector, full_index::Int)
-    index = get_breakpoint_index(knot_vector, full_index)
+function get_knot_multiplicity(knot_vector::KnotVector, knot_index::Int)
+    index = convert_knot_to_breakpoint_idx(knot_vector, knot_index)
     return knot_vector.multiplicity[index]
 end
 
@@ -287,36 +275,6 @@ function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::NTuple{1,Ve
 end
 
 """
-    get_local_knot_vector(bspline::BSplineSpace, basis_id::Int)
-
-Returns the local knot vector necessary to characterize the B-spline identified by `basis_id`.
-
-# Arguments
-- `bspline::BSplineSpace`: The full B-spline basis.
-- `basis_id::Int`: The id of the B-spline.
-# Returns
-- `::KnotVector`: The knot vector of the B-spline identified by `basis_id`.
-"""
-function get_local_knot_vector(bspline::BSplineSpace, basis_id::Int)
-    return get_local_knot_vector(bspline.knot_vector, basis_id)
-end
-
-"""
-    get_local_knot_vector(bspline::NTuple{n, BSplineSpace}, basis_id::NTuple{n, Int}) where {n}
-
-Returns the local knot vector necessary to characterize the `n`-variate B-spline identified by `basis_id`.
-
-# Arguments
-- `bspline::NTuple{n, BSplineSpace}`: The full B-spline basis.
-- `basis_id::NTuple{n, Int}`: The id of the B-spline.
-# Returns
-- `::NTuple{n, KnotVector}`: The knot vector of the B-spline identified by `basis_id`.
-"""
-function get_local_knot_vector(bspline::NTuple{n, BSplineSpace}, basis_id::NTuple{n, Int}) where {n}
-    return ntuple(d -> get_local_knot_vector(bspline[d], basis_id[d]), n)
-end
-
-"""
     get_polynomial_degree(bspline::BSplineSpace)
 
 Returns the degree of Bsplines
@@ -379,16 +337,16 @@ function get_patch(bspline::BSplineSpace)
 end
 
 """
-    get_patch(bspline::BSplineSpace)
+    get_multiplicity_vector(bspline::BSplineSpace)
 
-Returns the multiplicity of the knot vector associated with the univariate function space `bspline`.
+Returns the multiplicities of the knot vector associated with the univariate function space `bspline`.
 
 # Arguments
 - `bspline::BSplineSpace`: The B-Spline function space.
 # Returns
 - `::Vector{Int}`: The multiplicity of the knot vector associated with the B-Spline space.
 """
-function get_multiplicity(bspline::BSplineSpace)
+function get_multiplicity_vector(bspline::BSplineSpace)
     return bspline.knot_vector.multiplicity
 end
 
@@ -433,8 +391,8 @@ Returns the elements where the B-spline given by `basis_id` is supported.
 - `::UnitRange{Int}`: The support of the basis function.
 """
 function get_support(bspline::BSplineSpace, basis_id::Int)
-    first_element = get_breakpoint_index(bspline.knot_vector, basis_id)
-    last_element = get_breakpoint_index(bspline.knot_vector, basis_id+bspline.knot_vector.polynomial_degree+1) - 1
+    first_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id)
+    last_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id+bspline.knot_vector.polynomial_degree+1) - 1
 
     return first_element:last_element
 end

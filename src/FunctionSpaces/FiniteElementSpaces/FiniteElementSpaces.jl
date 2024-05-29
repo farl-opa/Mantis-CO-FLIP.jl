@@ -82,9 +82,10 @@ include("CanonicalFiniteElementSpaces.jl")
 # univariate function spaces
 include("UnivariateSplineSpaces.jl")
 include("UnivariateSplineExtractions.jl")
-include("TwoScaleRelations.jl")
 # composite function spaces
 include("UnstructuredSpaces.jl")
 include("TensorProductSpaces.jl")
-include("TensorProductTwoScaleRelations.jl")
-include("HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
+# two scale relations
+include("TwoScaleRelations/TwoScaleRelations.jl")
+# hierarchical function spaces
+include("HierarchicalFiniteElementSpaces.jl")

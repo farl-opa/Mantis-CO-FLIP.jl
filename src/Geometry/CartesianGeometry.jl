@@ -16,6 +16,22 @@ function get_num_elements(geometry::CartesianGeometry{n,n}) where {n}
     return prod(geometry.n_elements)
 end
 
+# function get_boundary_indices(geometry::CartesianGeometry{n,n}) where {n}
+#     return    
+# end
+
+# function get_num_boundary_elements(geometry::CartesianGeometry{n,n}) where {n}
+#     if any(geometry.n_elements) == 1
+#         return
+#     else
+#         return 2*sum(geometry.n_elements)
+#     end
+# end
+
+# function get_num_boundary_elements(geometry::CartesianGeometry{1,1})
+#     return minimum([2, geometry.n_elements])
+# end
+
 function get_domain_dim(geometry::CartesianGeometry{n,n}) where {n}
     return n
 end

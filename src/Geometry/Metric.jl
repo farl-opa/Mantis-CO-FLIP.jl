@@ -49,7 +49,13 @@ function inv_metric(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple
     g, sqrt_g = metric(geometry, element_id, xi)
 
     # Then compute the inverse of the metric
-    inv_g = mapslices(LinearAlgebra.inv, g, dims=(2, 3))  # operate LinearAlgebra.inv over the dimension 2 and 3 of g
+    #inv_g = mapslices(LinearAlgebra.inv, g, dims=(2, 3))  # operate LinearAlgebra.inv over the dimension 2 and 3 of g
+
+    # Test to see if the inv_g computation can be type stable:
+    inv_g = zeros(size(g))
+    for point in axes(g, 1)
+        inv_g[point,:,:] .= LinearAlgebra.inv(g[point,:,:])
+    end
 
     return inv_g, sqrt_g, g
 end

@@ -35,7 +35,7 @@ coarse_elements_to_refine = [3,4,5,8,9,10]
 refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
 
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
-hspace = Mantis.FunctionSpaces.get_hierarchical_space(spaces, [CTS], refined_domains)
+hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
 
 x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
 x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)

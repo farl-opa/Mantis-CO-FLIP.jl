@@ -1,5 +1,7 @@
 module Mantis
 
+using InteractiveUtils # For debugging only, includes things like @code_wartype
+
 # Remember that these include statements have to be in order, so that 
 # the include that are listed later can use code from the previous ones, 
 # but not the other way around.
