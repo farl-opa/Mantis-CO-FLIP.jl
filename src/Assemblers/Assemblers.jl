@@ -92,18 +92,36 @@ function compute_inner_product_L2(quad_nodes, quad_weights, fxi::T, gxi::F) wher
 end
 
 
-function compute_vec_inner_product_L2(quad_nodes, quad_weights, metric, fxi, gxi)
+
+
+
+
+function compute_vec_inner_product_L2(jac_det, quad_weights, metric, fxi, gxi)
     result = 0.0
-    product = zeros(size(fxi[1]))
-    for i in 1:1:length(product)
-        product[i] = transpose([fxi[1][i], fxi[2][i]]) * metric[i,:,:] * [gxi[1][i], gxi[2][i]]
+    @inbounds for i in axes(metric, 3)
+        for j in axes(metric, 2)
+            for point_idx in axes(metric, 1)
+                result += jac_det[point_idx] * quad_weights[point_idx] * fxi[j][point_idx] * metric[point_idx,j,i] * gxi[i][point_idx]
+            end
+        end
     end
-    #display(product)
-    @inbounds for node_idx in eachindex(quad_weights, product)
-        result += quad_weights[node_idx] * product[node_idx]
-    end
+
     return result
 end
+
+
+# function compute_vec_inner_product_L2(quad_nodes, quad_weights, metric, fxi, gxi)
+#     result = 0.0
+#     product = zeros(size(fxi[1]))
+#     for i in 1:1:length(product)
+#         product[i] = transpose([fxi[1][i], fxi[2][i]]) * metric[i,:,:] * [gxi[1][i], gxi[2][i]]
+#     end
+#     #display(product)
+#     @inbounds for node_idx in eachindex(quad_weights, product)
+#         result += quad_weights[node_idx] * product[node_idx]
+#     end
+#     return result
+# end
 
 function compute_novec_inner_product_L2(quad_nodes, quad_weights::T1, fxi::T2, gxi::T3) where {T1 <: AbstractArray{Float64, 1}, T2 <: AbstractArray{Float64, 1}, T3 <: AbstractArray{Float64, 1}}
     result = 0.0

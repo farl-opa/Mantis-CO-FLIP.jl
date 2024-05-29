@@ -11,6 +11,7 @@ include("FunctionSpaces/FunctionSpaces.jl")  # Creates Module FunctionSpaces
 include("Fields/Fields.jl") 
 include("Geometry/Geometry.jl")  # Creates Module Geometry
 include("Assemblers/Assemblers.jl")  # Creates Module Assemblers
+include("Analysis/Analysis.jl")  # Creates Module Analysis
 include("Plot/Plot.jl")  # Creates Module Plot
 # include("HierarchicalFiniteElementSpaces/HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
 

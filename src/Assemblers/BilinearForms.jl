@@ -3,7 +3,7 @@ import .. Geometry
 import .. FunctionSpaces
 import ... Main
 
-
+import .. Quadrature
 
 
 
@@ -70,11 +70,12 @@ function (PB::PoissonBilinearForm1D{Frhs, Fbilinear, Flinear, Ttrial, Ttest, TG}
     # Compute the quantities related to the geometry. We use the metric 
     # to prevent the need to invert the Jacobian.
     mapped_nodes = Geometry.evaluate(PB.geometry, element_id, (PB.quad_nodes,))
-    jacobian = Geometry.jacobian(PB.geometry, element_id, (PB.quad_nodes,))
-    #metric_inv = inv(transpose(jacobian) * jacobian)
-    metric_inv = 1.0 ./ (jacobian .* jacobian)
+    metric_inv, jac_det, metric = Geometry.inv_metric(PB.geometry, element_id, (PB.quad_nodes,))
+    # jacobian = Geometry.jacobian(PB.geometry, element_id, (PB.quad_nodes,))
+    # #metric_inv = inv(transpose(jacobian) * jacobian)
+    # metric_inv = 1.0 ./ (jacobian .* jacobian)
 
-    mapped_weights = jacobian .* PB.quad_weights
+    mapped_weights = jac_det .* PB.quad_weights
     
     # Count the number of supported basis on this element.
     n_supported_bases_trial = length(trial_supported_bases)
@@ -318,7 +319,7 @@ struct PoissonBilinearForm{n, Frhs, Fn, Ttrial, Ttest, TG} <: AbstractBilinearFo
     geometry::TG
 
     quad_nodes::NTuple{n, Vector{Float64}}
-    quad_weights::NTuple{n, Vector{Float64}}
+    quad_weights::Vector{Float64}
 end
 
 # Every bilinear form will need the functions defined below. These are 
@@ -357,24 +358,14 @@ boundary are removed.
 - `elem_id::NTuple{n,Int}`: element for which to compute the contribution.
 """
 function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG} where {n, Frhs, Ttrial, Ttest, TG})(element_id) 
-    # Computed bases and their derivatives. This returns the evaluations of (0,0), (0,1), and (1,0).
+    # Computed bases and their derivatives. This returns the evaluations 
+    # of (0,0), (0,1), and (1,0).
     trial_basis_evals, trial_supported_bases = FunctionSpaces.evaluate(self.space_trial, element_id, self.quad_nodes, 1)
     test_basis_evals, test_supported_bases = FunctionSpaces.evaluate(self.space_test, element_id, self.quad_nodes, 1)
-    # println("nodes weights")
-    # display(self.quad_nodes)
-    # display(self.quad_weights)
+    
     # Compute the quantities related to the geometry.
     mapped_nodes = Geometry.evaluate(self.geometry, element_id, self.quad_nodes)
-    metric_inv, jac_det, metric = Geometry.inv_metric(self.geometry, element_id, self.quad_nodes)
-    #mapped_weights = map(*, jac_det, self.quad_weights)
-    #mapped_weights = jac_det.* [self.quad_weights[1][i] * self.quad_weights[2][j] for i in 1:1:length(self.quad_weights[1]) for j in 1:1:length(self.quad_weights[2])]
-    mapped_weights = vec([jac_det[k] * self.quad_weights[1][i] * self.quad_weights[2][j] for (k, (j,i)) in enumerate(Iterators.product(1:1:length(self.quad_weights[2]), 1:1:length(self.quad_weights[1])))])
-    # println("mapped nodes, mapped weights")
-    # display(mapped_nodes)
-    # display(mapped_weights)
-    # display(jac_det)
-    # display(trial_basis_evals[(1,0)])
-    # println("elemid ",element_id)
+    metric_inv, metric, jac_det = Geometry.inv_metric(self.geometry, element_id, self.quad_nodes)
     
     # Count the number of supported basis on this element.
     n_supported_bases_trial = length(trial_supported_bases)
@@ -382,16 +373,11 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG} where {n, Frhs, 
     n_supported_total = n_supported_bases_trial * n_supported_bases_test
 
     # Pre-allocate the local matrices (their row, colum, and value vectors).
-    A_row_idx = zeros(Int, n_supported_total)
-    A_col_idx = zeros(Int, n_supported_total)
-    A_elem = zeros(n_supported_total)
-    b_col_idx = zeros(Int, n_supported_bases_test)
-    b_elem = zeros(n_supported_bases_test)
-    # A_row_idx = Vector{Int}(undef, n_supported_total)
-    # A_col_idx = Vector{Int}(undef, n_supported_total)
-    # A_elem = Vector{Float64}(undef, n_supported_total)
-    # b_col_idx = Vector{Int}(undef, n_supported_bases_test)
-    # b_elem = Vector{Float64}(undef, n_supported_bases_test)
+    A_row_idx = Vector{Int}(undef, n_supported_total)
+    A_col_idx = Vector{Int}(undef, n_supported_total)
+    A_elem = Vector{Float64}(undef, n_supported_total)
+    b_col_idx = Vector{Int}(undef, n_supported_bases_test)
+    b_elem = Vector{Float64}(undef, n_supported_bases_test)
 
     for test_linear_idx in 1:1:n_supported_bases_test
 
@@ -401,9 +387,7 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG} where {n, Frhs, 
             A_row_idx[idx] = trial_supported_bases[trial_linear_idx]
             A_col_idx[idx] = test_supported_bases[test_linear_idx]
 
-            #display([view(trial_basis_evals[(1, 0)], :, trial_linear_idx), view(trial_basis_evals[(0, 1)], :, trial_linear_idx)])
-            Aij = compute_vec_inner_product_L2(mapped_nodes, 
-                                               mapped_weights, 
+            Aij = compute_vec_inner_product_L2(jac_det, self.quad_weights, 
                                                metric_inv,
                                                (view(trial_basis_evals[(1, 0)], :, trial_linear_idx), view(trial_basis_evals[(0, 1)], :, trial_linear_idx)), 
                                                (view(test_basis_evals[(1, 0)], :, test_linear_idx), view(test_basis_evals[(0, 1)], :, test_linear_idx)))
@@ -414,16 +398,9 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG} where {n, Frhs, 
 
         b_col_idx[test_linear_idx] = test_supported_bases[test_linear_idx]
 
-        # if element_id == 1 && test_linear_idx == 1
-        #     Main.@code_warntype compute_novec_inner_product_L2(mapped_nodes, 
-        #     mapped_weights,
-        #     self.forcing.(mapped_nodes[:,1], mapped_nodes[:,2]), 
-        #     view(test_basis_evals[(0, 0)], :, test_linear_idx))
-        # end
-
         fxy = self.forcing.(mapped_nodes[:,1], mapped_nodes[:,2])
-        bi = compute_novec_inner_product_L2(mapped_nodes, 
-                                      mapped_weights,
+        bi = compute_inner_product_L2(mapped_nodes, 
+                                      jac_det .* self.quad_weights,
                                       fxy, 
                                       view(test_basis_evals[(0, 0)], :, test_linear_idx))
 

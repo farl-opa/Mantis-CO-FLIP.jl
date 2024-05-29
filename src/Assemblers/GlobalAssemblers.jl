@@ -1,4 +1,7 @@
 
+import .. Fields
+import .. Geometry
+
 struct Assembler <: AbstractAssemblers
     bc_left::Float64
     bc_right::Float64
@@ -98,6 +101,45 @@ function (assembler::Assembler)(bilinear_form::AbstractBilinearForms)
     end
 
     return A, b
+
+end
+
+
+
+struct AssemblerError{n} <: AbstractAssemblers 
+    quad_nodes::NTuple{n, Vector{Float64}}
+    quad_weights::Vector{Float64}
+    # function AssemblerError(quad_nodes::NTuple{n, Vector{Float64}}, quad_weights::NTuple{n, Vector{Float64}}) where {n}
+    #     new{n}(quad_nodes, quad_weights)
+    # end
+end
+
+@doc raw"""
+    (self::AssemblerError)(bilinear_form::AbstractBilinearForms)
+
+Assemble a continuous Galerkin problem with given bilinear form.
+
+# Arguments
+- `bilinear_form::AbstractBilinearForms`: bilinear form.
+"""
+function (self::AssemblerError)(space, dofs, geom, exact_sol, norm="L2")
+    result = 0.0
+
+    # Loop over all active elements
+    for elem_id in 1:Geometry.get_num_elements(geom)
+        field = Fields.FEMField(space, dofs)
+        element_sol = dropdims(Fields.evaluate(field, elem_id, self.quad_nodes), dims=2)
+
+        metric, jac_det = Geometry.metric(geom, elem_id, self.quad_nodes)
+
+        phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
+        element_exact = exact_sol.(phys_nodes[:,1], phys_nodes[:,2])
+
+        result += sum(@. jac_det * self.quad_weights * (element_sol - element_exact)^2)
+
+    end
+
+    return sqrt(result)
 
 end
 
