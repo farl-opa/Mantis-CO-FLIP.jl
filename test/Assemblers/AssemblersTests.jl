@@ -269,14 +269,13 @@ using LinearAlgebra
 
 
 
-########################################################################
-## Test cases for the 2D Poisson problem.                             ##
-########################################################################
 
-# This is how MANTIS is called to create a 2D problem.
+
+
+# This is how MANTIS is called to solve a problem. The bc input is only for the 1D case.
 function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, 
                 q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
-                verbose=false)
+                verbose=false, bc = (false, 0.0, 0.0))
     if verbose
         println("Starting setup for case "*case*" ...")
     end
@@ -289,18 +288,26 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
                                                               q_weights)
 
     # Setup the global assembler.
-    global_assembler = Mantis.Assemblers.Assembler()
+    if bc[1] == false
+        global_assembler = Mantis.Assemblers.Assembler()
+    else
+        global_assembler = Mantis.Assemblers.Assembler(bc[2], bc[3])
+    end
 
     if verbose
         println("Assembling ...")
     end
     A, b = global_assembler(element_assembler)
 
-    # Add the average = 0 condition for Neumann b.c. (derivatives are 
-    # assumed to be zero!)
-    A = vcat(A, ones((1,size(A)[2])))
-    A = hcat(A, vcat(ones(size(A)[1]-1), 0.0))
-    b = vcat(b, 0.0)
+    if n != 1
+        # Add the average = 0 condition for Neumann b.c. (derivatives are 
+        # assumed to be zero!)
+        A = vcat(A, ones((1,size(A)[2])))
+        A = hcat(A, vcat(ones(size(A)[1]-1), 0.0))
+        b = vcat(b, 0.0)
+    end
+
+    #@code_warntype element_assembler(1)
     
 
     if test
@@ -316,7 +323,18 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if verbose
         println("Solving ",size(A,1)," x ",size(A,2)," sized system ...")
     end
-    sol = A \ Vector(b)
+    if n == 1
+        sol = [bc[2], (A \ Vector(b))..., bc[3]]
+    else
+        sol = A \ Vector(b)
+    end
+
+    if n == 1
+        sol_rsh = reshape(sol, :, 1)
+    else
+        sol_rsh = reshape(sol[1:end-1], :, 1)
+    end
+
 
     # This is for the plotting. You can visualise the solution in 
     # Paraview, using the 'Plot over line'-filter.
@@ -328,7 +346,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         msave = Mantis.Geometry.get_num_elements(geom)
         output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*".vtu"
         output_file = joinpath(output_data_folder, output_filename)
-        field = Mantis.Fields.FEMField(trial_space, reshape(sol[1:end-1], :, 1))
+        field = Mantis.Fields.FEMField(trial_space, sol_rsh)
         if n == 1
             out_deg = maximum([1, p])
         else
@@ -342,7 +360,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         println("Computing L^2 error w.r.t. exact solution ...")
     end
     err_assembler = Mantis.Assemblers.AssemblerError(q_nodes, q_weights)
-    err = err_assembler(trial_space, reshape(sol[1:end-1], :, 1), geom, exact_sol)
+    err = err_assembler(trial_space, sol_rsh, geom, exact_sol)
     if verbose
         println("The L^2 error is: ",err)
         println()  # Extra blank line to separate the different runs.
@@ -378,8 +396,71 @@ verbose = false               # false
 
 
 
+
+
+
+########################################################################
+## Test cases for the 1D Poisson problem.                             ##
+########################################################################
+
 # Dimension
-n = 2
+n_1d = 1
+# Number of elements.
+m_1d = 5
+# polynomial degree and inter-element continuity.
+p_1d = 3
+k_1d = 2
+# Domain. The length of the domain is chosen so that the normal 
+# derivatives of the exact solution are zero at the boundary. This is 
+# the only Neumann b.c. that we can specify at the moment.
+Lleft_1d = 0.0
+Lright_1d = 1.0
+
+bc_sine_1d = (true, 0.0, 1.0)
+bc_const_1d = (true, 0.0, 0.0)
+
+function forcing_sine_1d(x)
+    return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
+end
+
+function exact_sol_sine_1d(x::Float64)
+    return sinpi(x)
+end
+
+function forcing_const_1d(x)
+    return -2.0
+end
+
+function exact_sol_const_1d(x::Float64)
+    return x * (x - Lright_1d)
+end
+
+# Create Patch.
+brk_1d = collect(LinRange(Lleft_1d, Lright_1d, m_1d+1))
+patch_1d = Mantis.Mesh.Patch1D(brk_1d)
+# Continuity vector for OPEN knot vector.
+kvec_1d = fill(k_1d, (m_1d+1,))
+kvec_1d[1] = -1
+kvec_1d[end] = -1
+# Create function spaces (b-splines here).
+trial_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
+test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
+
+# Create the geometry.
+geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
+
+# Setup the quadrature rule.
+q_nodes_1d, q_weights_1d = Mantis.Quadrature.gauss_legendre(p_1d+1)
+q_weights_1d_all = Mantis.Quadrature.tensor_product_weights((q_weights_1d,)) # Simply returns q_weights_1d
+
+
+
+########################################################################
+## Test cases for the 2D Poisson problem.                             ##
+########################################################################
+
+# Dimension
+n_2d = 2
 # Number of elements.
 m_x = 5
 m_y = 5
@@ -511,16 +592,24 @@ q_nodes_y, q_weights_y = Mantis.Quadrature.gauss_legendre(p_2d[2]+1)
 # a vector of the weights in the right order).
 q_weights_all = Mantis.Quadrature.tensor_product_weights((q_weights_x, q_weights_y))
 
-for case in ["sine2d", "sine2dH"]
+for case in ["sine1d", "const1d", "sine2d", "sine2dH"]
 
-    if case == "sine2d"
+    if case == "sine1d"
+        fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d, 
+               (q_nodes_1d, ), q_weights_1d_all, exact_sol_sine_1d, p_1d, 
+               k_1d, case, n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
+    elseif case == "const1d"
+        fe_run(forcing_const_1d, trial_space_1d, test_space_1d, geom_1d, 
+                (q_nodes_1d, ), q_weights_1d_all, exact_sol_const_1d, p_1d, 
+                k_1d, case, n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
+    elseif case == "sine2d"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-               k_2d, case, n, write_to_output_file, run_tests, verbose)
+               k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "sine2dH"
         fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, 
                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-               k_2d, case, n, write_to_output_file, run_tests, verbose)
+               k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
     else
         println("Warning: case '"*case*"' unknown. Skipping.") 
     end

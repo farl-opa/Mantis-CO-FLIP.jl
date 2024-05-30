@@ -5,6 +5,7 @@ Contains all assembly-related structs and functions.
 """
 module Assemblers
 
+import LinearAlgebra
 import SparseArrays; const spa = SparseArrays
 
 import .. Mesh
@@ -96,14 +97,24 @@ end
 
 
 
-function compute_vec_inner_product_L2(jac_det, quad_weights, metric, fxi, gxi)
+function compute_vec_inner_product_L2(jac_det, quad_weights, metric, f, g)
     result = 0.0
     @inbounds for i in axes(metric, 3)
         for j in axes(metric, 2)
             for point_idx in axes(metric, 1)
-                result += jac_det[point_idx] * quad_weights[point_idx] * fxi[j][point_idx] * metric[point_idx,j,i] * gxi[i][point_idx]
+                result += jac_det[point_idx] * quad_weights[point_idx] * f[j][point_idx] * metric[point_idx,j,i] * g[i][point_idx]
             end
         end
+    end
+
+    return result
+end
+
+# Special version for identity metric for which metric = LinearAlgebra.I
+function compute_vec_inner_product_L2(jac_det, quad_weights, metric::LinearAlgebra.UniformScaling{Bool}, f, g)
+    result = 0.0
+    @inbounds for point_idx in eachindex(jac_det)
+        result += jac_det[point_idx] * quad_weights[point_idx] * f[point_idx] * metric * g[point_idx]
     end
 
     return result
