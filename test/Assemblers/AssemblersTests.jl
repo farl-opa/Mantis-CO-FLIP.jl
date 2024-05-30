@@ -5,13 +5,6 @@ import Mantis
 using Test
 using LinearAlgebra
 
-# Compute base directories for data input and output
-Mantis_folder =  dirname(dirname(pathof(Mantis)))
-data_folder = joinpath(Mantis_folder, "test", "data")
-output_data_folder = joinpath(data_folder, "output", "Poisson")
-
-write_to_output_file = true
-
 
 # # This is how MANTIS is called to create a 1D mixed problem.
 # function fe_run_1D(forcing_function, bilinear_function, linear_function, trial_space, 
@@ -281,26 +274,14 @@ write_to_output_file = true
 ########################################################################
 
 # This is how MANTIS is called to create a 2D problem.
-function fe_run_2D(forcing_function_2d, trial_space, test_space, geom, q_nodes, 
-                   q_weights, p_2d, k_2d, case, output_to_file)
-    # Function that gives the neumann condition on the boundary
-    function neumann(x::Float64, which::String)
-        if which == "left"
-            return 2.0 * pi * cospi(2.0 * geom.breakpoints[1][1]) * sinpi(2.0 * x)
-        elseif which == "bottom"
-            return 2.0 * pi * sinpi(2.0 * x) * cospi(2.0 * geom.breakpoints[2][1])
-        elseif which == "right"
-            return 2.0 * pi * cospi(2.0 * geom.breakpoints[1][end]) * sinpi(2.0 * x)
-        elseif which == "top"
-            return 2.0 * pi * sinpi(2.0 * x) * cospi(2.0 * geom.breakpoints[2][end])
-        else
-            #return 0.0
-            error("Boundary function not defined.")
-        end
+function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, 
+                q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
+                verbose=false)
+    if verbose
+        println("Starting setup ...")
     end
     # Setup the element assembler.
-    element_assembler = Mantis.Assemblers.PoissonBilinearForm(forcing_function_2d,
-                                                              neumann,
+    element_assembler = Mantis.Assemblers.PoissonBilinearForm(forcing_function,
                                                               trial_space,
                                                               test_space,
                                                               geom,
@@ -310,46 +291,65 @@ function fe_run_2D(forcing_function_2d, trial_space, test_space, geom, q_nodes,
     # Setup the global assembler.
     global_assembler = Mantis.Assemblers.Assembler()
 
-    # Assemble.
+    if verbose
+        println("Assembling ...")
+    end
     A, b = global_assembler(element_assembler)
 
-    #@code_warntype element_assembler(1)
-
+    # Add the average = 0 condition for Neumann b.c. (derivatives are 
+    # assumed to be zero!)
     A = vcat(A, ones((1,size(A)[2])))
     A = hcat(A, vcat(ones(size(A)[1]-1), 0.0))
     b = vcat(b, 0.0)
+    
 
-    # println("res")
-    # display(A)
-    # display(b)
-    # println(LinearAlgebra.cond(Matrix(A)))
+    if test
+        if verbose
+            println("Running tests ...")
+        end
+        @test isapprox(A, A', rtol=1e-12)
+        @test isempty(nullspace(Matrix(A)))  # Only works on dense matrices!
+        @test LinearAlgebra.cond(Matrix(A)) < 1e10
+    end
 
     # Solve & add bcs.
+    if verbose
+        println("Solving ",size(A,1)," x ",size(A,2)," sized system ...")
+    end
     sol = A \ Vector(b)
-
-    # display(sol)
 
     # This is for the plotting. You can visualise the solution in 
     # Paraview, using the 'Plot over line'-filter.
     if output_to_file
-        println("writing to file")
+        if verbose
+            println("Writing to file ...")
+        end
+        
         msave = Mantis.Geometry.get_num_elements(geom)
-        output_filename = "Poisson-2D-p$p_2d-k$k_2d-m$msave-0to1-case-"*case*".vtu"
+        output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*".vtu"
         output_file = joinpath(output_data_folder, output_filename)
         field = Mantis.Fields.FEMField(trial_space, reshape(sol[1:end-1], :, 1))
-        Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = maximum([1, maximum(p_2d)]), ascii = false, compress = false)
+        if n == 1
+            out_deg = maximum([1, p])
+        else
+            out_deg = maximum([1, maximum(p)])
+        end
+        Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = out_deg, ascii = false, compress = false)
     end
 
     # Compute error
-    function exact_sol(x::Float64, y::Float64)
-        return sinpi(2.0 * x) * sinpi(2.0 * y)
+    if verbose
+        println("Computing L^2 error w.r.t. exact solution ...")
     end
     err_assembler = Mantis.Assemblers.AssemblerError(q_nodes, q_weights)
     err = err_assembler(trial_space, reshape(sol[1:end-1], :, 1), geom, exact_sol)
-    println(err)
+    if verbose
+        println("The L^2 error is: ",err)
+    end
 
-    err2 = err_assembler(trial_space, reshape(ones(length(sol)-1), :, 1), geom, (x,y) -> 0.0)
-    println(err2)
+    # Extra check to test if the metric computation was correct.
+    # err2 = err_assembler(trial_space, reshape(ones(length(sol)-1), :, 1), geom, (x,y) -> 0.0)
+    # println(err2)
 
     return sol
 end
@@ -368,15 +368,31 @@ end
 
 # Here we setup and specify the inputs to the FE problem.
 
+# Compute base directories for data input and output
+Mantis_folder =  dirname(dirname(pathof(Mantis)))
+data_folder = joinpath(Mantis_folder, "test", "data")
+output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this folder first if you haven't done so yet.
+
+# Choose whether to write the output to a file, run the tests, and/or 
+# print progress statements. Make sure they are set as indicated when 
+# committing and that the grid is not much larger than 10x10
+write_to_output_file = true  # false
+run_tests = true              # true
+verbose = true               # false
+
+
+
+# Dimension
+n = 2
 # Number of elements.
-m_x = 100
-m_y = 100
+m_x = 10
+m_y = 10
 # polynomial degree and inter-element continuity.
 p_2d = (3, 2)
 k_2d = (2, 0)
-# Domain. The length of the domain is chosen to be equal to the number 
-# of elements to ensure elements of size one. This automatically removes 
-# the implicit geometry assumed in the FunctionSpaces.
+# Domain. The length of the domain is chosen so that the normal 
+# derivatives of the exact solution are zero at the boundary. This is 
+# the only Neumann b.c. that we can specify at the moment.
 Lleft = 0.25
 Lright = 0.75
 Lbottom = 0.25
@@ -385,6 +401,10 @@ Ltop = 0.75
 
 function forcing_sine_2d(x::Float64, y::Float64)
     return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
+end
+
+function exact_sol_sine_2d(x::Float64, y::Float64)
+    return sinpi(2.0 * x) * sinpi(2.0 * y)
 end
 
 # Create Patch.
@@ -405,9 +425,8 @@ test_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
 trial_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
 test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
 
-data = Dict{Int, Int}() # Why do we need this? (I made up the kv types)
-trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y, data)
-test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y, data)
+trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
+test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
 
 # Create the geometry.
 geom_2d = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
@@ -415,15 +434,18 @@ geom_2d = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
 # Setup the quadrature rule.
 q_nodes_x, q_weights_x = Mantis.Quadrature.gauss_legendre(p_2d[1]+1)
 q_nodes_y, q_weights_y = Mantis.Quadrature.gauss_legendre(p_2d[2]+1)
+# This function computes the tensor product of the quadrature weights in 
+# the reference domain. This ensures that this only need to be computed 
+# once and makes the size compatible with our other outputs (it returns 
+# a vector of the weights in the right order).
 q_weights_all = Mantis.Quadrature.tensor_product_weights((q_weights_x, q_weights_y))
 
-for case in ["sine"]
+for case in ["sine2d"]
 
-    if case == "sine"
-        println("Starting")
-        fe_run_2D(forcing_sine_2d, trial_space_2d, test_space_2d, geom_2d, 
-                  (q_nodes_x, q_nodes_y), q_weights_all, p_2d, 
-                  k_2d, case, write_to_output_file)
+    if case == "sine2d"
+        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_2d, 
+               (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
+               k_2d, case, n, write_to_output_file, run_tests, verbose)
     else
         error("Case: '",case,"' unknown.") 
     end

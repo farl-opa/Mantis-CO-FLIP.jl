@@ -1,9 +1,9 @@
 
 import .. Geometry
 import .. FunctionSpaces
-import ... Main
-
 import .. Quadrature
+
+import ... Main
 
 
 
@@ -307,20 +307,72 @@ end
 
 
 
-# We can consider parameterising on the dimension here as well.
-struct PoissonBilinearForm{n, Frhs, Fn, Ttrial, Ttest, TG} <: AbstractBilinearForms
-    forcing::Frhs
+"""
+    struct PetrovGalerkinOneVariable{n, Frhs, Ttrial, Ttest, TG} <: AbstractBilinearForms
 
-    neumann_function::Fn
+Contains the required data for a Petrov-Galerkin FEM for one variable.
+
+# Fields
+- `forcing::Frhs <: Function`: Forcing function, must take in an NTuple{n, Float64} as argument.
+- `space_trial::Ttrial <: FunctionSpaces.AbstractFunctionSpace`: Trial (Solution) space.
+- `space_test::Ttest <: FunctionSpaces.AbstractFunctionSpace`: Test space.
+- `geometry::TG <: Geometry.AbstractGeometry{n,m}`: Geometry.
+- `quad_nodes::NTuple{n, Vector{Float64}}`: Quadrature nodes.
+- `quad_weights::Vector{Float64}`: Vector of the tensor product of the quadrature weights.
+
+# See also
+[`tensor_product_weights(weights_1d::NTuple{n, Vector{Float64}}) where {n}`](@ref) to compute the quadrature weights.
+"""
+struct PoissonBilinearForm{n, m, Frhs, Ttrial, Ttest, TG} <: AbstractBilinearForms
+    forcing::Frhs
 
     space_trial::Ttrial
     space_test::Ttest
 
     geometry::TG
 
+    # Quadrature rule in reference domain. Nodes per dimension, weights 
+    # as returned from Mantis.Quadrature.tensor_product_weights
     quad_nodes::NTuple{n, Vector{Float64}}
     quad_weights::Vector{Float64}
+
+    function PoissonBilinearForm(forcing::Frhs, 
+                                 space_trial::Ttrial, 
+                                 space_test::Ttest, 
+                                 geometry::TG, 
+                                 quad_nodes::NTuple{n, Vector{Float64}}, 
+                                 quad_weights::Vector{Float64}) where {n, m, 
+                                 Frhs <: Function, 
+                                 Ttrial <: FunctionSpaces.AbstractFunctionSpace, 
+                                 Ttest <: FunctionSpaces.AbstractFunctionSpace,
+                                 TG <: Geometry.AbstractGeometry{n,m}}
+        
+        new{n, m, Frhs, Ttrial, Ttest, TG}(forcing, space_trial, space_test, 
+                                           geometry, quad_nodes, quad_weights)
+    end
+
+    # Constructor for the standard Galerkin setup. Essential the same as above, 
+    # but the test and trial spaces are of the same type.
+    function Galerkin(forcing::Frhs, 
+                      space_trial::Tspace, 
+                      space_test::Tspace, 
+                      geometry::TG, 
+                      quad_nodes::NTuple{n, Vector{Float64}}, 
+                      quad_weights::Vector{Float64}) where {n, 
+                      Frhs <: Function, 
+                      Tspace <: FunctionSpaces.AbstractFunctionSpace, 
+                      TG <: Geometry.AbstractGeometry{n,m} where {m}}
+
+        new{n, m, Frhs, Tspace, Tspace, TG}(forcing, space_trial, space_test, 
+                                           geometry, quad_nodes, quad_weights)
 end
+end
+
+# If the names of the variables in the struct are consistent across 
+# multiple bilinear forms, we may be able to define some of these 
+# functions below (especially the number of elements) for the general 
+# case. This will be less error prone, but can fail if the geometry 
+# variable name in the struct is not called geometry.
 
 # Every bilinear form will need the functions defined below. These are 
 # used by the global assembler to set up the problem.
@@ -336,23 +388,29 @@ function get_estimated_nnz_per_elem(PB::PoissonBilinearForm)
     return FunctionSpaces.get_max_local_dim(PB.space_trial) * FunctionSpaces.get_max_local_dim(PB.space_test), FunctionSpaces.get_max_local_dim(PB.space_test)
 end
 
+
+# Maybe we should turn this into a function that takes something like 
+# the above struct as input. Then, depending the struct (= type) of 
+# this input, it can change its behaviour. I think this may reduce the 
+# number of structs that must be made, as they can be more universal. 
+# This would also improve the names I think.
 @doc raw"""
     (PB::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG} where {n, Frhs, Ttrial, Ttest, TG})(element_id) 
 
-Bilinear form for the computation of the 1D Poisson equation on the given element.
+Bilinear form for the computation of the Poisson equation on the given element.
 
 This function computes the contribution of the given element of both the 
-bilinear and linear form for the 1D Poisson equation. The associated 
-weak formulation is:
+bilinear and linear form for the Poisson equation. The associated weak 
+formulation is:
 
 For given ``f \in L^2(\Omega)``, find ``\phi \in H^1(\Omega)`` such that 
 ```math
-\int_{L_{left}}^{L_{right}} \frac{d \varphi}{d x} \frac{d \phi}{d x} \;dx = \int_{L_{left}}^{L_{right}} \varphi f(x) \;dx \quad \forall \ \varphi \in H_0^1(\Omega)
+\int_{\Omega} \nabla \varphi \cdot \nabla \phi \;d\Omega = \int_{\Omega} \varphi f(x) \;d\Omega \quad \forall \ \varphi \in H^1(\Omega)
 ```
 
-Note that the global assembler is currently taking care of the boundary 
-contributions, and it ensures that the non-zero test functions on the 
-boundary are removed.
+Note that there are not boundary conditions specified. To solve what the 
+global assembler returns, one should add an extra condition (e.g. average 
+of ``\phi`` is zero)
 
 # Arguments
 - `elem_id::NTuple{n,Int}`: element for which to compute the contribution.

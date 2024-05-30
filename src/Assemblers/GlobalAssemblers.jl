@@ -135,7 +135,9 @@ function (self::AssemblerError)(space, dofs, geom, exact_sol, norm="L2")
         phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
         element_exact = exact_sol.(phys_nodes[:,1], phys_nodes[:,2])
 
-        result += sum(@. jac_det * self.quad_weights * (element_sol - element_exact)^2)
+        @inbounds for point_idx in eachindex(jac_det, self.quad_weights, element_sol, element_exact)
+            result += jac_det[point_idx] * self.quad_weights[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
+        end
 
     end
 
