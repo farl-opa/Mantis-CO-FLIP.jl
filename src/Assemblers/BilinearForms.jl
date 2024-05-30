@@ -432,7 +432,7 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
     # Compute rhs on mapped nodes.
     # It can be more efficient to avoid this, but that is easier when we 
     # have a better interface for the inner products.
-    fxy = self.forcing.(Tuple(mapped_nodes[:,i] for i in 1:1:n)...)
+    fxy = self.forcing.(NTuple{n, Vector{Float64}}(mapped_nodes[:,i] for i in 1:1:n)...)
     
     # Count the number of supported basis on this element.
     n_supported_bases_trial = length(trial_supported_bases)
