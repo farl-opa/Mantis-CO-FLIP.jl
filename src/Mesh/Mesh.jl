@@ -60,6 +60,9 @@ struct Patch1D
         end
         new(breakpoints)
     end
+    function Patch1D(breakpoint::Float64)
+        return Patch1D([breakpoint])
+    end
 end
 
 function get_breakpoints(patch::Patch1D)

@@ -30,6 +30,9 @@ struct KnotVector
 
         new(patch_1d, polynomial_degree, multiplicity)
     end
+    function KnotVector(patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Int)
+       return KnotVector(patch_1d, polynomial_degree, [multiplicity])
+    end
 end
 
 """

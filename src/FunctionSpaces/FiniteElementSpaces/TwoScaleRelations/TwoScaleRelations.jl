@@ -318,6 +318,25 @@ function get_coarser_element(two_scale_operators::Vector{O}, coarse_level::Int, 
     return current_coarse
 end
 
+function get_contained_knot_vector(supp_intersection::UnitRange{Int}, ts::T, bspline::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+    if supp_intersection == []
+        breakpoint_idxs = get_finer_elements(ts, first(supp_intersection))[1]
+    else
+        element_idxs = Int[]
+
+        for element ∈ supp_intersection
+            append!(element_idxs, get_finer_elements(ts, element))
+        end
+        
+        breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)
+    end
+
+    breakpoints = get_patch(bspline).breakpoints[breakpoint_idxs]
+    multiplicity = get_multiplicity_vector(bspline)[breakpoint_idxs]
+
+    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(bspline), multiplicity)
+end
+
 # Includes for concrete two scale relations
 
 include("UnivariateBSplineTwoScaleRelations.jl")

@@ -65,6 +65,10 @@ function _get_dim_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F
     return (get_dim(tp_space.function_space_1), get_dim(tp_space.function_space_2))
 end
 
+function get_polynomial_degree_per_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    return (get_polynomial_degree(tp_space.function_space_1), get_polynomial_degree(tp_space.function_space_2))
+end
+
 @doc raw"""
     ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
 
