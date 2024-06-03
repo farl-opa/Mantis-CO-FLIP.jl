@@ -334,6 +334,24 @@ function get_support(bspline::BSplineSpace, basis_id::Int)
     return first_element:last_element
 end
 
+function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)
+    knot_vector = bspline.knot_vector
+    deg = get_polynomial_degree(bspline)
+
+    knot_cum_sum = cumsum(knot_vector.multiplicity)
+
+    first_breakpoint_idx = convert_knot_to_breakpoint_idx(knot_vector, basis_idx)
+    last_breakpoint_idx = convert_knot_to_breakpoint_idx(knot_vector, basis_idx + deg + 1)
+
+    first_knot_mult = knot_cum_sum[first_breakpoint_idx] - basis_idx + 1
+    last_knot_mult = basis_idx + deg + 1 - knot_cum_sum[last_breakpoint_idx - 1]
+
+    breakpoints = get_patch(bspline).breakpoints[first_breakpoint_idx:last_breakpoint_idx]
+    multiplicity = vcat(first_knot_mult, get_multiplicity_vector(bspline)[first_breakpoint_idx+1:last_breakpoint_idx-1], last_knot_mult)
+
+    return KnotVector(Mesh.Patch1D(breakpoints), deg, multiplicity)
+end
+
 """
 _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
 

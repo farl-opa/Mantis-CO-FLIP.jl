@@ -318,7 +318,7 @@ function get_coarser_element(two_scale_operators::Vector{O}, coarse_level::Int, 
     return current_coarse
 end
 
-function get_contained_knot_vector(supp_intersection::UnitRange{Int}, ts::T, bspline::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
     if supp_intersection == []
         breakpoint_idxs = get_finer_elements(ts, first(supp_intersection))[1]
     else
@@ -331,10 +331,23 @@ function get_contained_knot_vector(supp_intersection::UnitRange{Int}, ts::T, bsp
         breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)
     end
 
-    breakpoints = get_patch(bspline).breakpoints[breakpoint_idxs]
-    multiplicity = get_multiplicity_vector(bspline)[breakpoint_idxs]
+    breakpoints = get_patch(fine_space).breakpoints[breakpoint_idxs]
+    multiplicity = get_multiplicity_vector(fine_space)[breakpoint_idxs]
 
-    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(bspline), multiplicity)
+    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity)
+end
+
+function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, fem_space::BSplineSpace)
+    if supp_intersection == []
+        breakpoint_idxs = first(supp_intersection)
+    else
+        breakpoint_idxs = minimum(supp_intersection):maximum(supp_intersection)+1
+    end
+
+    breakpoints = get_patch(fem_space).breakpoints[breakpoint_idxs]
+    multiplicity = get_multiplicity_vector(fem_space)[breakpoint_idxs]
+
+    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fem_space), multiplicity)
 end
 
 # Includes for concrete two scale relations

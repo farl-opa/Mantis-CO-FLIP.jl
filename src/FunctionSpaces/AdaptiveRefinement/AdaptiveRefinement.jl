@@ -11,7 +11,7 @@ function proper_range(start::Int, finish::Int)
         return range(start, finish, step=:(-1))
     end
 
-    return range(start, finish)
+    return range(start, finish, step=:1)
 end
 
 function basis_functions_in_marked_elements(marked_elements::Vector{Int}, fem_space::T) where {T <: AbstractFiniteElementSpace{n} where {n}}
@@ -24,14 +24,57 @@ function basis_functions_in_marked_elements(marked_elements::Vector{Int}, fem_sp
     return unique!(basis_indices)
 end
 
-function check_problematic_intersection(twoscale_operator::T, basis_idx_1::Int, basis_idx_2::Int) where {T <: AbstractTwoScaleOperator}    
+function check_problematic_intersection(fem_space::F, twoscale_operator::T, basis_idx_1::Int, basis_idx_2::Int, corner_type::String) where {F <: AbstractFiniteElementSpace{n} where {n}, T <: AbstractTwoScaleOperator}    
     n = get_n(twoscale_operator.coarse_space) 
     @assert(n==2, "Only implemented for 2 dimensions.")
+
+    max_ind_basis = _get_dim_per_space(fem_space)
+    basis_per_dim_1 = linear_to_ordered_index(basis_idx_1, max_ind_basis)
 
     supp_1_per_dim = _get_support_per_dim(twoscale_operator.coarse_space, basis_idx_1)
     supp_2_per_dim = _get_support_per_dim(twoscale_operator.coarse_space, basis_idx_2)
 
-    supp_intersection_per_dim = intersect.(supp_1_per_dim, supp_2_per_dim)
+    supp_intersection_per_dim = StepRange.(intersect.(supp_1_per_dim, supp_2_per_dim))
+
+    el_supp_intersect_per_dim = Vector{StepRange{Int, Int}}(undef, n)
+    
+    if corner_type=="UR"
+        el_supp_intersect_per_dim[1] = proper_range(
+            minimum(supp_2_per_dim[1]),
+            maximum(supp_1_per_dim[1])
+        )
+        el_supp_intersect_per_dim[2] = proper_range(
+            minimum(supp_2_per_dim[2]),
+            maximum(supp_1_per_dim[2])
+        )
+    elseif corner_type=="UL"
+        el_supp_intersect_per_dim[1] = proper_range(
+            minimum(supp_1_per_dim[1]),
+            maximum(supp_2_per_dim[1])
+        )
+        el_supp_intersect_per_dim[2] = proper_range(
+            minimum(supp_2_per_dim[2]),
+            maximum(supp_1_per_dim[2])
+        )
+    elseif corner_type=="LL"
+        el_supp_intersect_per_dim[1] = proper_range(
+            minimum(supp_1_per_dim[1]),
+            maximum(supp_2_per_dim[1])
+        )
+        el_supp_intersect_per_dim[2] = proper_range(
+            minimum(supp_1_per_dim[2]),
+            maximum(supp_2_per_dim[2])
+        )
+    elseif corner_type=="LR"
+        el_supp_intersect_per_dim[1] = proper_range(
+            minimum(supp_2_per_dim[1]),
+            maximum(supp_1_per_dim[1])
+        )
+        el_supp_intersect_per_dim[2] = proper_range(
+            minimum(supp_1_per_dim[2]),
+            maximum(supp_2_per_dim[2])
+        )
+    end
 
     for k ∈ 1:n
         if first(supp_2_per_dim[k]) - last(supp_1_per_dim[k]) > 1 || first(supp_1_per_dim[k]) - last(supp_2_per_dim[k]) > 1 
@@ -42,6 +85,8 @@ function check_problematic_intersection(twoscale_operator::T, basis_idx_1::Int, 
     p_l2 = get_polynomial_degree_per_dim(twoscale_operator.fine_space)
 
     length_flag = Vector{Bool}(undef, n)
+    coarse_length_flag = Vector{Bool}(undef, n)
+
     for k ∈ 1:n
         if k ==1
             coarse_space = twoscale_operator.coarse_space.function_space_1
@@ -54,14 +99,17 @@ function check_problematic_intersection(twoscale_operator::T, basis_idx_1::Int, 
         end
 
         I_k = get_contained_knot_vector(supp_intersection_per_dim[k], ts, fine_space)
-
+        I_k_coarse = get_contained_knot_vector(el_supp_intersect_per_dim[k], ts.coarse_space)
+        
         length_flag[k] = get_knot_vector_length(I_k) > p_l2[k]
+        coarse_length_flag[k] = get_knot_vector_length(I_k_coarse) >= get_knot_vector_length(get_local_knot_vector(coarse_space, basis_per_dim_1[k]))
     end
 
-    return sum(length_flag) >= n-1 ? true : false
+    return sum(length_flag) >= n-1 && !any(coarse_length_flag) ? true : false
 end
 
 # Needs to be updated, the check is very weak
+#=
 function check_shortest_chain(fem_space::F, basis_idx_1::Int, basis_idx_2::Int, marked_bsplines::Vector{Int}) where {F <: AbstractFiniteElementSpace{n} where {n}}
     n = get_n(fem_space)
 
@@ -100,19 +148,99 @@ function check_shortest_chain(fem_space::F, basis_idx_1::Int, basis_idx_2::Int, 
     
     Graphs.has_path(local_grid_graph, 1, Graphs.nv(local_grid_graph)) ? (return true) : (return false)
 end
+=#
 
-function check_problematic(fem_space::F, twoscale_operator::T, basis_idx_1::Int, basis_idx_2::Int, marked_bsplines::Vector{Int}) where {F <: AbstractFiniteElementSpace{n} where {n}, T <: AbstractTwoScaleOperator}
-    if basis_idx_1 == 220 && basis_idx_2 == 347
-        nothing
-    end
-    intersection_check = check_problematic_intersection(twoscale_operator, basis_idx_1, basis_idx_2)
-    no_chain_check = !check_shortest_chain(fem_space, basis_idx_1, basis_idx_2, marked_bsplines)
-    if intersection_check && no_chain_check
-        nothing
+function get_relevant_bsplines(fem_space::F, el1::Int, el2::Int, corner_type::String) where {F <: AbstractFiniteElementSpace{n} where {n}}
+    _, el1_bsplines = get_extraction(fem_space, el1)
+    _, el2_bsplines = get_extraction(fem_space, el2)
+
+    if corner_type=="UR"
+        return maximum(el1_bsplines), minimum(el2_bsplines)
+    elseif corner_type=="LL"
+        return minimum(el1_bsplines), maximum(el2_bsplines)
+    elseif corner_type=="UL"
+        dim_per_space = _get_dim_per_space(fem_space)
+        bsplines1_per_dim = linear_to_ordered_index.(el1_bsplines, (dim_per_space,))
+        bsplines2_per_dim = linear_to_ordered_index.(el2_bsplines, (dim_per_space,)) 
+
+        min_dim_1 = Inf
+        max_dim_1 = -Inf
+        for basis_indxs ∈ bsplines1_per_dim
+            basis_indxs[1] < min_dim_1 ? min_dim_1 = basis_indxs[1] : nothing
+            basis_indxs[2] > max_dim_1 ? max_dim_1 = basis_indxs[2] : nothing  
+        end
+
+        min_dim_2 = Inf
+        max_dim_2 = -Inf
+        for basis_indxs ∈ bsplines2_per_dim
+            basis_indxs[2] < min_dim_2 ? min_dim_2 = basis_indxs[2] : nothing
+            basis_indxs[1] > max_dim_2 ? max_dim_2 = basis_indxs[1] : nothing  
+        end
+
+        return ordered_to_linear_index((min_dim_1, max_dim_1), dim_per_space), ordered_to_linear_index((max_dim_2, min_dim_2), dim_per_space)
+    elseif corner_type=="LR"
+        dim_per_space = _get_dim_per_space(fem_space)
+        bsplines1_per_dim = linear_to_ordered_index.(el1_bsplines, (dim_per_space,))
+        bsplines2_per_dim = linear_to_ordered_index.(el2_bsplines, (dim_per_space,)) 
+
+        min_dim_1 = Inf
+        max_dim_1 = -Inf
+        for basis_indxs ∈ bsplines1_per_dim
+            basis_indxs[2] < min_dim_1 ? min_dim_1 = basis_indxs[2] : nothing
+            basis_indxs[1] > max_dim_1 ? max_dim_1 = basis_indxs[1] : nothing  
+        end
+
+        min_dim_2 = Inf
+        max_dim_2 = -Inf
+        for basis_indxs ∈ bsplines2_per_dim
+            basis_indxs[1] < min_dim_2 ? min_dim_2 = basis_indxs[1] : nothing
+            basis_indxs[2] > max_dim_2 ? max_dim_2 = basis_indxs[2] : nothing  
+        end
+
+        return ordered_to_linear_index((max_dim_1, min_dim_1), dim_per_space), ordered_to_linear_index((min_dim_2, max_dim_2), dim_per_space)
     end
 
-    return intersection_check && no_chain_check
+    throw(ArgumentError("Corner type not valid."))
 end
+
+function check_problematic_bsplines(fem_space::F, twoscale_operator::T, el1::Int, el2::Int, corner_type::String) where {F <: AbstractFiniteElementSpace{n} where {n}, T <: AbstractTwoScaleOperator}
+    basis1, basis2 = get_relevant_bsplines(fem_space, el1, el2, corner_type)
+    #marked_bsplines = basis_functions_in_marked_elements([el1, el2], fem_space)
+
+    intersection_check = check_problematic_intersection(fem_space, twoscale_operator, basis1, basis2, corner_type)
+    #no_chain_check = !check_shortest_chain(fem_space, basis1, basis2, marked_bsplines)
+
+    return intersection_check #&& no_chain_check
+end
+
+function get_marked_elements_check_need(fem_space::F, el1::Int, el2::Int) where {F <: AbstractFiniteElementSpace{n} where {n}}
+    n = get_n(fem_space)
+    n==2 || throw(ArgumentError("Only implemented for 2 dimensions."))
+
+    deg_per_dim = get_polynomial_degree_per_dim(fem_space)
+
+    max_ind_els = _get_num_elements_per_space(fem_space)
+    el1_per_dim = linear_to_ordered_index(el1, max_ind_els)
+    el2_per_dim = linear_to_ordered_index(el2, max_ind_els)
+    diff_per_dim = el2_per_dim .- el1_per_dim
+
+    dim_1_gap = 2*deg_per_dim[1]+1
+    dim_2_gap = 2*deg_per_dim[2]+1
+
+    if (0 < diff_per_dim[1] <= dim_1_gap) && (0 < diff_per_dim[2] <= dim_2_gap)
+        return true, "UR"
+    elseif (0 < diff_per_dim[1] <= dim_1_gap) && (-dim_2_gap <= diff_per_dim[2] < 0)
+        return true, "LR"
+    elseif (-dim_1_gap <= diff_per_dim[1] < 0) && (0 < diff_per_dim[2] <= dim_2_gap)
+        return true, "UL"
+    elseif (-dim_1_gap <= diff_per_dim[1] < 0) && (-dim_2_gap <= diff_per_dim[2] < 0)
+        return true, "LL"
+    end
+
+    return false, "N"
+end
+
+#=
 
 function build_L_chain(fem_space::F, basis_idx_1::Int, basis_idx_2::Int) where {F <: AbstractFiniteElementSpace{n} where {n}}
     @assert(get_n(fem_space)==2, "Only implemented for 2 dimensions.")
@@ -142,11 +270,24 @@ function build_L_chain(fem_space::F, basis_idx_1::Int, basis_idx_2::Int) where {
     return L_chain 
 end
 
-function get_refinement_domain(fem_space::F, marked_elements::Vector{Int}, twoscale_operator::T) where {F <: AbstractFiniteElementSpace{n} where {n}, T<:AbstractTwoScaleOperator}
-    
-    marked_basis_functions = basis_functions_in_marked_elements(marked_elements, fem_space)
+=#
 
-    pair_combinations = Combinatorics.combinations(marked_basis_functions, 2) # unordered pairs of marked basis functions
+function get_fixer_element(fem_space::F, el1::Int, el2::Int) where {F <: AbstractFiniteElementSpace{n} where {n}}
+    n = get_n(fem_space)
+    @assert(n==2, "Only implemented for 2 dimensions.")
+    max_ind_els = _get_num_elements_per_space(fem_space)
+    el1_per_dim = linear_to_ordered_index(el1, max_ind_els)
+    el2_per_dim = linear_to_ordered_index(el2, max_ind_els)
+
+    location = Vector{Int}(undef, 2)
+    for k ∈ 1:n
+        location[k] = round(Int, (el2_per_dim[k] + el1_per_dim[k])/2)
+    end
+
+    return ordered_to_linear_index(location, max_ind_els)
+end
+
+function get_refinement_domain(fem_space::F, marked_elements::Vector{Int}, twoscale_operator::T) where {F <: AbstractFiniteElementSpace{n} where {n}, T<:AbstractTwoScaleOperator}
     el_pair_combinations = Combinatorics.combinations(marked_elements, 2)
     
     problematic_count = 1
@@ -154,16 +295,21 @@ function get_refinement_domain(fem_space::F, marked_elements::Vector{Int}, twosc
 
     while problematic_count>0
         problematic_count = 0
-        for (basis1, basis2) ∈ pair_combinations
-            if check_problematic(fem_space, twoscale_operator, basis1, basis2, marked_basis_functions)
-                append!(marked_basis_functions, build_L_chain(fem_space, basis1, basis2))
+        for (el1, el2) ∈ el_pair_combinations
+            el_pair_check, corner_type = get_marked_elements_check_need(fem_space, el1, el2) 
+
+            if el_pair_check && check_problematic_bsplines(fem_space, twoscale_operator, el1, el2, corner_type)
+                fixer_element = get_fixer_element(fem_space, el1, el2)
+                append!(marked_elements, fixer_element)
+                append!(checked_pairs, [[el1, fixer_element], [el2, fixer_element]])
                 problematic_count += 1
             end
         end
-        append!(checked_pairs, collect(pair_combinations))
-        pair_combinations = setdiff(collect(Combinatorics.combinations(marked_basis_functions, 2)), checked_pairs) # unordered pairs of marked basis functions
+        append!(checked_pairs, el_pair_combinations)
+        el_pair_combinations = setdiff(Combinatorics.combinations(marked_elements, 2), checked_pairs) # unordered pairs of marked basis functions
     end
 
+    marked_basis_functions = basis_functions_in_marked_elements(marked_elements, fem_space)
     refinement_domain = Int[]
 
     for basis_idx ∈ marked_basis_functions
