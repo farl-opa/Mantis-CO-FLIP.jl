@@ -64,9 +64,9 @@ struct HierarchicalFiniteElementSpace{n} <: AbstractFiniteElementSpace{n}
         new{n}(spaces, two_scale_operators, active_elements, active_functions, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
     end
 
-    function HierarchicalFiniteElementSpace(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
+    function HierarchicalFiniteElementSpace(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo, truncated::Bool=false) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
         active_elements, active_functions = get_active_objects(fe_spaces, two_scale_operators, refined_domains)
-        multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(fe_spaces, two_scale_operators, active_elements, active_functions)
+        multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(fe_spaces, two_scale_operators, active_elements, active_functions, truncated)
 
         return HierarchicalFiniteElementSpace(fe_spaces, two_scale_operators, active_elements, active_functions, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
     end
@@ -105,7 +105,7 @@ end
 # Getters for HierarchicalFiniteElementSpace
 
 """
-    get_n_active(active_info::HierarchicalActiveInfo)
+    get_num_active(active_info::HierarchicalActiveInfo)
 
 Returns the number of active objects in `active_info`.
 
@@ -114,7 +114,7 @@ Returns the number of active objects in `active_info`.
 # Returns
 - `::Int`: number of active objects.
 """
-function get_n_active(active_info::HierarchicalActiveInfo)
+function get_num_active(active_info::HierarchicalActiveInfo)
     return length(active_info.ids)
 end
 
@@ -129,7 +129,7 @@ Returns the number of active elements in `hierarchical_space`.
 - `::Int`: number of active elements.
 """
 function get_num_elements(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
-    return get_n_active(hierarchical_space.active_elements)
+    return get_num_active(hierarchical_space.active_elements)
 end
 
 """
@@ -143,7 +143,7 @@ Returns the number of active functions in `hierarchical_space`.
 - `::Int`: number of active functions.
 """
 function get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
-    return get_n_active(hierarchical_space.active_functions)
+    return get_num_active(hierarchical_space.active_functions)
 end
 
 """
@@ -328,31 +328,32 @@ end
 function get_active_indices(active_info::HierarchicalActiveInfo, ids, level::Int)
     ids_range = active_info.levels[level]+1:active_info.levels[level+1]
 
-    return ids_range[active_info.ids[ids_range] .∈ [ids]]
+    return @view ids_range[active_info.ids[ids_range] .∈ [ids]]
 end
 
 function get_active_extraction(hierarchical_space::HierarchicalFiniteElementSpace, element::Int)
     level = get_element_level(hierarchical_space, element)
     element_id = get_element_id(hierarchical_space, element)
 
-    return get_active_extraction(hierarchical_space.spaces[level], level, element_id, hierarchical_space.active_functions)
+    coeffs, basis_indices, _ = get_active_extraction(hierarchical_space.spaces[level], level, element_id, hierarchical_space.active_functions)
+    return coeffs, basis_indices
 end
 
-function get_active_extraction(space::S, level::Int, element_id::Int, active_functions::HierarchicalActiveInfo) where {S<:AbstractFiniteElementSpace}
+function get_active_extraction(space::S, level::Int, element_id::Int, active_functions::HierarchicalActiveInfo) where {S <: AbstractFiniteElementSpace{n} where {n}}
 
     coeffs, basis_indices = get_extraction(space, element_id)
 
     active_indices = findall(x -> x ∈ get_level_active(active_functions, level)[2], basis_indices)
 
-    return @views coeffs[:,active_indices], basis_indices[active_indices]
+    basis_indices = get_active_indices(active_functions, basis_indices[active_indices], level)
+
+    return coeffs, basis_indices, active_indices
 end
 
 function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace, element::Int)
 
     if length(hierarchical_space.multilevel_elements) == 0 || hierarchical_space.multilevel_elements[element] == 0
         coeffs, basis_indices = get_active_extraction(hierarchical_space, element)
-        level = get_element_level(hierarchical_space, element)
-        basis_indices = get_active_indices(hierarchical_space.active_functions, basis_indices, level)
         
         return coeffs, basis_indices
     else
@@ -370,6 +371,17 @@ function get_local_basis(hierarchical_space::HierarchicalFiniteElementSpace, ele
     level_space = get_space(hierarchical_space, level)
 
     return get_local_basis(level_space, element_id, xi, nderivatives)
+end
+
+function get_coarse_refinement_matrix(size_extraction_coeffs::Tuple{Int, Int}, active_indices::Vector{Int})
+    return Matrix{Float64}(LinearAlgebra.I, size_extraction_coeffs)[:,active_indices]
+end
+
+function truncate_refinement_matrix!(refinement_matrix::Union{Matrix{Float64}, SparseArrays.SparseMatrixCSC{Float64, Int}}, active_indices::Vector{Int})
+    active_length = length(active_indices)
+    refinement_matrix[active_indices, active_length+1:end] .= 0.0
+
+    return refinement_matrix
 end
 
 # Updaters for the Hierarcical Active information
@@ -496,12 +508,12 @@ function get_multilevel_elements(fe_spaces, two_scale_operators, active_elements
 
     sort!(unique!(el_columns))
 
-    multilevel_elements = SparseArrays.sparsevec(el_columns, 1:length(el_columns), get_n_active(active_elements))
+    multilevel_elements = SparseArrays.sparsevec(el_columns, 1:length(el_columns), get_num_active(active_elements))
 
     return multilevel_elements, multilevel_basis_indices_dic
 end
 
-function get_multilevel_extraction(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, active_elements::HierarchicalActiveInfo, active_functions::HierarchicalActiveInfo) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
+function get_multilevel_extraction(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, active_elements::HierarchicalActiveInfo, active_functions::HierarchicalActiveInfo, truncated::Bool) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
     multilevel_elements, multilevel_basis_indices_dic = get_multilevel_elements(fe_spaces, two_scale_operators, active_elements, active_functions)
 
     n_multilevel_els = length(multilevel_elements.nzind)
@@ -516,19 +528,21 @@ function get_multilevel_extraction(fe_spaces::Vector{T}, two_scale_operators::Ve
         element_level = get_active_level(active_elements, element)
         element_id = get_active_id(active_elements, element)
 
-        multilevel_extraction_coeffs[element_index], multilevel_basis_indices[element_index] = get_active_extraction(fe_spaces[element_level], element_level, element_id, active_functions)#copy extraction of current element
+        multilevel_extraction_coeffs[element_index], multilevel_basis_indices[element_index], active_indices = get_active_extraction(fe_spaces[element_level], element_level, element_id, active_functions)#copy extraction of current element with active basis indices
 
-        multilevel_basis_indices[element_index] = get_active_indices(active_functions, multilevel_basis_indices[element_index], element_level)
+        refinement_matrix = get_coarse_refinement_matrix(size(multilevel_extraction_coeffs[element_index]), active_indices)
 
         for Ni ∈ multilevel_basis_indices_dic[(element_level, element_id)] # Loop over active functions on the element
             basis_level = get_active_level(active_functions, Ni)
             basis_id = get_active_id(active_functions, Ni)
             basis_element = get_coarser_element(two_scale_operators, basis_level, element_id, element_level)
 
-            Ni_eval = get_finer_extraction_coeffs(fe_spaces[basis_level], two_scale_operators, basis_element, basis_level, element_id, element_level, basis_id) # Get evaluation of function on the element
-
-            multilevel_extraction_coeffs[element_index] = hcat(multilevel_extraction_coeffs[element_index], Ni_eval)# Add evaluation to extraction coeffs of that element
+            refinement_matrix = update_refinement_matrix!(refinement_matrix, two_scale_operators, basis_element, basis_level,basis_id, element_id, element_level) # Get current ml function refinement
         end
+        if truncated
+            refinement_matrix = truncate_refinement_matrix!(refinement_matrix, active_indices)
+        end
+        multilevel_extraction_coeffs[element_index] = multilevel_extraction_coeffs[element_index] * refinement_matrix
         append!(multilevel_basis_indices[element_index], multilevel_basis_indices_dic[(element_level, element_id)])
     end
 

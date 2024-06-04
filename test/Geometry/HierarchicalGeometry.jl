@@ -34,11 +34,11 @@ CTP_num_els = Mantis.FunctionSpaces.get_num_elements(CTP)
 
 CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(TS1,TS2)
 
-coarse_elements_to_refine = [3,4,5,8,9,10]
+coarse_elements_to_refine = [3,4,5,8,9,10,13,14,15]
 refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
 
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
+hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains, true)
 
 # Test if projection in space is exact
 nxi_per_dim = 3
