@@ -415,10 +415,8 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BS
     
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
     fine_to_coarse_elements = get_fine_to_coarse(fine_bspline, nsubdivisions)
-
-    lm = get_local_subdiv_matrices(coarse_bspline, nsubdivisions)
     
-    return TwoScaleOperator(coarse_bspline, fine_bspline, gm, lm, coarse_to_fine_elements, fine_to_coarse_elements), fine_bspline
+    return TwoScaleOperator(coarse_bspline, fine_bspline, gm, coarse_to_fine_elements, fine_to_coarse_elements), fine_bspline
 end
 
 """
@@ -524,30 +522,4 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 """
 function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, fine_bspline::NTuple{n, BSplineSpace}) where {n}
     return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]), n)
-end
-
-function get_local_subdiv_matrices(bspline::BSplineSpace, nsubdivisions::Int)
-    base_patch = Mesh.Patch1D([0.0, 1.0])
-    single_el_spline = BSplineSpace(base_patch, bspline.knot_vector.polynomial_degree, [-1,-1]) 
-    fine_knot_vector = subdivide_knot_vector(single_el_spline.knot_vector, nsubdivisions, bspline.knot_vector.polynomial_degree+1)
-    finer_spline = BSplineSpace(fine_knot_vector.patch_1d, fine_knot_vector.polynomial_degree, fine_knot_vector.polynomial_degree .- fine_knot_vector.multiplicity)
-
-    gm = build_two_scale_operator(single_el_spline.knot_vector, fine_knot_vector)
-
-    single_el_subdiv_matrices = Vector{Matrix{Float64}}(undef, nsubdivisions)
-
-    for fine_el ∈ 1:1:nsubdivisions
-        single_el_subdiv_matrices[fine_el] = get_element_basis_subdiv_matrices(gm, single_el_spline, finer_spline, 1, fine_el)
-    end
-    
-    local_subdiv_matrices = Vector{Matrix{Float64}}(undef, get_num_elements(bspline)*nsubdivisions)
-
-    for element ∈ 1:1:get_num_elements(bspline)*nsubdivisions
-        finer_index = (element-1) % nsubdivisions + 1
-
-        local_subdiv_matrices[element] = single_el_subdiv_matrices[finer_index]
-    end
-
-
-    return local_subdiv_matrices
 end

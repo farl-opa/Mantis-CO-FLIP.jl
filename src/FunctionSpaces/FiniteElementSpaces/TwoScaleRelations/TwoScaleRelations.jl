@@ -27,13 +27,12 @@ struct TwoScaleOperator <: AbstractTwoScaleOperator
     coarse_space::AbstractFiniteElementSpace
     fine_space::AbstractFiniteElementSpace
     global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Tv, Ti} where {Tv, Ti}
-    local_subdiv_matrices::Vector{Matrix{Float64}}
     coarse_to_fine_elements::Vector{Vector{Int}}
     fine_to_coarse_elements::Vector{Int}
     coarse_to_fine_functions::Vector{Vector{Int}}
     fine_to_coarse_functions::Vector{Vector{Int}}
 
-    function TwoScaleOperator(coarse_space::S, fine_space::T, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Tv, Ti}, local_subdiv_matrices::Vector{Matrix{Float64}}, coarse_to_fine_elements::Vector{Vector{Int}}, fine_to_coarse_elements::Vector{Int}) where {S<:AbstractFiniteElementSpace, T<:AbstractFiniteElementSpace, Tv, Ti}
+    function TwoScaleOperator(coarse_space::S, fine_space::T, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Tv, Ti}, coarse_to_fine_elements::Vector{Vector{Int}}, fine_to_coarse_elements::Vector{Int}) where {S<:AbstractFiniteElementSpace, T<:AbstractFiniteElementSpace, Tv, Ti}
         dims = size(global_subdiv_matrix)
         coarse_to_fine_functions = Vector{Vector{Int}}(undef, dims[2])
         fine_to_coarse_functions = Vector{Vector{Int}}(undef, dims[1])
@@ -49,7 +48,7 @@ struct TwoScaleOperator <: AbstractTwoScaleOperator
         end
 
 
-        new(coarse_space, fine_space, global_subdiv_matrix, local_subdiv_matrices, coarse_to_fine_elements, fine_to_coarse_elements, coarse_to_fine_functions, fine_to_coarse_functions)
+        new(coarse_space, fine_space, global_subdiv_matrix, coarse_to_fine_elements, fine_to_coarse_elements, coarse_to_fine_functions, fine_to_coarse_functions)
     end
 end
 
@@ -200,15 +199,11 @@ in terms of finer functions on element `fine_el_id`.
 # Returns
 - `::@views Array{Float64, 2}`: Local refinement matrix.
 """
-function get_local_subdiv_matrix(twoscale_operator::TwoScaleOperator, fine_el_id::Int)
-    return twoscale_operator.local_subdiv_matrices[fine_el_id]
-end
+function get_local_subdiv_matrix(twoscale_operator::AbstractTwoScaleOperator, coarse_el_id::Int, fine_el_id::Int)
+    _, fine_basis_indices = get_extraction(twoscale_operator.fine_space, fine_el_id)
+    _, coarse_basis_indices = get_extraction(twoscale_operator.coarse_space, coarse_el_id)
 
-function get_element_basis_subdiv_matrices(gm::SparseArrays.SparseMatrixCSC{Float64, Int}, coarse_space::C, fine_space::F, coarse_el_id::Int, fine_el_id::Int) where {C<:AbstractFiniteElementSpace{1}, F<:AbstractFiniteElementSpace{1}}
-    _, rows = get_extraction(fine_space, fine_el_id)
-    _, columns = get_extraction(coarse_space, coarse_el_id)
-
-    return @views gm[rows, columns]
+    return @view twoscale_operator.global_subdiv_matrix[fine_basis_indices, coarse_basis_indices]
 end
 
 """
@@ -277,32 +272,23 @@ function get_finer_support(support::Union{Vector{Int}, UnitRange{Int}}, twoscale
     return reduce(vcat, get_finer_elements(twoscale_operator, support)) #view
 end
 
-function get_finer_extraction_coeffs(space::S, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, finer_element::Int, finer_level::Int) where {S<: AbstractFiniteElementSpace, O<:AbstractTwoScaleOperator}
-    # Initialize the extraction coeffs
-    coarse_coeffs, basis_indices = get_extraction(space, coarse_element)
-
-    refinement_matrix = LinearAlgebra.I
-
+function update_refinement_matrix!(refinement_matrix::Union{Matrix{Float64}, SparseArrays.SparseMatrixCSC{Float64, Int}}, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, basis_id::Int, finer_element::Int, finer_level::Int) where {O<:AbstractTwoScaleOperator}
+    local_subdiv_matrix = LinearAlgebra.I
     current_fine = finer_element
-    
     for level ∈ finer_level:-1:coarse_level+1
         next_fine = get_coarser_element(two_scale_operators[level-1], current_fine) 
-        local_subdiv_matrix = get_local_subdiv_matrix(two_scale_operators[level-1], current_fine)
+        current_subdiv_matrix = get_local_subdiv_matrix(two_scale_operators[level-1], next_fine, current_fine)
 
-        refinement_matrix = refinement_matrix * local_subdiv_matrix
+        local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
         
         current_fine = next_fine
     end
+    _, coarse_basis_indices = get_extraction(two_scale_operators[coarse_level].coarse_space, coarse_element)
+    coarse_basis_idx = findfirst(x -> x == basis_id, coarse_basis_indices)
 
-    return refinement_matrix * coarse_coeffs, basis_indices
-end
+    refinement_matrix = hcat(refinement_matrix, local_subdiv_matrix[:, coarse_basis_idx])
 
-function get_finer_extraction_coeffs(space::S, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, finer_element::Int, finer_level::Int, basis_id::Int) where {S<: AbstractFiniteElementSpace, O<:AbstractTwoScaleOperator}
-    coarse_coeffs, basis_indices = get_finer_extraction_coeffs(space, two_scale_operators, coarse_element, coarse_level, finer_element, finer_level)
-    
-    basis_index = findfirst(x -> x == basis_id, basis_indices)
-
-    return @view coarse_coeffs[:, basis_index]
+    return refinement_matrix
 end
 
 function get_coarser_element(two_scale_operators::Vector{O}, coarse_level::Int, finer_element::Int, finer_level::Int) where {O<:AbstractTwoScaleOperator}
