@@ -412,14 +412,16 @@ p_1d = 3
 k_1d = 2
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
-# the only Neumann b.c. that we can specify at the moment.
-Lleft_1d = 0.0
-Lright_1d = 1.0
+# the only Neumann b.c. that we can specify at the moment. These are 
+# specified as constants to make sure that the forcing function can use 
+# them while remaining type stable.
+const Lleft_1d = 0.0
+const Lright_1d = 1.0
 
 bc_sine_1d = (true, 0.0, 1.0)
 bc_const_1d = (true, 0.0, 0.0)
 
-function forcing_sine_1d(x)
+function forcing_sine_1d(x::Float64)
     return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
 end
 
@@ -470,10 +472,10 @@ k_2d = (2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-Lleft = 0.25
-Lright = 0.75
-Lbottom = 0.25
-Ltop = 0.75
+const Lleft = 0.25
+const Lright = 0.75
+const Lbottom = 0.25
+const Ltop = 0.75
 
 
 function forcing_sine_2d(x::Float64, y::Float64)
