@@ -61,7 +61,7 @@ end
 
 
 @doc raw"""
-    tensor_product_weights(1d_weights::NTuple{n, Float64}) where {n}
+    tensor_product_weights(weights_1d::NTuple{n, Vector{Float64}}) where {n}
 
 Returns a vector of the tensor product of quadrature weights.
 """
