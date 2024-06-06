@@ -6,270 +6,6 @@ using Test
 using LinearAlgebra
 
 
-# # This is how MANTIS is called to create a 1D mixed problem.
-# function fe_run_1D(forcing_function, bilinear_function, linear_function, trial_space, 
-#                    test_space, geom, q_nodes, q_weights, bc_left, bc_right, p, 
-#                    k, case, output_to_file, tests=true)
-#     # Setup the element assembler.
-#     element_assembler = Mantis.Assemblers.PoissonBilinearForm1D(forcing_function,
-#                                                                 bilinear_function,
-#                                                                 linear_function,
-#                                                                 trial_space,
-#                                                                 test_space,
-#                                                                 geom,
-#                                                                 q_nodes,
-#                                                                 q_weights)
-
-#     # Setup the global assembler.
-#     global_assembler = Mantis.Assemblers.Assembler(bc_left, bc_right)
-
-#     # Set boundary conditions
-#     #bc_assembler = Mantis.Assemblers.Dirichlet()
-
-#     # Assemble.
-#     A, b = global_assembler(element_assembler)#, bc_assembler)
-
-#     # Solve & add bcs.
-#     #sol = A \ Vector(b)
-#     sol = [bc_left, (A \ Vector(b))..., bc_right]
-
-#     if tests
-#         @test isapprox(A, A', rtol=1e-12)
-#         @test isempty(nullspace(Matrix(A)))
-
-#         if case == "const" && p >= 2
-#             # The exact solution is in the space, so we can test for 
-#             # equality to the exact solution.
-#             n_points = 10
-#             m = Mantis.Geometry.get_num_elements(geom)
-#             xi = collect(LinRange(0.0, 1.0, n_points))
-#             exact_sol = x -> x.*(x.-m)
-#             for element_id in 1:m
-#                 x = Mantis.Geometry.evaluate(geom, element_id, (xi,))
-#                 basis, active_bases = Mantis.FunctionSpaces.evaluate(trial_space, element_id, (xi,), 0)
-#                 exact = exact_sol(x)
-#                 #@test all(isapprox.(exact .- reshape(sol[active_bases]' * basis[0]', n_points), 0.0, atol=1e-12))
-#             end
-#         end
-#     end
-
-
-#     # This is for the plotting. If you want to output the data into vtu-
-#     # files, uncomment these lines. You can visualise the solution in 
-#     # Paraview, using the 'Plot over line'-filter.
-#     if output_to_file
-#         msave = Mantis.Geometry.get_num_elements(geom)
-#         output_filename = "Poisson-1D-p$p-k$k-m$msave-0to1-case-"*case*".vtu"
-#         output_file = joinpath(output_data_folder, output_filename)
-#         field = Mantis.Fields.FEMField(trial_space, reshape(sol, :, 1))
-#         Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = p, ascii = false, compress = false)
-#     end
-# end
-
-# # Here we setup and specify the inputs to the FE problem.
-# function forcing_sine(x)
-#     return pi^2 * sinpi(x)
-# end
-
-# function forcing_const(x)
-#     return -2.0
-# end
-
-# function bilinear_function(Ndi, Ndj)
-#     return Ndi * Ndj
-# end
-
-# function linear_function(Ni, f)
-#     return Ni * f
-# end
-
-
-# # Number of elements.
-# m = 10
-# # polynomial degree and inter-element continuity.
-# p = 5
-# k = 3
-# # Domain.
-# Lleft = 0.0
-# Lright = 1.0
-
-# # Create Patch.
-# brk = collect(LinRange(Lleft, Lright, m+1))
-# patch = Mantis.Mesh.Patch1D(brk)
-# # Continuity vector for OPEN knot vector.
-# kvec = fill(k, (m+1,))
-# kvec[1] = -1
-# kvec[end] = -1
-# # Create function spaces (b-splines here).
-# trial_space = Mantis.FunctionSpaces.BSplineSpace(patch, p, kvec)
-# test_space = Mantis.FunctionSpaces.BSplineSpace(patch, p, kvec)
-
-# # Create the geometry.
-# geom_1d = Mantis.Geometry.CartesianGeometry((brk,))
-
-# # Setup the quadrature rule.
-# q_nodes, q_weights = Mantis.Quadrature.gauss_legendre(p+1)
-
-# # Choose case ("sine" or "const")
-# for case in ["sine", "const"]
-#     if case == "sine"
-#         # Boundary conditions (Dirichlet).
-#         bc_left = 0.0
-#         bc_right = 1.0
-#         fe_run_1D(forcing_sine, bilinear_function, linear_function, trial_space, 
-#                   test_space, geom_1d, q_nodes, q_weights, bc_left, bc_right, p, 
-#                   k, case, write_to_output_file)
-#     elseif case == "const"
-#         # Boundary conditions (Dirichlet).
-#         bc_left = 0.0
-#         bc_right = 0.0
-#         fe_run_1D(forcing_const, bilinear_function, linear_function, trial_space, 
-#                   test_space, geom_1d, q_nodes, q_weights, bc_left, bc_right, p, 
-#                   k, case, write_to_output_file)
-#     else
-#         error("Case: '",case,"' unknown.")
-#     end
-# end
-
-
-
-
-
-# ########################################################################
-# ## Test cases for the mixed 1D Poisson problem.                       ##
-# ########################################################################
-
-# # This is how MANTIS is called to create a 1D mixed problem.
-# function fe_run_mixed(forcing_function_mixed, Fbilinear1, Fbilinear2, 
-#                       Fbilinear3, Flinear, trial_space_phi, test_space_phi, 
-#                       trial_space_sigma, test_space_sigma, geom, q_nodes, 
-#                       q_weights, p_sigma, k_sigma, p_phi, k_phi, case, 
-#                       output_to_file)
-#     # Setup the element assembler.
-#     element_assembler = Mantis.Assemblers.PoissonBilinearFormMixed1D(forcing_function_mixed,
-#                                                                      Fbilinear1,
-#                                                                      Fbilinear2,
-#                                                                      Fbilinear3,
-#                                                                      Flinear,
-#                                                                      trial_space_phi,
-#                                                                      test_space_phi,
-#                                                                      trial_space_sigma,
-#                                                                      test_space_sigma,
-#                                                                      geom,
-#                                                                      q_nodes,
-#                                                                      q_weights)
-
-#     # Setup the global assembler.
-#     global_assembler = Mantis.Assemblers.Assembler()
-
-#     # Assemble.
-#     A, b = global_assembler(element_assembler)
-
-#     # Solve & add bcs.
-#     sol = A \ Vector(b)
-
-#     # This is for the plotting. You can visualise the solution in 
-#     # Paraview, using the 'Plot over line'-filter.
-#     if output_to_file
-#         ndofs_sigma = Mantis.FunctionSpaces.get_dim(trial_space_sigma)
-
-#         msave = Mantis.Geometry.get_num_elements(geom)
-
-#         output_filename = "Poisson-1D-Mixed-phi-p$p_sigma-k$k_sigma-m$msave-case-"*case*".vtu"
-#         output_file = joinpath(output_data_folder, output_filename)
-#         field = Mantis.Fields.FEMField(trial_space_phi, reshape(sol[ndofs_sigma+1:end], :, 1))
-#         Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = maximum([1, p_phi]), ascii = false, compress = false)
-
-#         output_filename = "Poisson-1D-Mixed-sigma-p$p_phi-k$k_phi-m$msave-case-"*case*".vtu"
-#         output_file = joinpath(output_data_folder, output_filename)
-#         field = Mantis.Fields.FEMField(trial_space_sigma, reshape(sol[begin:ndofs_sigma], :, 1))
-#         Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = p_sigma, ascii = false, compress = false)
-#     end
-
-#     return sol
-# end
-
-
-
-# # Here we setup and specify the inputs to the FE problem.
-# function function_der_function(Ndi, Nj)
-#     return Ndi * Nj
-# end
-
-# function function_function(Ni, f)
-#     return Ni * f
-# end
-
-
-# # Number of elements.
-# m = 14
-# # polynomial degree and inter-element continuity.
-# p_phi = 0
-# k_phi = -1
-# p_sigma = 1
-# k_sigma = 0
-# # Domain.
-# Lleft = 0.0
-# Lright = float(m)
-
-
-# function forcing_sine_mixed(x)
-#     return (pi/Lright)^2 * sin(pi * x / Lright)
-# end
-
-# function forcing_const_mixed(x)
-#     return -2.0
-# end
-
-# # Create Patch.
-# brk = collect(LinRange(Lleft, Lright, m+1))
-# patch = Mantis.Mesh.Patch1D(brk)
-# # Continuity vector for OPEN knot vector.
-# kvec_phi = fill(k_phi, (m+1,))
-# kvec_phi[1] = -1
-# kvec_phi[end] = -1
-# kvec_sigma = fill(k_sigma, (m+1,))
-# kvec_sigma[1] = -1
-# kvec_sigma[end] = -1
-# # Create function spaces (b-splines here).
-# trial_space_phi = Mantis.FunctionSpaces.BSplineSpace(patch, p_phi, kvec_phi)
-# test_space_phi = Mantis.FunctionSpaces.BSplineSpace(patch, p_phi, kvec_phi)
-# trial_space_sigma = Mantis.FunctionSpaces.BSplineSpace(patch, p_sigma, kvec_sigma)
-# test_space_sigma = Mantis.FunctionSpaces.BSplineSpace(patch, p_sigma, kvec_sigma)
-
-# # Create the geometry.
-# geom = Mantis.Geometry.CartesianGeometry((brk,))
-
-# # Setup the quadrature rule.
-# q_nodes, q_weights = Mantis.Quadrature.gauss_legendre(maximum([p_phi, p_sigma])+1)
-
-# # Choose case ("sine" or "const")
-# for case in ["sine", "const"]
-    
-#     if case == "sine"
-#         fe_run_mixed(forcing_sine_mixed, function_function, function_der_function, 
-#                      function_der_function, function_function, trial_space_phi, 
-#                      test_space_phi, trial_space_sigma, test_space_sigma, geom, 
-#                      q_nodes, q_weights, p_sigma, k_sigma, p_phi, k_phi, case, write_to_output_file)
-#     elseif case == "const"
-#         fe_run_mixed(forcing_const_mixed, function_function, function_der_function, 
-#                      function_der_function, function_function, trial_space_phi, 
-#                      test_space_phi, trial_space_sigma, test_space_sigma, geom, 
-#                      q_nodes, q_weights, p_sigma, k_sigma, p_phi, k_phi, case, write_to_output_file)
-#     else
-#         error("Case: '",case,"' unknown.")
-#     end
-# end
-
-
-
-
-
-
-
-
-
-
 
 
 # This is how MANTIS is called to solve a problem. The bc input is only for the 1D case.
@@ -277,7 +13,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
                 q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
                 verbose=false, bc = (false, 0.0, 0.0))
     if verbose
-        println("Starting setup for case "*case*" ...")
+        println("Starting setup of problem and assembler for case "*case*" ...")
     end
     # Setup the element assembler.
     element_assembler = Mantis.Assemblers.PoissonBilinearForm(forcing_function,
@@ -383,7 +119,7 @@ end
 # Here we setup and specify the inputs to the FE problem.
 
 # Compute base directories for data input and output
-Mantis_folder =  dirname(dirname(pathof(Mantis)))
+Mantis_folder = dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
 output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this folder first if you haven't done so yet.
 
@@ -402,6 +138,10 @@ verbose = false               # false
 ########################################################################
 ## Test cases for the 1D Poisson problem.                             ##
 ########################################################################
+
+if verbose
+    println("Creating 1D Geometry and spaces ...")
+end
 
 # Dimension
 n_1d = 1
@@ -461,6 +201,10 @@ q_weights_1d_all = Mantis.Quadrature.tensor_product_weights((q_weights_1d,)) # S
 ## Test cases for the 2D Poisson problem.                             ##
 ########################################################################
 
+if verbose
+    println("Creating 2D Geometry and spaces ...")
+end
+
 # Dimension
 n_2d = 2
 # Number of elements.
@@ -515,7 +259,33 @@ geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
 
 
 
-# Hierarchical refinement on the same mesh as above.
+# Same problem as above, but on the 'crazy' mesh
+if verbose
+    println("Creating crazy mesh ...")
+end
+const crazy_c = 0.3
+function mapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+    #return [x[1] + 0.25*crazy_c*sinpi(4.0*x[1]-2.0)*sinpi(4.0*x[2]-2.0), x[2] + 0.25*crazy_c*sinpi(4.0*x[1]-2.0)*sinpi(4.0*x[2]-2.0)]
+end
+function dmapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+    #return [1.0 + pi*crazy_c*cospi(4.0*x[1]-2.0)*sinpi(4.0*x[2]-2.0) pi*crazy_c*sinpi(4.0*x[1]-2.0)*cospi(4.0*x[2]-2.0); pi*crazy_c*cospi(4.0*x[1]-2.0)*sinpi(4.0*x[2]-2.0) 1.0 + pi*crazy_c*sinpi(4.0*x[1]-2.0)*cospi(4.0*x[2]-2.0)]
+end
+dimension = (n_2d, n_2d)
+curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
+geom_crazy = Mantis.Geometry.MappedGeometry(geom_cartesian, curved_mapping)
+
+
+
+# Hierarchical refinement on the same mesh as the first 2D case.
+if verbose
+    println("Creating 2D Hierarchical geometry and spaces ...")
+end
 # Create the space
 CB1 = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], [-1; fill(p_2d[1]-1, m_x-1); -1])
 CB2 = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], [-1; fill(p_2d[2]-1, m_y-1); -1])
@@ -583,8 +353,6 @@ hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
 
 
 
-
-
 # Setup the quadrature rule.
 q_nodes_x, q_weights_x = Mantis.Quadrature.gauss_legendre(p_2d[1]+1)
 q_nodes_y, q_weights_y = Mantis.Quadrature.gauss_legendre(p_2d[2]+1)
@@ -594,7 +362,96 @@ q_nodes_y, q_weights_y = Mantis.Quadrature.gauss_legendre(p_2d[2]+1)
 # a vector of the weights in the right order).
 q_weights_all = Mantis.Quadrature.tensor_product_weights((q_weights_x, q_weights_y))
 
-for case in ["sine1d", "const1d", "sine2d", "sine2dH"]
+
+
+########################################################################
+## Test cases for the 2D Poisson problem.                             ##
+########################################################################
+
+if verbose
+    println("Creating 3D Geometry and spaces ...")
+end
+
+# Dimension
+n_3d = 3
+# Number of elements.
+m_3d_x = 5
+m_3d_y = 5
+m_3d_z = 5
+# polynomial degree and inter-element continuity.
+p_3d = (3, 4, 1)
+k_3d = (2, 2, 0)
+# Domain. The length of the domain is chosen so that the normal 
+# derivatives of the exact solution are zero at the boundary. This is 
+# the only Neumann b.c. that we can specify at the moment.
+const Lx1 = 0.25
+const Lx2 = 0.75
+const Ly1 = 0.25
+const Ly2 = 0.75
+const Lz1 = 0.25
+const Lz2 = 0.75
+
+
+function forcing_sine_3d(x::Float64, y::Float64, z::Float64)
+    return 12.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
+end
+
+function exact_sol_sine_3d(x::Float64, y::Float64, z::Float64)
+    return sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
+end
+
+
+
+# Tensor product b-spline case on a Cartesian geometry.
+# Create Patch.
+brk_3d_x = collect(LinRange(Lx1, Lx2, m_3d_x+1))
+brk_3d_y = collect(LinRange(Ly1, Ly2, m_3d_y+1))
+brk_3d_z = collect(LinRange(Lz1, Lz2, m_3d_z+1))
+patch_3d_x = Mantis.Mesh.Patch1D(brk_3d_x)
+patch_3d_y = Mantis.Mesh.Patch1D(brk_3d_y)
+patch_3d_z = Mantis.Mesh.Patch1D(brk_3d_z)
+# Continuity vector for OPEN knot vector.
+kvec_3d_x = fill(k_3d[1], (m_3d_x+1,))
+kvec_3d_x[1] = -1
+kvec_3d_x[end] = -1
+kvec_3d_y = fill(k_3d[2], (m_3d_y+1,))
+kvec_3d_y[1] = -1
+kvec_3d_y[end] = -1
+kvec_3d_z = fill(k_3d[3], (m_3d_z+1,))
+kvec_3d_z[1] = -1
+kvec_3d_z[end] = -1
+# Create function spaces (b-splines here).
+trial_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
+test_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
+trial_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
+test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
+trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+
+trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
+test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
+
+trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
+test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
+
+# Create the geometry.
+geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
+
+# Setup the quadrature rule.
+q_nodes_3d_x, q_weights_3d_x = Mantis.Quadrature.gauss_legendre(p_3d[1]+1)
+q_nodes_3d_y, q_weights_3d_y = Mantis.Quadrature.gauss_legendre(p_3d[2]+1)
+q_nodes_3d_z, q_weights_3d_z = Mantis.Quadrature.gauss_legendre(p_3d[3]+1)
+# This function computes the tensor product of the quadrature weights in 
+# the reference domain. This ensures that this only need to be computed 
+# once and makes the size compatible with our other outputs (it returns 
+# a vector of the weights in the right order).
+q_weights_3d_all = Mantis.Quadrature.tensor_product_weights((q_weights_3d_x, q_weights_3d_y, q_weights_3d_z))
+
+
+
+
+# Running all testcases.
+for case in ["sine1d", "const1d", "sine2d", "sine2d-crazy", "sine2dH", "sine3d"]
 
     if case == "sine1d"
         fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d, 
@@ -608,10 +465,19 @@ for case in ["sine1d", "const1d", "sine2d", "sine2dH"]
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
                k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+    elseif case == "sine2d-crazy"
+        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
+                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
+                k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "sine2dH"
         fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, 
                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
                k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+    elseif case == "sine3d"
+        fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
+                (q_nodes_3d_x, q_nodes_3d_y, q_nodes_3d_z), q_weights_3d_all, 
+                exact_sol_sine_3d, p_3d, k_3d, case, n_3d, write_to_output_file, 
+                run_tests, verbose)
     else
         println("Warning: case '"*case*"' unknown. Skipping.") 
     end
