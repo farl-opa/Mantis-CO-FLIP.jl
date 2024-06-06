@@ -166,10 +166,8 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
             grad_trail = NTuple{n, SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}}(view(trial_basis_evals[key], :, trial_linear_idx) for key in key_itr_trial)
             
 
-            Aij = compute_vec_inner_product_L2(jac_det, self.quad_weights, 
-                                               metric_inv,
-                                               grad_trail, 
-                                               grad_test)
+            Aij = compute_inner_product_L2(jac_det, self.quad_weights, 
+                                           metric_inv, grad_trail, grad_test)
             
             A_elem[idx] = Aij
         end
@@ -177,10 +175,9 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
 
         b_col_idx[test_linear_idx] = test_supported_bases[test_linear_idx]
 
-        bi = compute_vec_inner_product_L2(jac_det, self.quad_weights,
-                                          LinearAlgebra.I,
-                                          fxy,
-                                          view(test_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, test_linear_idx))
+        bi = compute_inner_product_L2(jac_det, self.quad_weights, 
+                                      LinearAlgebra.I, fxy,
+                                      view(test_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, test_linear_idx))
 
         b_elem[test_linear_idx] = bi
     end
