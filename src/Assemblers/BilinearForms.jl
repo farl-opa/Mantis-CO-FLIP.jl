@@ -143,10 +143,16 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
     b_col_idx = Vector{Int}(undef, n_supported_bases_test)
     b_elem = Vector{Float64}(undef, n_supported_bases_test)
 
+    # Not exactly elegant, but we need a way to easily and stably 
+    # extract things like a gradient from the evaluations. The filter 
+    # iterator only iterates over the keys for which the sum is 
+    # 1 (so all partial derivatives of order 1).
+    key_itr_test = sort(collect(Iterators.filter(x -> sum(x) == 1 ? true : false, keys(test_basis_evals))), rev=true)
+    key_itr_trial = sort(collect(Iterators.filter(x -> sum(x) == 1 ? true : false, keys(trial_basis_evals))), rev=true)
+
     for test_linear_idx in 1:1:n_supported_bases_test
 
         # See the comment below.
-        key_itr_test = sort(collect(Iterators.filter(x -> sum(x) == 1 ? true : false, keys(trial_basis_evals))), rev=true)
         grad_test = NTuple{n, SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}}(view(test_basis_evals[key], :, test_linear_idx) for key in key_itr_test)
 
         for trial_linear_idx in 1:1:n_supported_bases_trial
@@ -155,14 +161,10 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
             A_row_idx[idx] = trial_supported_bases[trial_linear_idx]
             A_col_idx[idx] = test_supported_bases[test_linear_idx]
 
-            # Not exactly elegant, but we need a way to easily and stably 
-            # extract things like a gradient from the evaluations. The filter 
-            # iterator only iterates over the keys for which the sum is 
-            # 1 (so all partial derivatives of order 1). In order to make 
-            # this type stable, I made sure that the size of the tuple is 
-            # known (there are n partial derivatives of interest in 
-            # dimension n) and I specified the type of the SubArray.
-            key_itr_trial = sort(collect(Iterators.filter(x -> sum(x) == 1 ? true : false, keys(trial_basis_evals))), rev=true)
+            # Not exactly elegant. In order to make this type stable, I 
+            # made sure that the size of the tuple is known (there are n 
+            # partial derivatives of interest in dimension n) and I 
+            # specified the type of the SubArray.
             grad_trail = NTuple{n, SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}}(view(trial_basis_evals[key], :, trial_linear_idx) for key in key_itr_trial)
             
 
