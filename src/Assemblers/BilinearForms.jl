@@ -153,7 +153,7 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
     for test_linear_idx in 1:1:n_supported_bases_test
 
         # See the comment below.
-        grad_test = NTuple{n, SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Int64}, true}}(view(test_basis_evals[key], :, test_linear_idx) for key in key_itr_test)
+        grad_test = NTuple{n, SubArray{Float64, 1, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int}}, Int}, true}}(view(test_basis_evals[key], :, test_linear_idx) for key in key_itr_test)
 
         for trial_linear_idx in 1:1:n_supported_bases_trial
             idx = (test_linear_idx - 1) * n_supported_bases_test + trial_linear_idx
