@@ -11,6 +11,24 @@ data_folder = joinpath(Mantis_folder, "test", "data")
 input_data_folder = joinpath(data_folder, "reference", "Geometry")
 output_data_folder = joinpath(data_folder, "output", "Geometry")
 
+# Test FEMGeometry (Polar) --------------------------------------------------
+deg = 2
+Wt = pi/2
+b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt))
+B = ntuple( i -> b, 4)
+GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
+b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(3))
+PSplines, geom_coeffs = Mantis.FunctionSpaces.PolarSplineSpace(GB, b1)
+geom = Mantis.Geometry.FEMGeometry(PSplines, geom_coeffs)
+
+field_coeffs = rand(Float64, Mantis.FunctionSpaces.get_dim(PSplines), 1)
+polar_surface_field = Mantis.Fields.FEMField(PSplines, field_coeffs)
+
+# Generate the plot
+output_filename = "fem_geometry_polar_test.vtu"
+output_file = joinpath(output_data_folder, output_filename)
+Mantis.Plot.plot(geom, polar_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+
 # Test FEMGeometry (Annulus) --------------------------------------------------
 deg = 2
 Wt = pi/2

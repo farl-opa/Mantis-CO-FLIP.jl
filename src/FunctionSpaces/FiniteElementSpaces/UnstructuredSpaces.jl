@@ -17,7 +17,7 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
     data::Dict
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, us_config::Dict, data::Dict) where {n,m}
-        new{n,m}(function_spaces, extraction_op, us_config, data, Vector{Int}(undef,0))
+        new{n,m}(function_spaces, extraction_op, Vector{Int}(undef,0), us_config, data)
     end
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
@@ -119,7 +119,7 @@ function set_boundary_dof_indices(us_space::UnstructuredSpace{1,m}, indices::Vec
 end
 
 function get_boundary_dof_indices(us_space::UnstructuredSpace{1,m}) where {m}
-    return us_space.get_boundary_dof_indices
+    return us_space.boundary_dof_indices
 end
 
 @doc raw"""
@@ -170,3 +170,5 @@ function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{
 
     return local_basis, basis_indices
 end
+
+include("PolarSplines.jl")

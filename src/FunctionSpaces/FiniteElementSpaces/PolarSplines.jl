@@ -1,0 +1,99 @@
+function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1})
+
+    # number of dofs for the poloidal and radial spaces
+    n_p = get_dim(space_p)
+    n_r = get_dim(space_r)
+
+    # check that the poloidal space has no bounday dofs
+    bdof_p = get_boundary_dof_indices(space_p)
+    if length(bdof_p) > 0
+        throw(ArgumentError("Poloidal space has boundary dofs and is likely not periodic."))
+    end
+
+    # tensor-product space which will form the foundation of the polar spline space
+    tp_space = TensorProductSpace(space_p, space_r)
+
+    # polar control points
+    polar_control_points, radii, theta = build_standard_polar_geometry(n_p, n_r, 1.0)
+
+    # the extraction sub-matrix in the neighborhood of the polynomial_degree
+    ex_coeff_pole = Matrix{Float64}(undef,2*n_p,3)
+    for j ∈ 1:n_p
+        ex_coeff_pole[j,:] .= 1/3
+    end
+    t_mat = Matrix{Float64}(undef,3,3)
+    t_mat[:,1] .= [1/3, -1/6, -1/6]
+    t_mat[:,2] .= [0, sqrt(3)/6, -sqrt(3)/6]
+    t_mat[:,3] .= [1/3, 1/3, 1/3]
+    for j = n_p+1:2*n_p
+        ex_coeff_pole[j,:] = t_mat * [cos(theta[j-n_p]), sin(theta[j-n_p]), 1]
+    end
+    # polar offset
+    pole_offset = 2*n_p - 3
+
+    # number of elements
+    num_elements = get_num_elements(tp_space)
+
+    # number of polar dofs
+    space_dim = get_dim(tp_space) - pole_offset
+
+    # allocate space for extraction coefficients and basis indices
+    extraction_coefficients = Vector{Array{Float64}}(undef,num_elements)
+    basis_indices = Vector{Vector{Int}}(undef,num_elements)
+    for e ∈ 1:num_elements
+        # get tp_extraction basis indices
+        _, tp_basis_inds = get_extraction(tp_space,e)
+        n_tp_basis = length(tp_basis_inds)
+        # if none of the basis functions are relevant for the polar construction, then extraction is identity
+        if minimum(tp_basis_inds) > 2*n_p
+            extraction_coefficients[e] = Matrix(LinearAlgebra.I, n_tp_basis, n_tp_basis)
+            basis_indices[e] = tp_basis_inds .- pole_offset
+        else
+            # find which functions are unmodified
+            i_unmodified = findall(tp_basis_inds .> 2*n_p)
+            i_modified = findall(tp_basis_inds .<= 2*n_p)
+            # indices of all active functions
+            basis_indices[e] = cat([1,2,3],tp_basis_inds[i_unmodified] .- pole_offset,dims=1)
+            # extraction coefficients will be stored here
+            el_extraction = Array{Float64}(undef,n_tp_basis,length(i_unmodified)+3)
+            # extraction coefficients for modified basis functions
+            for j ∈ 1:3
+                el_extraction[i_modified,j] .= ex_coeff_pole[tp_basis_inds[i_modified],j]
+            end
+            # extraction coefficients for unmodified basis functions
+            count = 1
+            for i ∈ i_unmodified
+                el_extraction[i,count+3] = 1.0
+                count += 1
+            end
+            extraction_coefficients[e] = el_extraction
+        end
+    end
+    
+    # Polar spline extraction operator
+    extraction_op = ExtractionOperator(extraction_coefficients, basis_indices, num_elements, space_dim)
+
+    # return Polar spline space
+    return UnstructuredSpace((tp_space,), extraction_op, Dict(), Dict("regularity" => 1)), polar_control_points
+
+end
+
+function build_standard_polar_geometry(n_p::Int, n_r::Int, R::Float64)
+    radii = LinRange(0.0, R, n_r)
+    theta = 2*pi .+ (1 .- 2 .* (1:n_p)) .* pi / n_p
+    polar_control_points = zeros(Float64, n_p*(n_r-2)+3, 2)
+    # the control points that are identical to the tensor-product control points
+    for idx ∈ Iterators.product(1:n_p, 3:n_r)
+        pidx = ordered_to_linear_index(idx, (n_p, n_r))
+        pidx = pidx - (2*n_p - 3)
+        polar_control_points[pidx,1] = radii[idx[2]]*cos(theta[idx[1]])
+        polar_control_points[pidx,2] = radii[idx[2]]*sin(theta[idx[1]])
+    end
+    # the control points for the control triangle
+    rho_2 = radii[2]
+    polar_control_points[1,:] .= [2*rho_2, 0]
+    polar_control_points[2,:] .= [-rho_2, sqrt(3)*rho_2]
+    polar_control_points[3,:] .= [-rho_2, -sqrt(3)*rho_2]
+
+    return polar_control_points, radii, theta
+end
