@@ -69,6 +69,10 @@ function get_polynomial_degree_per_dim(tp_space::TensorProductSpace{n, F1, F2}) 
     return (get_polynomial_degree(tp_space.function_space_1), get_polynomial_degree(tp_space.function_space_2))
 end
 
+function get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    return get_max_local_dim(tp_space.function_space_1) * get_max_local_dim(tp_space.function_space_2)
+end
+
 @doc raw"""
     ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
 
@@ -195,8 +199,8 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
 
     local_basis_per_dim = _get_local_basis_per_dim(tp_space, el_id, xi, nderivatives)
 
-    der_keys = _integer_sums(nderivatives, n)
-    local_basis = Dict{NTuple{n,Int}, Matrix{Float64}}(i => Matrix{Float64}(undef,1,1) for i in der_keys)
+    der_keys = _integer_sums(nderivatives, n+1)
+    local_basis = Dict{NTuple{n,Int}, Matrix{Float64}}(i[1:n] => Matrix{Float64}(undef,1,1) for i in der_keys)
 
     # kronecker product of constituent basis functions
     for key in keys(local_basis)
@@ -215,8 +219,8 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
 
     ordered_index = linear_to_ordered_index(el_id, max_ind_el)
 
-    length(xi[1:n1]) == 1 ? xi_1 = xi[1:n1][1] : xi_1 = xi[1:n1]
-    length(xi[n1+1:n]) == 1 ? xi_2 = xi[n1+1:n][1] : xi_2 = xi[n1+1:n]
+    xi_1 = xi[1:n1]
+    xi_2 = xi[n1+1:n]
 
     return (get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives))
 end

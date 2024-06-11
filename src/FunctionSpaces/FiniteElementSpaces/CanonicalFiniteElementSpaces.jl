@@ -6,11 +6,15 @@ Wrapper that allows treating a canonical space as a finite element space.
 # Fields
 - `canonical_space::AbstractCanonicalSpace` : canonical space.
 """
-struct CanonicalFiniteElementSpace <: AbstractFiniteElementSpace{1}
-    canonical_space::AbstractCanonicalSpace
+struct CanonicalFiniteElementSpace{F} <: AbstractFiniteElementSpace{1}
+    canonical_space::F
 end
 
 function get_polynomial_degree(space::CanonicalFiniteElementSpace)
+    return space.canonical_space.p
+end
+
+function get_polynomial_degree(space::CanonicalFiniteElementSpace, ::Int)
     return space.canonical_space.p
 end
 
@@ -58,14 +62,17 @@ function _evaluate_all_at_point(space::CanonicalFiniteElementSpace, ::Int, xi::F
     return _evaluate_all_at_point(space, xi, nderivatives)
 end
 
-function get_local_basis(space::CanonicalFiniteElementSpace,::Int, xi::Vector{Float64}, nderivatives::Int)
-    return evaluate(space.canonical_space, xi, nderivatives)
+function get_local_basis(space::CanonicalFiniteElementSpace,::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
+    return evaluate(space.canonical_space, xi[1], nderivatives)
 end
 
 function get_basis_indices(space::CanonicalFiniteElementSpace,::Int)
     return collect(1:get_dim(space))
 end
 
+function get_max_local_dim(space::CanonicalFiniteElementSpace)
+    return get_dim(space)
+end
 
 function get_extraction(space::CanonicalFiniteElementSpace,::Int)
     basis_indices = get_basis_indices(space, 1)
@@ -73,7 +80,7 @@ function get_extraction(space::CanonicalFiniteElementSpace,::Int)
     return Matrix(LinearAlgebra.I, nbasis, nbasis), basis_indices
 end
 
-function evaluate(space::CanonicalFiniteElementSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
+function evaluate(space::CanonicalFiniteElementSpace, ::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
     local_basis = get_local_basis(space, 1, xi, nderivatives)
     basis_indices = get_basis_indices(space, 1)
 

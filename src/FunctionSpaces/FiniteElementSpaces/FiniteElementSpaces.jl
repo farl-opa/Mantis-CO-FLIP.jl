@@ -24,7 +24,7 @@ For given global element id `element_id` for a given finite element `space`, eva
 - `::Array{Float64}`: array of evaluated global basis (size: num_eval_points x num_funcs x nderivatives+1)
 - `::Vector{Int}`: vector of global basis indices (size: num_funcs).
 """
-function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::Union{Vector{Float64}, NTuple{n,Vector{Float64}}}, nderivatives::Int) where {n}
+function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n}
     extraction_coefficients, basis_indices = get_extraction(space, element_id)
     local_basis = get_local_basis(space, element_id, xi, nderivatives)
 
@@ -35,15 +35,11 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::Uni
     return local_basis, basis_indices
 end
 
-function evaluate(function_space::AbstractFiniteElementSpace{1}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
-    return evaluate(function_space, element_id, xi[1], nderivatives)
-end
-
-function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::Union{Vector{Float64}, NTuple{n,Vector{Float64}}}) where {n}
+function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n}
     return evaluate(space, element_id, xi, 0)
 end
 
-function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::Union{Vector{Float64}, NTuple{n,Vector{Float64}}}, nderivatives::Int, coeffs::Vector{Float64}) where {n}
+function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int, coeffs::Vector{Float64}) where {n}
     local_basis, basis_indices = evaluate(space, element_id, xi, nderivatives) 
     evaluation = copy(local_basis)
     
@@ -79,6 +75,8 @@ function get_num_elements(extraction_op::ExtractionOperator)
     return extraction_op.num_elements
 end
 
+# rational version of finite element spaces
+include("RationalFiniteElementSpaces.jl")
 # canonical finite element space wrapper
 include("CanonicalFiniteElementSpaces.jl")
 # univariate function spaces

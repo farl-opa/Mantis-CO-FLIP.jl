@@ -36,7 +36,12 @@ Pages = [
 # allows for a more straightforward specification of the latex packages 
 # and has a more consistent (with surrounding text) style for inline 
 # math. The default options for MathJax will do for now.
-math_engine = Documenter.MathJax3()
+math_engine = Documenter.MathJax3(Dict(
+    :tex => Dict(
+        "inlineMath" => [["\$","\$"], ["\\(","\\)"]],
+        "tags" => "ams",
+        "packages" => ["base", "ams", "autoload"])
+))
 
 # References are handled by DocumenterCitations so this should be set up.
 bib = CitationBibliography(
@@ -62,7 +67,7 @@ format_setup = Documenter.HTML(
 # definitions as work-around.
 # Author names are ordered alphabetically on last name.
 makedocs(
-    modules  = [Mantis.FunctionSpaces, Mantis.Quadrature], 
+    modules  = [Mantis.Assemblers, Mantis.FunctionSpaces, Mantis.Quadrature], 
     format   = format_setup,
     sitename = "MANTIS.jl",
     authors  = "Diogo Costa Cabanas, Joey Dekker, Artur Palha, Deepesh Toshniwal",

@@ -59,4 +59,19 @@ function gauss_legendre(p::Integer)
 end
 
 
+
+@doc raw"""
+    tensor_product_weights(weights_1d::NTuple{n, Vector{Float64}}) where {n}
+
+Returns a vector of the tensor product of quadrature weights.
+"""
+function tensor_product_weights(weights_1d::NTuple{n, Vector{Float64}}) where {n}
+    result = Vector{Float64}(undef, prod(size.(weights_1d, 1)))
+    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
+        result[linear_idx] = prod(weights_all)
+    end
+    return result
+end
+
+
 end

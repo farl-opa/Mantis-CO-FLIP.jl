@@ -1,7 +1,8 @@
+import LinearAlgebra
 struct CartesianGeometry{n,n} <: AbstractAnalGeometry{n, n}
     n_elements::NTuple{n,Int}
     breakpoints::NTuple{n,Vector{Float64}}
-    cartesian_idxs::CartesianIndices
+    cartesian_idxs::CartesianIndices{n, NTuple{n, Base.OneTo{Int}}}
 
     function CartesianGeometry(breakpoints::NTuple{n,Vector{Float64}}) where {n}
         n_elements = length.(breakpoints) .- 1
@@ -15,21 +16,28 @@ function get_num_elements(geometry::CartesianGeometry{n,n}) where {n}
     return prod(geometry.n_elements)
 end
 
+# function get_boundary_indices(geometry::CartesianGeometry{n,n}) where {n}
+#     return    
+# end
+
+# function get_num_boundary_elements(geometry::CartesianGeometry{n,n}) where {n}
+#     if any(geometry.n_elements) == 1
+#         return
+#     else
+#         return 2*sum(geometry.n_elements)
+#     end
+# end
+
+# function get_num_boundary_elements(geometry::CartesianGeometry{1,1})
+#     return minimum([2, geometry.n_elements])
+# end
+
 function get_domain_dim(geometry::CartesianGeometry{n,n}) where {n}
     return n
 end
 
 function get_image_dim(geometry::CartesianGeometry{n,n}) where {n}
     return n
-end
-
-function evaluate(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::Matrix{Float64}) where {n}
-    return evaluate.(geometry, element_idx, ntuple(i -> ntuple(j -> [ξ[i,j]], n), size(ξ,1)))
-end
-
-function evaluate(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::Vector{Float64}) where {n}
-    @assert length(ξ) == n "Dimension mismatch"
-    return reshape(evaluate(geometry, element_idx, ntuple(i -> [ξ[i]], n)), :)  # return as a vector since there is only one point (one column)
 end
 
 function evaluate(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
@@ -40,27 +48,35 @@ function evaluate(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple
 
     # Loop over the points and compute their coordinates as the tensor product of the unidimensional points
     n_points = prod(size.(ξ, 1))  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
-    x = zeros(Float64, n, n_points)
+    x = zeros(Float64, n_points, n)
     for (point_idx, point_cartesian_idx) in enumerate(points_tensor_product_idx)
         for component_idx in 1:n 
-            x[component_idx, point_idx] = univariate_points[component_idx][point_cartesian_idx[component_idx]]
+            x[point_idx, component_idx] = univariate_points[component_idx][point_cartesian_idx[component_idx]]
         end    
     end
 
     return x
 end
 
-function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::Matrix{Float64}) where {n}
-    return jacobian(geometry, element_idx, ntuple(i -> ntuple(j -> [ξ[i,j]], n), size(ξ,1)))
-end
-
-function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::Vector{Float64}) where {n}
-    @assert length(ξ) == n "Dimension mismatch"
-    return collect(jacobian(geometry, element_idx, ntuple(i -> [ξ[i]], n))[1])
-end
-
 function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
+    # Get the multi-index of the element
     ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
-    dx = prod(geometry.breakpoints[k][ordered_idx[k]+1] - geometry.breakpoints[k][ordered_idx[k]] for k = 1:n)
-    return dx * ones(Float64, prod(length.(ξ)))
+    
+    # Compute the spacing in every direction
+    dx = zeros(Float64, n)  # allocate the memory space 
+    for dim_idx in range(1, n)
+        start_breakpoint_idx = ordered_idx[dim_idx]
+        end_breakpoint_idx = ordered_idx[dim_idx] + 1
+        dx[dim_idx] = geometry.breakpoints[dim_idx][end_breakpoint_idx] - geometry.breakpoints[dim_idx][start_breakpoint_idx]
+    end
+    
+    # Generate the Jacobian for the Cartesian grid, which, for each point, 
+    # is just a diagonal matrix multiplied by the cell spacings in each direction
+    J = zeros(Float64, prod(length.(ξ)), n, n)
+    for dim_idx in range(1, n)
+        J[:, dim_idx, dim_idx] .= dx[dim_idx]
+    end
+    
+    return J
+    
 end

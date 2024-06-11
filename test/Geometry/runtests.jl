@@ -7,5 +7,6 @@ using Test
 @testset "FEMGeometry" begin include("FEMGeometry.jl") end
 @testset "TensorProductGeometry" begin include("TensorProductGeometry.jl") end
 @testset "HierarchicalGeometry" begin include("HierarchicalGeometry.jl") end
+@testset "Metric" begin include("Metric.jl") end
 
 end

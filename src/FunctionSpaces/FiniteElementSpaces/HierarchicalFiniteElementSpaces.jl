@@ -146,6 +146,10 @@ function get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n
     return get_num_active(hierarchical_space.active_functions)
 end
 
+function get_max_local_dim(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
+    return 27
+end
+
 """
     get_num_levels(active_info::HierarchicalActiveInfo)
 

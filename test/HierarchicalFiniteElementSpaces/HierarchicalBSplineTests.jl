@@ -58,7 +58,7 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     idx = (el-1)*nxi+1:el*nxi
     xs[idx] = x
 
-    local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
+    local eval = Mantis.FunctionSpaces.evaluate(hspace, el, (xi,), 0)
 
     A[idx, eval[2]] = eval[1][0]
 end
@@ -81,7 +81,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
 
     # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, (xi,), 0)
     # Positivity of the basis
     @test minimum(h_eval[0]) >= 0.0
 end
