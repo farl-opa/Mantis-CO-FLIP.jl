@@ -73,5 +73,17 @@ function tensor_product_weights(weights_1d::NTuple{n, Vector{Float64}}) where {n
     return result
 end
 
+function tensor_product_rule(p::Vector{Int}, quad_rule::F) where {F <: Function}
+    n = length(p)
+    qrules_1d = collect(quad_rule(p[k]) for k = 1:n);
+    points = Tuple(qrules_1d[k][1] for k = 1:n);
+    weights_1d = (qrules_1d[k][2] for k = 1:n);
+    weights = Vector{Float64}(undef, prod(size.(weights_1d, 1)))
+    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
+        weights[linear_idx] = prod(weights_all)
+    end
+    return points, weights
+end
+
 
 end
