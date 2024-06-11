@@ -30,7 +30,7 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # assemble patch config in a dictionary
         us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
 
-        if us_space.data["regularity"][end] > -1
+        if data["regularity"][end] > -1
             boundary_dof_indices = Vector{Int}(undef,0)
         else
             boundary_dof_indices = [1, get_dim(extraction_op)]

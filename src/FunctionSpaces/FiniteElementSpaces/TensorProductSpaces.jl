@@ -21,7 +21,7 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n} #where {n,
     end
 
     function TensorProductSpace(function_space_1::F1, function_space_2::F2) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
-        return TensorProductSpace(function_space_1, function_space_2, Vector{Int}(undef,0),Dict())
+        return TensorProductSpace(function_space_1, function_space_2, Dict())
     end
 end
 
