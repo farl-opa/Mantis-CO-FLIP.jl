@@ -208,6 +208,7 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::Bernstein
+    boundary_dof_indices::Vector{Int}
     
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
         # Check for errors in the construction 
@@ -231,7 +232,11 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
         
         knot_vector = create_knot_vector(patch_1d, polynomial_degree, regularity, "regularity")
 
-        new(knot_vector, extract_bspline_to_bernstein(knot_vector), Bernstein(polynomial_degree))
+        extraction_op = extract_bspline_to_bernstein(knot_vector)
+
+        bspline_dim = get_dim(extraction_op)
+
+        new(knot_vector, extraction_op, Bernstein(polynomial_degree), [1, bspline_dim])
     end
 end
 
@@ -399,6 +404,15 @@ end
 
 function get_max_local_dim(bspline::BSplineSpace)
     return bspline.knot_vector.polynomial_degree+1
+end
+
+function set_boundary_dof_indices(bspline::BSplineSpace, indices::Vector{Int})
+    bspline.boundary_dof_indices = indices
+    return nothing
+end
+
+function get_boundary_dof_indices(bspline::BSplineSpace)
+    return bspline.boundary_dof_indices
 end
 
 """

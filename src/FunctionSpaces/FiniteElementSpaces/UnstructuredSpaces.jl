@@ -12,11 +12,12 @@
 struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
     function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}
     extraction_op::ExtractionOperator
+    boundary_dof_indices::Vector{Int}
     us_config::Dict
     data::Dict
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, us_config::Dict, data::Dict) where {n,m}
-        new{n,m}(function_spaces, extraction_op, us_config, data)
+        new{n,m}(function_spaces, extraction_op, us_config, data, Vector{Int}(undef,0))
     end
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
@@ -29,7 +30,13 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # assemble patch config in a dictionary
         us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
 
-        new{1,m}(function_spaces, extraction_op, us_config, data)
+        if us_space.data["regularity"][end] > -1
+            boundary_dof_indices = Vector{Int}(undef,0)
+        else
+            boundary_dof_indices = [1, get_dim(extraction_op)]
+        end
+
+        new{1,m}(function_spaces, extraction_op, boundary_dof_indices, us_config, data)
     end
 end
 
@@ -104,6 +111,15 @@ end
 
 function get_max_local_dim(us_space::UnstructuredSpace)
     return maximum(get_max_local_dim.(us_space.function_spaces))
+end
+
+function set_boundary_dof_indices(us_space::UnstructuredSpace{1,m}, indices::Vector{Int}) where {m}
+    us_space.boundary_dof_indices = indices
+    return nothing
+end
+
+function get_boundary_dof_indices(us_space::UnstructuredSpace{1,m}) where {m}
+    return us_space.get_boundary_dof_indices
 end
 
 @doc raw"""
