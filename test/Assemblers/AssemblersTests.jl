@@ -115,7 +115,7 @@ end
 
 
 
-
+using InteractiveUtils
 # Here we setup and specify the inputs to the FE problem.
 
 # Compute base directories for data input and output
