@@ -39,12 +39,4 @@ struct FormSpace{n,k,G,F} <: AbstractFormSpace
     end
 end
 
-function evaluate(f::FormSpace{n,0,G,Tuple{F}}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,G <: Geometry.AbstractGeometry{n,r} where {r}, F <: FunctionSpaces.AbstractFunctionSpace{n} where {n}}
-    return evaluate(f.fem_space[1],element_id,xi,nderivatives)
-end
-
-function evaluate(f::FormSpace{n,n,G,Tuple{F}}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,G <: Geometry.AbstractGeometry{n,r} where {r}, F <: FunctionSpaces.AbstractFunctionSpace{n} where {n}}
-    return evaluate(f.fem_space[1],element_id,xi,nderivatives)
-end
-
 end
