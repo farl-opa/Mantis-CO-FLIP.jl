@@ -23,6 +23,12 @@ for nx = 1:3
         function dmapping(x::Vector{Float64})
             return [cos(x[2]) -(x[1] + 0.2)*sin(x[2]); sin(x[2]) (x[1] + 0.2)*cos(x[2])]
         end
+        function mapping(x::Matrix{Float64})
+            return [(x[:,1] .+ 0.2) .* cos.(x[:,2]), (x[:,1] .+ 0.2) .* sin.(x[:,2])]
+        end
+        function dmapping(x::Matrix{Float64})
+            return [cos(x[2]) -(x[1] + 0.2)*sin(x[2]); sin(x[2]) (x[1] + 0.2)*cos(x[2])]
+        end
         dimension = (2, 2)
         curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
         mapped_geometry = Mantis.Geometry.MappedGeometry(geom, curved_mapping)

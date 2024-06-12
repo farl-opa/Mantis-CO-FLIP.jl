@@ -1,7 +1,133 @@
 """
-Functions and algorithms used for knot insertion.
+Functions and algorithms used for two scale relations.
 
 """
+
+"""
+    AbstractTwoScaleOperator
+
+Supertype for all two scale relations.
+"""
+abstract type AbstractTwoScaleOperator end
+
+# Getters for elements
+
+"""
+
+    element_ranges_to_tuple_list(finer_ranges::Vector{Vector{Int}}, nsubdivisions::NTuple{n, Int}) where {n}
+
+Converts `finer_ranges::Vector{Vector{Int}}` to a `Vector{NTuple{n, Int}}` containing all 
+permutations of numbers in `finer_ranges` as `NTuple{n, Int}`.
+
+# Examples
+```julia-repl
+julia> element_ranges_to_tuple_list([[1, 2], [3, 4]], (2,2))
+[(1, 3), (2, 3), (1, 4), (2, 4)]
+```
+# Arguments
+- `finer_ranges::Vector{Vector{Int}}`: The numbers to be used in the permutations.
+- `nsubdivisions::NTuple{n, Int})`: The number of subdivisions in each dimension.
+# Returns
+- `finer_elements::Vector{NTuple{n, Int}}`: Vector containing all permutations as `NTuple{n, Int}`.
+"""
+function element_ranges_to_tuple_list(finer_ranges::Vector{Vector{Int}}, nsubdivisions::NTuple{n, Int}) where {n}
+    finer_elements = Vector{NTuple{n, Int}}(undef, prod(nsubdivisions))
+
+    el_count = 1
+    @inbounds for el_id in Iterators.product(finer_ranges...)
+        finer_elements[el_count] = el_id
+        el_count += 1
+    end
+    
+    return finer_elements
+end
+
+"""
+    get_finer_elements(coarse_element_id::Int, nsubdivisions::Int)
+
+Returns the child elements contained inside `coarse_element_id`, according to the number of
+`nsubdivisions`.
+
+# Arguments
+- `coarse_element_id::Int`: The parent element where the child elements are contained.
+- `nsubdivisions::Int`: The number of subdivisions.
+# Returns
+- `::Vector{Int}`: The element ids of the child elements.
+"""
+function get_finer_elements(coarse_element_id::Int, nsubdivisions::Int)
+    return [get_finer_elements((coarse_element_id,), (nsubdivisions,))[i][1] for i in 1:nsubdivisions]
+end
+
+"""
+    get_finer_elements(coarse_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+
+Returns the child elements contained inside `coarse_element_id`, according to the number of
+`nsubdivisions`.
+
+# Arguments
+- `coarse_element_id::NTuple{n, Int}`: The parent element where the child elements are contained.
+- `nsubdivisions::NTuple{n, Int})`: The number of subdivisions in each dimension.
+# Returns
+- `::Vector{NTuple{n, Int}}`: The element ids of the child elements.
+"""
+function get_finer_elements(coarse_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+    finer_ranges = Vector{Vector{Int}}(undef, n)
+
+    for d in 1:1:n
+        finer_ranges[d] = collect((1:nsubdivisions[d]) .+ (coarse_element_id[d]-1)*nsubdivisions[d]) 
+    end
+
+    return element_ranges_to_tuple_list(finer_ranges, nsubdivisions)
+end
+
+"""
+    get_coarser_elements(fine_element_id::Int, nsubdivisions::Int)
+
+Returns the parent element where `fine_element_id` is contained.
+
+# Arguments
+- `fine_element_id::Int`: The child element where parent element containment is checked. 
+- `nsubdivisions::Int`: The number of subdivisions in each dimension.
+# Returns
+- `::Int`: The parent element where `fine_element_id` is contained.
+"""
+function get_coarser_element(fine_element_id::Int, nsubdivisions::Int)
+    return floor(Int, (fine_element_id-1)/nsubdivisions + 1)
+end
+
+"""
+    get_coarser_elements(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+
+Returns the parent element where `fine_element_id` is contained.
+
+# Arguments
+- `fine_element_id::NTuple{n, Int}`: The child element where parent element containment is checked. 
+- `nsubdivisions::NTuple{n, Int})`: The number of subdivisions in each dimension.
+# Returns
+- `::NTuple{n, Int}`: The parent element where `fine_element_id` is contained.
+"""
+function get_coarser_element(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+    return ntuple(d -> get_coarser_element(fine_element_id[d], nsubdivisions[d]), n)
+end
+
+function get_coarse_to_fine(bspline_space::BSplineSpace, nsubdivisions::Int)
+    coarse_to_fine = Vector{Vector{Int}}(undef, get_num_elements(bspline_space))
+    for el in 1:get_num_elements(bspline_space)
+        coarse_to_fine[el] = get_finer_elements(el, nsubdivisions)
+    end
+
+    return coarse_to_fine
+end
+
+function get_fine_to_coarse(bspline_space::BSplineSpace, nsubdivisions::Int)
+    fine_to_coarse = Vector{Int}(undef, get_num_elements(bspline_space))
+    for el in 1:get_num_elements(bspline_space)
+        fine_to_coarse[el] = get_coarser_element(el, nsubdivisions)
+    end
+
+    return fine_to_coarse
+end
+
 
 # TwoScaleOperator structure
 
@@ -16,22 +142,52 @@ Two-scale operator for a change of basis between two finite element spaces.
 - `global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int64}`: Change of basis matrix.
 - `coarse_to_fine::Vector{Vector{Int}}`: Relation between coarser and finer basis functions.
 """
-struct TwoScaleOperator
+struct TwoScaleOperator <: AbstractTwoScaleOperator
     coarse_space::AbstractFiniteElementSpace
     fine_space::AbstractFiniteElementSpace
-    global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int64}
-    coarse_to_fine::Vector{Vector{Int}}
+    global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Tv, Ti} where {Tv, Ti}
+    local_subdiv_matrices::Vector{Matrix{Float64}}
+    coarse_to_fine_elements::Vector{Vector{Int}}
+    fine_to_coarse_elements::Vector{Int}
+    coarse_to_fine_functions::Vector{Vector{Int}}
+    fine_to_coarse_functions::Vector{Vector{Int}}
 
-    function TwoScaleOperator(coarse_space::S, fine_space::T, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int64}) where {S<:AbstractFiniteElementSpace, T<:AbstractFiniteElementSpace}
-        ncoarse = size(global_subdiv_matrix)[2]
-        coarse_to_fine = Vector{Vector{Int}}(undef, ncoarse)
+    function TwoScaleOperator(coarse_space::S, fine_space::T, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Tv, Ti}, local_subdiv_matrices::Vector{Matrix{Float64}}, coarse_to_fine_elements::Vector{Vector{Int}}, fine_to_coarse_elements::Vector{Int}) where {S<:AbstractFiniteElementSpace, T<:AbstractFiniteElementSpace, Tv, Ti}
+        dims = size(global_subdiv_matrix)
+        coarse_to_fine_functions = Vector{Vector{Int}}(undef, dims[2])
+        fine_to_coarse_functions = Vector{Vector{Int}}(undef, dims[1])
 
-        for i in 1:1:ncoarse
-            coarse_to_fine[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(global_subdiv_matrix, i)]
+        gm_data = SparseArrays.findnz(global_subdiv_matrix)
+        transpose_matrix = SparseArrays.sparse(gm_data[2],gm_data[1],gm_data[3])
+
+        for i in 1:1:dims[2]
+            coarse_to_fine_functions[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(global_subdiv_matrix, i)]
+        end
+        for i in 1:1:dims[1]
+            fine_to_coarse_functions[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(transpose_matrix, i)]
         end
 
-        new(coarse_space, fine_space, global_subdiv_matrix, coarse_to_fine)
+
+        new(coarse_space, fine_space, global_subdiv_matrix, local_subdiv_matrices, coarse_to_fine_elements, fine_to_coarse_elements, coarse_to_fine_functions, fine_to_coarse_functions)
     end
+end
+
+# Getters for TwoScaleOperator
+
+function get_coarse_space(twoscale_operator::AbstractTwoScaleOperator) 
+    return twoscale_operator.coarse_space
+end
+
+function get_fine_space(twoscale_operator::AbstractTwoScaleOperator)
+    return twoscale_operator.fine_space
+end
+
+function get_coarse_spaces(twoscale_opeators::NTuple{m, AbstractTwoScaleOperator}) where {m}
+    return get_coarse_space.(twoscale_opeators)
+end
+
+function get_fine_spaces(twoscale_opeators::NTuple{m, AbstractTwoScaleOperator}) where {m}
+    return get_fine_space.(twoscale_opeators)
 end
 
 # Helper functions for knot insertion
@@ -253,7 +409,7 @@ function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fin
     p = coarse_bspline.knot_vector.polynomial_degree
     fine_bspline = BSplineSpace(fine_knot_vector.patch_1d, p, p .- fine_knot_vector.multiplicity)
 
-    return build_two_scale_operator(coarse_bspline, fine_bspline)
+    return build_two_scale_operator(coarse_bspline, fine_bspline, nsubdivisions)
 end
 
 """
@@ -357,7 +513,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knots.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
@@ -406,7 +562,7 @@ function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vect
         e += 1
     end
 
-    global_extraction_matrix = SparseArrays.sparse(gm_rows, gm_columns, gm_values, rf-1, cf)
+    global_extraction_matrix = SparseArrays.dropzeros(SparseArrays.sparse(gm_rows, gm_columns, gm_values, rf-1, cf))
     
     return global_extraction_matrix
 end
@@ -424,13 +580,18 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `fine_bspline::BSplineSpace`: Fine B-spline, with extra knots.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
-function build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace)
+function build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace, nsubdivisions::Int)
     gm = build_two_scale_operator(coarse_bspline.knot_vector, fine_bspline.knot_vector)
     
-    return TwoScaleOperator(coarse_bspline, fine_bspline, gm), fine_bspline
+    coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
+    fine_to_coarse_elements = get_fine_to_coarse(fine_bspline, nsubdivisions)
+
+    lm = get_local_subdiv_matrices(coarse_bspline, nsubdivisions)
+    
+    return TwoScaleOperator(coarse_bspline, fine_bspline, gm, lm, coarse_to_fine_elements, fine_to_coarse_elements), fine_bspline
 end
 
 """
@@ -447,7 +608,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 - `fine_multiplicity::Int`: Multiplicity of each new knot in refined knot vector.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
@@ -456,7 +617,7 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::I
 
     fine_bspline = subdivide_bspline(coarse_bspline, nsubdivisions, fine_multiplicity)
 
-    return build_two_scale_operator(coarse_bspline, fine_bspline)
+    return build_two_scale_operator(coarse_bspline, fine_bspline, nsubdivisions)
 end
 
 """
@@ -472,7 +633,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a two_scale_operator
+- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
 function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int)
@@ -541,36 +702,173 @@ end
 # Getters for change of basis
 
 """
-    subdivide_coeffs(coarse_basis_coeffs::Vector{Float64}, two_scale_operator::TwoScaleOperator)
+    subdivide_coeffs(coarse_basis_coeffs::Vector{Float64}, twoscale_operator::TwoScaleOperator)
 
 Returns the spline coefficients in a refined basis from coefficients in a coarser B-spline basis.
 
 # Arguments
 - `coarse_basis_coeffs::Vector{Float64}`: Coefficients in the coarser basis.
-- `two_scale_operator::TwoScaleOperator`: Two-scale operator the change of basis matrix.
+- `twoscale_operator::TwoScaleOperator`: Two-scale operator the change of basis matrix.
 # Returns
 -`::Vector{Float64}`: Coefficients in the finer basis.
 """
-function subdivide_coeffs(coarse_basis_coeffs::Vector{Float64}, two_scale_operator::TwoScaleOperator)
-    return two_scale_operator.global_subdiv_matrix * coarse_basis_coeffs
+function subdivide_coeffs(coarse_basis_coeffs::Vector{Float64}, twoscale_operator::TwoScaleOperator)
+    return twoscale_operator.global_subdiv_matrix * coarse_basis_coeffs
 end
 
 """
-    get_local_subdiv_matrix(coarse_el_id::Int, fine_el_id::Int, two_scale_operator::TwoScaleOperator)
+    get_local_subdiv_matrix(twoscale_operator::TwoScaleOperator, fine_el_id::Int)
 
-Returns the local subdivision matrix necessary to represent functions from a coarser space on
-`coarse_el_id` in terms of finer functions on element `fine_el_id`.
+Returns the local subdivision matrix necessary to represent functions from a coarser space 
+in terms of finer functions on element `fine_el_id`.
 
 # Arguments 
-- `coarse_el_id::Int`: Id of the coarse element.
+- `twoscale_operator::TwoScaleOperator`: Two-scale operator relating two B-spline spaces.
 - `fine_el_id::Int`: Id of the fine element.
-- `two_scale_operator::TwoScaleOperator`: Two-scale operator relating two B-spline spaces.
 # Returns
-- `::@views Array{Float64, 2}`: Local change of basis extraction matrix.
+- `::@views Array{Float64, 2}`: Local refinement matrix.
 """
-function get_local_subdiv_matrix(coarse_el_id::Int, fine_el_id::Int, two_scale_operator::TwoScaleOperator)
-    _, rows = get_extraction(two_scale_operator.fine_space, fine_el_id)
-    _, columns = get_extraction(two_scale_operator.coarse_space, coarse_el_id)
-
-    @views two_scale_operator.global_subdiv_matrix[rows, columns]
+function get_local_subdiv_matrix(twoscale_operator::TwoScaleOperator, fine_el_id::Int)
+    return twoscale_operator.local_subdiv_matrices[fine_el_id]
 end
+
+function get_element_basis_subdiv_matrices(gm::SparseArrays.SparseMatrixCSC{Float64, Int}, coarse_space::C, fine_space::F, coarse_el_id::Int, fine_el_id::Int) where {C<:AbstractFiniteElementSpace{1}, F<:AbstractFiniteElementSpace{1}}
+    _, rows = get_extraction(fine_space, fine_el_id)
+    _, columns = get_extraction(coarse_space, coarse_el_id)
+
+    return @views gm[rows, columns]
+end
+
+function get_local_subdiv_matrices(bspline::BSplineSpace, nsubdivisions::Int)
+    base_patch = Mesh.Patch1D([0.0, 1.0])
+    single_el_spline = BSplineSpace(base_patch, bspline.knot_vector.polynomial_degree, [-1,-1]) 
+    fine_knot_vector = subdivide_knot_vector(single_el_spline.knot_vector, nsubdivisions, bspline.knot_vector.polynomial_degree+1)
+    finer_spline = BSplineSpace(fine_knot_vector.patch_1d, fine_knot_vector.polynomial_degree, fine_knot_vector.polynomial_degree .- fine_knot_vector.multiplicity)
+
+    gm = build_two_scale_operator(single_el_spline.knot_vector, fine_knot_vector)
+
+    single_el_subdiv_matrices = Vector{Matrix{Float64}}(undef, nsubdivisions)
+
+    for fine_el ∈ 1:1:nsubdivisions
+        single_el_subdiv_matrices[fine_el] = get_element_basis_subdiv_matrices(gm, single_el_spline, finer_spline, 1, fine_el)
+    end
+    
+    local_subdiv_matrices = Vector{Matrix{Float64}}(undef, get_num_elements(bspline)*nsubdivisions)
+
+    for element ∈ 1:1:get_num_elements(bspline)*nsubdivisions
+        finer_index = (element-1) % nsubdivisions + 1
+
+        local_subdiv_matrices[element] = single_el_subdiv_matrices[finer_index]
+    end
+
+
+    return local_subdiv_matrices
+end
+
+"""
+    get_finer_basis_id(coarse_basis_id::Int, twoscale_operator::FunctionSpaces.TwoScaleOperator)
+
+Returns the ids of the child B-splines of `coarse_basis_id`, in terms of the change of basis
+provided by `twoscale_operator`.
+
+# Arguments
+- `basis_id::Int`: Id of the parent B-spline.
+- `twoscale_operator::TwoScaleOperator`: The two-scale operator for
+the change of basis.
+# Returns
+- `::@view Vector{Int}`: Ids of the child B-splines.
+"""
+function get_finer_basis_id(twoscale_operator::TwoScaleOperator, basis_id::Int)
+    return twoscale_operator.coarse_to_fine_functions[basis_id]
+end
+
+function get_finer_elements(twoscale_operator::TwoScaleOperator, el_id::Int)
+    return twoscale_operator.coarse_to_fine_elements[el_id]    
+end
+
+function get_finer_elements(twoscale_operator::TwoScaleOperator, el_ids::Union{Vector{Int},UnitRange{Int}})
+    return vcat(get_finer_elements.((twoscale_operator,), el_ids)...)  
+end
+
+function get_coarser_element(twoscale_operator::TwoScaleOperator, el_id::Int)
+    return twoscale_operator.fine_to_coarse_elements[el_id]    
+end
+
+function get_coarser_basis_id(twoscale_operator::TwoScaleOperator, basis_id::Int)
+    return twoscale_operator.fine_to_coarse_functions[basis_id]
+end
+
+# Checks for spaces
+function check_support(fe_space::F, basis_id::Int, next_level_domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true}, twoscale_operator::O) where {O<:AbstractTwoScaleOperator, F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+    basis_support = FunctionSpaces.get_support(fe_space, basis_id)
+    finer_support = get_finer_support(basis_support, twoscale_operator)
+
+    contained, _ = Mesh.check_contained(finer_support, next_level_domain)
+
+    if contained
+        return true, basis_support, finer_support
+    end
+
+    return false, basis_support, finer_support
+
+end
+
+# Getters for basis splines
+
+"""
+    get_finer_support(support::UnitRange{Int}, nsubdivision::Int)
+
+Returns the ids of the child B-splines of `coarse_basis_id`, in terms of the change of basis
+provided by `twoscale_operator`.
+
+# Arguments
+- `support::UnitRange{Int}`: the support of a basis function.
+- `nsubdivisions::Int`: The number of subdivisions.
+# Returns
+- `::Vector{Int}`: the finer elements of the support.
+"""
+function get_finer_support(support::Union{Vector{Int}, UnitRange{Int}}, twoscale_operator::O) where {O<:AbstractTwoScaleOperator}
+    return reduce(vcat, get_finer_elements(twoscale_operator, support)) #view
+end
+
+function get_finer_extraction_coeffs(space::S, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, finer_element::Int, finer_level::Int) where {S<: AbstractFiniteElementSpace, O<:AbstractTwoScaleOperator}
+    # Initialize the extraction coeffs
+    coarse_coeffs, basis_indices = get_extraction(space, coarse_element)
+
+    refinement_matrix = LinearAlgebra.I
+
+    current_fine = finer_element
+    
+    for level ∈ finer_level:-1:coarse_level+1
+        next_fine = get_coarser_element(two_scale_operators[level-1], current_fine) 
+        local_subdiv_matrix = get_local_subdiv_matrix(two_scale_operators[level-1], current_fine)
+
+        refinement_matrix = refinement_matrix * local_subdiv_matrix
+        
+        current_fine = next_fine
+    end
+
+    return refinement_matrix * coarse_coeffs, basis_indices
+end
+
+function get_finer_extraction_coeffs(space::S, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, finer_element::Int, finer_level::Int, basis_id::Int) where {S<: AbstractFiniteElementSpace, O<:AbstractTwoScaleOperator}
+    coarse_coeffs, basis_indices = get_finer_extraction_coeffs(space, two_scale_operators, coarse_element, coarse_level, finer_element, finer_level)
+    
+    basis_index = findfirst(x -> x == basis_id, basis_indices)
+
+    return @view coarse_coeffs[:, basis_index]
+end
+
+function get_coarser_element(two_scale_operators::Vector{O}, coarse_level::Int, finer_element::Int, finer_level::Int) where {O<:AbstractTwoScaleOperator}
+
+    current_coarse = finer_element
+    current_fine = finer_element
+    for level ∈ finer_level:-1:coarse_level+1
+        current_coarse = get_coarser_element(two_scale_operators[level-1], current_fine)
+
+        current_fine = current_coarse
+    end
+
+    return current_coarse
+end
+

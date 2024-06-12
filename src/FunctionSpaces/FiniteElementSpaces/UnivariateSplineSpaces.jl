@@ -182,6 +182,29 @@ function get_local_knot_vector(knot_vector::KnotVector, basis_id::Int)
     return KnotVector(local_patch, knot_vector.polynomial_degree, local_multiplicity)
 end
 
+function get_greville_points(knot_vector::KnotVector)
+    p = knot_vector.polynomial_degree
+    n = sum(knot_vector.multiplicity)-p-1
+    cm = cumsum(knot_vector.multiplicity)
+    greville_points = zeros(n)
+    for i = 1:n
+        # starting breakpoint index
+        id0 = findfirst(cm .>= i+1)
+        id1 = findfirst(cm .>= i+p)
+        if id1 > id0
+            pt = knot_vector.patch_1d.breakpoints[id0]*(cm[id0]-i)
+            for j = id0+1:id1-1
+                pt += knot_vector.patch_1d.breakpoints[j]*knot_vector.multiplicity[j]
+            end
+            pt += knot_vector.patch_1d.breakpoints[id1]*(i+p-cm[id1-1])
+        else
+            pt = knot_vector.patch_1d.breakpoints[id0]*p
+        end
+        greville_points[i] = pt / p
+    end
+    return greville_points
+end
+
 """
     struct BSplineSpace
 
@@ -251,12 +274,16 @@ Returns the reference Bernstein polynomials of `bspline`.
 """
 function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
     local_basis = bspline.polynomials(xi, nderivatives)
-    el_size = get_element_size(bspline, element_id)
-    for r = 0:nderivatives
-        local_basis[r] .= @views local_basis[r] ./ el_size^r
-    end
+    # el_size = get_element_size(bspline, element_id)
+    # for r = 0:nderivatives
+    #     local_basis[r] .= @views local_basis[r] ./ el_size^r
+    # end
     
     return local_basis
+end
+
+function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int)
+    return get_local_basis(bspline, element_id, xi[1], nderivatives)
 end
 
 """
@@ -300,6 +327,10 @@ Returns the degree of Bsplines
 - `polynomial_degree`: Polynomial degree.
 """
 function get_polynomial_degree(bspline::BSplineSpace)
+    return bspline.knot_vector.polynomial_degree
+end
+
+function get_polynomial_degree(bspline::BSplineSpace, ::Int)
     return bspline.knot_vector.polynomial_degree
 end
 
@@ -376,43 +407,25 @@ function get_element_size(bspline::BSplineSpace, element_id::Int)
 end
 
 """
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
+    get_support(bspline::BSplineSpace, basis_id::Int)
 
-Evaluates the non-zero `bspline` basis functions on the element specified by `element_id` and points `xi` and all derivatives up to nderivatives.
+Returns the elements where the B-spline given by `basis_id` is supported.
 
 # Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Vector{Float64}`: The points where the global basis is evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
+- `bspline::BSplineSpace`: The B-Spline function space.
+- `basis_id::Int`: The id of the basis function.
 # Returns
-- `::Array{Float64}`: Global basis functions, size = n_eval_points x degree+1 x nderivatives+1
+- `::UnitRange{Int}`: The support of the basis function.
 """
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
-    extraction_coefficients, basis_indices = get_extraction(bspline, element_id)
-    local_basis = get_local_basis(bspline, element_id, xi, nderivatives)
-    for r = 0:nderivatives
-        local_basis[r] .= @views local_basis[r] * extraction_coefficients
-    end
+function get_support(bspline::BSplineSpace, basis_id::Int)
+    first_element = get_breakpoint_index(bspline.knot_vector, basis_id)
+    last_element = get_breakpoint_index(bspline.knot_vector, basis_id+bspline.knot_vector.polynomial_degree+1) - 1
 
-    return local_basis, basis_indices
+    return first_element:last_element
 end
 
-"""
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-
-Evaluates the non-zero `bspline` basis functions on the element specified by `element_id` on point `xi` and all derivatives up to nderivatives.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Float64`: The point where the global basis is evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
-# Returns
-- `::Array{Float64}`: Global basis functions, size = 1 x degree+1 x nderivatives+1
-"""
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-    return evaluate(bspline, element_id, [xi], nderivatives)
+function get_max_local_dim(bspline::BSplineSpace)
+    return bspline.knot_vector.polynomial_degree+1
 end
 
 """
@@ -429,7 +442,7 @@ Evaluates all derivatives upto order `nderivatives` for all `bspline` basis func
 - `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
 """
 function _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-    local_basis, basis_indices = evaluate(bspline, element_id, [xi], nderivatives)
+    local_basis, basis_indices = evaluate(bspline, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
     ndofs = get_dim(bspline)
     I = zeros(Int, nloc * (nderivatives + 1))
@@ -449,56 +462,8 @@ function _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Floa
 end
 
 """
-    evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int, coefficients::Vector{Float64})
-
-Evaluates a spline on the element specified by `element_id` and points `xi` and all derivatives up to nderivatives, form a 
-`bspline` basis with given `coefficients`.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Vector{Float64}`: The points where the global basis is evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
-- `coefficients::Vector{Float64}`: Coefficients of the spline with basis `bspline`.
-# Returns
-- `::Array{Float64}`: Spline evaluation (size = n_eval_points x nderivatives+1).
+    GTBSplineSpace constructors
 """
-function evaluate(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int, coefficients::Vector{Float64})
-    local_basis, basis_indices = evaluate(bspline, element_id, xi, nderivatives)
-    evaluation = zeros(Float64, (size(local_basis[0],1),nderivatives+1) )
-    
-    for r = 0:nderivatives
-        evaluation[:,r+1] .= @views local_basis[r] * coefficients[basis_indices]
-    end
-
-    return evaluation
-end
-
-"""
-    GTBSplineSpace constructor
-"""
-function GTBSplineSpace(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
-    if length(regularity) != m
-        msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
-        msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
-        throw(ArgumentError(msg1*msg2))
-    end
-    for i in 1:m
-        j = i
-        k = i+1
-        if i == m
-            k = 1
-        end
-        polynomial_degree = min(get_polynomial_degree(bsplines[j]), get_polynomial_degree(bsplines[k]))
-        if polynomial_degree < regularity[i]
-            msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
-            msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
-            throw(ArgumentError(msg1*msg2))
-        end
-    end
-    return UnstructuredSpace(bsplines, extract_gtbspline_to_bspline(bsplines, regularity), Dict("regularity" => regularity))
-end
-
 function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}, regularity::Vector{Int}) where {m}
     if length(regularity) != m
         msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
@@ -519,4 +484,26 @@ function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace},
         end
     end
     return UnstructuredSpace(canonical_spaces, extract_gtbspline_to_canonical(canonical_spaces, regularity), Dict("regularity" => regularity))
+end
+
+function GTBSplineSpace(nurbs::NTuple{m,T}, regularity::Vector{Int}) where {m, T <: Union{BSplineSpace, RationalFiniteElementSpace{1,F} where {F <: Union{BSplineSpace, CanonicalFiniteElementSpace}}}}
+    if length(regularity) != m
+        msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
+        msg2 = " You have $(m) interfaces and $(length(regularity)) regularity conditions."
+        throw(ArgumentError(msg1*msg2))
+    end
+    for i in 1:m
+        j = i
+        k = i+1
+        if i == m
+            k = 1
+        end
+        polynomial_degree = min(get_polynomial_degree(nurbs[j], 1), get_polynomial_degree(nurbs[k], 1))
+        if polynomial_degree < regularity[i]
+            msg1 = "Minimal polynomial degrees must be greater than or equal to the regularity."
+            msg2 = " The minimal degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
+            throw(ArgumentError(msg1*msg2))
+        end
+    end
+    return UnstructuredSpace(nurbs, extract_gtbspline_to_nurbs(nurbs, regularity), Dict("regularity" => regularity))
 end

@@ -23,13 +23,13 @@ for deg1 in 0:5
         # second B-spline patch
         local B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-1, -1])
         # tensor-product B-spline patch
-        TP = Mantis.FunctionSpaces.TensorProductSpace(B1,B2,Dict())
+        TP = Mantis.FunctionSpaces.TensorProductSpace(B1,B2)
         # evaluation points
         x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
         x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
         for el in 1:1:Mantis.FunctionSpaces.get_num_elements(TP)
             # check B-spline evaluation
-            TP_eval, _ = Mantis.FunctionSpaces.evaluate(TP, el, (x1,x2),0)
+            TP_eval, _ = Mantis.FunctionSpaces.evaluate(TP, el, (x1,x2), 0)
             # Positivity of the polynomials
             @test minimum(TP_eval[0,0]) >= 0.0
 
@@ -62,7 +62,7 @@ B4_tensor_prod = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-
 MP2 = Mantis.FunctionSpaces.GTBSplineSpace((B3_tensor_prod, B4_tensor_prod), [1, -1])
 
 # tensor-product B-spline patch
-TP = Mantis.FunctionSpaces.TensorProductSpace(MP1, MP2, Dict())
+TP = Mantis.FunctionSpaces.TensorProductSpace(MP1, MP2)
 # evaluation points
 x1 = collect(LinRange(0.0,1.0,11))
 x2 = collect(LinRange(0.0,1.0,11))

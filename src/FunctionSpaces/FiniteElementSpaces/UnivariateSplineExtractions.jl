@@ -101,15 +101,15 @@ Computes the extraction coefficients of GTB-Spline basis functions in terms of c
 - `::ExtractionOperator`
 
 """
-function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regularity::Vector{Int}) where {m}
+function extract_gtbspline_to_nurbs(nurbs::NTuple{m,F}, regularity::Vector{Int}) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
     # construct cumulative sum of all bspline dims
     bspl_dims = zeros(Int, m+1)
     for i = 2:m+1
-        bspl_dims[i] = bspl_dims[i-1] + get_dim(bsplines[i-1])
+        bspl_dims[i] = bspl_dims[i-1] + get_dim(nurbs[i-1])
     end
 
-    # number of elements for all bsplines
-    bspl_nels = [get_num_elements(bsplines[i]) for i = 1:m]
+    # number of elements for all nurbs
+    bspl_nels = [get_num_elements(nurbs[i]) for i = 1:m]
     nel = sum(bspl_nels)
 
     # initialize global extraction matrix
@@ -119,8 +119,8 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
         # regularity at this interface
         r = regularity[i]
         # smoothness constraint matrix
-        KL = SparseArrays.findnz(_evaluate_all_at_point(bsplines[i], bspl_nels[i], 1.0, r))
-        KR = SparseArrays.findnz(_evaluate_all_at_point(bsplines[i+1], 1, 0.0, r))
+        KL = SparseArrays.findnz(_evaluate_all_at_point(nurbs[i], bspl_nels[i], 1.0, r))
+        KR = SparseArrays.findnz(_evaluate_all_at_point(nurbs[i+1], 1, 0.0, r))
         rows = [KL[1]; KR[1] .+ (bspl_dims[i+1] - bspl_dims[i])]
         cols = [KL[2]; KR[2]]
         vals = [-KL[3]; KR[3]]
@@ -139,8 +139,8 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
         r = regularity[m]
         if size(H, 1) >= 2*(r+1)
             Hper = circshift(H, r+1)
-            KL = SparseArrays.findnz(_evaluate_all_at_point(bsplines[m], bspl_nels[m], 1.0, r))
-            KR = SparseArrays.findnz(_evaluate_all_at_point(bsplines[1], 1, 0.0, r))
+            KL = SparseArrays.findnz(_evaluate_all_at_point(nurbs[m], bspl_nels[m], 1.0, r))
+            KR = SparseArrays.findnz(_evaluate_all_at_point(nurbs[1], 1, 0.0, r))
             rows = [KL[1]; KR[1] .+ (bspl_dims[m+1] - bspl_dims[m])]
             cols = [KL[2]; KR[2]]
             vals = [-KL[3]; KR[3]]
@@ -159,13 +159,13 @@ function extract_gtbspline_to_bspline(bsplines::NTuple{m,BSplineSpace}, regulari
     SparseArrays.fkeep!((i,j,x) -> abs(x) > 1e-14, H)
 
     # convert global extraction matrix to element local extractions
-    # (here, the matrix is transposed so that [Bsplines] * [extraction] = [GTB-splines])
+    # (here, the matrix is transposed so that [nurbs] * [extraction] = [GTB-splines])
     extraction_coefficients = Vector{Array{Float64}}(undef, nel)
     basis_indices = Vector{Vector{Int}}(undef, nel)
     count = 0
     for i = 1:m
         for j = 1:bspl_nels[i]
-            _, cols_ij = get_extraction(bsplines[i], j)
+            _, cols_ij = get_extraction(nurbs[i], j)
             cols_ij .+= bspl_dims[i]
             eij = SparseArrays.findnz(H[:,cols_ij])
             # unique indices for non-zero rows and columns
