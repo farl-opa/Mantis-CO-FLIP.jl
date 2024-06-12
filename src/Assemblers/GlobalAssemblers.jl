@@ -132,4 +132,41 @@ function (self::AssemblerError)(space, dofs, geom, exact_sol, norm="L2")
 
 end
 
+struct AssemblerErrorPerElement{n} <: AbstractAssemblers 
+    quad_nodes::NTuple{n, Vector{Float64}}
+    quad_weights::Vector{Float64}
+end
 
+@doc raw"""
+    (self::AssemblerErrorPerElement)(bilinear_form::AbstractBilinearForms)
+
+Assemble a continuous Galerkin problem with given bilinear form.
+
+# Arguments
+- `bilinear_form::AbstractBilinearForms`: bilinear form.
+"""
+function (self::AssemblerErrorPerElement)(space, dofs, geom, exact_sol, norm="L2")
+    num_elements = Geometry.get_num_elements(geom)
+    result_per_element = Vector{Float64}(undef, num_elements)
+
+    # Loop over all active elements
+    for elem_id in 1:Geometry.get_num_elements(geom)
+        field = Fields.FEMField(space, dofs)
+        element_sol = dropdims(Fields.evaluate(field, elem_id, self.quad_nodes), dims=2)
+
+        _, jac_det = Geometry.metric(geom, elem_id, self.quad_nodes)
+
+        phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
+        element_exact = exact_sol.(Tuple(phys_nodes[:,i] for i in 1:1:Geometry.get_domain_dim(geom))...)
+
+        element_result = 0.0
+        @inbounds for point_idx in eachindex(jac_det, self.quad_weights, element_sol, element_exact)
+            element_result += jac_det[point_idx] * self.quad_weights[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
+        end
+        result_per_element[elem_id] = element_result
+
+    end
+
+    return sqrt.(result_per_element)
+
+end

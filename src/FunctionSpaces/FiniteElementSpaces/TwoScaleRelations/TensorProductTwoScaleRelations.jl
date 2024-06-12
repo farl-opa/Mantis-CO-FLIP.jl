@@ -56,7 +56,7 @@ function _get_finer_elements_per_space(twoscale_operator::TensorProductTwoScaleO
 end
 
 function get_finer_elements(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, O1, O2}, el_ids::Vector{Int}) where{n, F1<:TensorProductSpace{n, T1, T2} where{T1, T2},  F2<:TensorProductSpace{n, T3, T4} where{T3, T4}, O1<:AbstractTwoScaleOperator, O2<:AbstractTwoScaleOperator }
-    return get_finer_elements.((twoscale_operator,), el_ids)
+    return vcat(get_finer_elements.((twoscale_operator,), el_ids)...)
 end
 
 function get_coarser_element(twoscale_operator::TensorProductTwoScaleOperator{n,m}, el_id::Int) where {n, m}
@@ -119,4 +119,11 @@ function _get_coarser_basis_id_per_space(twoscale_operator::TensorProductTwoScal
     ordered_index = linear_to_ordered_index(basis_id, max_ind_f)
 
     return (get_coarser_basis_id(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_coarser_basis_id(twoscale_operator.twoscale_operator_2, ordered_index[2]))
+end
+
+function subdivide_bspline(tp_space::TensorProductSpace{n, F1, F2}, nsubdivs::Tuple{Int, Int}) where {n, F1 <: BSplineSpace, F2 <: BSplineSpace}
+    space_1_ts, space_1_fine = subdivide_bspline(tp_space.function_space_1, nsubdivs[1])
+    space_2_ts, space_2_fine = subdivide_bspline(tp_space.function_space_2, nsubdivs[2])
+
+    return TensorProductTwoScaleOperator(space_1_ts, space_2_ts), TensorProductSpace(space_1_fine, space_2_fine)
 end

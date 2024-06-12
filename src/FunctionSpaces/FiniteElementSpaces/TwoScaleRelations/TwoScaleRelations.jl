@@ -235,6 +235,13 @@ function get_coarser_element(twoscale_operator::TwoScaleOperator, el_id::Int)
     return twoscale_operator.fine_to_coarse_elements[el_id]    
 end
 
+function get_coarser_elements(twoscale_operator::AbstractTwoScaleOperator, el_ids)
+    if el_ids == Int[]
+        return Int[]
+    end
+    return union(get_coarser_element.((twoscale_operator,), el_ids)...)  
+end
+
 function get_coarser_basis_id(twoscale_operator::TwoScaleOperator, basis_id::Int)
     return twoscale_operator.fine_to_coarse_functions[basis_id]
 end
@@ -242,15 +249,11 @@ end
 # Checks for spaces
 function check_support(fe_space::F, basis_id::Int, next_level_domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true}, twoscale_operator::O) where {O<:AbstractTwoScaleOperator, F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
     basis_support = FunctionSpaces.get_support(fe_space, basis_id)
-    finer_support = get_finer_support(basis_support, twoscale_operator)
+    finer_support = get_finer_elements(twoscale_operator, basis_support)
 
     contained, _ = Mesh.check_contained(finer_support, next_level_domain)
 
-    if contained
-        return true, basis_support, finer_support
-    end
-
-    return false, basis_support, finer_support
+    return contained, basis_support, finer_support
 
 end
 
@@ -272,21 +275,25 @@ function get_finer_support(support::Union{Vector{Int}, UnitRange{Int}}, twoscale
     return reduce(vcat, get_finer_elements(twoscale_operator, support)) #view
 end
 
-function update_refinement_matrix!(refinement_matrix::Union{Matrix{Float64}, SparseArrays.SparseMatrixCSC{Float64, Int}}, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, basis_id::Int, finer_element::Int, finer_level::Int) where {O<:AbstractTwoScaleOperator}
+function update_refinement_matrix!(refinement_matrix::Union{Matrix{Float64}, SparseArrays.SparseMatrixCSC{Float64, Int}}, two_scale_operators::Vector{O}, coarse_element::Int, coarse_level::Int, basis_id::Int, finer_element::Int, finer_level::Int, ml_count::Int, active_functions, truncated::Bool) where {O<:AbstractTwoScaleOperator}
     local_subdiv_matrix = LinearAlgebra.I
     current_fine = finer_element
     for level ∈ finer_level:-1:coarse_level+1
         next_fine = get_coarser_element(two_scale_operators[level-1], current_fine) 
         current_subdiv_matrix = get_local_subdiv_matrix(two_scale_operators[level-1], next_fine, current_fine)
+        if truncated
+            _, _, active_indices = get_active_extraction(two_scale_operators[level-1].fine_space, level, current_fine, active_functions)
+            current_subdiv_matrix[active_indices, :] .= 0.0
+        end
 
-        local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
+        local_subdiv_matrix =  local_subdiv_matrix * current_subdiv_matrix 
         
         current_fine = next_fine
     end
     _, coarse_basis_indices = get_extraction(two_scale_operators[coarse_level].coarse_space, coarse_element)
     coarse_basis_idx = findfirst(x -> x == basis_id, coarse_basis_indices)
 
-    refinement_matrix = hcat(refinement_matrix, local_subdiv_matrix[:, coarse_basis_idx])
+    refinement_matrix[:, ml_count] .= @view local_subdiv_matrix[:, coarse_basis_idx]
 
     return refinement_matrix
 end

@@ -248,7 +248,7 @@ function get_element(patch::Patch1D, element_id::Int)
     return @view get_breakpoints(patch)[element_id:element_id+1]
 end
 
-function check_contained(support::Union{UnitRange{Int}, Vector{Int}}, domain::SubArray{Int64, 1, Vector{Int64}, Tuple{UnitRange{Int64}}, true})
+function check_contained(support::Union{UnitRange{Int}, Vector{Int}}, domain)
     element_checks = support .∈ [domain] 
     return all(element_checks), element_checks
 end
