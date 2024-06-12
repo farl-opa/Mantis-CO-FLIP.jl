@@ -415,6 +415,10 @@ function get_boundary_dof_indices(bspline::BSplineSpace)
     return bspline.boundary_dof_indices
 end
 
+function get_base_control_points(bspline::BSplineSpace)
+    return get_greville_points(bspline.knot_vector)
+end
+
 """
 _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
 

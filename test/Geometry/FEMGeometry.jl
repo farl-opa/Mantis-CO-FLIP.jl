@@ -5,6 +5,8 @@ import ReadVTK
 using Printf
 using Test
 
+import LinearAlgebra
+
 # Compute base directories for data input and output
 Mantis_folder =  dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
@@ -18,10 +20,11 @@ b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Gene
 B = ntuple( i -> b, 4)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(3))
-PSplines, geom_coeffs = Mantis.FunctionSpaces.PolarSplineSpace(GB, b1)
+PSplines = Mantis.FunctionSpaces.PolarSplineSpace(GB, b1)
+geom_coeffs, _, _ = Mantis.FunctionSpaces.build_base_polar_control_points(Mantis.FunctionSpaces.get_dim(GB),Mantis.FunctionSpaces.get_dim(b1),1.0)
 geom = Mantis.Geometry.FEMGeometry(PSplines, geom_coeffs)
 
-field_coeffs = rand(Float64, Mantis.FunctionSpaces.get_dim(PSplines), 1)
+field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_dim(PSplines), Mantis.FunctionSpaces.get_dim(PSplines))
 polar_surface_field = Mantis.Fields.FEMField(PSplines, field_coeffs)
 
 # Generate the plot
@@ -343,7 +346,6 @@ nurbs_annulus = Mantis.Geometry.FEMGeometry(TP_nurbs, geom_coeffs)
 gtb_annulus = Mantis.Geometry.FEMGeometry(TP_gtb, geom_coeffs)
 
 # field on the annulus
-import LinearAlgebra
 field_coeffs = Matrix{Float64}(LinearAlgebra.I, 8, 8)
 bsp_field = Mantis.Fields.FEMField(TP_bsp, field_coeffs)
 gtb_field = Mantis.Fields.FEMField(TP_gtb, field_coeffs)

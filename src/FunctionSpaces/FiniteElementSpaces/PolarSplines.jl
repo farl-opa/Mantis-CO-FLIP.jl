@@ -14,7 +14,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     tp_space = TensorProductSpace(space_p, space_r)
 
     # polar control points
-    polar_control_points, radii, theta = build_standard_polar_geometry(n_p, n_r, 1.0)
+    _, _, theta = build_base_polar_control_points(n_p, n_r, 1.0)
 
     # the extraction sub-matrix in the neighborhood of the polynomial_degree
     ex_coeff_pole = Matrix{Float64}(undef,2*n_p,3)
@@ -73,12 +73,20 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     # Polar spline extraction operator
     extraction_op = ExtractionOperator(extraction_coefficients, basis_indices, num_elements, space_dim)
 
-    # return Polar spline space
-    return UnstructuredSpace((tp_space,), extraction_op, Dict(), Dict("regularity" => 1)), polar_control_points
+    # unstructured spline config
+    patch_neighbours = [-1
+                        -1]
+    # number of elements per patch
+    patch_nels = [0; get_num_elements(tp_space)]
 
+    # assemble patch config in a dictionary
+    us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
+
+    # return Polar spline space
+    return UnstructuredSpace((tp_space,), extraction_op, us_config, Dict("regularity" => 1))
 end
 
-function build_standard_polar_geometry(n_p::Int, n_r::Int, R::Float64)
+function build_base_polar_control_points(n_p::Int, n_r::Int, R::Float64)
     radii = LinRange(0.0, R, n_r)
     theta = 2*pi .+ (1 .- 2 .* (1:n_p)) .* pi / n_p
     polar_control_points = zeros(Float64, n_p*(n_r-2)+3, 2)
