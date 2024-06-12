@@ -4,18 +4,19 @@
 function inner_product(f1::FormSpace{domain_dim, 0, G, Tuple{F1}}, f2::FormSpace{domain_dim, 0, G, Tuple{F2}}, element_id::Int, quad_rule::QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim} where {codomain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}, F2 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}}
 
     # Compute bases
-
+    basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, xi, 0)
+    basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, xi, 0)
 end
 
 # n-forms
 function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::FormSpace{domain_dim, domain_dim, G, Tuple{F2}}, element_id::Int, quad_rule::QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim} where {codomain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}, F2 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}}
 
     # Compute bases and their derivatives.
-    basis_eval_1, basis_inds_1 = FunctionSpaces.evaluate(f1.fem_space[1], element_id, xi, 0)
-    basis_eval_2, basis_inds_2 = FunctionSpaces.evaluate(f2.fem_space[1], element_id, xi, 0)
+    basis_eval_1, basis_inds_1 = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.xi, 0)
+    basis_eval_2, basis_inds_2 = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.xi, 0)
 
     # Compute the quantities related to the geometry.
-    _, _, sqrt_g = Geometry.inv_metric(f.geometry, element_id, xi, nderivatives)
+    _, _, sqrt_g = Geometry.inv_metric(f.geometry, element_id, quad_rule.xi, nderivatives)
 
     # Count the number of supported basis on this element.
     n_1 = length(basis_inds_1)
