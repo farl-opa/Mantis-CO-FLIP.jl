@@ -6,8 +6,8 @@ The exported names are:
 module Quadrature
 
 struct QuadratureRule{n}
-    points::NTuple{n,Vector{Float64}}
-    weights::Vector{Float64}
+    ξ::NTuple{n,Vector{Float64}}
+    w::Vector{Float64}
 end
 
 """
