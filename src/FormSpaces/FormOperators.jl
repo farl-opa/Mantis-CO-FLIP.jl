@@ -4,8 +4,46 @@
 function inner_product(f1::FormSpace{domain_dim, 0, G, Tuple{F1}}, f2::FormSpace{domain_dim, 0, G, Tuple{F2}}, element_id::Int, quad_rule::QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim} where {codomain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}, F2 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}}
 
     # Compute bases
-    basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, xi, 0)
-    basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, xi, 0)
+    basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.xi, 0)
+    basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.xi, 0)
+
+    # Compute the quantities related to the geometry.
+    # The geometries of f1 and f2 are assumed equal, so we use one. 
+    # We need to add a check for the equality of both geometries
+    _, _, sqrt_g = Geometry.inv_metric(f1.geometry, element_id, quad_rule.xi, nderivatives)
+
+    # Count the number of supported basis on this element.
+    n_basis_1 = length(basis_1_inds)
+    n_basis_2 = length(basis_2_inds)
+    n_basis_total = n_basis_1 * n_basis_2
+
+    # Pre-allocate the inner product data: row indices, colum indices, and values).
+    M_row = Vector{Int}(undef, n_basis_total)
+    M_col = Vector{Int}(undef, n_basis_total)
+    M_val = Vector{Float64}(undef, n_basis_total)
+
+    # Compute the inner products
+    # Inner product M_{i,j} = (f^{1}_{i}, f^{2}_{j})
+    # I change the order of the indices with respect to the one for n-forms.
+    # The reason derives from the definition of the inner product above: 
+    # f^{1} is on the left and f^{2} on the right, therefore the index for 
+    # the basis of f^{1} is associated to the rows and the index for the basis 
+    # of f^{2} is associated to the columns.
+    for basis_2_idx in 1:n_basis_2
+        for basis_1_idx in 1:n_basis_1
+            inner_prod_idx = basis_1_idx + (basis_2_idx - 1) * n_basis_2  # get the linear index of the inner product (basis_1_idx, basis_2_idx)
+
+            M_row[inner_prod_idx] = basis_1_inds[basis_1_idx]
+            M_col[inner_prod_idx] = basis_2_inds[basis_2_idx]
+
+            M_val[inner_prod_idx] = 0.0
+            for quad_node_idx in eachindex(quad_rule.weights)
+                M_val[inner_prod_idx] += (quad_rule.weights[quad_node_idx]/sqrt_g[quad_node_idx]) * basis_eval_1[quad_node_idx, basis_1_idx] * basis_eval_2[quad_node_idx, basis_2_idx]
+            end
+        end
+    end
+
+    return M_row, M_col, M_val
 end
 
 # n-forms
@@ -16,7 +54,9 @@ function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::
     basis_eval_2, basis_inds_2 = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.xi, 0)
 
     # Compute the quantities related to the geometry.
-    _, _, sqrt_g = Geometry.inv_metric(f.geometry, element_id, quad_rule.xi, nderivatives)
+    # The geometries of f1 and f2 are assumed equal, so we use one. 
+    # We need to add a check for the equality of both geometries
+    _, _, sqrt_g = Geometry.inv_metric(f1.geometry, element_id, quad_rule.xi, nderivatives)
 
     # Count the number of supported basis on this element.
     n_1 = length(basis_inds_1)
@@ -43,6 +83,8 @@ function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::
             M_val[idx] = Mij
         end
     end
+
+    return M_row, M_col, M_val
 end
 
 # 1-forms in 2D
