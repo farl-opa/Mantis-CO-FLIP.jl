@@ -11,6 +11,10 @@ end
 # n-forms
 function inner_product(f1::FormSpace{n,n,G,Tuple{F1}}, f2::FormSpace{n,n,G,Tuple{F2}}, element_id::Int, quad_rule::QuadratureRule{n}) where {n, G<:Geometry.AbstractGeometry{n,m} where {m}, F1 <: FunctionSpaces.AbstractFunctionSpace{n}, F2 <: FunctionSpaces.AbstractFunctionSpace{n}}
 
+    # Computed bases and their derivatives.
+    basis_eval_1, basis_inds_1 = FunctionSpaces.evaluate(f1, element_id, quad_rule.points, 0)
+    basis_eval_2, basis_inds_2 = FunctionSpaces.evaluate(f2, element_id, quad_rule.points, 0)
+    
     
 
 end
@@ -18,7 +22,7 @@ end
 # 1-forms in 2D
 function inner_product(f1::FormSpace{2,1,G,Tuple{F1x,F1y}}, f2::FormSpace{2,1,G,Tuple{F2x,F2y}}, element_id::Int, quad_rule::QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2,m} where {m}, F1x <: FunctionSpaces.AbstractFunctionSpace{2}, F1y <: FunctionSpaces.AbstractFunctionSpace{2}, F2x <: FunctionSpaces.AbstractFunctionSpace{2}, F2y <: FunctionSpaces.AbstractFunctionSpace{2}}
 
-    
+
 
 end
 

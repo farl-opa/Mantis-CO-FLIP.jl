@@ -15,7 +15,7 @@ abstract type AbstractFormSpace end
 
 struct FormSpace{n,k,G,F} <: AbstractFormSpace
     geometry::G
-    fem_space::Tuple{m,F}
+    fem_space::F
 
     # 0- and n-form constructor
     function FormSpace(k::Int, geometry::Geometry.AbstractGeometry{n,r}, fem_space::Tuple{F}) where {n,r,F <: FunctionSpaces.AbstractFunctionSpace{n}}
@@ -37,6 +37,14 @@ struct FormSpace{n,k,G,F} <: AbstractFormSpace
         @assert m == length(fem_space)
         new{n,k,G,Tuple{F1, F2, F3}}(geometry, fem_space)
     end
+end
+
+function evaluate(f::FormSpace{n,0,G,Tuple{F}}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,G <: Geometry.AbstractGeometry{n,r} where {r}, F <: FunctionSpaces.AbstractFunctionSpace{n} where {n}}
+    return evaluate(f.fem_space[1],element_id,xi,nderivatives)
+end
+
+function evaluate(f::FormSpace{n,n,G,Tuple{F}}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,G <: Geometry.AbstractGeometry{n,r} where {r}, F <: FunctionSpaces.AbstractFunctionSpace{n} where {n}}
+    return evaluate(f.fem_space[1],element_id,xi,nderivatives)
 end
 
 end
