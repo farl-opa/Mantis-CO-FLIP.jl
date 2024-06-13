@@ -23,7 +23,7 @@ Contains the required data for a Petrov-Galerkin FEM for one variable.
 - `quad_weights::Vector{Float64}`: Vector of the tensor product of the quadrature weights.
 
 # See also
-[`Quadrature.tensor_product_weights(weights_1d::NTuple{n, Vector{Float64}}) where {n}`](@ref) to compute the quadrature weights.
+[`Quadrature.tensor_product_rule(p::NTuple{n, Int}, quad_rule::F) where {n, F <: Function}`](@ref) to compute the quadrature weights.
 """
 struct PoissonBilinearForm{n, m, Frhs, Ttrial, Ttest, TG} <: AbstractBilinearForms
     forcing::Frhs

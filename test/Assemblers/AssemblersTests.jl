@@ -80,15 +80,23 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         end
         
         msave = Mantis.Geometry.get_num_elements(geom)
-        output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*".vtu"
+        if case == "sine2d-crazy"
+            output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*"-$crazy_c.vtu"
+            output_filename_error = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*"-$crazy_c-error.vtu"
+        else
+            output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*".vtu"
+            output_filename_error = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*"-error.vtu"
+        end
         output_file = joinpath(output_data_folder, output_filename)
+        output_file_error = joinpath(output_data_folder, output_filename_error)
         field = Mantis.Fields.FEMField(trial_space, sol_rsh)
         if n == 1
             out_deg = maximum([1, p])
         else
             out_deg = maximum([1, maximum(p)])
         end
-        Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        Mantis.Plot.plot(geom, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        Mantis.Plot.plot(geom, field, exact_sol; vtk_filename = output_file_error, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
     end
 
     # Compute error
@@ -192,8 +200,7 @@ test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
 
 # Setup the quadrature rule.
-q_nodes_1d, q_weights_1d = Mantis.Quadrature.gauss_legendre(p_1d+1)
-q_weights_1d_all = Mantis.Quadrature.tensor_product_weights((q_weights_1d,)) # Simply returns q_weights_1d
+q_nodes_1d, q_weights_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature.gauss_legendre)
 
 
 
@@ -352,13 +359,7 @@ hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
 
 
 # Setup the quadrature rule.
-q_nodes_x, q_weights_x = Mantis.Quadrature.gauss_legendre(p_2d[1]+1)
-q_nodes_y, q_weights_y = Mantis.Quadrature.gauss_legendre(p_2d[2]+1)
-# This function computes the tensor product of the quadrature weights in 
-# the reference domain. This ensures that this only need to be computed 
-# once and makes the size compatible with our other outputs (it returns 
-# a vector of the weights in the right order).
-q_weights_all = Mantis.Quadrature.tensor_product_weights((q_weights_x, q_weights_y))
+q_nodes_2d, q_weights_2d = Mantis.Quadrature.tensor_product_rule(p_2d .+ 1, Mantis.Quadrature.gauss_legendre)
 
 
 
@@ -436,14 +437,7 @@ test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_
 geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
 
 # Setup the quadrature rule.
-q_nodes_3d_x, q_weights_3d_x = Mantis.Quadrature.gauss_legendre(p_3d[1]+1)
-q_nodes_3d_y, q_weights_3d_y = Mantis.Quadrature.gauss_legendre(p_3d[2]+1)
-q_nodes_3d_z, q_weights_3d_z = Mantis.Quadrature.gauss_legendre(p_3d[3]+1)
-# This function computes the tensor product of the quadrature weights in 
-# the reference domain. This ensures that this only need to be computed 
-# once and makes the size compatible with our other outputs (it returns 
-# a vector of the weights in the right order).
-q_weights_3d_all = Mantis.Quadrature.tensor_product_weights((q_weights_3d_x, q_weights_3d_y, q_weights_3d_z))
+q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mantis.Quadrature.gauss_legendre)
 
 
 
@@ -452,32 +446,32 @@ q_weights_3d_all = Mantis.Quadrature.tensor_product_weights((q_weights_3d_x, q_w
 for case in ["sine1d", "const1d", "sine2d", "sine2d-crazy", "sine2dH", "sine3d"]
 
     if case == "sine1d"
-        fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d, 
-               (q_nodes_1d, ), q_weights_1d_all, exact_sol_sine_1d, p_1d, 
-               k_1d, case, n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
+        fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d,
+               q_nodes_1d, q_weights_1d, exact_sol_sine_1d, p_1d, k_1d, case, 
+               n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
     elseif case == "const1d"
         fe_run(forcing_const_1d, trial_space_1d, test_space_1d, geom_1d, 
-                (q_nodes_1d, ), q_weights_1d_all, exact_sol_const_1d, p_1d, 
-                k_1d, case, n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
+               q_nodes_1d, q_weights_1d, exact_sol_const_1d, p_1d, k_1d, case, 
+               n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
     elseif case == "sine2d"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
-               (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-               k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "sine2d-crazy"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
-                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-                k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "sine2dH"
-        fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, 
-               (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-               k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+        fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
+               q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+               write_to_output_file, run_tests, verbose)
     elseif case == "sine3d"
         fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
-                (q_nodes_3d_x, q_nodes_3d_y, q_nodes_3d_z), q_weights_3d_all, 
-                exact_sol_sine_3d, p_3d, k_3d, case, n_3d, write_to_output_file, 
-                run_tests, verbose)
+               q_nodes_3d, q_weights_3d, exact_sol_sine_3d, p_3d, k_3d, case, 
+               n_3d, write_to_output_file, run_tests, verbose)
     else
         println("Warning: case '"*case*"' unknown. Skipping.") 
+        println()  # Extra blank line to separate the different runs.
     end
 end
 
