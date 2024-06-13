@@ -13,7 +13,6 @@ import .. Geometry
 Supertype for all function spaces.
 """
 abstract type AbstractFormSpace{n,k} end
-abstract type AbstractFormExpression{n,k} end
 
 function get_form_rank(::AbstractFormSpace{n,k})
     return k
@@ -49,14 +48,19 @@ struct FormSpace{n,k,G,F} <: AbstractFormSpace{n,k}
     end
 end
 
-struct ExteriorDerivative{n,k,F} <: AbstractFormExpression{n,k}
+struct ExteriorDerivative{n,k,F} <: AbstractFormSpace{n,k}
     form_space::F
 
     function ExteriorDerivative(form_space::F) where {F <: AbstractFormSpace{n,k} where {n,k}}
-        n = get_form_rank(form_space)
-        k = get_spatial_dim(form_space)
+        n = get_domain_dim(form_space)
+        k = get_form_rank(form_space)
         new{n,k+1,F}(form_space)
     end
 
 end
 
+function evaluate(ext_der::ExteriorDerivative{n,0,F},element_id::Int,quad_rule::Quadrature.QuadratureRule{n}) where {n,F}
+    # Compute derivatives of bases
+    basis_eval, basis_inds = FunctionSpaces.evaluate(ext_der.form_space.fem_space[1], element_id, quad_rule.xi, 1)
+    # construct and return the exterior derivative of the 0-form...
+end
