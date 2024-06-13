@@ -68,7 +68,7 @@ end
 
 function jacobian(geometry::MappedGeometry{n, m}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, m}
     J_1 = jacobian(geometry.geometry, element_idx, ξ)  # the Jacobian for the mapping from the elements to base geometry image
-    x = evaluate(geometry, element_idx, ξ)
+    x = evaluate(geometry.geometry, element_idx, ξ)
     J_2 = jacobian(geometry.mapping, x)  # the mapping from the image of the  base geometry to the image of the mapping
     n_eval = size(x,1)
     J = zeros(n_eval, m, n)
