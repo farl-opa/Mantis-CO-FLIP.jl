@@ -5,6 +5,7 @@ The exported names are:
 module FormSpaces
 
 import .. FunctionSpaces
+import .. Geometry
 
 """
     AbstractFormSpace

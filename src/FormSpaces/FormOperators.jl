@@ -43,12 +43,14 @@ function inner_product(f1::FormSpace{n,n,G,Tuple{F1}}, f2::FormSpace{n,n,G,Tuple
             M_val[idx] = Mij
         end
     end
+
+    return M_row, M_col, M_val
 end
 
 # 1-forms in 2D
 function inner_product(f1::FormSpace{2,1,G,Tuple{F1x,F1y}}, f2::FormSpace{2,1,G,Tuple{F2x,F2y}}, element_id::Int, quad_rule::QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2,m} where {m}, F1x <: FunctionSpaces.AbstractFunctionSpace{2}, F1y <: FunctionSpaces.AbstractFunctionSpace{2}, F2x <: FunctionSpaces.AbstractFunctionSpace{2}, F2y <: FunctionSpaces.AbstractFunctionSpace{2}}
 
-
+    
 
 end
 
