@@ -12,9 +12,18 @@ import .. Geometry
 
 Supertype for all function spaces.
 """
-abstract type AbstractFormSpace end
+abstract type AbstractFormSpace{n,k} end
+abstract type AbstractFormExpression{n,k} end
 
-struct FormSpace{n,k,G,F} <: AbstractFormSpace
+function get_form_rank(::AbstractFormSpace{n,k})
+    return k
+end
+
+function get_spatial_dim(::AbstractFormSpace{n,k})
+    return n
+end
+
+struct FormSpace{n,k,G,F} <: AbstractFormSpace{n,k}
     geometry::G
     fem_space::F
 
@@ -40,4 +49,14 @@ struct FormSpace{n,k,G,F} <: AbstractFormSpace
     end
 end
 
+struct ExteriorDerivative{n,k,F} <: AbstractFormExpression{n,k}
+    form_space::F
+
+    function ExteriorDerivative(form_space::F) where {F <: AbstractFormSpace{n,k} where {n,k}}
+        n = get_form_rank(form_space)
+        k = get_spatial_dim(form_space)
+        new{n,k+1,F}(form_space)
+    end
+
 end
+
