@@ -90,6 +90,9 @@ function get_estimated_nnz_per_elem(PB::PoissonBilinearForm)
     return FunctionSpaces.get_max_local_dim(PB.space_trial) * FunctionSpaces.get_max_local_dim(PB.space_test), FunctionSpaces.get_max_local_dim(PB.space_test)
 end
 
+function get_boundary_dof_indices(PB::PoissonBilinearForm)
+    return FunctionSpaces.get_boundary_dof_indices(PB.space_trial)
+end
 
 # Maybe we should turn this into a function that takes something like 
 # the above struct as input. Then, depending the struct (= type) of 
@@ -97,7 +100,7 @@ end
 # number of structs that must be made, as they can be more universal. 
 # This would also improve the names I think.
 @doc raw"""
-    (PB::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG} where {n, Frhs, Ttrial, Ttest, TG})(element_id) 
+    (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) where {n, Frhs, Ttrial, Ttest, TG}
 
 Bilinear form for the computation of the Poisson equation on the given element.
 

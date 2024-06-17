@@ -144,7 +144,9 @@ end
 
 function get_boundary_dof_indices(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     if length(tp_space.boundary_dof_indices)==0 # use default tp-dofs
-        boundary_dofs_1, boundary_dofs_2 = _get_boundary_dof_indices_per_dim(tp_space)
+        #boundary_dofs_1, boundary_dofs_2 = _get_boundary_dof_indices_per_dim(tp_space)
+        boundary_dofs_1 = get_boundary_dof_indices(tp_space.function_space_1)
+        boundary_dofs_2 = get_boundary_dof_indices(tp_space.function_space_2)
         tp_dim = _get_dim_per_space(tp_space)
         # total number of boundary dofs
         n_boundary_dofs = tp_dim[1] * length(boundary_dofs_2) + tp_dim[2] * length(boundary_dofs_1) - length(boundary_dofs_1) * length(boundary_dofs_2)

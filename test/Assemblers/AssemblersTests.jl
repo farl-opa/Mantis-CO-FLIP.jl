@@ -8,10 +8,10 @@ using LinearAlgebra
 
 
 
-# This is how MANTIS is called to solve a problem. The bc input is only for the 1D case.
+# This is how MANTIS is called to solve a problem.
 function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, 
                 q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
-                verbose=false, bc = (false, 0.0, 0.0))
+                verbose=false, bc = (false, [0.0, 0.0]))
     if verbose
         println("Starting setup of problem and assembler for case "*case*" ...")
     end
@@ -27,7 +27,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if bc[1] == false
         global_assembler = Mantis.Assemblers.Assembler()
     else
-        global_assembler = Mantis.Assemblers.Assembler(bc[2], bc[3])
+        global_assembler = Mantis.Assemblers.Assembler(bc[2])
     end
 
     if verbose
@@ -35,9 +35,9 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     end
     A, b = global_assembler(element_assembler)
 
-    if n != 1
+    if n > 1 && bc[1] == false
         # Add the average = 0 condition for Neumann b.c. (derivatives are 
-        # assumed to be zero!)
+        # assumed to be zero!). Note that this only sums the coefficients.
         A = vcat(A, ones((1,size(A)[2])))
         A = hcat(A, vcat(ones(size(A)[1]-1), 0.0))
         b = vcat(b, 0.0)
@@ -50,7 +50,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         if verbose
             println("Running tests ...")
         end
-        @test isapprox(A, A', rtol=1e-12)
+        #@test isapprox(A, A', rtol=1e-12)  # Full system matrices need not be symmetric due to the boundary conditions.
         @test isempty(nullspace(Matrix(A)))  # Only works on dense matrices!
         @test LinearAlgebra.cond(Matrix(A)) < 1e10
     end
@@ -59,16 +59,12 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if verbose
         println("Solving ",size(A,1)," x ",size(A,2)," sized system ...")
     end
-    if n == 1
-        sol = [bc[2], (A \ Vector(b))..., bc[3]]
-    else
-        sol = A \ Vector(b)
-    end
+    sol = A \ b
 
-    if n == 1
-        sol_rsh = reshape(sol, :, 1)
-    else
+    if n > 1 && bc[1] == false
         sol_rsh = reshape(sol[1:end-1], :, 1)
+    else
+        sol_rsh = reshape(sol, :, 1)
     end
 
 
@@ -107,7 +103,15 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     err = err_assembler(trial_space, sol_rsh, geom, exact_sol)
     if verbose
         println("The L^2 error is: ",err)
-        println()  # Extra blank line to separate the different runs.
+    end
+
+    if test
+        if case == "const1d"
+            if verbose
+                println("Error tests ...")
+            end
+            @test err < 1e12
+        end
     end
 
     # Extra check to test if the metric computation was correct.
@@ -166,8 +170,8 @@ k_1d = 2
 const Lleft_1d = 0.0
 const Lright_1d = 1.0
 
-bc_sine_1d = (true, 0.0, 1.0)
-bc_const_1d = (true, 0.0, 0.0)
+bc_sine_1d = (true, [0.0, 1.0])
+bc_const_1d = (true, [0.0, 0.0])
 
 function forcing_sine_1d(x::Float64)
     return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
@@ -223,10 +227,10 @@ k_2d = (2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-const Lleft = 0.25
-const Lright = 0.75
-const Lbottom = 0.25
-const Ltop = 0.75
+const Lleft = 0.0#0.25
+const Lright = 1.0#0.75
+const Lbottom = 0.0#0.25
+const Ltop = 1.0#0.75
 
 
 function forcing_sine_2d(x::Float64, y::Float64)
@@ -383,12 +387,12 @@ k_3d = (2, 2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-const Lx1 = 0.25
-const Lx2 = 0.75
-const Ly1 = 0.25
-const Ly2 = 0.75
-const Lz1 = 0.25
-const Lz2 = 0.75
+const Lx1 = 0.0
+const Lx2 = 1.0
+const Ly1 = 0.0
+const Ly2 = 1.0
+const Lz1 = 0.0
+const Lz2 = 1.0
 
 
 function forcing_sine_3d(x::Float64, y::Float64, z::Float64)
@@ -443,7 +447,8 @@ q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mant
 
 
 # Running all testcases.
-for case in ["sine1d", "const1d", "sine2d", "sine2d-crazy", "sine2dH", "sine3d"]
+println()
+for case in ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
 
     if case == "sine1d"
         fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d,
@@ -453,24 +458,40 @@ for case in ["sine1d", "const1d", "sine2d", "sine2d-crazy", "sine2dH", "sine3d"]
         fe_run(forcing_const_1d, trial_space_1d, test_space_1d, geom_1d, 
                q_nodes_1d, q_weights_1d, exact_sol_const_1d, p_1d, k_1d, case, 
                n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
-    elseif case == "sine2d"
+    elseif case == "sine2d-Dirichlet"
+        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d)))))
+    elseif case == "sine2d-Neumann"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
                n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "sine2d-crazy"
+    elseif case == "sine2d-crazy-Dirichlet"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "sine2dH"
+               n_2d, write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d)))))
+    elseif case == "sine2d-crazy-Neumann"
+        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
+                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+                n_2d, write_to_output_file, run_tests, verbose)
+    # elseif case == "sine2dH-Dirichlet"
+    #     fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
+    #            q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+    #            write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d)))))
+    elseif case == "sine2dH-Neumann"
         fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
-               q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
-               write_to_output_file, run_tests, verbose)
-    elseif case == "sine3d"
+                q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+                write_to_output_file, run_tests, verbose)
+    elseif case == "sine3d-Dirichlet"
         fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
                q_nodes_3d, q_weights_3d, exact_sol_sine_3d, p_3d, k_3d, case, 
-               n_3d, write_to_output_file, run_tests, verbose)
+               n_3d, write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d)))))
     else
-        println("Warning: case '"*case*"' unknown. Skipping.") 
+        if verbose
+            println("Warning: case '"*case*"' unknown. Skipping.") 
+        end
+    end
+    if verbose
         println()  # Extra blank line to separate the different runs.
     end
 end
