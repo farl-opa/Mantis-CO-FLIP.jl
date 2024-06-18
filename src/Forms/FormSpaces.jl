@@ -17,14 +17,13 @@ abstract type AbstractFormSpace{n,k} end
 
 struct FormSpace{n, k,G, F} <: AbstractFormSpace{n,k}
     geometry::G
-    fem_space::F    
+    fem_space::F
 
     # NOTE: FunctionSpaces.AbstractFunctionSpace does not have a parameter of dimension of manifold,
     # we need to add this, but it implies several changes (I started, but postponed it!)
 
     # 0- and n-form constructor
     function FormSpace(form_rank::Int, geometry::G, fem_space::F) where {domain_dim, codomain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
-        form_components = binomial(domain_dim, form_rank)
         # The dimension match is automatically verified because of the inputs types that are enforced
         new{domain_dim, form_rank, G, F}(geometry, fem_space)
     end
@@ -44,13 +43,5 @@ struct FormSpace{n, k,G, F} <: AbstractFormSpace{n,k}
     end
 end
 
-# struct ExteriorDerivative{n,k,F} <: AbstractFormExpression{n,k}
-#     form_space::F
-
-#     function ExteriorDerivative(form_space::F) where {F <: AbstractFormSpace{n,k} where {n,k}}
-#         n = get_form_rank(form_space)
-#         k = get_spatial_dim(form_space)
-#         new{n,k+1,F}(form_space)
-#     end
 
 
