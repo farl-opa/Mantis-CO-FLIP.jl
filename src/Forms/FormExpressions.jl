@@ -52,7 +52,15 @@ struct FormExpression{n, k, F} <:AbstractFormExpression{n, k}
     op::String
     label::String
 
-    function FormExpression(form::F, op::String, label::String) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+    function FormExpression(form::F, op::String) where {F <: AbstractFormExpression{manifold_dim, child_form_rank}} where {manifold_dim, child_form_rank}
+        label = op * form.label
+        if op == "⋆"
+            form_rank = manifold_dim - child_form_rank
+
+        elseif op == "d"
+            @assert F <: FormField "Exterior derivative can only be applied to FormFields."
+            form_rank = child_form_rank + 1
+        end
         new{manifold_dim, form_rank, F}(form, op, label)
     end
 
@@ -97,12 +105,16 @@ function evaluate(form_expression::FormExpression{manifold_dim, form_rank, F}) w
     return form_expression_eval
 end
 
-function (∧)(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
+function wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
     return FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
 end
 
-function (⋆)(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
-    return FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
+function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+    return FormExpression(form, "⋆")
+end
+
+function exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+    return FormExpression(form, "d")
 end
 
 

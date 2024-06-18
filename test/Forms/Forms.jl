@@ -55,19 +55,19 @@ Mantis.Forms.evaluate(σ⁰)
 print("\n")
 
 
-function (∧)(form_1::F_1, form_2::F_2) where {F_1 <: Mantis.Forms.AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: Mantis.Forms.AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
-    return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
-end
+# function (∧)(form_1::F_1, form_2::F_2) where {F_1 <: Mantis.Forms.AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: Mantis.Forms.AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
+#     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
+# end
 
-function (⋆)(form::F) where {F <: Mantis.Forms.AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
-    return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
-end
+# function (⋆)(form::F) where {F <: Mantis.Forms.AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+#     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
+# end
 
 print("Evaluating the wedge operator\n")
-γ = ∧(α⁰, β²)
+γ = Mantis.Forms.wedge(α⁰, β²)
 print(γ.label)
 
-γ2 = ∧(γ, β²)
+γ2 = Mantis.Forms.wedge(γ, β²)
 print("\n")
 print(γ2.label)
 print("\n")
