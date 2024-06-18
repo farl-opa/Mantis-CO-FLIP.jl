@@ -28,10 +28,12 @@ tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
 
 # Then the form space 
 zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, TP_Space)
+one_form_space = Mantis.Forms.FormSpace(1, tensor_prod_geo, (TP_Space, TP_Space))
 top_form_space = Mantis.Forms.FormSpace(2, tensor_prod_geo, TP_Space)
 
 # Generate the form expressions
 α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+ξ¹ = Mantis.Forms.FormField(one_form_space, "ξ")
 β² = Mantis.Forms.FormField(top_form_space, "β")
 θ² = Mantis.Forms.FormExpression(α⁰, β², 2, "∧")
 ζ² = Mantis.Forms.FormExpression(α⁰, θ², 2, "∧")
@@ -40,19 +42,6 @@ print(θ².label)
 print("\n")
 ζ² = Mantis.Forms.FormExpression(α⁰, θ², 2, "∧")
 print(ζ².label)
-print("\n")
-σ⁰ = Mantis.Forms.FormExpression(α⁰, ζ², 0, "⋆")
-print(σ⁰.label)
-print("\n")
-
-Mantis.Forms.evaluate(α⁰)
-print("\n")
-
-Mantis.Forms.evaluate(θ²)
-print("\n")
-
-Mantis.Forms.evaluate(σ⁰)
-print("\n")
 
 
 # function (∧)(form_1::F_1, form_2::F_2) where {F_1 <: Mantis.Forms.AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: Mantis.Forms.AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
@@ -71,8 +60,17 @@ print(γ.label)
 print("\n")
 print(γ2.label)
 print("\n")
-Mantis.Forms.evaluate(γ2)
 
+zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+d_zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+
+one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+
+α⁰.coefficients .= 1.0
+ξ¹.coefficients .= 1.0
+
+α⁰_eval = Mantis.Forms.evaluate(α⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
+ξ¹_eval = Mantis.Forms.evaluate(ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 
 # abstract type AbstractMyStruct{n} end

@@ -14,37 +14,71 @@ using Subscripts
 
 # GraphPlot.gplot(G₁, nodelabel=1:3)
 
-abstract type AbstractFormExpression{n, k} end
-abstract type AbstractFormField{n, k} end
+abstract type AbstractFormExpression{manifold_dim, form_rank} end
+abstract type AbstractFormField{manifold_dim, form_rank} <: AbstractFormExpression{manifold_dim, form_rank} end
 
-# struct FormField{manifold_dim, form_rank, FS} <:AbstractFormExpression{manifold_dim, form_rank}
-#     form_space::FS
-#     coefficients::Vector{Float64}
+struct FormFieldTrialBasis{manifold_dim, form_rank, FS} <:AbstractFormField{manifold_dim, form_rank}
+    form_space::FS
+    label::String
 
-#     function FormField(form_space::FS, coefficients::Vector{Float64}) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
-#         # Need to have a check if the number of coefficients is the same as the number of dofs 
-#         # The numbering of the coefficients here is the numbering of the basis, which is given by the space
-#         # We need to make this clear
-#         new{manifold_dim, form_rank, FS}(form_space, coefficients)
-#     end
-# end
+    function FormFieldTrialBasis(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+        label = label * super("$form_rank")
+        new{manifold_dim, form_rank, FS}(form_space, label)
+    end
+end
 
-struct FormField{manifold_dim, form_rank, FS} <:AbstractFormExpression{manifold_dim, form_rank}
+struct FormFieldTestBasis{manifold_dim, form_rank, FS} <:AbstractFormField{manifold_dim, form_rank}
+    form_space::FS
+    label::String
+
+    function FormFieldTestBasis(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+        label = label * super("$form_rank")
+        new{manifold_dim, form_rank, FS}(form_space, label)
+    end
+end
+
+struct FormField{manifold_dim, form_rank, FS} <:AbstractFormField{manifold_dim, form_rank}
     form_space::FS
     coefficients::Vector{Float64}
     label::String
 
     function FormField(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
-        # Here we just generate the coefficients as zeros, for now just a number (10), but this needs
-        # to be the number of dofs of the form_space, so we need a method that returns this for each form_space.
-        coefficients = zeros(Float64, 10)
+        # Here we just generate the coefficients as zeros, i.e., initialize the coefficients
+        n_dofs = get_dim(form_space)
+        coefficients = zeros(Float64, n_dofs)
+        label = label * super("$form_rank")
         new{manifold_dim, form_rank, FS}(form_space, coefficients, label)
     end
 end
 
-function evaluate(form::FormField{manifold_dim, form_rank, FS}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
-    print("Evaluating $(form.label)" * sub("$form_rank") * "\n")
-    return 5.0
+function evaluate(form::FormField{manifold_dim, 0, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0}}
+    print("Evaluating $(form.label) \n")
+    form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
+    form_eval = form_basis_eval * form.coefficients[form_basis_indices]
+
+    return form_eval
+end
+
+function evaluate(form::FormField{manifold_dim, manifold_dim, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, manifold_dim}}
+    print("Evaluating $(form.label) \n")
+    form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
+    form_eval = form_basis_eval * form.coefficients[form_basis_indices]
+
+    return form_eval
+end
+
+function evaluate(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
+    print("Evaluating $(form.label) \n")
+    n_form_components = binomial(manifold_dim, form_rank)
+    form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
+
+    form_eval = Vector{Vector{Float64}}(undef, n_form_components)
+
+    for form_component_idx in 1:n_form_components
+        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices[form_component_idx]]
+    end
+
+    return form_eval
 end
 
 struct FormExpression{n, k, F} <:AbstractFormExpression{n, k}
@@ -66,13 +100,13 @@ struct FormExpression{n, k, F} <:AbstractFormExpression{n, k}
 
     function FormExpression(form_1::F_1, form_2::F_2, expression_rank::Int, op::String) where {F_1 <: AbstractFormExpression{manifold_dim, form_rank_1}, F_2 <: AbstractFormExpression{manifold_dim, form_rank_2}} where {manifold_dim, form_rank_1, form_rank_2}
         if typeof(form_1) <: FormField
-            label_1 = form_1.label * super("$form_rank_1")
+            label_1 = form_1.label
         else
             label_1 = "(" * form_1.label * ")" * super("$form_rank_1")
         end
 
         if typeof(form_2) <: FormField
-            label_2 = form_2.label * super("$form_rank_2")
+            label_2 = form_2.label
         else
             label_2 = "(" * form_2.label * ")" * super("$form_rank_2")
         end
