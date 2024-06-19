@@ -27,9 +27,9 @@ line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
 
 # Then the form space 
-zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, TP_Space)
+zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, (TP_Space,))
 one_form_space = Mantis.Forms.FormSpace(1, tensor_prod_geo, (TP_Space, TP_Space))
-top_form_space = Mantis.Forms.FormSpace(2, tensor_prod_geo, TP_Space)
+top_form_space = Mantis.Forms.FormSpace(2, tensor_prod_geo, (TP_Space,))
 
 # Generate the form expressions
 α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
@@ -62,7 +62,7 @@ print(γ2.label)
 print("\n")
 
 zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
-d_zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 

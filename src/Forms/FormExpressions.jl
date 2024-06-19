@@ -51,21 +51,21 @@ struct FormField{manifold_dim, form_rank, FS} <:AbstractFormField{manifold_dim, 
     end
 end
 
-function evaluate(form::FormField{manifold_dim, 0, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0}}
-    print("Evaluating $(form.label) \n")
-    form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
-    form_eval = form_basis_eval * form.coefficients[form_basis_indices]
+# function evaluate(form::FormField{manifold_dim, 0, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0}}
+#     print("Evaluating $(form.label) \n")
+#     form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
+#     form_eval = form_basis_eval[1] * form.coefficients[form_basis_indices[1]]
 
-    return form_eval
-end
+#     return form_eval
+# end
 
-function evaluate(form::FormField{manifold_dim, manifold_dim, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, manifold_dim}}
-    print("Evaluating $(form.label) \n")
-    form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
-    form_eval = form_basis_eval * form.coefficients[form_basis_indices]
+# function evaluate(form::FormField{manifold_dim, manifold_dim, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, manifold_dim}}
+#     print("Evaluating $(form.label) \n")
+#     form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
+#     form_eval = form_basis_eval * form.coefficients[form_basis_indices]
 
-    return form_eval
-end
+#     return form_eval
+# end
 
 function evaluate(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
     print("Evaluating $(form.label) \n")
