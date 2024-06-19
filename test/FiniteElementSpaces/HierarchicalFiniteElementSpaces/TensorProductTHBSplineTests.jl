@@ -54,7 +54,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 end
 
 # Geometry visualization
-#=
+
 function get_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n}) where {n}
     degrees = Mantis.FunctionSpaces.get_polynomial_degree_per_dim(hspace.spaces[1])
     nxi_per_dim = maximum(degrees) + 1
@@ -103,9 +103,8 @@ hspace_geo = get_geometry(hspace)
 # Generate the Plot
 Mantis_folder =  dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
-output_data_folder = joinpath(data_folder, "output", "Field")
+output_data_folder = joinpath(data_folder, "output", "Geometry")
 
-output_filename = "THB-partition-unity-test.vtu"
+output_filename = "thb-partition-of-unity-test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
 Mantis.Plot.plot(hspace_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
-=#

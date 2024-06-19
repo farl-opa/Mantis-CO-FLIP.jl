@@ -40,7 +40,7 @@ struct HierarchicalFiniteElementSpace{n} <: AbstractFiniteElementSpace{n}
     active_elements::HierarchicalActiveInfo
     active_functions::HierarchicalActiveInfo
     multilevel_elements::SparseArrays.SparseVector{Int, Int}
-    multilevel_extraction_coeffs::Vector{Array{Float64, 2}}
+    multilevel_extraction_coeffs::Vector{Matrix{Float64}}
     multilevel_basis_indices::Vector{Vector{Int}}
 
     function HierarchicalFiniteElementSpace(spaces::Vector{T}, two_scale_operators::Vector{O}, active_elements::HierarchicalActiveInfo, active_functions::HierarchicalActiveInfo, multilevel_elements::SparseArrays.SparseVector{Int, Int}, multilevel_extraction_coeffs::Vector{Array{Float64, 2}}, multilevel_basis_indices::Vector{Vector{Int}}) where {n, T <: AbstractFiniteElementSpace{n}, O<:AbstractTwoScaleOperator}
@@ -79,34 +79,6 @@ struct HierarchicalFiniteElementSpace{n} <: AbstractFiniteElementSpace{n}
 end
 
 # Getters for HierarchicalActiveInfo
-
-function get_finer_active_elements(active_elements::HierarchicalActiveInfo, two_scale_operators::Vector{O}, element_id::Int, level::Int) where {O<:AbstractTwoScaleOperator}
-    element_ids = Int[]
-    levels = zeros(Int, level+1)
-
-    finer_active_elements = HierarchicalActiveInfo(element_ids, levels)
-
-    if element_id ∈ get_level_active(active_elements, level)[2]
-        add_active!(finer_active_elements, element_id, level)
-        return finer_active_elements
-    end
-    
-    elements = [element_id]
-    next_elements = Int[]
-    for l ∈ level:get_num_levels(active_elements)-1
-        for element ∈ elements, finer_element ∈ get_finer_elements(two_scale_operators[l], element)
-            if finer_element ∈ get_level_active(active_elements, l+1)[2]
-                add_active!(finer_active_elements, finer_element, l+1)
-            else
-                append!(next_elements, finer_element)
-            end
-        end
-        elements = next_elements
-        next_elements = Int[]
-    end
-
-    return finer_active_elements
-end
 
 function convert_element_vector_to_active_info(elements_to_refine_per_level::Vector{Vector{Int}})
     ids = vcat(elements_to_refine_per_level...)
@@ -353,167 +325,35 @@ function get_level_functions(hierarchical_space::HierarchicalFiniteElementSpace{
     return get_level_active(hierarchical_space.active_functions, level)
 end
 
+function get_active_index(active_info::HierarchicalActiveInfo, id::Int, level::Int)
+    ids_range = active_info.levels[level]+1:active_info.levels[level+1]
+    findfirst(x -> x==id, active_info.ids[ids_range])
+
+    return ids_range[findfirst(x -> x==id, active_info.ids[ids_range])]
+end
+
 function get_active_indices(active_info::HierarchicalActiveInfo, ids, level::Int)
     ids_range = active_info.levels[level]+1:active_info.levels[level+1]
 
-    return @view ids_range[active_info.ids[ids_range] .∈ [ids]]
-end
-
-function get_active_extraction(hierarchical_space::HierarchicalFiniteElementSpace{n}, element::Int) where {n}
-    level = get_element_level(hierarchical_space, element)
-    element_id = get_element_id(hierarchical_space, element)
-
-    coeffs, basis_indices, _ = get_active_extraction(hierarchical_space.spaces[level], level, element_id, hierarchical_space.active_functions)
-    return coeffs, basis_indices
-end
-
-function get_active_extraction(space::S, level::Int, element_id::Int, active_functions::HierarchicalActiveInfo) where {S <: AbstractFiniteElementSpace{n} where {n}}
-
-    coeffs, basis_indices = get_extraction(space, element_id)
-
-    active_indices = findall(x -> x ∈ get_level_active(active_functions, level)[2], basis_indices)
-    active_basis_ids = basis_indices[active_indices]
-
-    basis_indices = get_active_indices(active_functions, active_basis_ids, level)
-
-    return coeffs, basis_indices, active_indices
-end
-
-function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace{n}, element::Int) where {n}
-
-    if length(hierarchical_space.multilevel_elements) == 0 || hierarchical_space.multilevel_elements[element] == 0
-        coeffs, basis_indices = get_active_extraction(hierarchical_space, element)
-    else
-        multilevel_idx = hierarchical_space.multilevel_elements[element]
-        coeffs = hierarchical_space.multilevel_extraction_coeffs[multilevel_idx]
-        basis_indices = hierarchical_space.multilevel_basis_indices[multilevel_idx]
+    indices = Vector{Int}(undef, length(ids))
+    for (count, id) ∈ enumerate(ids)
+        range_id = findfirst(x -> x== id, active_info.ids[ids_range])
+        indices[count] = ids_range[range_id]
     end
 
-    return coeffs, basis_indices
+    return indices
 end
 
-function get_local_basis(hierarchical_space::HierarchicalFiniteElementSpace{n}, element::Int, xi::Union{Vector{Float64}, NTuple{n, Vector{Float64}}}, nderivatives::Int) where {n}
-    level = get_element_level(hierarchical_space, element)
-    element_id = get_element_id(hierarchical_space, element)
-    level_space = get_space(hierarchical_space, level)
-
-    return get_local_basis(level_space, element_id, xi, nderivatives)
-end
-
-function get_coarse_refinement_matrix(size_extraction_coeffs::Tuple{Int, Int}, active_indices::Vector{Int})
-    return Matrix{Float64}(LinearAlgebra.I, size_extraction_coeffs)[:,active_indices]
-end
-
-function truncate_refinement_matrix!(refinement_matrix::Union{Matrix{Float64}, SparseArrays.SparseMatrixCSC{Float64, Int}}, active_indices::Vector{Int})
+function truncate_refinement_matrix!(refinement_matrix, active_indices::Vector{Int})
     active_length = length(active_indices)
     refinement_matrix[active_indices, active_length+1:end] .= 0.0
 
     return refinement_matrix
 end
 
-# Updaters for the Hierarcical Active information
+# Getters for hierarchical space constructor
 
-function remove_active!(active_info::HierarchicalActiveInfo, indices::Vector{Int}, level::Int)
-    indices = sort!(unique(indices))
-    deleteat!(active_info.ids, indices)
-    active_info.levels[level+1] -= length(indices)
-
-    return active_info
-end
-
-function add_active!(active_info::HierarchicalActiveInfo, id::Int, level::Int)
-    current_levels = get_num_levels(active_info) 
-    if level <= current_levels
-        index = active_info.levels[level+1]+1
-        insert!(active_info.ids, index, id)
-        active_info.levels[level+1] += 1
-    else
-        append!(active_info.ids, id)
-        append!(active_info.levels, zeros(Int, level-current_levels-1))
-        append!(active_info.levels, active_info.levels[end]+1)
-    end
-
-    return active_info
-end
-
-function add_active!(active_info::HierarchicalActiveInfo, ids::Vector{Int}, level::Int)
-    ids = sort!(unique(ids))
-    if level <= get_num_levels(active_info)
-        index = active_info.levels[level+1]+1
-        active_info.ids = [active_info.ids[1:index-1]; ids; active_info.ids[index:end]]
-        active_info.levels[level+1:end] .+= length(ids)
-    else
-        append!(active_info.ids, ids)
-        append!(active_info.levels, active_info.levels[end]+length(ids))
-    end
-
-    return active_info
-end
-
-function add_multilevel_elements!(columns::Vector{Int}, active_elements::HierarchicalActiveInfo, finer_elements::HierarchicalActiveInfo)
-    for level ∈ 1:get_num_levels(finer_elements)
-        finer_element_indices = get_active_indices(active_elements, get_level_active(finer_elements, level)[2], level)
-        append!(columns, finer_element_indices)
-    end
-
-    return columns
-end
-
-function add_multilevel_functions!(multilevel_basis_indices::Dict{Tuple{Int, Int}, Vector{Int}}, finer_elements::HierarchicalActiveInfo, Ni::Int)
-    for level ∈ 1:get_num_levels(finer_elements)
-        for element ∈ get_level_active(finer_elements, level)[2]
-            if haskey(multilevel_basis_indices, (level, element))
-                append!(multilevel_basis_indices[(level, element)], Ni)
-            else
-                multilevel_basis_indices[(level, element)] = [Ni]
-            end
-        end
-    end
-
-    return multilevel_basis_indices
-end
-
-# getters for hierarchical space constructor
-
-
-function get_active_objects(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo) where {O<:AbstractTwoScaleOperator, T<:AbstractFiniteElementSpace{n} where n}
-    L = get_num_levels(refined_domains)
-
-    # Initialize active functions and elements
-    active_elements = HierarchicalActiveInfo(collect(1:get_num_elements(fe_spaces[1])),[0, get_num_elements(fe_spaces[1])])
-    active_functions = HierarchicalActiveInfo(collect(1:get_dim(fe_spaces[1])),[0, get_dim(fe_spaces[1])])
-
-    for level in 1:L-1 # Loop over levels
-        _, next_level_domain = get_level_active(refined_domains, level+1)
-
-        element_indices_to_remove = Int[]
-        elements_to_add = Int[]
-        function_indices_to_remove = Int[]
-        functions_to_add = Int[]
-
-        level_indices, level_basis = get_level_active(active_functions, level)
-        for (i, Ni) ∈ zip(level_indices, level_basis)
-            support_check, support = check_support(fe_spaces[level], Ni, next_level_domain, two_scale_operators[level]) # gets support in both levels
-            if support_check
-                union!(element_indices_to_remove, get_active_indices(active_elements, support, level))
-                append!(function_indices_to_remove, i)
-                union!(elements_to_add, get_finer_elements(two_scale_operators[level], support))
-                union!(functions_to_add, get_finer_basis_id(two_scale_operators[level], Ni))
-            end
-        end
-
-        # change way active functions are stored.
-
-        remove_active!(active_elements, element_indices_to_remove, level)
-        add_active!(active_elements, elements_to_add, level+1)
-        remove_active!(active_functions, function_indices_to_remove, level)
-        add_active!(active_functions, functions_to_add, level+1)
-    end
-    nothing
-    return active_elements, active_functions
-end
-
-#=
+# 1
 function get_active_objects(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, refined_domains::HierarchicalActiveInfo) where {O<:AbstractTwoScaleOperator, T<:AbstractFiniteElementSpace{n} where n}
     L = get_num_levels(refined_domains)
 
@@ -547,10 +387,13 @@ function get_active_objects(fe_spaces::Vector{T}, two_scale_operators::Vector{O}
         # Update of active elements and basis
         active_elements_per_level[level] = setdiff(active_elements_per_level[level], elements_to_remove)
         active_functions_per_level[level] = setdiff(active_functions_per_level[level], functions_to_remove)
-        push!(active_elements_per_level, elements_to_add)
-        push!(active_functions_per_level, functions_to_add)
+        push!(active_elements_per_level, unique(elements_to_add))
+        push!(active_functions_per_level, unique(functions_to_add))
 
     end
+
+    map(x -> sort!(x), active_elements_per_level)
+    map(x -> sort!(x), active_functions_per_level)
 
     active_elements = convert_element_vector_to_active_info(active_elements_per_level)
     active_functions = convert_element_vector_to_active_info(active_functions_per_level)
@@ -561,19 +404,20 @@ end
 function get_inactive_active_children(active_elements, element_id, level, two_scale_operators)
     active_children = NTuple{2, Int}[]
 
-    all_active_check = false
     current_element_ids = [element_id]
+    current_level = level
+    all_active_check = false
     while !all_active_check
         all_active_check = true
         inactive_children = Int[]
-        for element_id ∈ current_element_ids 
-            children = get_finer_elements(two_scale_operators[current_level], element_id)
-            children_check = children .∈ get_level_active(active_elements, level+1)
+        for curr_element_id ∈ current_element_ids 
+            children = get_finer_elements(two_scale_operators[current_level], curr_element_id)
+            children_check = children .∈ [get_level_active(active_elements, current_level+1)[2]]
             for child_id ∈ children[children_check]
-                append!(active_children, (current_level+1, child_id))
+                push!(active_children, (current_level+1, child_id))
             end
             append!(inactive_children, children[map(!, children_check)])
-        all_active_check = all_active_check && all(children_check)
+            all_active_check = all_active_check && all(children_check)
         end
         current_element_ids = inactive_children
         current_level += 1
@@ -582,26 +426,29 @@ function get_inactive_active_children(active_elements, element_id, level, two_sc
     return active_children
 end
 
-function get_multilevel_basis_indices(fe_spaces, two_scale_operators, active_elements, active_functions)
+function get_multilevel_information(fe_spaces, two_scale_operators, active_elements, active_functions)
     L = get_num_levels(active_elements)
-    multilevel_information = Dict{Tuple{Int, Int}, Tuple{Int, Int}}()
+    multilevel_information = Dict{Tuple{Int, Int}, Vector{Tuple{Int, Int}}}()
     # Above, first tuple is level and id of ml element, second tuple
     # is level and id of ml basis in that element
     for level ∈ 1:L
-        active_elements = [get_level_active(active_elements, level)[2]]
+        level_active_elements = [get_level_active(active_elements, level)[2]]
         _, active_basis = get_level_active(active_functions, level)
 
         for basis ∈ active_basis
             support = get_support(fe_spaces[level], basis)
+            if level == 1 && basis==26
+                nothing
+            end
 
-            active_support_checks = support .∈ active_elements
-            for inactive_element ∈ elements[map(!, active_support_checks)]
+            active_support_checks = support .∈ level_active_elements
+            for inactive_element ∈ support[map(!, active_support_checks)]
                 active_children = get_inactive_active_children(active_elements, inactive_element, level, two_scale_operators)
                 for (child_level, child_id) ∈ active_children
-                    if haskey(multilevel_information, (level, inactive_element))
-                        append!(multilevel_information[(level, inactive_element)], (child_level, child_id))
+                    if haskey(multilevel_information, (child_level, child_id))
+                        push!(multilevel_information[(child_level, child_id)], (level, basis))
                     else
-                        multilevel_information[(level, element)] = [(child_level, child_id)]
+                        multilevel_information[(child_level, child_id)] = [(level, basis)]
                     end
                 end
             end
@@ -611,84 +458,137 @@ function get_multilevel_basis_indices(fe_spaces, two_scale_operators, active_ele
     return multilevel_information
 end
 
-function get_multilevel_extraction(fe_spaces, two_scale_operators, active_elements, active_functions, multilevel_information)
-    for (level, element) ∈ keys(multilevel_information)
+function get_active_basis_matrix(fe_spaces, element, level, active_functions)
+    full_coeffs, full_indices = get_extraction(fe_spaces[level], element)
+    local_active_indices = findall(x -> x in get_level_active(active_functions, level)[2], full_indices)
 
-    end
-
-    return multilevel_elements, multilevel_extraction_coeffs
-end
-=#
-
-function get_multilevel_elements(fe_spaces, two_scale_operators, active_elements, active_functions)
-    L = get_num_levels(active_elements)
-
-    el_columns = Int[]
-    multilevel_basis_indices_dic = Dict{Tuple{Int, Int}, Vector{Int}}()
-
-    for level in 1:L-1
-        _, current_domain = get_level_active(active_elements, level)
-
-        index, N = get_level_active(active_functions, level)
-        for (i, Ni) ∈ zip(index, N) # Loop over active functions in level
-            elements = FunctionSpaces.get_support(fe_spaces[level], Ni) # support of the basis function
-            
-            _, element_checks =  Mesh.check_contained(elements, current_domain) # Check which elements are active
-
-            for element ∈ elements[map(!,element_checks)] # loop over deactivated elements in the support
-                finer_active_elements = get_finer_active_elements(active_elements, two_scale_operators, element, level)
-                add_multilevel_elements!(el_columns, active_elements, finer_active_elements)
-                add_multilevel_functions!(multilevel_basis_indices_dic, finer_active_elements, i)
-            end
-        end
-    end
-
-    sort!(unique!(el_columns))
-
-    multilevel_elements = SparseArrays.sparsevec(el_columns, 1:length(el_columns), get_num_active(active_elements))
-
-    return multilevel_elements, multilevel_basis_indices_dic
+    return Matrix{Float64}(LinearAlgebra.I, size(full_coeffs))[:, local_active_indices], local_active_indices
 end
 
+function get_multilevel_basis_evaluation(fe_spaces, two_scale_operators, active_functions, basis_level, basis_id, element_level, element_id, truncated::Bool)
+    local_subdiv_matrix = LinearAlgebra.I
+    current_child_element = element_id
 
-function get_multilevel_extraction(fe_spaces::Vector{T}, two_scale_operators::Vector{O}, active_elements::HierarchicalActiveInfo, active_functions::HierarchicalActiveInfo, truncated::Bool) where {T<:AbstractFiniteElementSpace{n} where n, O<:AbstractTwoScaleOperator}
-    multilevel_elements, multilevel_basis_indices_dic = get_multilevel_elements(fe_spaces, two_scale_operators, active_elements, active_functions)
+    for level ∈ element_level:-1:basis_level+1
+        current_parent_element = get_coarser_element(two_scale_operators[level-1], current_child_element)
 
-    n_multilevel_els = length(multilevel_elements.nzind)
-    multilevel_extraction_coeffs = Vector{Array{Float64, 2}}(undef, n_multilevel_els)
-    multilevel_basis_indices = Vector{Vector{Int}}(undef, n_multilevel_els)
+        current_subdiv_matrix = get_local_subdiv_matrix(two_scale_operators[level-1], current_parent_element, current_child_element)
 
-    # use multilevel elements and functions on those elements to get new extraction coeffs. a loop will go over every multilevel element, then another loop will go over every function on that multilevele element and add the function to the extraction operator of that multilevel element.
-    
-    for element ∈ multilevel_elements.nzind # loop over multilevel elements
-        element_index = multilevel_elements[element]
-
-        element_level = get_active_level(active_elements, element)
-        element_id = get_active_id(active_elements, element)
-
-        multilevel_extraction_coeffs[element_index], multilevel_basis_indices[element_index], active_indices = get_active_extraction(fe_spaces[element_level], element_level, element_id, active_functions)#copy extraction of current element with active basis indices
-
-        current_level_matrix = get_coarse_refinement_matrix(size(multilevel_extraction_coeffs[element_index]), active_indices)
-        refinement_matrix = Matrix{Float64}(undef, (size(current_level_matrix)[1], length(multilevel_basis_indices_dic[(element_level, element_id)])))
-
-        for (ml_count, Ni) ∈ enumerate(multilevel_basis_indices_dic[(element_level, element_id)]) # Loop over active functions on the element
-            basis_level = get_active_level(active_functions, Ni)
-            basis_id = get_active_id(active_functions, Ni)
-            basis_element = get_coarser_element(two_scale_operators, basis_level, element_id, element_level)
-
-            refinement_matrix = update_refinement_matrix!(refinement_matrix, two_scale_operators, basis_element, basis_level,basis_id, element_id, element_level, ml_count, active_functions, truncated) # Get current ml function refinement
-        end
         if truncated
-            refinement_matrix = truncate_refinement_matrix!(refinement_matrix, active_indices)
+            _, full_level_indices = get_extraction(fe_spaces[level], current_child_element)
+            active_indices = findall(x -> x in get_level_active(active_functions, level)[2], full_level_indices)
+            current_subdiv_matrix[active_indices, :] .= 0.0
         end
-        refinement_matrix = hcat(current_level_matrix, refinement_matrix)
-        multilevel_extraction_coeffs[element_index] = multilevel_extraction_coeffs[element_index] * refinement_matrix
-        append!(multilevel_basis_indices[element_index], multilevel_basis_indices_dic[(element_level, element_id)])
+        
+        if level==element_level
+            local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
+        else
+            local_subdiv_matrix .= local_subdiv_matrix * current_subdiv_matrix
+        end
+        current_child_element = current_parent_element
     end
+
+    level_diff = element_level-basis_level
+    basis_element_id = get_ancestor_element(two_scale_operators, element_id, element_level, level_diff)
+    _, lowest_level_basis_indices = get_extraction(fe_spaces[basis_level], basis_element_id)
+    basis_local_id = findfirst(x -> x == basis_id, lowest_level_basis_indices)
+
+    return @view local_subdiv_matrix[:, basis_local_id]
+end
+
+function get_refinement_data(active_basis_matrix, local_active_indices, fe_spaces, two_scale_operators, active_functions, element_id, element_level, multilevel_information, truncated)
+    active_basis_size = size(active_basis_matrix)
+    multilevel_basis_length = length(multilevel_information[(element_level, element_id)])
+
+    refinement_matrix = zeros(active_basis_size .+ (0, multilevel_basis_length))
+
+    refinement_matrix[1:active_basis_size[1],1:active_basis_size[2]] .= active_basis_matrix
+
+    multilevel_basis_hspace_indices = Vector{Int}(undef, multilevel_basis_length)
+    
+    ml_basis_count = 1
+    for (basis_level, basis_id) ∈ multilevel_information[(element_level, element_id)]
+        refinement_matrix[:,active_basis_size[2]+ml_basis_count] .= get_multilevel_basis_evaluation(fe_spaces, two_scale_operators, active_functions, basis_level, basis_id, element_level, element_id, truncated)
+
+        multilevel_basis_hspace_indices[ml_basis_count] = get_active_index(active_functions, basis_id, basis_level)
+
+        ml_basis_count += 1
+    end
+    if truncated
+        refinement_matrix = truncate_refinement_matrix!(refinement_matrix, local_active_indices)
+    end
+
+    return refinement_matrix, multilevel_basis_hspace_indices
+end
+
+# 2
+function get_multilevel_extraction(fe_spaces, two_scale_operators, active_elements, active_functions, truncated)
+    multilevel_information = get_multilevel_information(fe_spaces, two_scale_operators, active_elements, active_functions)
+    
+    num_multilevel_elements = length(keys(multilevel_information))
+
+    if num_multilevel_elements == 0 # Skip trivial case (first adaptive iteration step)
+        return SparseArrays.spzeros(Int, get_num_active(active_elements)), Matrix{Float64}[], [Int[]]
+    end
+
+    multilevel_element_indices = Vector{Int}(undef, num_multilevel_elements)
+    multilevel_extraction_coeffs = Vector{Matrix{Float64}}(undef, num_multilevel_elements)
+    multilevel_basis_indices = Vector{Vector{Int}}(undef, num_multilevel_elements)
+
+    ml_id_count = 1
+    for (level, element) ∈ keys(multilevel_information)
+        # Create multilevel element specific extraction coefficients
+        if (level, element) == (3,15)
+            nothing
+        end
+        active_basis_matrix, local_active_indices = get_active_basis_matrix(fe_spaces, element, level, active_functions)
+        refinement_matrix, multilevel_basis_hspace_indices = get_refinement_data(active_basis_matrix, local_active_indices, fe_spaces, two_scale_operators, active_functions, element, level, multilevel_information, truncated)
+
+        element_coeffs, element_basis_indices = get_extraction(fe_spaces[level], element)
+        element_hspace_basis_indices = map(x -> get_active_index(active_functions, x, level), element_basis_indices[local_active_indices])
+
+        # Add multilevel extraction data
+        multilevel_extraction_coeffs[ml_id_count] = element_coeffs * refinement_matrix
+        multilevel_basis_indices[ml_id_count] = append!(element_hspace_basis_indices, multilevel_basis_hspace_indices)
+
+        # Add multilevel element specific index
+        multilevel_element_indices[ml_id_count] = get_active_index(active_elements, element, level)
+        ml_id_count += 1
+    end
+
+    multilevel_elements = SparseArrays.sparsevec(multilevel_element_indices, 1:num_multilevel_elements, get_num_active(active_elements))
 
     return multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices
 end
 
+# Extraction method for hierarchical space
+
+function get_local_basis(hierarchical_space::HierarchicalFiniteElementSpace{n}, element::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n}
+    element_level = get_active_level(hierarchical_space.active_elements, element)
+    element_id = get_active_id(hierarchical_space.active_elements, element)
+
+    return get_local_basis(hierarchical_space.spaces[element_level], element_id, xi, nderivatives)
+end
+
+function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace{n}, element::Int) where {n}
+    if hierarchical_space.multilevel_elements[element] == 0
+        element_level = get_active_level(hierarchical_space.active_elements, element)
+        element_id = get_active_id(hierarchical_space.active_elements, element)
+
+        coeffs, level_basis_indices = get_extraction(hierarchical_space.spaces[element_level], element_id)
+
+        # Convert level space basis indices to hierarchical space basis indices
+        basis_indices = get_active_indices(hierarchical_space.active_functions, level_basis_indices, element_level)
+    else
+        multilevel_idx = hierarchical_space.multilevel_elements[element]
+        coeffs = hierarchical_space.multilevel_extraction_coeffs[multilevel_idx]
+        basis_indices = hierarchical_space.multilevel_basis_indices[multilevel_idx]
+    end
+
+    return coeffs, basis_indices
+end
+
+# Useful for L-chain
 function get_level_inactive_domain(hspace::HierarchicalFiniteElementSpace{n}, level::Int) where {n}
     inactive_basis = setdiff(1:get_num_elements(hspace.spaces[level]), get_level_active(hspace.active_elements, level)[2])
     if level > 1
@@ -711,3 +611,19 @@ function get_basis_contained_in_next_level(hspace::HierarchicalFiniteElementSpac
 
     return basis_contained_in_next_level
 end
+
+function get_level_domain(hspace::HierarchicalFiniteElementSpace{n}, level::Int) where {n}
+    if level == get_num_levels(hspace)
+        return get_level_active(hspace.active_elements, level)[2]
+    else
+        level_active = collect(get_level_active(hspace.active_elements, level)[2])
+        for l ∈ level+1:get_num_levels(hspace)
+            next_domain = get_level_active(hspace.active_elements, l)[2]
+            next_domain_in_level = get_ancestor_element(hspace.two_scale_operators, next_domain, l, l-level)
+            append!(level_active, next_domain_in_level)
+        end
+
+        return level_active
+    end
+end
+

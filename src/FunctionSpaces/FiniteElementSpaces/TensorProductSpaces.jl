@@ -86,7 +86,7 @@ linear_index = ordered_pair[1] + (ord_ind[2]-1)*max_ind[1] + ...
 # Returns
 - `lin_ind::Int`: computed linear index
 """
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
+function ordered_to_linear_index(ord_ind, max_ind)
     m = length(max_ind)
     @assert length(ord_ind)==m "Dimension mismatch."
     max_ind = cumprod(max_ind)
@@ -96,18 +96,6 @@ function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
     end
 
     return lin_ind
-end
-
-function ordered_to_linear_index(ord_ind::Tuple{m,Int}, max_ind::Tuple{m,Int}) where {m}
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Tuple{Int, Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(ord_ind, collect(max_ind))
 end
 
 @doc raw"""

@@ -88,7 +88,7 @@ function get_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpa
     return hierarchical_geo
 end
 
-function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, q_weights, exact_sol, p, k, step, case, n, output_to_file, bc = (false, 0.0, 0.0))
+function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, q_weights, exact_sol, p, k, step, case, dorfler_parameter, n, output_to_file, bc = (false, 0.0, 0.0))
     element_assembler = Mantis.Assemblers.PoissonBilinearForm(
         forcing_function,
         trial_space,
@@ -132,7 +132,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, q_weig
         Mantis_folder = dirname(dirname(pathof(Mantis)))
         data_folder = joinpath(Mantis_folder, "test", "data")
         output_data_folder = joinpath(data_folder, "output", "Field")
-        output_filename = "Poisson-step$step-$n-D-p$p-k$k-case-"*case*".vtu"
+        output_filename = "Poisson-step$step-$n-D-p$p-k$k-dp$dorfler_parameter-case-"*case*".vtu"
         output_file = joinpath(output_data_folder, output_filename)
         field = Mantis.Fields.FEMField(trial_space, sol_rsh)
         if n == 1
@@ -153,85 +153,77 @@ const Lright = 0.75
 const Lbottom = 0.25
 const Ltop = 0.75
 
-function test()
-    # Dimension
-    n_2d = 2
-    # Number of elements.
-    # Test parameters
-    ne1 = 10
-    ne2 = 10
-    breakpoints1 = collect(range(0, 1, ne1+1))
-    patch1 = Mantis.Mesh.Patch1D(breakpoints1)
-    breakpoints2 = collect(range(0, 1, ne2+1))
-    patch2 = Mantis.Mesh.Patch1D(breakpoints2)
+# Dimension
+n_2d = 2
+# Number of elements.
+# Test parameters
+ne1 = 10
+ne2 = 10
+breakpoints1 = collect(range(0, 1, ne1+1))
+patch1 = Mantis.Mesh.Patch1D(breakpoints1)
+breakpoints2 = collect(range(0, 1, ne2+1))
+patch2 = Mantis.Mesh.Patch1D(breakpoints2)
 
-    deg1 = 2
-    deg2 = 2
-    reg1 = 1
-    reg2 = 1
+deg1 = 2
+deg2 = 2
+reg1 = 1
+reg2 = 1
 
-    B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(reg1, ne1-1); -1])
-    B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(reg2, ne2-1); -1])
-    TB = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
+B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(reg1, ne1-1); -1])
+B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(reg2, ne2-1); -1])
+TB = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
 
-    q_nodes1, q_weights1 = Mantis.Quadrature.gauss_legendre(deg1+1)
-    q_nodes2, q_weights2 = Mantis.Quadrature.gauss_legendre(deg2+1)
-    q_nodes = (q_nodes1, q_nodes2)
-    q_weights = Mantis.Quadrature.tensor_product_weights((q_weights1, q_weights2))
+q_nodes1, q_weights1 = Mantis.Quadrature.gauss_legendre(deg1+1)
+q_nodes2, q_weights2 = Mantis.Quadrature.gauss_legendre(deg2+1)
+q_nodes = (q_nodes1, q_nodes2)
+q_weights = Mantis.Quadrature.tensor_product_weights((q_weights1, q_weights2))
 
-    # Domain. The length of the domain is chosen so that the normal 
-    # derivatives of the exact solution are zero at the boundary. This is 
-    # the only Neumann b.c. that we can specify at the moment.
+# Domain. The length of the domain is chosen so that the normal 
+# derivatives of the exact solution are zero at the boundary. This is 
+# the only Neumann b.c. that we can specify at the moment.
 
-    function forcing_sine(x::Float64, y::Float64)
-        return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
+function forcing_sine(x::Float64, y::Float64)
+    return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
+end
+
+function exact_sol_sine(x::Float64, y::Float64)
+    return sinpi(2.0 * x) * sinpi(2.0 * y)
+end
+
+nsub1 = 2
+nsub2 = 2
+
+case = "sine2d-HB-adaptive-refinement"
+output_to_file = true
+n_steps = 5
+dorfler_parameter = 0.33
+spaces = [TB]
+operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
+hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]])
+hspace_geo = get_geometry(hspace)
+err_per_element = fe_run(forcing_sine, hspace, hspace, hspace_geo, 
+q_nodes, q_weights, exact_sol_sine, (deg1, deg2), 
+(reg1, reg2), 0, case, dorfler_parameter, n_2d, output_to_file)
+
+for step ∈ 1:n_steps
+    println("Step $step")
+    # Solve current hierarchical space solution
+
+    L = Mantis.FunctionSpaces.get_num_levels(hspace)
+    new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hspace.spaces[L], (nsub1, nsub2))
+
+    println("Maximum error is $(maximum(err_per_element))")
+    dorfler_marking = Mantis.FunctionSpaces.get_dorfler_marking(err_per_element, dorfler_parameter)
+    refinement_domains = Mantis.FunctionSpaces.get_refinement_domain(hspace, dorfler_marking, new_operator)
+
+    if length(refinement_domains) > L
+        push!(spaces, new_space)
+        push!(operators, new_operator)
     end
-
-    function exact_sol_sine(x::Float64, y::Float64)
-        return sinpi(2.0 * x) * sinpi(2.0 * y)
-    end
-
-    nsub1 = 2
-    nsub2 = 2
-
-    case = "sine2d-HB-adaptive-refinement"
-    output_to_file = true
-    n_steps = 2
-    dorfler_parameter = 0.1
-    spaces = [TB]
-    operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
-    hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]])
+    
+    hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, refinement_domains, false)
     hspace_geo = get_geometry(hspace)
     err_per_element = fe_run(forcing_sine, hspace, hspace, hspace_geo, 
     q_nodes, q_weights, exact_sol_sine, (deg1, deg2), 
-    (reg1, reg2), 0, case, n_2d, output_to_file)
-
-    test_domain = [1]
-    for step ∈ 1:n_steps
-        println("Step $step")
-        # Solve current hierarchical space solution
-
-        L = Mantis.FunctionSpaces.get_num_levels(hspace)
-        new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hspace.spaces[L], (nsub1, nsub2))
-
-        println("Maximum error is $(maximum(err_per_element))")
-        dorfler_marking = Mantis.FunctionSpaces.get_dorfler_marking(err_per_element, dorfler_parameter)
-        refinement_domains = Mantis.FunctionSpaces.get_refinement_domain(hspace, dorfler_marking, new_operator)
-        if step == 3
-            plot_grid(20,20,[117, 118, 119, 137, 138, 139, 157, 158, 159], Int[], Int[], hspace)
-        end
-
-        if length(refinement_domains) > L
-            push!(spaces, new_space)
-            push!(operators, new_operator)
-        end
-        
-        hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, refinement_domains, false)
-        hspace_geo = get_geometry(hspace)
-        err_per_element = fe_run(forcing_sine, hspace, hspace, hspace_geo, 
-        q_nodes, q_weights, exact_sol_sine, (deg1, deg2), 
-        (reg1, reg2), step, case, n_2d, output_to_file)
-    end
+    (reg1, reg2), step, case, dorfler_parameter, n_2d, output_to_file)
 end
-
-test()

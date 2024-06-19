@@ -290,10 +290,10 @@ function get_level_marked_basis(hspace::HierarchicalFiniteElementSpace{n}, level
     new_basis_to_check, new_inactive_basis = initiate_basis_to_check(get_space(hspace, level), marked_elements_per_level[level])
     previous_inactive_basis = get_basis_contained_in_next_level(hspace, level)
     if length(marked_elements_per_level[level]) == 0
-        return previous_inactive_basis
+        return Int[]
     end 
     basis_to_check = union(previous_inactive_basis, new_basis_to_check)
-    inactive_basis = union(previous_inactive_basis, new_inactive_basis)
+    #inactive_basis = union(previous_inactive_basis, new_inactive_basis)
     #=
     combinations_to_check = Combinatorics.combinations(basis_to_check, 2)
     
@@ -317,7 +317,7 @@ function get_level_marked_basis(hspace::HierarchicalFiniteElementSpace{n}, level
     end
     =#
 
-    return inactive_basis
+    return new_inactive_basis
 end
 
 function get_refinement_domain(hspace::HierarchicalFiniteElementSpace{n}, marked_elements::Vector{Int}, new_two_scale_operator::AbstractTwoScaleOperator) where {n}
@@ -325,30 +325,36 @@ function get_refinement_domain(hspace::HierarchicalFiniteElementSpace{n}, marked
 
     L = get_num_levels(hspace)
     marked_elements_per_level = get_marked_elements_per_level(hspace, marked_elements)
-    if step == 3
-        println(marked_elements_per_level)
-    end
+    println(map(x -> length(x), marked_elements_per_level))
 
     refinement_domains = Vector{Vector{Int}}(undef, L+1)
     refinement_domains[1] = Int[]
     for level ∈ 1:L
         level_marked_basis = get_level_marked_basis(hspace, level, marked_elements_per_level, new_two_scale_operator)
+        println((level, length(level_marked_basis)))
 
-        if level_marked_basis == Int[]
-            refinement_domains[level+1] = Int[]
-            continue
-        end
-        coarse_els = get_marked_basis_support(hspace, level, level_marked_basis)
-        if level == L
-            refinement_domains[level+1] = get_finer_elements(new_two_scale_operator, coarse_els)
-        else
-            refinement_domains[level+1] = get_finer_elements(hspace.two_scale_operators[level], coarse_els)
+        if level<L
+            if level_marked_basis == Int[]
+                refinement_domains[level+1] = get_level_domain(hspace, level+1)
+            else
+                basis_supports = get_marked_basis_support(hspace, level, level_marked_basis)
+                refinement_domains[level+1] = union(get_level_domain(hspace, level+1), get_finer_elements(new_two_scale_operator, basis_supports))
+            end
+        else 
+            if level_marked_basis == Int[]
+                refinement_domains[level+1] = Int[]
+            else
+                basis_supports = get_marked_basis_support(hspace, level, level_marked_basis)
+                refinement_domains[level+1] = get_finer_elements(new_two_scale_operator, basis_supports)
+            end
         end
     end 
 
     if refinement_domains[end] == Int[]
         deleteat!(refinement_domains, length(refinement_domains))
     end
+
+    println(map(x -> length(x), refinement_domains))
 
     return refinement_domains
 end

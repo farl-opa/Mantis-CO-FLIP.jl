@@ -137,6 +137,19 @@ function get_coarser_element(fine_element_id::Int, nsubdivisions::Int)
     return floor(Int, (fine_element_id-1)/nsubdivisions + 1)
 end
 
+function get_ancestor_element(two_scale_operators, child_element_id::Int, child_level::Int, num_ancestor_levels::Int)
+    ancestor_id = child_element_id
+    for level ∈ child_level:-1:child_level-num_ancestor_levels+1
+        ancestor_id = get_coarser_element(two_scale_operators[level-1], ancestor_id)
+    end
+
+    return ancestor_id 
+end
+
+function get_ancestor_element(two_scale_operator, child_element_ids, child_level::Int, num_ancestor_levels::Int)
+    return union(get_ancestor_element.((two_scale_operator,), child_element_ids, (child_level,), (num_ancestor_levels,))...)
+end
+
 """
     get_coarser_elements(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
 
@@ -227,8 +240,8 @@ function get_finer_elements(twoscale_operator::TwoScaleOperator, el_id::Int)
     return twoscale_operator.coarse_to_fine_elements[el_id]    
 end
 
-function get_finer_elements(twoscale_operator::TwoScaleOperator, el_ids::Union{Vector{Int},UnitRange{Int}})
-    return vcat(get_finer_elements.((twoscale_operator,), el_ids)...)  
+function get_finer_elements(twoscale_operator::TwoScaleOperator, el_ids)
+    return reduce(vcat, get_finer_elements.(Ref(twoscale_operator), el_ids))  
 end
 
 function get_coarser_element(twoscale_operator::TwoScaleOperator, el_id::Int)
@@ -239,7 +252,8 @@ function get_coarser_elements(twoscale_operator::AbstractTwoScaleOperator, el_id
     if el_ids == Int[]
         return Int[]
     end
-    return union(get_coarser_element.((twoscale_operator,), el_ids)...)  
+
+    return reduce(union, get_coarser_element.(Ref(twoscale_operator), el_ids))  
 end
 
 function get_coarser_basis_id(twoscale_operator::TwoScaleOperator, basis_id::Int)
