@@ -5,7 +5,7 @@
 Structure to store extraction operators and coefficients.
 """
 struct ExtractionOperator
-    extraction_coefficients::Vector{Array{Float64}}
+    extraction_coefficients::Vector{Matrix{Float64}}
     basis_indices::Vector{Vector{Int}}
     num_elements::Int
     space_dim::Int

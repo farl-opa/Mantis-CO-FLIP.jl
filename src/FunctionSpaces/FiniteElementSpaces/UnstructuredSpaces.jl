@@ -137,36 +137,9 @@ For given global element id `element_id` for a given 1D unstructured space, find
 - `::Array{Float64}`: array of evaluated local basis (size: num_eval_points x num_funcs x nderivatives+1)
 - `::Vector{Int}`: vector of local basis indices (size: num_funcs)
 """
-function get_local_basis(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {m}
+function get_local_basis(us_space::UnstructuredSpace{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,m}
     space_id = get_space_id(us_space, element_id)
     space_element_id = element_id - us_space.us_config["patch_nels"][space_id]
 
-    # implement geometric transformation
-
     return evaluate(us_space.function_spaces[space_id], space_element_id, xi, nderivatives)[1]
-end
-
-@doc raw"""
-    evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {m}
-
-For given global element id `element_id` for a given 1D unstructured space, evaluate the unstructured basis functions and return.
-
-# Arguments 
-- `us_space::UnstructuredSpace`: unstructured space
-- `element_id::Int`: global element id
-- `xi::NTuple{1,Vector{Float64}}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated
-- `nderivatives::Int`: number of derivatives to evaluate
-
-# Returns
-- `::Array{Float64}`: array of evaluated global basis (size: num_eval_points x num_funcs x nderivatives+1)
-- `::Vector{Int}`: vector of global basis indices (size: num_funcs)
-"""
-function evaluate(us_space::UnstructuredSpace{1,m}, element_id::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {m}
-    extraction_coefficients, basis_indices = get_extraction(us_space, element_id)
-    local_basis = get_local_basis(us_space, element_id, xi, nderivatives)
-    for r = 0:nderivatives
-        local_basis[r] .= @views local_basis[r] * extraction_coefficients
-    end
-
-    return local_basis, basis_indices
 end

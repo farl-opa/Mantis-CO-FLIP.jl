@@ -223,12 +223,26 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
     local_basis_per_dim = _get_local_basis_per_dim(tp_space, el_id, xi, nderivatives)
 
     der_keys = _integer_sums(nderivatives, n+1)
-    local_basis = Dict{NTuple{n,Int}, Matrix{Float64}}(i[1:n] => Matrix{Float64}(undef,1,1) for i in der_keys)
-
+    local_basis = Vector{Matrix{Matrix{Float64}}}(undef, length(der_keys))
+    
     # kronecker product of constituent basis functions
-    for key in keys(local_basis)
-        tmp = kron(local_basis_per_dim[2][key[n1+1:n]...], local_basis_per_dim[1][key[1:n1]...])
-        local_basis[key] = tmp
+    for key in der_keys
+        key1 = key[1:n1]
+        j1 = sum(key1[1:n])
+        nz1 = findall(key1 .> 0)
+        idx1 = vcat(fill.(nz1, key1[nz1])...)
+
+        key2 = key[n1+1:n]
+        j2 = sum(key2[1:n])
+        nz2 = findall(key2 .> 0)
+        idx2 = vcat(fill.(nz2, key1[nz2])...)
+
+        tmp = kron(local_basis_per_dim[2][j2+1][idx2...], local_basis_per_dim[1][j1+1][idx1...])
+
+        j = sum(key[1:n])
+        nz = findall(key .> 0)
+        idx = vcat(fill.(nz, key[nz])...)
+        local_basis[j+1][idx...] = tmp
     end
 
     return local_basis
@@ -246,21 +260,4 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
     xi_2 = xi[n1+1:n]
 
     return (get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives))
-end
-
-function _integer_sums(n, k)
-    if k == 1
-        solutions = [n]
-    elseif k > 1
-        solutions = []
-        for combo in Combinatorics.combinations(0:n+k-2, k-1)
-            s = (combo[1],)
-            for i in 2:k-1
-                s = (s..., combo[i] - combo[i-1] - 1)
-            end
-            s = (s..., n+k-2 - combo[k-1])
-            push!(solutions, s)
-        end
-    end
-    return solutions
 end

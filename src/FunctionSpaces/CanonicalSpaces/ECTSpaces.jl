@@ -55,13 +55,22 @@ Compute derivatives up to order `nderivatives` for all basis functions of degree
 
 See also [`evaluate(gtrig::GeneralizedTrigonometric, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(gtrig::GeneralizedTrigonometric, xi::Vector{Float64}, nderivatives::Int)
-    neval = length(xi)
-    ders = zeros(Float64, neval, gtrig.p + 1, nderivatives + 1)
-    for i = 1:neval
-        ders[i,:,:] = _evaluate(gtrig, xi[i],nderivatives)
+function evaluate(gtrig::GeneralizedTrigonometric, ξ::Vector{Float64}, nderivatives::Int)
+    neval = length(ξ)
+    # allocate space for derivatives
+    ders = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
+    for j = 0:nderivatives
+        ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
+        ders[j+1][1] = zeros(Float64, neval, polynomials.p + 1)
     end
-    return Dict{Int,Matrix{Float64}}(i => ders[:,:,i+1] for i = 0:nderivatives)
+    # loop over the evaluation points and evaluate all derivatives at each point
+    for i = 1:neval
+        tmp = _evaluate(gtrig, ξ[i],nderivatives)
+        for j = 0:nderivatives
+            ders[j+1][1][i,:] .= tmp[1,:,j+1]
+        end
+    end
+    return ders
 end
 
 function _evaluate(gtrig::GeneralizedTrigonometric, xi::Float64, nderivatives::Int)

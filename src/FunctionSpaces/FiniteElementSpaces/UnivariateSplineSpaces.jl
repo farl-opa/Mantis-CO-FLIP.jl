@@ -416,39 +416,6 @@ function get_boundary_dof_indices(bspline::BSplineSpace)
 end
 
 """
-_evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-
-Evaluates all derivatives upto order `nderivatives` for all `bspline` basis functions at a given point `xi` in the element `element_id`.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Float64`: The point where all global basis functiuons are evaluated.
-- `nderivatives::Int`: The order upto which derivatives need to be computed.
-# Returns
-- `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
-"""
-function _evaluate_all_at_point(bspline::BSplineSpace, element_id::Int, xi::Float64, nderivatives::Int)
-    local_basis, basis_indices = evaluate(bspline, element_id, ([xi],), nderivatives)
-    nloc = length(basis_indices)
-    ndofs = get_dim(bspline)
-    I = zeros(Int, nloc * (nderivatives + 1))
-    J = zeros(Int, nloc * (nderivatives + 1))
-    V = zeros(Float64, nloc * (nderivatives + 1))
-    count = 0
-    for r = 0:nderivatives
-        for i = 1:nloc
-            I[count+1] = basis_indices[i]
-            J[count+1] = r+1
-            V[count+1] = local_basis[r][1, i]
-            count += 1
-        end
-    end
-
-    return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
-end
-
-"""
     GTBSplineSpace constructors
 """
 function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}, regularity::Vector{Int}) where {m}

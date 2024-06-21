@@ -205,7 +205,7 @@ function build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
 end
 
 """
-extract_gtbspline_to_canonical(bsplines::NTuple{m,CanonicalFiniteElementSpace{1}}, regularity::Vector{Int}) where {m}
+extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace{1}}, regularity::Vector{Int}) where {m}
 
 Computes the extraction coefficients of GTB-Spline basis functions in terms of constitutent canonical basis functions.
 
@@ -231,8 +231,8 @@ function extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFini
         # regularity at this interface
         r = regularity[i]
         # smoothness constraint matrix
-        KL = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[i], 1.0, r))
-        KR = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[i+1], 0.0, r))
+        KL = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[i], 1, 1.0, r))
+        KR = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[i+1], 1, 0.0, r))
         rows = [KL[1]; KR[1] .+ (canonical_dims[i+1] - canonical_dims[i])]
         cols = [KL[2]; KR[2]]
         vals = [-KL[3]; KR[3]]
@@ -251,8 +251,8 @@ function extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFini
         r = regularity[m]
         if size(H, 1) >= 2*(r+1)
             Hper = circshift(H, r+1)
-            KL = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[m], 1.0, r))
-            KR = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[1], 0.0, r))
+            KL = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[m], 1, 1.0, r))
+            KR = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[1], 1, 0.0, r))
             rows = [KL[1]; KR[1] .+ (canonical_dims[m+1] - canonical_dims[m])]
             cols = [KL[2]; KR[2]]
             vals = [-KL[3]; KR[3]]

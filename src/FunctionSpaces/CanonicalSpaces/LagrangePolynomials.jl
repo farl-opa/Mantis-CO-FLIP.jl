@@ -99,12 +99,15 @@ function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64},
     ξ_scaled = 2.0*ξ .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
     
     # Allocate memory space for the result, derivatives are the third dimension
-    # We evaluate the polynomials and the derivatives (hence the + 1) 
-    d_polynomials = Array{Float64, 3}(undef, n_points, p + 1, nderivatives + 1)
+    d_polynomials = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
+    for j = 0:nderivatives
+        ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
+        ders[j+1][1] = zeros(Float64, n_points, polynomials.p + 1)
+    end
     
     # Evaluate the polynomials at the points ξ
     # PolynomialBases.interpolation_matrix!(view(d_polynomials, :, :, 1), ξ, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
-    d_polynomials[:, :, 1] .= PolynomialBases.interpolation_matrix(ξ_scaled, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
+    d_polynomials[1][1] .= PolynomialBases.interpolation_matrix(ξ_scaled, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
     
     # Evaluate the derivatives at the points ξ
     if nderivatives > 0
@@ -144,8 +147,8 @@ function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64},
         # Compute the first derivative
         # mul!(view(d_polynomials, :, :, derivative_idx + 1), view(d_polynomials, :, :, derivative_idx), D)
         derivative_idx = 1
-        d_polynomials[:, :, derivative_idx + 1] .= d_polynomials[:, :, derivative_idx] * D
-
+        d_polynomials[derivative_idx+1][1] .= d_polynomials[derivative_idx][1] * D
+        
         # Loop over the remaining derivatives and compute them 
         if nderivatives > 1
             D_n = copy(D)  # we use a recursive formula, so we need the previous D^{n} derivative 
@@ -154,12 +157,12 @@ function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64},
                 # In this way we reuse previously computed values of D^{n-1}, so we just need to update in each step
                 # mul!(view(d_polynomials, :, :, derivative_idx + 1), view(d_polynomials, :, :, derivative_idx), D)
                 D_n = _derivative_matrix_next!(D_n, derivative_idx, D, polynomials.nodes)
-                d_polynomials[:, :, derivative_idx + 1] .= d_polynomials[:, :, 1] * D_n
+                d_polynomials[derivative_idx + 1][1] .= d_polynomials[derivative_idx][1] * D_n
             end
         end
     end
 
-    return Dict{Int,Matrix{Float64}}(i => d_polynomials[:,:,i+1] for i = 0:nderivatives)
+    return d_polynomials
     
 end
 
@@ -221,9 +224,11 @@ function evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderiva
 
     # Compute nderivatives+1 of the Lagrange polynomials over Gauss-Lobatto-Legendre nodes
     ll_polynomials_eval = evaluate(polynomials._core_polynomials, ξ, nderivatives+1)
+    for i = 0:nderivatives
+        ll_polynomials_eval[i+1][1] = -cumsum(ll_polynomials_eval[i+2][1][:,1:(end-1)],dims=2)
+    end
     
-
-    return Dict{Int,Matrix{Float64}}(i => -cumsum(ll_polynomials_eval[i+1][:,1:(end-1)],dims=2) for i = 0:nderivatives)
+    return ll_polynomials_eval[1:nderivatives+1]
 end
 
 

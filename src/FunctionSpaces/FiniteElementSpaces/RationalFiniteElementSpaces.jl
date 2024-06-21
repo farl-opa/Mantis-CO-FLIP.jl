@@ -24,22 +24,26 @@ end
 function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n, F <: AbstractFiniteElementSpace{n}}
     homog_basis, basis_indices = evaluate(rat_space.function_space, element_id, xi, nderivatives)
     n_eval = prod(length.(xi))
-    for key in keys(homog_basis)
-        if sum(key) == 0
-            temp = homog_basis[key] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-            weight = reshape(sum(temp, dims=2), n_eval)
-            homog_basis[key] .= LinearAlgebra.Diagonal(weight) \ temp
-
-        elseif sum(key) == 1
-            key_zero = Tuple(zeros(Float64,n))
-            temp = homog_basis[key_zero...] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-            dtemp = homog_basis[key] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-            weight = reshape(sum(temp, dims=2), n_eval)
-            dweight = reshape(sum(dtemp, dims=2), n_eval)
-            homog_basis[key] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
-
-        else
+    for j = 0:nderivatives
+        if j > 1
             error("Derivatives of rational spaces of order  not implemented")
+        else
+            der_keys = _integer_sums(j, n)
+            for key in der_keys
+                if sum(key) == 0
+                    temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                    weight = reshape(sum(temp, dims=2), n_eval)
+                    homog_basis[1][1] .= LinearAlgebra.Diagonal(weight) \ temp
+
+                elseif sum(key) == 1
+                    temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                    dtemp = homog_basis[2][findfirst(key).>0] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                    weight = reshape(sum(temp, dims=2), n_eval)
+                    dweight = reshape(sum(dtemp, dims=2), n_eval)
+                    homog_basishomog_basis[2][findfirst(key).>0] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
+
+                end
+            end
         end
     end
     
@@ -48,26 +52,6 @@ end
 
 function get_max_local_dim(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <: AbstractFiniteElementSpace{n}}
     return get_max_local_dim(rat_space.function_space)
-end
-
-function _evaluate_all_at_point(rat_space::RationalFiniteElementSpace{1,F}, element_id::Int, xi::Float64, nderivatives::Int) where {F <: AbstractFiniteElementSpace{1}}
-    local_basis, basis_indices = evaluate(rat_space, element_id, ([xi],), nderivatives)
-    nloc = length(basis_indices)
-    ndofs = get_dim(rat_space)
-    I = zeros(Int, nloc * (nderivatives + 1))
-    J = zeros(Int, nloc * (nderivatives + 1))
-    V = zeros(Float64, nloc * (nderivatives + 1))
-    count = 0
-    for r = 0:nderivatives
-        for i = 1:nloc
-            I[count+1] = basis_indices[i]
-            J[count+1] = r+1
-            V[count+1] = local_basis[r][1, i]
-            count += 1
-        end
-    end
-
-    return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
 end
 
 # dummy getters
