@@ -3,23 +3,10 @@ import .. Fields
 import .. Geometry
 
 struct Assembler <: AbstractAssemblers
-    bc_values::Vector{Float64}
-    set_bcs::Bool
+    dirichlet_bcs::Dict{Int, Float64}
 end
 
-# Construction if no boundary conditions are needed. The b.c.s will be 
-# set to zero, but won't be used.
-function Assembler()
-    return Assembler([0.0, 0.0], false)
-end
-# Construction if both boundary conditions are needed.
-function Assembler(bc_left::Float64, bc_right::Float64)
-    return Assembler([bc_left, bc_right], true)
-end
-# Construction for more bcs.
-function Assembler(bc_vals::Vector{Float64})
-    return Assembler(bc_vals, true)
-end
+
 
 @doc raw"""
     (self::Assembler)(bilinear_form::AbstractBilinearForms)
@@ -72,18 +59,21 @@ function (self::Assembler)(bilinear_form::AbstractBilinearForms)
 
     end
 
-    
 
-    if self.set_bcs
+    # Set Dirichlet conditions if needed.
+    if ~isempty(self.dirichlet_bcs)
         # Set the bc value for the rhs.
-        bc_idxs = get_boundary_dof_indices(bilinear_form)
-        for idx in eachindex(bc_idxs)
-            b[bc_idxs[idx]] = self.bc_values[idx]
+        for (bc_idx, bc_value) in pairs(self.dirichlet_bcs)
+            b[bc_idx] = bc_value
         end
         
-        # Update the A matrix to be an identity row for the given indices.
+        # Update the A matrix to be an identity row for the given 
+        # indices. As the default sparse matrices are column-based, we 
+        # cannot easily set all values in a row to zero, so we have to 
+        # loop over all indices and check if they are boundary indices.
         for idx in eachindex(A_row_idxs, A_column_idxs, A_vals)
-            if A_row_idxs[idx] in bc_idxs
+            # Check if the row index is also a boundary index.
+            if haskey(self.dirichlet_bcs, A_row_idxs[idx])
                 if A_column_idxs[idx] == A_row_idxs[idx]
                     # Diagonal term, set to 1.0.
                     A_vals[idx] = 1.0

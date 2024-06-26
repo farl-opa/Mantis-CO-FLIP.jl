@@ -11,7 +11,7 @@ using LinearAlgebra
 # This is how MANTIS is called to solve a problem.
 function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, 
                 q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
-                verbose=false, bc = (false, [0.0, 0.0]))
+                verbose=false, bc_dirichlet = Dict{Int, Float64}())
     if verbose
         println("Starting setup of problem and assembler for case "*case*" ...")
     end
@@ -24,18 +24,14 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
                                                               q_weights)
 
     # Setup the global assembler.
-    if bc[1] == false
-        global_assembler = Mantis.Assemblers.Assembler()
-    else
-        global_assembler = Mantis.Assemblers.Assembler(bc[2])
-    end
+    global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
 
     if verbose
         println("Assembling ...")
     end
     A, b = global_assembler(element_assembler)
 
-    if n > 1 && bc[1] == false
+    if n > 1 && isempty(bc_dirichlet)
         # Add the average = 0 condition for Neumann b.c. (derivatives are 
         # assumed to be zero!). Note that this only sums the coefficients.
         A = vcat(A, ones((1,size(A)[2])))
@@ -61,7 +57,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     end
     sol = A \ b
 
-    if n > 1 && bc[1] == false
+    if n > 1 && isempty(bc_dirichlet)
         sol_rsh = reshape(sol[1:end-1], :, 1)
     else
         sol_rsh = reshape(sol, :, 1)
@@ -170,8 +166,6 @@ k_1d = 2
 const Lleft_1d = 0.0
 const Lright_1d = 1.0
 
-bc_sine_1d = (true, [0.0, 1.0])
-bc_const_1d = (true, [0.0, 0.0])
 
 function forcing_sine_1d(x::Float64)
     return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
@@ -199,6 +193,10 @@ kvec_1d[end] = -1
 # Create function spaces (b-splines here).
 trial_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
+
+# Set Dirichlet boundary conditions.
+bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
 
 # Create the geometry.
 geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
@@ -264,6 +262,9 @@ test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
 
 trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
 test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
+
+# Set Dirichlet boundary conditions to zero.
+bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d))
 
 # Create the geometry.
 geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
@@ -437,6 +438,9 @@ test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, tes
 trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
 test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
 
+# Set Dirichlet boundary conditions to zero.
+bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d))
+
 # Create the geometry.
 geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
 
@@ -461,7 +465,7 @@ for case in ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-
     elseif case == "sine2d-Dirichlet"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d)))))
+               n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
     elseif case == "sine2d-Neumann"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
@@ -469,23 +473,23 @@ for case in ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-
     elseif case == "sine2d-crazy-Dirichlet"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d)))))
+               n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
     elseif case == "sine2d-crazy-Neumann"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
-                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-                n_2d, write_to_output_file, run_tests, verbose)
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose)
     # elseif case == "sine2dH-Dirichlet"
     #     fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
     #            q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
-    #            write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d)))))
+    #            write_to_output_file, run_tests, verbose, bc_dirichlet_dict_2d)
     elseif case == "sine2dH-Neumann"
         fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
-                q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
-                write_to_output_file, run_tests, verbose)
+               q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+               write_to_output_file, run_tests, verbose)
     elseif case == "sine3d-Dirichlet"
         fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
                q_nodes_3d, q_weights_3d, exact_sol_sine_3d, p_3d, k_3d, case, 
-               n_3d, write_to_output_file, run_tests, verbose, (true, zeros(length(Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d)))))
+               n_3d, write_to_output_file, run_tests, verbose, bc_dirichlet_3d)
     else
         if verbose
             println("Warning: case '"*case*"' unknown. Skipping.") 
