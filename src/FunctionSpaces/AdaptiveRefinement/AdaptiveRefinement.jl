@@ -4,7 +4,6 @@
 Contains all structures and methods related with adaptive refinement.
 """
 
-include("Mark.jl")
-include("Estimate.jl")
+include("Mark.jl") # Methods concerning marking elements to due error estimations
 
-include("L-Chain.jl")
+include("L-Chain.jl") # Methods concerning L-chain marking

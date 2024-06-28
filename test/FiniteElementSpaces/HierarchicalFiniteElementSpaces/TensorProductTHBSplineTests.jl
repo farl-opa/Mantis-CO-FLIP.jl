@@ -55,50 +55,34 @@ end
 
 # Geometry visualization
 
-function get_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n}) where {n}
-    degrees = Mantis.FunctionSpaces.get_polynomial_degree_per_dim(hspace.spaces[1])
-    nxi_per_dim = maximum(degrees) + 1
-    nxi = nxi_per_dim^2
-    xi_per_dim = collect(range(0,1, nxi_per_dim))
-    xi = Matrix{Float64}(undef, nxi,2)
+function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
+    L = Mantis.FunctionSpaces.get_num_levels(hspace)
+    
+    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_dim(hspace), 2))
 
-    xi_eval = (xi_per_dim, xi_per_dim)
+    id_sum = 1
+    for level ∈ 1:1:L
+        max_ind_basis = Mantis.FunctionSpaces._get_dim_per_space(hspace.spaces[level])
+        x_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
+        y_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
+        grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
+        
+        _, level_active_basis = Mantis.FunctionSpaces.get_level_active(hspace.active_basis, level)
 
-    for (idx,x) ∈ enumerate(Iterators.product(xi_per_dim, xi_per_dim))
-        xi[idx,:] = [x[1] x[2]]
+        for (y_count, y_id) ∈ enumerate(y_greville_points)
+            for (x_count, x_id) ∈ enumerate(x_greville_points)
+                if Mantis.FunctionSpaces.ordered_to_linear_index((x_count, y_count), max_ind_basis) ∈ level_active_basis
+                    coefficients[id_sum, :] .= [x_id, y_id]
+                    id_sum += 1
+                end
+            end
+        end
     end
 
-    xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
-    nx = size(xs)[1]
-
-    A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
-
-    for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
-        level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
-        element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
-
-        max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hspace.spaces[level])
-        ordered_index = Mantis.FunctionSpaces.linear_to_ordered_index(element_id, max_ind_els)
-
-        borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
-        borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
-
-        x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
-
-        idx = (el-1)*nxi+1:el*nxi
-        xs[idx,:] = x
-        local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
-        A[idx, eval[2]] = eval[1][0,0]
-    end
-
-    coeffs = A \ xs
-
-    hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
-
-    return hierarchical_geo
+    return Mantis.Geometry.FEMGeometry(hspace, coefficients)
 end
 
-hspace_geo = get_geometry(hspace)
+hspace_geo = get_thb_geometry(hspace)
 
 # Generate the Plot
 Mantis_folder =  dirname(dirname(pathof(Mantis)))

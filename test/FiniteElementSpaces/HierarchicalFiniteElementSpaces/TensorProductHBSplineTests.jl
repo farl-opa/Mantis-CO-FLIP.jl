@@ -35,6 +35,10 @@ coarse_elements_to_refine = [3,4,5,8,9,10]
 refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
 
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
+
+### Stability test
+ae, ab = Mantis.FunctionSpaces.get_active_objects(spaces, [CTS], refined_domains)
+###
 hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
 
 x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
@@ -53,8 +57,6 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # Positivity of the basis
     @test minimum(h_eval[0,0]) >= 0.0
 end
-
-hspace.active_elements
 
 # Test if projection in space is exact
 nxi_per_dim = 3

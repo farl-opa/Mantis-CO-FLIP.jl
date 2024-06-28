@@ -191,4 +191,3 @@ function (self::PoissonBilinearForm{n, Frhs, Ttrial, Ttest, TG})(element_id) whe
     return (A_row_idx, A_col_idx, A_elem), (b_col_idx, b_elem)
     
 end
-

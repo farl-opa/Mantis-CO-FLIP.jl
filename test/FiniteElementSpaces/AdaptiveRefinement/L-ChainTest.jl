@@ -84,6 +84,9 @@ function plot_geometry(hspace)
     end
 
     coeffs = A \ xs
+    println(size(A))
+    println(size(coeffs))
+    display(coeffs)
 
     hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
 
@@ -152,8 +155,8 @@ function plot_field(hspace)
 end
 
 # Test parameters
-ne1 = 10
-ne2 = 10
+ne1 = 5
+ne2 = 5
 breakpoints1 = collect(range(0, 1, ne1+1))
 patch1 = Mantis.Mesh.Patch1D(breakpoints1)
 breakpoints2 = collect(range(0, 1, ne2+1))
@@ -186,7 +189,7 @@ for step ∈ 1:n_steps
     push!(marked_elements_per_level, rand(Mantis.FunctionSpaces.get_level_active(hspace.active_elements, L-1)[2], n_els_per_step))
     push!(marked_elements_per_level, Int[])
 
-    refinement_domains = Mantis.FunctionSpaces.get_refinement_domain(hspace, marked_elements_per_level, new_operator)
+    refinement_domains = Mantis.FunctionSpaces.get_refinement_domain(hspace, Int[], new_operator)
 
     if length(refinement_domains) > L
         push!(operators, new_operator)

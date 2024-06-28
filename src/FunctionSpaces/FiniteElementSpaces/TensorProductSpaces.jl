@@ -111,7 +111,7 @@ linear_index = ordered_pair[1] + (ord_ind[2]-1)*max_ind[1] + ...
 # Returns
 - `ord_ind::Vector{Int}`: ordered index pair
 """
-function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
+function linear_to_ordered_index(lin_ind::Int, max_ind)
     m = length(max_ind)
     ord_ind = zeros(Int,m)
     ord_ind[1] = lin_ind - floor((lin_ind-1)/max_ind[1])*max_ind[1]
@@ -123,14 +123,6 @@ function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
     @assert lin_ind==0 "Ordered pair computation failed."
     
     return Int.(ord_ind)
-end
-
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{m,Int}) where {m}
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
-end
-
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{Int,Int})
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
 end
 
 function get_support(tp_space::TensorProductSpace{n, F1, F2}, basis_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
