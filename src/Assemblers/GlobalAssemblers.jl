@@ -16,14 +16,14 @@ Assemble a continuous Galerkin problem with given bilinear form.
 # Arguments
 - `bilinear_form::AbstractBilinearForms`: bilinear form.
 """
-function (self::Assembler)(bilinear_form::AbstractBilinearForms)
+function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Function, W <: AbstractInputs}
     # Get the actual size of the problem.
-    n_dofs_trial, n_dofs_test = get_problem_size(bilinear_form)
+    n_dofs_trial, n_dofs_test = get_problem_size(weak_form_inputs)
     
     # Pre-allocate
-    nnz_elem = get_estimated_nnz_per_elem(bilinear_form)
+    nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
 
-    nvals_A = nnz_elem[1] * get_num_elements(bilinear_form)
+    nvals_A = nnz_elem[1] * get_num_elements(weak_form_inputs)
     A_column_idxs = Vector{Int}(undef, nvals_A)
     A_row_idxs = Vector{Int}(undef, nvals_A)
     A_vals = Vector{Float64}(undef, nvals_A)
@@ -38,9 +38,9 @@ function (self::Assembler)(bilinear_form::AbstractBilinearForms)
     counts_A = 0
 
     # Loop over all active elements
-    for elem_id in 1:get_num_elements(bilinear_form)
+    for elem_id in 1:get_num_elements(weak_form_inputs)
         # Volume/element contributions
-        contrib_A, contrib_b = bilinear_form(elem_id)
+        contrib_A, contrib_b = weak_form(weak_form_inputs, elem_id)
 
         for idx in eachindex(contrib_A...)
             counts_A += 1

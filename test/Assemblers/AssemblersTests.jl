@@ -16,12 +16,12 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         println("Starting setup of problem and assembler for case "*case*" ...")
     end
     # Setup the element assembler.
-    element_assembler = Mantis.Assemblers.PoissonBilinearForm(forcing_function,
-                                                              trial_space,
-                                                              test_space,
-                                                              geom,
-                                                              q_nodes,
-                                                              q_weights)
+    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(forcing_function,
+                                                        trial_space,
+                                                        test_space,
+                                                        geom,
+                                                        q_nodes,
+                                                        q_weights)
 
     # Setup the global assembler.
     global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
@@ -29,7 +29,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if verbose
         println("Assembling ...")
     end
-    A, b = global_assembler(element_assembler)
+    A, b = global_assembler(Mantis.Assemblers.poisson_weak_form_1, weak_form_inputs)
 
     if n > 1 && isempty(bc_dirichlet)
         # Add the average = 0 condition for Neumann b.c. (derivatives are 
@@ -452,7 +452,8 @@ q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mant
 
 # Running all testcases.
 println()
-for case in ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
+cases = ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
+for case in cases
 
     if case == "sine1d"
         fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d,

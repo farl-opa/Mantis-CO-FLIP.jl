@@ -66,7 +66,7 @@ end
 
 
 abstract type AbstractAssemblers end
-abstract type AbstractBilinearForms end
+abstract type AbstractInputs end
 abstract type AbstractBoundaryForms end
 
 
