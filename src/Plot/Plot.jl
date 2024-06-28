@@ -44,6 +44,10 @@ function plot(geometry::Geometry.AbstractGeometry{n, m}, field::Fields.AbstractF
   _plot(geometry, field; kwargs...)
 end
 
+function plot(geometry::Geometry.AbstractGeometry{n, m}, field::Fields.AbstractField{n,k}, offset::Function; kwargs...) where {n, m, k}
+  _plot(geometry, field, offset; kwargs...)
+end
+
 
 @doc raw"""
 plot(field::F; kwargs...) where {F <: AbstractFunction}

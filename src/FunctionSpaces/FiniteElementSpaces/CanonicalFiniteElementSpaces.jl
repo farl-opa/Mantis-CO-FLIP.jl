@@ -8,6 +8,11 @@ Wrapper that allows treating a canonical space as a finite element space.
 """
 struct CanonicalFiniteElementSpace{F} <: AbstractFiniteElementSpace{1}
     canonical_space::F
+    boundary_dof_indices::Vector{Int}
+
+    function CanonicalFiniteElementSpace(canonical_space::F) where F <: AbstractCanonicalSpace
+        new{F}(canonical_space, [1, canonical_space.p+1])
+    end
 end
 
 function get_polynomial_degree(space::CanonicalFiniteElementSpace)
@@ -72,6 +77,15 @@ end
 
 function get_max_local_dim(space::CanonicalFiniteElementSpace)
     return get_dim(space)
+end
+
+function set_boundary_dof_indices(space::CanonicalFiniteElementSpace, indices::Vector{Int})
+    space.boundary_dof_indices = indices
+    return nothing
+end
+
+function get_boundary_dof_indices(space::CanonicalFiniteElementSpace)
+    return space.boundary_dof_indices
 end
 
 function get_extraction(space::CanonicalFiniteElementSpace,::Int)

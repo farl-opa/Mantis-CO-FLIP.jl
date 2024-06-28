@@ -12,11 +12,12 @@ A tensor-product space that is built as the tensor-product of `m` input spaces. 
 struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n} #where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     function_space_1::F1
     function_space_2::F2
+    boundary_dof_indices::Vector{Int}
     data::Dict
 
     function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
         n = get_n(function_space_1) + get_n(function_space_2)
-        new{n,F1,F2}(function_space_1, function_space_2, data)
+        new{n,F1,F2}(function_space_1, function_space_2, Vector{Int}(undef,0), data)
     end
 
     function TensorProductSpace(function_space_1::F1, function_space_2::F2) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
@@ -123,6 +124,34 @@ function linear_to_ordered_index(lin_ind::Int, max_ind)
     @assert lin_ind==0 "Ordered pair computation failed."
     
     return Int.(ord_ind)
+end
+
+function get_boundary_dof_indices(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    if length(tp_space.boundary_dof_indices)==0 # use default tp-dofs
+        #boundary_dofs_1, boundary_dofs_2 = _get_boundary_dof_indices_per_dim(tp_space)
+        boundary_dofs_1 = get_boundary_dof_indices(tp_space.function_space_1)
+        boundary_dofs_2 = get_boundary_dof_indices(tp_space.function_space_2)
+        tp_dim = _get_dim_per_space(tp_space)
+        # total number of boundary dofs
+        n_boundary_dofs = tp_dim[1] * length(boundary_dofs_2) + tp_dim[2] * length(boundary_dofs_1) - length(boundary_dofs_1) * length(boundary_dofs_2)
+        boundary_dofs = Vector{Int}(undef,n_boundary_dofs)
+        # boundaries aligned with function space 1
+        idx = 1
+        for id ∈ Iterators.product(1:tp_dim[1], boundary_dofs_2)
+            boundary_dofs[idx] = ordered_to_linear_index(id, tp_dim)
+            idx += 1
+        end
+        # boundaries aligned with function space 2
+        for id ∈ Iterators.product(boundary_dofs_1, 1:tp_dim[2])
+            if !any(boundary_dofs_2 .== id[2])
+                boundary_dofs[idx] = ordered_to_linear_index(id, tp_dim)
+                idx += 1
+            end
+        end
+        return boundary_dofs
+    else
+        return tp_space.boundary_dof_indices
+    end
 end
 
 function get_support(tp_space::TensorProductSpace{n, F1, F2}, basis_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
