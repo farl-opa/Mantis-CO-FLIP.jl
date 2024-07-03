@@ -40,8 +40,7 @@ function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, x
                     dtemp = homog_basis[2][findfirst(key).>0] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
                     weight = reshape(sum(temp, dims=2), n_eval)
                     dweight = reshape(sum(dtemp, dims=2), n_eval)
-                    homog_basishomog_basis[2][findfirst(key).>0] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
-
+                    homog_basis[2][findfirst(key).>0] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
                 end
             end
         end

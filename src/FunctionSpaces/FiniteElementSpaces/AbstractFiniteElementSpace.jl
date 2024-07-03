@@ -49,7 +49,7 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTu
     for j = 0:nderivatives
         for k = 1:length(local_basis[j+1])
             if isassigned(local_basis[j+1],k)
-                evaluation[j+1][idx...] = @views local_basis[j+1][idx...] * coeffs[basis_indices]
+                evaluation[j+1][k] = @views local_basis[j+1][k] * coeffs[basis_indices]
             end
         end
     end

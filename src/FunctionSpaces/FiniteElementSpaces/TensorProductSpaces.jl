@@ -217,11 +217,14 @@ function _get_extraction_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id:
 end
 
 function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    # spatial dimensions of domains of definition for the two function spaces
     n1 = get_n(tp_space.function_space_1)
     n2 = get_n(tp_space.function_space_2)
 
+    # get local bases for the two function spaces
     local_basis_per_dim = _get_local_basis_per_dim(tp_space, el_id, xi, nderivatives)
-
+    
+    # generate derivative keys 
     der_keys = _integer_sums(nderivatives, n+1)
     local_basis = Vector{Matrix{Matrix{Float64}}}(undef, length(der_keys))
     
