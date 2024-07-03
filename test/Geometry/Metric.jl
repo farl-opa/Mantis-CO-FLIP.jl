@@ -180,7 +180,6 @@ geom_coeffs = [geom_coeffs_0.*r0 -[+1.0, -1.0, +1.0, -1.0]
                geom_coeffs_0.*r1 [+1.0, -1.0, +1.0, -1.0]]
 wavy_surface_geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 
-
 # Points where to evaluate the metric
 nx_evaluate = 20
 ny_evaluate = 20
