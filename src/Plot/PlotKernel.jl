@@ -1,15 +1,13 @@
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{1, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{1}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {F <: Fields.AbstractField{1, field_dim} where {field_dim}}
     # This function generates points per plotted 1D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
     # These cells can be on a straight line, but they can also lie on a complex manifold of dimension 1 embedded in R^3
     
-    domain_dim = 1  # this is hardcoded, because each type of cell plotted in VTK is different, so
-                    # we need specialized functions
-
+    range_dim = Geometry.get_image_dim(geometry)
     # print("Geometry dimensions: ", domain_dim, " x ", range_dim, "\n")
     
     # Compute the total number of points
@@ -89,14 +87,13 @@ end
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{2, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{2}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {F <: Fields.AbstractField{2, field_dim} where {field_dim}}
     # This function generates points per plotted 2D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
     # These cells can be on a plane, but then can also lie on a complex manifold of dimension 2 embedded in R^3
     
-    domain_dim = 2  # this is hardcoded, because each type of cell plotted in VTK is different, so
-                    # we need specialized functions
+    range_dim = Geometry.get_image_dim(geometry)
 
     # print("Geometry dimensions: ", domain_dim, " x ", range_dim, "\n")
     

@@ -59,7 +59,8 @@ function get_finer_elements(twoscale_operator::TensorProductTwoScaleOperator{n, 
     return reduce(vcat, get_finer_elements.(Ref(twoscale_operator), el_ids))
 end
 
-function get_coarser_element(twoscale_operator::TensorProductTwoScaleOperator{n,m}, el_id::Int) where {n, m}
+
+function get_coarser_element(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_c = _get_num_elements_per_space(twoscale_operator.coarse_space)
 
     coarser_ordered_indices = _get_coarser_elements_per_space(twoscale_operator, el_id)
@@ -67,12 +68,15 @@ function get_coarser_element(twoscale_operator::TensorProductTwoScaleOperator{n,
     return ordered_to_linear_index(coarser_ordered_indices, max_ind_c)
 end
 
+
+
 function _get_coarser_elements_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_f = _get_num_elements_per_space(twoscale_operator.fine_space)
     ordered_index = linear_to_ordered_index(el_id, max_ind_f)
 
     return (get_coarser_element(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_coarser_element(twoscale_operator.twoscale_operator_2, ordered_index[2]))
 end
+
 
 function get_finer_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, basis_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_f = _get_dim_per_space(twoscale_operator.fine_space)

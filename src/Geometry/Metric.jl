@@ -1,6 +1,6 @@
 import LinearAlgebra
 
-function metric(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
+function metric(geometry::AbstractGeometry{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n}
     # The metric tensor gᵢⱼ is
     #   gᵢⱼ := ∑ₖᵐ ∂Φᵏ\∂ξᵢ ⋅ ∂Φᵏ\∂ξⱼ
     # Since the Jacobian matrix J is given by
@@ -34,7 +34,7 @@ function metric(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple{n,V
     return g, sqrt_g
 end
 
-function inv_metric(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
+function inv_metric(geometry::AbstractGeometry{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n}
     # The inverse of the metric tensor gᵢⱼ is
     #   [gⁱʲ] := [gᵢⱼ]⁻¹
     # The metric tensor is computed for all evaluation points. To avoid having to compute the 
@@ -58,29 +58,4 @@ function inv_metric(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple
     end
 
     return inv_g, g, sqrt_g
-end
-
-
-function metric_deepesh(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
-    J = jacobian(geometry, element_id, xi)
-    n_eval_points = prod(length.(xi))
-    g = zeros(n_eval_points, n, n)
-    sqrt_g = zeros(n_eval_points)
-    for i = 1:n_eval_points
-        g[i, :, :] .= reshape(J[i, :, :],m,n)' * reshape(J[i, :, :],m,n)
-        sqrt_g[i] = sqrt(LinearAlgebra.det(reshape(g[i, :, :],n,n)))
-    end
-    return g, sqrt_g
-end
-
-function inv_metric_deepesh(geometry::AbstractGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
-    J = jacobian(geometry, element_id, xi)
-    n_eval_points = prod(length.(xi))
-    inv_g = zeros(n_eval_points, n, n)
-    sqrt_g = zeros(n_eval_points)
-    for i = 1:n_eval_points
-        inv_g[i, :, :] .= inv(reshape(J[i, :, :],m,n)' * reshape(J[i, :, :],m,n))
-        sqrt_g[i] = sqrt(1.0/LinearAlgebra.det(reshape(inv_g[i, :, :],n,n)))
-    end
-    return inv_g, sqrt_g
 end

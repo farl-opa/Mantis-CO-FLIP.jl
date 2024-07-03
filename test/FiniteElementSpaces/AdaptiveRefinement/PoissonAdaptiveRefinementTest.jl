@@ -177,7 +177,7 @@ function test()
         L = Mantis.FunctionSpaces.get_num_levels(hspace)
         new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hspace.spaces[L], (nsub1, nsub2))
         dorfler_marking = Mantis.FunctionSpaces.get_dorfler_marking(err_per_element, dorfler_parameter)
-        marked_domains = Mantis.FunctionSpaces.get_marked_domains(hspace, dorfler_marking, new_operator, true)
+        marked_domains = Mantis.FunctionSpaces.get_marked_domains(hspace, dorfler_marking, new_operator, false)
 
         if length(marked_domains) > L
             push!(spaces, new_space)

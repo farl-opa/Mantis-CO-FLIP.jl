@@ -18,14 +18,14 @@ Contains the required data for a one variable FEM.
 - `forcing::Frhs <: Function`: Forcing function, must take in an NTuple{n, Float64} as argument.
 - `space_trial::Ttrial <: FunctionSpaces.AbstractFunctionSpace`: Trial (Solution) space.
 - `space_test::Ttest <: FunctionSpaces.AbstractFunctionSpace`: Test space.
-- `geometry::TG <: Geometry.AbstractGeometry{n,m}`: Geometry.
+- `geometry::TG <: Geometry.AbstractGeometry{n}`: Geometry.
 - `quad_nodes::NTuple{n, Vector{Float64}}`: Quadrature nodes.
 - `quad_weights::Vector{Float64}`: Vector of the tensor product of the quadrature weights.
 
 # See also
 [`Quadrature.tensor_product_rule(p::NTuple{n, Int}, quad_rule::F) where {n, F <: Function}`](@ref) to compute the quadrature weights.
 """
-struct WeakFormInputs{n, m, Frhs, Ttrial, Ttest, TG} <: AbstractInputs
+struct WeakFormInputs{n, Frhs, Ttrial, Ttest, TG} <: AbstractInputs
     forcing::Frhs
 
     space_trial::Ttrial
@@ -43,13 +43,13 @@ struct WeakFormInputs{n, m, Frhs, Ttrial, Ttest, TG} <: AbstractInputs
                             space_test::Ttest, 
                             geometry::TG, 
                             quad_nodes::NTuple{n, Vector{Float64}}, 
-                            quad_weights::Vector{Float64}) where {n, m, 
+                            quad_weights::Vector{Float64}) where {n, 
                             Frhs <: Function, 
                             Ttrial <: FunctionSpaces.AbstractFunctionSpace, 
                             Ttest <: FunctionSpaces.AbstractFunctionSpace,
-                            TG <: Geometry.AbstractGeometry{n,m}}
+                            TG <: Geometry.AbstractGeometry{n}}
         
-        new{n, m, Frhs, Ttrial, Ttest, TG}(forcing, space_trial, space_test, 
+        new{n, Frhs, Ttrial, Ttest, TG}(forcing, space_trial, space_test, 
                                            geometry, quad_nodes, quad_weights)
     end
 end

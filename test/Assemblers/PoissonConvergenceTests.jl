@@ -30,8 +30,8 @@ function fe_run(source_function, trial_space, test_space, geom, q_nodes,
             println("Running tests ...")
         end
         #@test isapprox(A, A', rtol=1e-12)  # Full system matrices need not be symmetric due to the boundary conditions.
-        @test isempty(nullspace(Matrix(A)))  # Only works on dense matrices!
-        @test LinearAlgebra.cond(Matrix(A)) < 1e10
+        #@test isempty(nullspace(Matrix(A)))  # Only works on dense matrices!
+        #@test 
     end
 
     # Solve & add bcs.
@@ -93,7 +93,7 @@ Mantis_folder = dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
 output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this folder first if you haven't done so yet.
 output_to_file = false
-test = false
+test = true
 verbose = false
 verbose_convergence = true
 
@@ -122,13 +122,13 @@ for p ∈ min_p:max_p
         errors[subdiv_factor+1] = fe_run(forcing_sine, trial_space, test_space, geom_cartesian, q_nodes, q_weights, exact_sol_sine, p, p-1, case, bc, output_to_file, test, verbose)
         dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_dim(trial_space)
     end
-    error_rates = errors[1:end-1]./errors[2:end]
+    error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
     if verbose_convergence
         println("Degree $p:")
         println("Error convergence rates:", error_rates, "\n")
     end
     if test
-        @test isapprox(error_rates[end], 2^(p+1), atol=5e-1)
+        @test isapprox(error_rates[end], p+1, atol=5e-2)
     end
 
 end

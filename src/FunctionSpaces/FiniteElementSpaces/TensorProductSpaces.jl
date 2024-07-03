@@ -15,8 +15,8 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n} #where {n,
     boundary_dof_indices::Vector{Int}
     data::Dict
 
-    function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
-        n = get_n(function_space_1) + get_n(function_space_2)
+    function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}} where {n1, n2}
+        n = n1 + n2
         new{n,F1,F2}(function_space_1, function_space_2, Vector{Int}(undef,0), data)
     end
 

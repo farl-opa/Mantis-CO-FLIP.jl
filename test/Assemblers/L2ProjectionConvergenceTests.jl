@@ -116,12 +116,14 @@ for p ∈ min_p:max_p
         errors[subdiv_factor+1] = fe_run(source_function, trial_space, test_space, geom_cartesian, q_nodes, q_weights, source_function, p, p-1, case, 2, bc, output_to_file, test, verbose)
         dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_dim(trial_space)
     end
-    error_rates = errors[1:end-1]./errors[2:end]
+    error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
     if verbose_convergence
         println("Degree $p:")
         println("Error convergence rates:", error_rates, "\n")
     end
-    @test isapprox(error_rates[end], 2^(p+1), atol=1e-1)
+    if test
+        @test isapprox(error_rates[end], p+1, atol=5e-2)
+    end
 
 end
 

@@ -6,7 +6,7 @@ Supertype for all scalar finite element spaces.
 abstract type AbstractFiniteElementSpace{n} <: AbstractFunctionSpace end
 
 # Getters for the function spaces
-get_n(f::AbstractFiniteElementSpace{n}) where {n} = n
+get_n(_::AbstractFiniteElementSpace{n}) where {n} = n
 
 
 @doc raw"""
