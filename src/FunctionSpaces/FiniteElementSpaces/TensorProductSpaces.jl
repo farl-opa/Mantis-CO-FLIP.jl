@@ -12,11 +12,12 @@ A tensor-product space that is built as the tensor-product of `m` input spaces. 
 struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n} #where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     function_space_1::F1
     function_space_2::F2
+    boundary_dof_indices::Vector{Int}
     data::Dict
 
-    function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
-        n = get_n(function_space_1) + get_n(function_space_2)
-        new{n,F1,F2}(function_space_1, function_space_2, data)
+    function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}} where {n1, n2}
+        n = n1 + n2
+        new{n,F1,F2}(function_space_1, function_space_2, Vector{Int}(undef,0), data)
     end
 
     function TensorProductSpace(function_space_1::F1, function_space_2::F2) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
@@ -65,6 +66,10 @@ function _get_dim_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F
     return (get_dim(tp_space.function_space_1), get_dim(tp_space.function_space_2))
 end
 
+function get_polynomial_degree_per_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    return (get_polynomial_degree(tp_space.function_space_1), get_polynomial_degree(tp_space.function_space_2))
+end
+
 function get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     return get_max_local_dim(tp_space.function_space_1) * get_max_local_dim(tp_space.function_space_2)
 end
@@ -82,7 +87,7 @@ linear_index = ordered_pair[1] + (ord_ind[2]-1)*max_ind[1] + ...
 # Returns
 - `lin_ind::Int`: computed linear index
 """
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
+function ordered_to_linear_index(ord_ind, max_ind)
     m = length(max_ind)
     @assert length(ord_ind)==m "Dimension mismatch."
     max_ind = cumprod(max_ind)
@@ -92,18 +97,6 @@ function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
     end
 
     return lin_ind
-end
-
-function ordered_to_linear_index(ord_ind::Tuple{m,Int}, max_ind::Tuple{m,Int}) where {m}
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Tuple{Int, Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(ord_ind, collect(max_ind))
 end
 
 @doc raw"""
@@ -119,7 +112,7 @@ linear_index = ordered_pair[1] + (ord_ind[2]-1)*max_ind[1] + ...
 # Returns
 - `ord_ind::Vector{Int}`: ordered index pair
 """
-function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
+function linear_to_ordered_index(lin_ind::Int, max_ind)
     m = length(max_ind)
     ord_ind = zeros(Int,m)
     ord_ind[1] = lin_ind - floor((lin_ind-1)/max_ind[1])*max_ind[1]
@@ -133,12 +126,32 @@ function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
     return Int.(ord_ind)
 end
 
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{m,Int}) where {m}
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
-end
-
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{Int,Int})
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
+function get_boundary_dof_indices(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    if length(tp_space.boundary_dof_indices)==0 # use default tp-dofs
+        #boundary_dofs_1, boundary_dofs_2 = _get_boundary_dof_indices_per_dim(tp_space)
+        boundary_dofs_1 = get_boundary_dof_indices(tp_space.function_space_1)
+        boundary_dofs_2 = get_boundary_dof_indices(tp_space.function_space_2)
+        tp_dim = _get_dim_per_space(tp_space)
+        # total number of boundary dofs
+        n_boundary_dofs = tp_dim[1] * length(boundary_dofs_2) + tp_dim[2] * length(boundary_dofs_1) - length(boundary_dofs_1) * length(boundary_dofs_2)
+        boundary_dofs = Vector{Int}(undef,n_boundary_dofs)
+        # boundaries aligned with function space 1
+        idx = 1
+        for id ∈ Iterators.product(1:tp_dim[1], boundary_dofs_2)
+            boundary_dofs[idx] = ordered_to_linear_index(id, tp_dim)
+            idx += 1
+        end
+        # boundaries aligned with function space 2
+        for id ∈ Iterators.product(boundary_dofs_1, 1:tp_dim[2])
+            if !any(boundary_dofs_2 .== id[2])
+                boundary_dofs[idx] = ordered_to_linear_index(id, tp_dim)
+                idx += 1
+            end
+        end
+        return boundary_dofs
+    else
+        return tp_space.boundary_dof_indices
+    end
 end
 
 function get_support(tp_space::TensorProductSpace{n, F1, F2}, basis_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
@@ -161,7 +174,7 @@ function _get_support_per_dim(tp_space::TensorProductSpace{n, F1, F2}, basis_id:
     max_ind_basis = _get_dim_per_space(tp_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_basis)
 
-    return (get_support(tp_space.function_space_1, ordered_index[1]), get_support(tp_space.function_space_2, ordered_index[2]))
+    return get_support(tp_space.function_space_1, ordered_index[1]), get_support(tp_space.function_space_2, ordered_index[2])
 end
 
 function get_extraction(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
@@ -218,7 +231,7 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
     xi_1 = xi[1:n1]
     xi_2 = xi[n1+1:n]
 
-    return (get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives))
+    return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
 end
 
 function _integer_sums(n, k)

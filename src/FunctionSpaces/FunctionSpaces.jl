@@ -16,5 +16,6 @@ abstract type AbstractFunctionSpace end
 
 include("CanonicalSpaces/CanonicalSpaces.jl")  # Creates Module CanonicalSpaces
 include("FiniteElementSpaces/FiniteElementSpaces.jl")  # Creates Module FiniteElementSpaces
+include("AdaptiveRefinement/AdaptiveRefinement.jl")
 
 end

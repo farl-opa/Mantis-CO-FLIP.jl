@@ -6,7 +6,7 @@ Supertype for all scalar finite element spaces.
 abstract type AbstractFiniteElementSpace{n} <: AbstractFunctionSpace end
 
 # Getters for the function spaces
-get_n(f::AbstractFiniteElementSpace{n}) where {n} = n
+get_n(_::AbstractFiniteElementSpace{n}) where {n} = n
 
 
 @doc raw"""
@@ -56,7 +56,7 @@ end
 Structure to store extraction operators and coefficients.
 """
 struct ExtractionOperator
-    extraction_coefficients::Vector{Array{Float64}}
+    extraction_coefficients::Vector{Matrix{Float64}}
     basis_indices::Vector{Vector{Int}}
     num_elements::Int
     space_dim::Int
@@ -82,9 +82,10 @@ include("CanonicalFiniteElementSpaces.jl")
 # univariate function spaces
 include("UnivariateSplineSpaces.jl")
 include("UnivariateSplineExtractions.jl")
-include("TwoScaleRelations.jl")
 # composite function spaces
 include("UnstructuredSpaces.jl")
 include("TensorProductSpaces.jl")
-include("TensorProductTwoScaleRelations.jl")
-include("HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
+# two scale relations
+include("TwoScaleRelations/TwoScaleRelations.jl")
+# hierarchical function spaces
+include("HierarchicalFiniteElementSpaces.jl")

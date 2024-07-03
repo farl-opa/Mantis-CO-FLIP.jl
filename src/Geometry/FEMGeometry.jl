@@ -1,31 +1,30 @@
 import LinearAlgebra
 
-struct FEMGeometry{n,m} <: AbstractGeometry{n, m}
+struct FEMGeometry{n, F} <: AbstractGeometry{n}
     geometry_coeffs::Array{Float64,2}
-    fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}
+    fem_space::F
     n_elements::Int
 
-    function FEMGeometry(fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}, geometry_coeffs::Array{Float64,2}) where {n}
-        m = size(geometry_coeffs,2)
+    function FEMGeometry(fem_space::F, geometry_coeffs::Array{Float64,2}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
         n_elements = FunctionSpaces.get_num_elements(fem_space)
-        return new{n,m}(geometry_coeffs, fem_space, n_elements)
+        return new{n,F}(geometry_coeffs, fem_space, n_elements)
     end
 end
 
-function get_num_elements(geometry::FEMGeometry{n,m}) where {n,m}
+function get_num_elements(geometry::FEMGeometry{n, F}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
     return geometry.n_elements
 end
 
-function get_domain_dim(::FEMGeometry{n,m}) where {n, m}
+function get_domain_dim(_::FEMGeometry{n, F}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
     return n
 end
 
-function get_image_dim(::FEMGeometry{n,m}) where {n, m}
-    return m
+function get_image_dim(geometry::FEMGeometry{n, F}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
+    return size(geometry.geometry_coeffs)[2]
 end
 
 # evaluate in each direction at the specific points in the ntuple
-function evaluate(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
+function evaluate(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
     # evaluate fem space
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(geometry.fem_space, element_id, xi, 0)
     # combine with coefficients and return
@@ -33,15 +32,14 @@ function evaluate(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vect
     return fem_basis[key...] * geometry.geometry_coeffs[fem_basis_indices,:]
 end
 
-import LinearAlgebra
-
-function jacobian(geometry::FEMGeometry{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n,m}
+function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
     # Jᵢⱼ = ∂Φⁱ\∂ξⱼ
     # evaluate fem space
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(geometry.fem_space, element_id, xi, 1)
     # combine with coefficients and return
     keys = Matrix{Int}(LinearAlgebra.I,n,n)
     n_eval_points = prod(length.(xi))
+    m = get_image_dim(geometry)
     J = zeros(n_eval_points, m, n)
     for k = 1:n 
         J[:, :, k] .= fem_basis[Tuple(keys[k,:])...] * geometry.geometry_coeffs[fem_basis_indices,:]

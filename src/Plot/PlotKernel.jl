@@ -1,15 +1,13 @@
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{1, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{1}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {F <: Fields.AbstractField{1, field_dim} where {field_dim}}
     # This function generates points per plotted 1D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
     # These cells can be on a straight line, but they can also lie on a complex manifold of dimension 1 embedded in R^3
     
-    domain_dim = 1  # this is hardcoded, because each type of cell plotted in VTK is different, so
-                    # we need specialized functions
-
+    range_dim = Geometry.get_image_dim(geometry)
     # print("Geometry dimensions: ", domain_dim, " x ", range_dim, "\n")
     
     # Compute the total number of points
@@ -52,6 +50,9 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
                 if !isnothing(field)
                     point_data[:,vertex_idx + bnd_idx] = vec(Fields.evaluate(field, element_idx, ([ξ],)))
                 end
+                if !isnothing(offset)
+                    point_data[:, vertex_idx + bnd_idx] .-= offset(vertices[:, vertex_idx + bnd_idx]...)
+                end
             end
             
             # Add interior vertices 
@@ -61,6 +62,9 @@ function _plot(geometry::Geometry.AbstractGeometry{1, range_dim}, field::Union{N
                 # Compute data to plot 
                 if !isnothing(field)
                     point_data[:,vertex_idx + interior_vertex_idx + 1] = vec(Fields.evaluate(field, element_idx, ([ξ],)))
+                end
+                if !isnothing(offset)
+                    point_data[:, vertex_idx + interior_vertex_idx + 1] .-= offset(vertices[:, vertex_idx + interior_vertex_idx + 1]...)
                 end
             end
 
@@ -83,14 +87,13 @@ end
 
 
 
-function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{Nothing, F} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {range_dim, F <: Fields.AbstractField{2, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{2}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int64 = 1, degree::Int64 = 1, ascii = false, compress = true) where {F <: Fields.AbstractField{2, field_dim} where {field_dim}}
     # This function generates points per plotted 2D cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
     # These cells can be on a plane, but then can also lie on a complex manifold of dimension 2 embedded in R^3
     
-    domain_dim = 2  # this is hardcoded, because each type of cell plotted in VTK is different, so
-                    # we need specialized functions
+    range_dim = Geometry.get_image_dim(geometry)
 
     # print("Geometry dimensions: ", domain_dim, " x ", range_dim, "\n")
     
@@ -137,6 +140,9 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                     if !isnothing(field)
                         point_data[:,vertex_idx + corner_idx[count+1]] = vec(Fields.evaluate(field, element_idx, ξ))
                     end
+                    if !isnothing(offset)
+                        point_data[:,vertex_idx + corner_idx[count+1]] .-= offset(vertices[:, vertex_idx + corner_idx[count+1]]...)
+                    end
                     count += 1
                 end
             end
@@ -161,6 +167,9 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                     if !isnothing(field)
                         point_data[:,vertex_idx + count] = vec(Fields.evaluate(field, element_idx, ξ))
                     end
+                    if !isnothing(offset)
+                        point_data[:,vertex_idx + count] .-= offset(vertices[:, vertex_idx + count]...)
+                    end
                     count += 1
                 end
             end
@@ -177,6 +186,9 @@ function _plot(geometry::Geometry.AbstractGeometry{2, range_dim}, field::Union{N
                     # Compute data to plot 
                     if !isnothing(field)
                         point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] = vec(Fields.evaluate(field, element_idx, ξ))
+                    end
+                    if !isnothing(offset)
+                        point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .-= offset(vertices[:, vertex_idx + vertex_offset + interior_vertex_idx]...)
                     end
                 end
             end

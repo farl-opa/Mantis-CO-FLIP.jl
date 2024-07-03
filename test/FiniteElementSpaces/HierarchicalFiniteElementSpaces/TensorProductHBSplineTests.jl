@@ -1,11 +1,8 @@
 import Mantis
 
-import ReadVTK
-using Printf
 using Test
-using LinearAlgebra
 
-# Create the space
+# Tests for a tensor product HierarchicalSplineSpace
 
 ne1 = 5
 ne2 = 5
@@ -23,19 +20,46 @@ CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1);
 nsub1 = 2
 nsub2 = 2
 
+TS1,FB1 = Mantis.FunctionSpaces.subdivide_bspline(CB1, nsub1)
+TS2, FB2 = Mantis.FunctionSpaces.subdivide_bspline(CB2, nsub2)
+
 CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
-CTS, FTP = Mantis.FunctionSpaces.subdivide_bspline(CTP, (nsub1, nsub2))
+FTP = Mantis.FunctionSpaces.TensorProductSpace(FB1, FB2)
 spaces = [CTP, FTP]
 
 CTP_num_els = Mantis.FunctionSpaces.get_num_elements(CTP)
 
-coarse_elements_to_refine = [3,4,5,8,9,10,13,14,15]
+CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(TS1,TS2)
+
+coarse_elements_to_refine = [3,4,5,8,9,10]
 refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
 
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], [Int[], refined_elements], true)
+refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
+
+### Stability test
+ae, ab = Mantis.FunctionSpaces.get_active_objects(spaces, [CTS], refined_domains)
+###
+hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
+
+x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
+x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
+xi = (x1, x2)
+
+# Tests for coefficients and evaluation
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
+
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hspace, el)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+
+    # check Hierarchical B-spline evaluation
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
+    # Positivity of the basis
+    @test minimum(h_eval[0,0]) >= 0.0
+end
 
 # Test if projection in space is exact
-nxi_per_dim = max(deg1, deg2) + 1
+nxi_per_dim = 3
 nxi = nxi_per_dim^2
 xi_per_dim = collect(range(0,1, nxi_per_dim))
 xi = Matrix{Float64}(undef, nxi,2)
@@ -72,17 +96,4 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 end
 
 coeffs = A \ xs
-
-hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
-
-field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_dim(hspace), Mantis.FunctionSpaces.get_dim(hspace))
-tensor_field = Mantis.Fields.FEMField(hspace, field_coeffs)
-
-# Generate the Plot
-Mantis_folder =  dirname(dirname(pathof(Mantis)))
-data_folder = joinpath(Mantis_folder, "test", "data")
-output_data_folder = joinpath(data_folder, "output", "Geometry")
-
-output_filename = "fem_geometry_tensor_hbsplines.vtu"
-output_file = joinpath(output_data_folder, output_filename)
-Mantis.Plot.plot(hierarchical_geo, tensor_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))

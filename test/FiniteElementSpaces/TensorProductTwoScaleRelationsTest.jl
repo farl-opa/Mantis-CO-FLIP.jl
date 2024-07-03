@@ -39,7 +39,8 @@ tts2 = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(ts1, ttsr)
 @test Mantis.FunctionSpaces.get_num_elements(tts1.fine_space) == Mantis.FunctionSpaces.get_num_elements(tts2.fine_space) # Check total number of fine elements
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(tts1.fine_space) # Check if local subdivision matrices are the same.
-    all(isapprox.(Mantis.FunctionSpaces.get_local_subdiv_matrix(tts1, el) .- Mantis.FunctionSpaces.get_local_subdiv_matrix(tts2, el), 0.0, atol=1e-14))
+    coarse_el = Mantis.FunctionSpaces.get_coarser_element(tts1, el)
+    all(isapprox.(Mantis.FunctionSpaces.get_local_subdiv_matrix(tts1, coarse_el, el) .- Mantis.FunctionSpaces.get_local_subdiv_matrix(tts2, coarse_el, el), 0.0, atol=1e-14))
 
     @test Mantis.FunctionSpaces.get_coarser_element(tts1, el) ==  Mantis.FunctionSpaces.get_coarser_element(tts2, el) # Check if coarse elements are the same.
 end

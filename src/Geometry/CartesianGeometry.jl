@@ -1,30 +1,46 @@
 import LinearAlgebra
-struct CartesianGeometry{n,n} <: AbstractAnalGeometry{n, n}
+struct CartesianGeometry{n} <: AbstractAnalGeometry{n}
     n_elements::NTuple{n,Int}
     breakpoints::NTuple{n,Vector{Float64}}
-    cartesian_idxs::CartesianIndices
+    cartesian_idxs::CartesianIndices{n, NTuple{n, Base.OneTo{Int}}}
 
     function CartesianGeometry(breakpoints::NTuple{n,Vector{Float64}}) where {n}
         n_elements = length.(breakpoints) .- 1
         cartesian_idxs = CartesianIndices(n_elements)
-        return new{n,n}(n_elements, breakpoints, cartesian_idxs)
+        return new{n}(n_elements, breakpoints, cartesian_idxs)
     end
 
 end
 
-function get_num_elements(geometry::CartesianGeometry{n,n}) where {n}
+function get_num_elements(geometry::CartesianGeometry{n}) where {n}
     return prod(geometry.n_elements)
 end
 
-function get_domain_dim(geometry::CartesianGeometry{n,n}) where {n}
+# function get_boundary_indices(geometry::CartesianGeometry{n}) where {n}
+#     return    
+# end
+
+# function get_num_boundary_elements(geometry::CartesianGeometry{n}) where {n}
+#     if any(geometry.n_elements) == 1
+#         return
+#     else
+#         return 2*sum(geometry.n_elements)
+#     end
+# end
+
+# function get_num_boundary_elements(geometry::CartesianGeometry{1,1})
+#     return minimum([2, geometry.n_elements])
+# end
+
+function get_domain_dim(::CartesianGeometry{n}) where {n}
     return n
 end
 
-function get_image_dim(geometry::CartesianGeometry{n,n}) where {n}
+function get_image_dim(::CartesianGeometry{n}) where {n}
     return n
 end
 
-function evaluate(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
+function evaluate(geometry::CartesianGeometry{n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
     ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
     univariate_points = ntuple( k -> (1 .- ξ[k]) .* geometry.breakpoints[k][ordered_idx[k]] + ξ[k] .* geometry.breakpoints[k][ordered_idx[k]+1], n)
     
@@ -42,7 +58,7 @@ function evaluate(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple
     return x
 end
 
-function jacobian(geometry::CartesianGeometry{n,n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
+function jacobian(geometry::CartesianGeometry{n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
     # Get the multi-index of the element
     ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
     

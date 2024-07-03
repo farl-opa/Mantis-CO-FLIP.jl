@@ -36,12 +36,16 @@ degree elements.
 # Returns 
 Nothing
 """
-function plot(geometry::Geometry.AbstractGeometry{n, m}; kwargs...) where {n, m}
+function plot(geometry::Geometry.AbstractGeometry{n}; kwargs...) where {n}
     _plot(geometry; kwargs...)
 end
 
-function plot(geometry::Geometry.AbstractGeometry{n, m}, field::Fields.AbstractField{n,k}; kwargs...) where {n, m, k}
+function plot(geometry::Geometry.AbstractGeometry{n}, field::Fields.AbstractField{n,k}; kwargs...) where {n, k}
   _plot(geometry, field; kwargs...)
+end
+
+function plot(geometry::Geometry.AbstractGeometry{n}, field::Fields.AbstractField{n,k}, offset::Function; kwargs...) where {n, k}
+  _plot(geometry, field, offset; kwargs...)
 end
 
 
