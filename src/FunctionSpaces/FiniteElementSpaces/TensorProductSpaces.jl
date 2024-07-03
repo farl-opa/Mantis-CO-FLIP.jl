@@ -174,7 +174,7 @@ function _get_support_per_dim(tp_space::TensorProductSpace{n, F1, F2}, basis_id:
     max_ind_basis = _get_dim_per_space(tp_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_basis)
 
-    return (get_support(tp_space.function_space_1, ordered_index[1]), get_support(tp_space.function_space_2, ordered_index[2]))
+    return get_support(tp_space.function_space_1, ordered_index[1]), get_support(tp_space.function_space_2, ordered_index[2])
 end
 
 function get_extraction(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
@@ -231,7 +231,7 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
     xi_1 = xi[1:n1]
     xi_2 = xi[n1+1:n]
 
-    return (get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives))
+    return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
 end
 
 function _integer_sums(n, k)

@@ -104,11 +104,11 @@ Checks whether a pair of basis functions has an (n-1, l+1)-intersection.
 """
 function check_nl_intersection(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     
-    basis_supp_per_dim = [_get_support_per_dim(hspace.spaces[level], basis_pair[k]) for k ∈ 1:2]
-    basis_supp_intersection_per_dim = StepRange.(intersect.(basis_supp_per_dim...))
+    basis_supp_per_dim1 = _get_support_per_dim(hspace.spaces[level], basis_pair[1])
+    basis_supp_per_dim2 = _get_support_per_dim(hspace.spaces[level], basis_pair[2])
 
     for k ∈ 1:n
-        if first(basis_supp_per_dim[2][k]) - last(basis_supp_per_dim[1][k]) > 1 || first(basis_supp_per_dim[1][k]) - last(basis_supp_per_dim[2][k]) > 1 
+        if first(basis_supp_per_dim2[k]) - last(basis_supp_per_dim1[k]) > 1 || first(basis_supp_per_dim1[k]) - last(basis_supp_per_dim2[k]) > 1 
             return false
         end
     end
@@ -134,7 +134,8 @@ function check_nl_intersection(hspace::HierarchicalFiniteElementSpace{n, S, T}, 
             ts = operator.twoscale_operator_2
         end
 
-        I_k = get_contained_knot_vector(basis_supp_intersection_per_dim[k], ts, fine_space)
+        basis_supp_intersection = StepRange(intersect(basis_supp_per_dim1[k], basis_supp_per_dim2[k]))
+        I_k = get_contained_knot_vector(basis_supp_intersection, ts, fine_space)
         
         length_flag[k] = get_knot_vector_length(I_k) > p_fine[k]
     end
@@ -334,7 +335,7 @@ function get_level_marked_basis(hspace::HierarchicalFiniteElementSpace{n, S, T},
         combinations_to_check = setdiff(Combinatorics.combinations(basis_to_check, 2), checked_pairs)
     end
     
-    return new_inactive_basis
+    return inactive_basis
 end
 
 @doc raw"""

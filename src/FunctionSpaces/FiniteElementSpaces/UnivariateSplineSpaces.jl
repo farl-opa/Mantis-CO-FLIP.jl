@@ -217,7 +217,7 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
         # Check for errors in the construction 
         if polynomial_degree <0
             msg1 = "Polynomial degree must be greater or equal than 0."
-            msg2 = " The degree is $polynomial_degree."
+            msg2 = " The degree is $(polynomial_degree)."
             throw(ArgumentError(msg1*msg2))
         end
         if (size(patch_1d)+1) != length(regularity)
@@ -269,12 +269,8 @@ Returns the reference Bernstein polynomials of `bspline`.
 - `::Bernstein`: Bernstein polynomials.
 """
 function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
-    local_basis = bspline.polynomials(xi, nderivatives)
-    # el_size = get_element_size(bspline, element_id)
-    # for r = 0:nderivatives
-    #     local_basis[r] .= @views local_basis[r] ./ el_size^r
-    # end
-    
+    local_basis = evaluate(bspline.polynomials, xi, nderivatives)
+
     return local_basis
 end
 

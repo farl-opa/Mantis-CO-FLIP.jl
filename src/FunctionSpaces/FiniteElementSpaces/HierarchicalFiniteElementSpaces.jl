@@ -175,13 +175,11 @@ function get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) wh
     return get_num_active(hierarchical_space.active_basis)
 end
 
+
 function get_max_local_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    return 27
+    return get_max_local_dim(hierarchical_space.spaces[1])*2 # This needs to be checked
 end
 
-function get_max_local_dim(hierarchical_space::HierarchicalFiniteElementSpace{n}) where {n}
-    return 27
-end
 
 """
     get_num_levels(active_info::HierarchicalActiveInfo)
@@ -378,7 +376,7 @@ Returns the index in hierarchical indexing of the `id` in `level` indexing.
 function get_active_index(active_info::HierarchicalActiveInfo, id::Int, level::Int)
     ids_range = active_info.levels[level]+1:active_info.levels[level+1]
 
-    return ids_range[findfirst(x -> x==id, active_info.ids[ids_range])]
+    return ids_range[findfirst(x -> x==id, @view active_info.ids[ids_range])]
 end
 
 @doc raw"""
@@ -389,13 +387,7 @@ Equivalent to `get_active_index` for multiple `ids` in `level`.
 function get_active_indices(active_info::HierarchicalActiveInfo, ids, level::Int)
     ids_range = active_info.levels[level]+1:active_info.levels[level+1]
 
-    indices = Vector{Int}(undef, length(ids))
-    for (count, id) ∈ enumerate(ids)
-        range_id = findfirst(x -> x== id, active_info.ids[ids_range])
-        indices[count] = ids_range[range_id]
-    end
-
-    return indices
+    return ids_range[findall(x -> x ∈ ids, @view active_info.ids[ids_range])]
 end
 
 # Truncation of refinement matrix
@@ -760,5 +752,22 @@ function get_level_domain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level
 
         return level_active
     end
+end
+
+# Boundary methods
+
+function get_boundary_dof_indices(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+
+    L = get_num_levels(hspace)
+
+    boundary_dof_indices = Vector{Int}(undef, 0)
+    for level ∈ 1:L
+        level_boundary_dof_indices = get_boundary_dof_indices(hspace.spaces[level])
+        active_hspace_indices, active_level_indices = get_level_active(hspace.active_basis, level)
+
+        append!(boundary_dof_indices, active_hspace_indices[findall(id -> id ∈ level_boundary_dof_indices, active_level_indices)])
+    end
+
+    return boundary_dof_indices
 end
 
