@@ -4,16 +4,8 @@
 
 Supertype for all function spaces.
 """
-abstract type AbstractFormSpace{n,k} end
-# abstract type AbstractFormExpression{n,k} end
+abstract type AbstractFormSpace{manifold_dim, form_rank} <: AbstractFormField{manifold_dim, form_rank} end
 
-# function get_form_rank(::AbstractFormSpace{n,k})
-#     return k
-# end
-
-# function get_spatial_dim(::AbstractFormSpace{n,k})
-#     return n
-# end
 
 struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     geometry::G
@@ -61,9 +53,16 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     n_form_components = binomial(manifold_dim, form_rank)
     
     # Compute the offset in the numbering of the degrees of freedom 
-    # of the form space. The form space is made up of components (dξ, dη, dζ)
+    # of the form space. The form space is made up of components 
+    # e.g, 
+    #   0-forms: single component
+    #   1-forms:(dξ₁, dξ₂) (2D)
+    #   1-forms:(dξ₁, dξ₂, dξ₃) (3D)
+    #   2-forms:(dξ₁dξ₂) (2D)
+    #   2-forms:(dξ₂dξ₃, dξ₃dξ₁, dξ₁dξ₂) (3D)
+    #   3-forms: single component
     # each component has a numbering starting at 1, we stack the numbering 
-    # so the dη numbering starts from the end of the dξ numbering, and so on.
+    # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
     n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
     dof_offset_component = zeros(Int, n_form_components)
     dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
@@ -96,58 +95,136 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
 #    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
     first_derivative_base_key = [0 for k in 1:manifold_dim]
 
-    n_form_components_result = binomial(manifold_dim, 1)
+    n_derivative_form_components = binomial(manifold_dim, 1)
     
-    local_d_form_basis_eval = Vector{Array{Float64, 2}}(undef, n_form_components_result)
-    form_basis_indices = Vector{Vector{Int}}(undef, n_form_components_result)
+    local_d_form_basis_eval = Vector{Array{Float64, 2}}(undef, n_derivative_form_components)
+    form_basis_indices = Vector{Vector{Int}}(undef, n_derivative_form_components)
     
-    for result_component_idx in 1:n_form_components_result
+    d_local_fem_basis, fem_basis_indices = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
+
+    for derivative_component_idx in 1:n_derivative_form_components
         # Select the derivative for this component
-        first_derivative_base_key[result_component_idx] = 1
+        first_derivative_base_key[derivative_component_idx] = 1
         first_derivative_key = Tuple(first_derivative_base_key)
-        first_derivative_base_key[result_component_idx] = 0
-
-        local_basis, form_basis_indices[result_component_idx] = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
-
-        local_d_form_basis_eval[result_component_idx] = local_basis[first_derivative_key]
+        first_derivative_base_key[derivative_component_idx] = 0
+        
+        # I think deepcopy is needed  because someone may make changes in place
+        # somewhere outside this function and this will affect several 
+        # of the components because they reuse the same matrix if no deepcopy is used
+        local_d_form_basis_eval[derivative_component_idx] = deepcopy(d_local_fem_basis[first_derivative_key])
+        form_basis_indices[derivative_component_idx] = deepcopy(fem_basis_indices)
     end
 
     return local_d_form_basis_eval, form_basis_indices
 end
 
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{n, n} where n}
+    throw("Manifold dim == Form rank: Unable to compute exterior derivative of volume forms.")
+end
 
-# function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}
-#     n_form_components = binomial(manifold_dim, form_rank)
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1}}
+    # manifold_dim = 2
+    n_form_components = 2 # binomial(manifold_dim, 1)
+    n_derivative_form_components = 1 # binomial(manifold_dim, 2)
     
-#     # Compute the offset in the numbering of the degrees of freedom 
-#     # of the form space. The form space is made up of components (dξ, dη, dζ)
-#     # each component has a numbering starting at 1, we stack the numbering 
-#     # so the dη numbering starts from the end of the dξ numbering, and so on.
-#     n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
-#     dof_offset_component = zeros(Int, n_form_components)
-#     dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
+    # Compute the offset in the numbering of the degrees of freedom 
+    # of the form space. The form space is made up of components 
+    #   1-forms:(dξ₁, dξ₂) (2D)
+    # each component has a numbering starting at 1, we stack the numbering 
+    # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
+    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    dof_offset_component = zeros(Int, n_form_components)
+    dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
 
-#     # Allocate memory for the evaluation of all basis for all components
-#     local_form_basis = Vector{Array{Float64, 2}}(undef, n_form_components)
-#     form_basis_indices = Vector{Vector{Int}}(undef, n_form_components)
+    local_d_form_basis_eval = Vector{Array{Float64, 2}}(undef, n_derivative_form_components)
+    form_basis_indices = Vector{Vector{Int}}(undef, n_derivative_form_components)
+    
+    d_local_fem_basis_dξ_1, form_basis_indices_dξ_1 = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
+    d_local_fem_basis_dξ_2, form_basis_indices_dξ_2 = FunctionSpaces.evaluate(form_space.fem_space[2], element_idx, xi, 1)
+    form_basis_indices_dξ_2 .+= dof_offset_component[2]  # the second component basis need to be offset to have the correct numbering
+    # The exterior derivative is 
+    # (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
+    local_d_form_basis_eval[1] = hcat(d_local_fem_basis_dξ_2[1, 0], -d_local_fem_basis_dξ_1[0, 1])
+    form_basis_indices[1] = vcat(form_basis_indices_dξ_2, form_basis_indices_dξ_1)
+    
+    return local_d_form_basis_eval, form_basis_indices
+end
 
-#     # Loop over the spaces of the each component and evaluate them 
-#     # Note that the indices of the basis for each component are updated
-#     # by the offset defined above.
-#     no_derivative_key = Tuple(0 for k in 1:manifold_dim)
-#     for form_component_idx in 1:n_form_components
-#         # Evaluate the basis for the component
-#         local_basis, form_basis_indices[form_component_idx] = FunctionSpaces.evaluate(form_space.fem_space[form_component_idx], element_idx, xi)
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1}}
+    # manifold_dim = 3
+    n_form_components = 3 # binomial(manifold_dim, 1)
+    n_derivative_form_components = 3 # binomial(manifold_dim, 2)
+    
+    # Compute the offset in the numbering of the degrees of freedom 
+    # of the form space. The form space is made up of components 
+    #   1-forms:(dξ₁, dξ₂, dξ₃) (3D)
+    # each component has a numbering starting at 1, we stack the numbering 
+    # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
+    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    dof_offset_component = zeros(Int, n_form_components)
+    dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
+    
+    local_d_form_basis_eval = Vector{Array{Float64, 2}}(undef, n_derivative_form_components)
+    form_basis_indices = Vector{Vector{Int}}(undef, n_derivative_form_components)
+    
+    d_local_fem_basis_dξ_1, form_basis_indices_dξ_1 = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
+    
+    d_local_fem_basis_dξ_2, form_basis_indices_dξ_2 = FunctionSpaces.evaluate(form_space.fem_space[2], element_idx, xi, 1)
+    form_basis_indices_dξ_2 .+= dof_offset_component[2]
+    
+    d_local_fem_basis_dξ_3, form_basis_indices_dξ_3 = FunctionSpaces.evaluate(form_space.fem_space[3], element_idx, xi, 1)
+    form_basis_indices_dξ_3 .+= dof_offset_component[3]
 
-#         local_form_basis[form_component_idx] = local_basis[no_derivative_key]
+    # The exterior derivative is 
+    # (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃ + (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁ + (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
+    # First: (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃
+    local_d_form_basis_eval[1] = hcat(d_local_fem_basis_dξ_3[0, 1, 0], -d_local_fem_basis_dξ_2[0, 0, 1])
+    form_basis_indices[1] = vcat(form_basis_indices_dξ_3, form_basis_indices_dξ_2)
+    # Second: (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁
+    local_d_form_basis_eval[2] = hcat(d_local_fem_basis_dξ_1[0, 0, 1], -d_local_fem_basis_dξ_3[1, 0, 0])
+    form_basis_indices[2] = vcat(form_basis_indices_dξ_1, form_basis_indices_dξ_3)
+    # Third: (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
+    local_d_form_basis_eval[3] = hcat(d_local_fem_basis_dξ_2[1, 0, 0], -d_local_fem_basis_dξ_1[0, 1, 0])
+    form_basis_indices[3] = vcat(form_basis_indices_dξ_2, form_basis_indices_dξ_1)
+    
+    return local_d_form_basis_eval, form_basis_indices
+end
 
-#         # Update the basis indices by adding the offset, since they are now 
-#         # a component among several, so the indexing needs to include all components
-#         form_basis_indices[form_component_idx] .+= dof_offset_component[form_component_idx]
-#     end
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2}}
+    # manifold_dim = 3
+    n_form_components = 3 # binomial(manifold_dim, 1)
+    n_derivative_form_components = 1 # binomial(manifold_dim, 2)
+    
+    # Compute the offset in the numbering of the degrees of freedom 
+    # of the form space. The form space is made up of components 
+    #   2-forms:(dξ₂dξ₃, dξ₃dξ₁, dξ₁dξ₂) (3D)
+    # each component has a numbering starting at 1, we stack the numbering 
+    # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
+    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    dof_offset_component = zeros(Int, n_form_components)
+    dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
 
-#     return local_form_basis, form_basis_indices
-# end
+
+    local_d_form_basis_eval = Vector{Array{Float64, 2}}(undef, n_derivative_form_components)
+    form_basis_indices = Vector{Vector{Int}}(undef, n_derivative_form_components)
+    
+    d_local_fem_basis_dξ_2_dξ_3, form_basis_indices_dξ_2_dξ_3 = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
+    
+    d_local_fem_basis_dξ_3_dξ_1, form_basis_indices_dξ_3_dξ_1 = FunctionSpaces.evaluate(form_space.fem_space[2], element_idx, xi, 1)
+    form_basis_indices_dξ_3_dξ_1 .+= dof_offset_component[2]
+
+    d_local_fem_basis_dξ_1_dξ_2, form_basis_indices_dξ_1_dξ_2 = FunctionSpaces.evaluate(form_space.fem_space[3], element_idx, xi, 1)
+    form_basis_indices_dξ_1_dξ_2 .+= dof_offset_component[3]
+
+    # The form is 
+    # α₁ dξ₂∧dξ₃ + α₂ dξ₃∧dξ₁ + α₃ dξ₁∧dξ₂
+    # The exterior derivative is 
+    # (∂α₁/∂ξ₁ + ∂α₂/∂ξ₂ + ∂α₃/∂ξ₃) dξ₁∧dξ₂∧dξ₃
+    local_d_form_basis_eval[1] = hcat(d_local_fem_basis_dξ_2_dξ_3[1, 0, 0], d_local_fem_basis_dξ_3_dξ_1[0, 1, 0], d_local_fem_basis_dξ_1_dξ_2[0, 0, 1])
+    form_basis_indices[1] = vcat(form_basis_indices_dξ_2_dξ_3, form_basis_indices_dξ_3_dξ_1, form_basis_indices_dξ_1_dξ_2)
+    
+    return local_d_form_basis_eval, form_basis_indices
+end
 
 
 """
