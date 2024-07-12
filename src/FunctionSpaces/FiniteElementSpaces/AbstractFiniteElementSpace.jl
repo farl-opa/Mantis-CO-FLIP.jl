@@ -58,7 +58,7 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTu
 end
 
 """
-_evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, element_id::Int, xi::Float64, nderivatives::Int)
+    _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, element_id::Int, xi::Float64, nderivatives::Int)
 
 Evaluates all derivatives upto order `nderivatives` for all basis functions of `fem_space` at a given point `xi` in the element `element_id`.
 
@@ -90,6 +90,18 @@ function _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, elemen
     return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
 end
 
+"""
+    _integer_sums(sum_indices::Int, num_indices::Int)
+
+This function generates all possible combinations of non-negative integers that sum up to a given value, where each combination has a specified number of elements.
+
+# Arguments
+- `sum_indices::Int`: The target sum of the integers in each combination.
+- `num_indices::Int`: The number of integers in each combination.
+
+Return Value
+The function returns a vector of vectors, where each inner vector represents a combination of integers that sum up to sum_indices. If no valid combinations exist, the function returns an empty vector.
+"""
 function _integer_sums(sum_indices::Int, num_indices::Int)
     if num_indices == 1
         solutions = [sum_indices]
