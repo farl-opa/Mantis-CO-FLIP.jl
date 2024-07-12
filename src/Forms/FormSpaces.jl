@@ -196,7 +196,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
         # I think deepcopy is needed  because someone may make changes in place
         # somewhere outside this function and this will affect several 
         # of the components because they reuse the same matrix if no deepcopy is used
-        local_d_form_basis_eval[derivative_component_idx] = deepcopy(d_local_fem_basis[1][first_derivative_idx])
+        local_d_form_basis_eval[derivative_component_idx] = deepcopy(d_local_fem_basis[2][first_derivative_idx])
         form_basis_indices[derivative_component_idx] = deepcopy(fem_basis_indices)
     end
 
