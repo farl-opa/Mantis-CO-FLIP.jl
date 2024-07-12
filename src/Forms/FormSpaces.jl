@@ -7,6 +7,11 @@ Supertype for all function spaces representing differential forms.
 # Type parameters
 - `manifold_dim`: Dimension of the manifold
 - `form_rank`: Rank of the differential form
+
+# Inner Constructors
+- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F})`: Constructor for 0-forms and n-forms
+- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη})`: Constructor for 1-forms in 2D
+- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ})`: Constructor for 1-forms and 2-forms in 3D
 """
 abstract type AbstractFormSpace{manifold_dim, form_rank} <: AbstractFormField{manifold_dim, form_rank} end
 
