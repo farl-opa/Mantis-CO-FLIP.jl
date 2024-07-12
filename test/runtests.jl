@@ -6,7 +6,7 @@ using Test
 @testset "CanonicalSpaces" begin include("CanonicalSpaces/runtests.jl") end
 @testset "Quadrature" begin include("Quadrature/runtests.jl") end
 @testset "FiniteElementSpaces" begin include("FiniteElementSpaces/runtests.jl") end
-# @testset "HierarchicalFiniteElementSpaces" begin include("HierarchicalFiniteElementSpaces/runtests.jl") end
+@testset "HierarchicalFiniteElementSpaces" begin include("HierarchicalFiniteElementSpaces/runtests.jl") end
 # @testset "Geometry" begin include("Geometry/runtests.jl") end
 # @testset "Assembly" begin include("Assemblers/runtests.jl") end
 # # @testset "HierarchicalFiniteElementSpaces" begin include("HierarchicalFiniteElementSpaces/runtests.jl") end

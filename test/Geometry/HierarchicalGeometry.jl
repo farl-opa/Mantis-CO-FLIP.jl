@@ -74,7 +74,7 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 
     local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
 
-    A[idx, eval[2]] = eval[1][0,0]
+    A[idx, eval[2]] = eval[1][1][1]
 end
 
 coeffs = A \ xs
