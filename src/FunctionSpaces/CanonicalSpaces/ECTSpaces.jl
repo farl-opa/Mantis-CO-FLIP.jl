@@ -62,7 +62,7 @@ function evaluate(gtrig::GeneralizedTrigonometric, ξ::Vector{Float64}, nderivat
     ders = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j = 0:nderivatives
         ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
-        ders[j+1][1] = zeros(Float64, neval, polynomials.p + 1)
+        ders[j+1][1] = zeros(Float64, neval, gtrig.p + 1)
     end
     # loop over the evaluation points and evaluate all derivatives at each point
     for i = 1:neval
