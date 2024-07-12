@@ -10,6 +10,6 @@ using Test
 @testset "Geometry" begin include("Geometry/runtests.jl") end
 # @testset "Assembly" begin include("Assemblers/runtests.jl") end
 # # @testset "HierarchicalFiniteElementSpaces" begin include("HierarchicalFiniteElementSpaces/runtests.jl") end
-# @testset "Plot" begin include("Plot/runtests.jl") end
+@testset "Plot" begin include("Plot/runtests.jl") end
 
 end; nothing
