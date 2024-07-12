@@ -35,12 +35,12 @@ top_form_space = Mantis.Forms.FormSpace(2, tensor_prod_geo, (TP_Space,))
 α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
 ξ¹ = Mantis.Forms.FormField(one_form_space, "ξ")
 β² = Mantis.Forms.FormField(top_form_space, "β")
-θ² = Mantis.Forms.FormExpression(α⁰, β², 2, "∧")
-ζ² = Mantis.Forms.FormExpression(α⁰, θ², 2, "∧")
+θ² = Mantis.Forms.FormExpression((α⁰, β²), 2, "∧")
+ζ² = Mantis.Forms.FormExpression((α⁰, θ²), 2, "∧")
 
 print(θ².label)
 print("\n")
-ζ² = Mantis.Forms.FormExpression(α⁰, θ², 2, "∧")
+ζ² = Mantis.Forms.FormExpression((α⁰, θ²), 2, "∧")
 print(ζ².label)
 
 
@@ -52,7 +52,7 @@ print(ζ².label)
 #     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
 # end
 
-print("Evaluating the wedge operator\n")
+print("\nComputing the wedge operator\n")
 γ = Mantis.Forms.wedge(α⁰, β²)
 print(γ.label)
 
@@ -65,12 +65,18 @@ zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate(zero_form_spac
 d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 α⁰.coefficients .= 1.0
 ξ¹.coefficients .= 1.0
 
+dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
+
 α⁰_eval = Mantis.Forms.evaluate(α⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
+dα⁰_eval = Mantis.Forms.evaluate(dα⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
 ξ¹_eval = Mantis.Forms.evaluate(ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
+dξ¹_eval = Mantis.Forms.evaluate(dξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 
 # abstract type AbstractMyStruct{n} end
