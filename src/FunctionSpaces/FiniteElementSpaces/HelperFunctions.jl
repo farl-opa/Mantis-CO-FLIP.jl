@@ -11,10 +11,10 @@ Return Value
 The function returns a vector of vectors, where each inner vector represents a combination of integers that sum up to sum_indices. If no valid combinations exist, the function returns an empty vector.
 """
 function _integer_sums(sum_indices::Int, num_indices::Int)
+    solutions = Vector{Vector{Int}}(undef,0)
     if num_indices == 1
-        solutions = [sum_indices]
+        push!(solutions, [sum_indices])
     elseif num_indices > 1
-        solutions = Vector{Vector{Int}}(undef,0)
         for combo in Combinatorics.combinations(0:sum_indices+num_indices-2, num_indices-1)
             s = zeros(Int, num_indices)
             s[1] = combo[1]

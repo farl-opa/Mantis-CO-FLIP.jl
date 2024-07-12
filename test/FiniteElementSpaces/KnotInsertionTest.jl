@@ -38,7 +38,7 @@ for p in degrees_for_test
 
             fine_spline_eval = Mantis.FunctionSpaces.evaluate(fine_bspline, fine_el, (fine_x,), 0, fine_coeffs)
             
-            @test all(isapprox.(fine_spline_eval[0] .- coarse_spline_eval[0][1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
+            @test all(isapprox.(fine_spline_eval[1][1] .- coarse_spline_eval[1][1][1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
         end
     end
 end

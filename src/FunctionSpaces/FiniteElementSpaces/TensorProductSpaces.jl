@@ -297,7 +297,7 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
 
     # Compute tensor product of constituent basis functions for each derivative combination
     for key in der_keys
-        key = key([1:n])
+        key = key[1:n]
         j = sum(key)
         der_idx = _get_derivative_idx(key)
         key_1 = key[1:n1]

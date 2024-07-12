@@ -375,6 +375,10 @@ function get_polynomial_degree(bspline::BSplineSpace)
     return bspline.knot_vector.polynomial_degree
 end
 
+function get_polynomial_degree(bspline::BSplineSpace, ::Int)
+    return bspline.knot_vector.polynomial_degree
+end
+
 """
     get_dim(bspline::BSplineSpace)
 

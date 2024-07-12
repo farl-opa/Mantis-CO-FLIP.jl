@@ -46,8 +46,12 @@ end
 
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int, coeffs::Vector{Float64}) where {n}
     local_basis, basis_indices = evaluate(space, element_id, xi, nderivatives) 
-    evaluation = copy(local_basis)
-    
+    evaluation = Vector{Vector{Vector{Float64}}}(undef, nderivatives + 1)
+    for j = 0:nderivatives
+        n_ders = length(local_basis[j+1])
+        evaluation[j+1] = Vector{Vector{Float64}}(undef, n_ders)
+    end
+
     for j = 0:nderivatives
         for k = 1:length(local_basis[j+1])
             if isassigned(local_basis[j+1],k)
