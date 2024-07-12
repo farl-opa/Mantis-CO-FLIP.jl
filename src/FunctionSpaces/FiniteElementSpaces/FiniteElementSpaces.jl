@@ -1,3 +1,5 @@
+# some helper functions
+include("HelperFunctions.jl")
 
 # AbstractFiniteElementSpace: Common functionality accross FEM spaces
 include("AbstractFiniteElementSpace.jl")

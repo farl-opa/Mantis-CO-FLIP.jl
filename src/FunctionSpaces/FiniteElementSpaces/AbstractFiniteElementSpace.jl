@@ -22,6 +22,8 @@ For given global element id `element_id` for a given finite element `space`, eva
 # Returns
 - `::Array{Float64}`: array of evaluated global basis (size: num_eval_points x num_funcs x nderivatives+1)
 - `::Vector{Int}`: vector of global basis indices (size: num_funcs).
+
+# See also [`_get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
 """
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n}
     extraction_coefficients, basis_indices = get_extraction(space, element_id)
@@ -88,34 +90,4 @@ function _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, elemen
     end
 
     return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
-end
-
-"""
-    _integer_sums(sum_indices::Int, num_indices::Int)
-
-This function generates all possible combinations of non-negative integers that sum up to a given value, where each combination has a specified number of elements.
-
-# Arguments
-- `sum_indices::Int`: The target sum of the integers in each combination.
-- `num_indices::Int`: The number of integers in each combination.
-
-Return Value
-The function returns a vector of vectors, where each inner vector represents a combination of integers that sum up to sum_indices. If no valid combinations exist, the function returns an empty vector.
-"""
-function _integer_sums(sum_indices::Int, num_indices::Int)
-    if num_indices == 1
-        solutions = [sum_indices]
-    elseif num_indices > 1
-        solutions = Vector{Vector{Int}}(undef,0)
-        for combo in Combinatorics.combinations(0:sum_indices+num_indices-2, num_indices-1)
-            s = zeros(Int, num_indices)
-            s[1] = combo[1]
-            for i in 2:num_indices-1
-                s[i] = combo[i] - combo[i-1] - 1
-            end
-            s[end] = sum_indices+num_indices-2 - combo[num_indices-1]
-            push!(solutions, s)
-        end
-    end
-    return solutions
 end

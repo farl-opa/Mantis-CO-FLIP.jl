@@ -101,8 +101,8 @@ function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64},
     # Allocate memory space for the result, derivatives are the third dimension
     d_polynomials = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j = 0:nderivatives
-        ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
-        ders[j+1][1] = zeros(Float64, n_points, polynomials.p + 1)
+        d_polynomials[j+1] = Vector{Matrix{Float64}}(undef, 1)
+        d_polynomials[j+1][1] = zeros(Float64, n_points, polynomials.p + 1)
     end
     
     # Evaluate the polynomials at the points ξ

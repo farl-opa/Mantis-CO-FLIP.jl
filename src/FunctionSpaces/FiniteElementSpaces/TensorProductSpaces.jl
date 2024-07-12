@@ -40,7 +40,7 @@ Get the total dimension of the tensor-product space.
 # Returns
 - `::Int`: The total dimension of the space
 """
-function get_n(tp::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
+function get_n(::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
     return n
 end
 
@@ -120,76 +120,6 @@ Get the maximum local dimension of the tensor-product space.
 function get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
     # Multiply the maximum local dimensions of each constituent space
     return get_max_local_dim(tp_space.function_space_1) * get_max_local_dim(tp_space.function_space_2)
-end
-
-"""
-    ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
-
-Convert given ordered pair index to linear index.
-
-# Arguments
-- `ord_ind::Vector{Int}`: ordered index pair
-- `max_ind::Vector{Int}`: maximum index in each direction
-
-# Returns
-- `::Int`: computed linear index
-"""
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
-    m = length(max_ind)
-    @assert length(ord_ind)==m "Dimension mismatch."
-    max_ind = cumprod(max_ind)
-    lin_ind = ord_ind[1]
-    for i = 2:m
-        lin_ind += (ord_ind[i]-1)*max_ind[i-1]
-    end
-    return lin_ind
-end
-
-# Additional method overloads for ordered_to_linear_index
-function ordered_to_linear_index(ord_ind::Tuple{m,Int}, max_ind::Tuple{m,Int}) where {m}
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Tuple{Int, Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(ord_ind, collect(max_ind))
-end
-
-"""
-    linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
-
-Convert given linear index to ordered index pair.
-
-# Arguments
-- `lin_ind::Int`: computed linear index
-- `max_ind::Vector{Int}`: maximum index in each direction
-
-# Returns
-- `::Vector{Int}`: ordered index pair
-"""
-function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
-    m = length(max_ind)
-    ord_ind = zeros(Int,m)
-    ord_ind[1] = lin_ind - floor((lin_ind-1)/max_ind[1])*max_ind[1]
-    lin_ind = (lin_ind - ord_ind[1])/max_ind[1]
-    for i = 2:m
-        ord_ind[i] = lin_ind - floor(lin_ind/max_ind[i])*max_ind[i] + 1
-        lin_ind = (lin_ind - ord_ind[i] + 1)/max_ind[i]
-    end
-    @assert lin_ind==0 "Ordered pair computation failed."
-    return Int.(ord_ind)
-end
-
-# Additional method overloads for linear_to_ordered_index
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{m,Int}) where {m}
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
-end
-
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{Int,Int})
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
 end
 
 """
@@ -350,17 +280,33 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
 
     # Compute local basis for each constituent space
     local_basis_per_dim = _get_local_basis_per_dim(tp_space, el_id, xi, nderivatives)
+    # # Size of all evaluations
+    # n_eval_1 = size(local_basis_per_dim[1][1][1],1)
+    # n_basis_1 = size(local_basis_per_dim[1][1][1],2)
+    # n_eval_2 = size(local_basis_per_dim[2][1][1],1)
+    # n_basis_2 = size(local_basis_per_dim[2][1][1],2)
 
     # Generate keys for all possible derivative combinations
     der_keys = _integer_sums(nderivatives, n+1)
-    
-    # Initialize dictionary to store local basis functions and derivatives
-    local_basis = Dict{NTuple{n,Int}, Matrix{Float64}}(i[1:n] => Matrix{Float64}(undef,1,1) for i in der_keys)
+    # Initialize storage of local basis functions and derivatives
+    local_basis = Vector{Vector{Matrix{Float64}}}(undef,nderivatives+1)
+    for j = 0:nderivatives
+        num_j_ders = binomial(n+j-1,n-1)
+        local_basis[j+1] = Vector{Matrix{Float64}}(undef, num_j_ders)
+    end
 
     # Compute tensor product of constituent basis functions for each derivative combination
-    for key in keys(local_basis)
-        tmp = kron(local_basis_per_dim[2][key[n1+1:n]...], local_basis_per_dim[1][key[1:n1]...])
-        local_basis[key] = tmp
+    for key in der_keys
+        key = key([1:n])
+        j = sum(key)
+        der_idx = _get_derivative_idx(key)
+        key_1 = key[1:n1]
+        j_1 = sum(key_1)
+        der_idx_1 = _get_derivative_idx(key_1)
+        key_2 = key[n1+1:n]
+        j_2 = sum(key_2)
+        der_idx_2 = _get_derivative_idx(key_2)
+        local_basis[j+1][der_idx] = kron(local_basis_per_dim[2][j_2+1][der_idx_2], local_basis_per_dim[1][j_1+1][der_idx_1])
     end
 
     return local_basis

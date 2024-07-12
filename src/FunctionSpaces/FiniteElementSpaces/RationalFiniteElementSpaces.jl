@@ -11,10 +11,9 @@ struct RationalFiniteElementSpace{n,F} <: AbstractFiniteElementSpace{n}
     function_space::F
     weights::Vector{Float64}
 
-    function RationalFiniteElementSpace(function_space::F, weights::Vector{Float64}) where {F <: AbstractFiniteElementSpace{n} where {n}}
+    function RationalFiniteElementSpace(function_space::F, weights::Vector{Float64}) where {F <: AbstractFiniteElementSpace{n}} where {n}
         # Ensure that the dimension of the function space matches the length of the weights vector
         @assert get_dim(function_space)==length(weights) "Dimension mismatch"
-        n = get_n(function_space)
         new{n,F}(function_space, weights)
     end
 end
@@ -88,27 +87,27 @@ function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, x
 
     # Compute the rational basis functions and their derivatives
     for j = 0:nderivatives
-        if j > 1
-            error("Derivatives of rational spaces of order  not implemented")
-        else
+        if j == 0
+            # Compute the weight
+            temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+            weight = reshape(sum(temp, dims=2), n_eval)
+            # Rationalize with the weights
+            homog_basis[1][1] .= LinearAlgebra.Diagonal(weight) \ temp
+        elseif j == 1
             der_keys = _integer_sums(j, n)
             for key in der_keys
-                if sum(key) == 0
-                    # Compute the weight
-                    temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-                    weight = reshape(sum(temp, dims=2), n_eval)
-                    # Rationalize with the weights
-                    homog_basis[1][1] .= LinearAlgebra.Diagonal(weight) \ temp
-                elseif sum(key) == 1
-                    # Compute the weight and its derivative
-                    temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-                    dtemp = homog_basis[2][findfirst(key).>0] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-                    weight = reshape(sum(temp, dims=2), n_eval)
-                    dweight = reshape(sum(dtemp, dims=2), n_eval)
-                    # Compute the derivative of the rational basis functions
-                    homog_basis[2][findfirst(key).>0] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
-                end
+                # get the location where the derivative is stored
+                der_idx = _get_derivative_idx(key)
+                # Compute the weight and its derivative
+                temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                dtemp = homog_basis[j+1][der_idx] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                weight = reshape(sum(temp, dims=2), n_eval)
+                dweight = reshape(sum(dtemp, dims=2), n_eval)
+                # Compute the derivative of the rational basis functions
+                homog_basis[j+1][der_idx] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
             end
+        elseif j > 1
+            error("Derivatives of rational spaces of order  not implemented")
         end
     end
 

@@ -30,6 +30,7 @@ function evaluate(polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int
     neval = length(ξ)
 
     # allocate space for derivatives
+    # - ders[j+1][1] contains the matrix of evaluations of the j-th derivative
     ders = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j = 0:nderivatives
         ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
