@@ -79,7 +79,7 @@ function get_num_elements(::CanonicalFiniteElementSpace{C}) where {C<: AbstractC
 end
 
 """
-    get_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+    get_num_basis(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
 
 Get the dimension of the canonical finite element space.
 
@@ -89,7 +89,7 @@ Get the dimension of the canonical finite element space.
 # Returns
 The dimension of the space, which is polynomial degree + 1.
 """
-function get_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+function get_num_basis(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
     return space.canonical_space.p + 1
 end
 
@@ -108,7 +108,7 @@ A sparse matrix containing the values of the basis functions and their derivativ
 """
 function _evaluate_all_at_point(space::CanonicalFiniteElementSpace{C}, xi::Float64, nderivatives::Int) where {C<: AbstractCanonicalSpace}
     local_basis = evaluate(space.canonical_space, [xi], nderivatives)
-    ndofs = get_dim(space)
+    ndofs = get_num_basis(space)
     basis_indices = 1:ndofs
     nloc = length(basis_indices)
     I = zeros(Int, nloc * (nderivatives + 1))
@@ -175,7 +175,7 @@ Get the indices of the basis functions.
 A vector of indices for the basis functions.
 """
 function get_basis_indices(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
-    return collect(1:get_dim(space))
+    return collect(1:get_num_basis(space))
 end
 
 """
@@ -190,7 +190,7 @@ Get the maximum local dimension of the canonical finite element space.
 The maximum local dimension, which is equal to the total dimension for canonical spaces.
 """
 function get_max_local_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
-    return get_dim(space)
+    return get_num_basis(space)
 end
 
 """

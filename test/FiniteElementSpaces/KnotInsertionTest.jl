@@ -22,7 +22,7 @@ for p in degrees_for_test
     coarse_regularity[1] = coarse_regularity[end] = -1
     coarse_bspline = BSplineSpace(Patch1D(collect(range(0,1, nel+1))), p, coarse_regularity)
 
-    coarse_coeffs = (rand(Mantis.FunctionSpaces.get_dim(coarse_bspline)) .* 2 .- 1 ) .* coeff_factor
+    coarse_coeffs = (rand(Mantis.FunctionSpaces.get_num_basis(coarse_bspline)) .* 2 .- 1 ) .* coeff_factor
     
     for nsubdivision in subdivisions_to_test
         coarse_x = collect(range(0, 1, nq * nsubdivision + 1))

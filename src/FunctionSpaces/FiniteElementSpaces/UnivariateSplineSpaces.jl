@@ -288,7 +288,7 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
         extraction_op = extract_bspline_to_bernstein(knot_vector)
 
         # Get the dimension of the B-spline space
-        bspline_dim = get_dim(extraction_op)
+        bspline_dim = get_num_basis(extraction_op)
 
         # Allocate memory for degree of freedom partitioning
         dof_partition = Vector{Vector{Int}}(undef,3)
@@ -393,7 +393,7 @@ function get_polynomial_degree(bspline::BSplineSpace, ::Int)
 end
 
 """
-    get_dim(bspline::BSplineSpace)
+    get_num_basis(bspline::BSplineSpace)
 
 Returns the dimension of the univariate function space `bspline`.
 
@@ -403,9 +403,9 @@ Returns the dimension of the univariate function space `bspline`.
 # Returns
 - `::Int`: The dimension of the B-Spline space.
 """
-function get_dim(bspline::BSplineSpace)
-    @assert get_dim(bspline.extraction_op) == size(bspline.knot_vector.patch_1d) * (bspline.knot_vector.polynomial_degree + 1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree + 1)) "B-spline dimension incorrect."
-    return get_dim(bspline.extraction_op)
+function get_num_basis(bspline::BSplineSpace)
+    @assert get_num_basis(bspline.extraction_op) == size(bspline.knot_vector.patch_1d) * (bspline.knot_vector.polynomial_degree + 1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree + 1)) "B-spline dimension incorrect."
+    return get_num_basis(bspline.extraction_op)
 end
 
 """

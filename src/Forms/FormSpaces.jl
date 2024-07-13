@@ -129,7 +129,7 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     #   3-forms: single component
     # each component has a numbering starting at 1, we stack the numbering 
     # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
-    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    n_dofs_component = FunctionSpaces.get_num_basis.(form_space.fem_space)
     dof_offset_component = zeros(Int, n_form_components)
     dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
 
@@ -248,7 +248,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     #   1-forms:(dξ₁, dξ₂) (2D)
     # each component has a numbering starting at 1, we stack the numbering 
     # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
-    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    n_dofs_component = FunctionSpaces.get_num_basis.(form_space.fem_space)
     dof_offset_component = zeros(Int, n_form_components)
     dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
 
@@ -304,7 +304,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     #   1-forms:(dξ₁, dξ₂, dξ₃) (3D)
     # each component has a numbering starting at 1, we stack the numbering 
     # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
-    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    n_dofs_component = FunctionSpaces.get_num_basis.(form_space.fem_space)
     dof_offset_component = zeros(Int, n_form_components)
     dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
     
@@ -376,7 +376,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     #   2-forms:(dξ₂dξ₃, dξ₃dξ₁, dξ₁dξ₂) (3D)
     # each component has a numbering starting at 1, we stack the numbering 
     # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
-    n_dofs_component = FunctionSpaces.get_dim.(form_space.fem_space)
+    n_dofs_component = FunctionSpaces.get_num_basis.(form_space.fem_space)
     dof_offset_component = zeros(Int, n_form_components)
     dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
 
@@ -407,7 +407,7 @@ end
 
 
 @doc raw"""
-    get_dim(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+    get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
 
 Returns the number of degrees of freedom of the FormSpace `form_space`.
 
@@ -417,7 +417,7 @@ Returns the number of degrees of freedom of the FormSpace `form_space`.
 # Returns
 - `::Int`: The total number of degrees of freedom of the space.
 """
-function get_dim(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+function get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
     # Get the total number of dofs for the form space by looping 
     # over all the FEM spaces. Each FEM space is associated to a 
     # component of the form: 0- and n-forms have one component, and 
@@ -427,7 +427,7 @@ function get_dim(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, fo
     
     # Loop over the spaces and add their number of dofs
     for space in form_space.fem_space
-        form_space_n_dofs += FunctionSpaces.get_dim(space)
+        form_space_n_dofs += FunctionSpaces.get_num_basis(space)
     end
 
     return form_space_n_dofs

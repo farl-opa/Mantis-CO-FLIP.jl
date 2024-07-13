@@ -61,7 +61,7 @@ function plot_geometry(hspace)
     xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
     nx = size(xs)[1]
 
-    A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
     for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
         level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -116,7 +116,7 @@ function plot_field(hspace)
     xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
     nx = size(xs)[1]
 
-    A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
     for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
         level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -141,7 +141,7 @@ function plot_field(hspace)
     coeffs = A \ xs
 
     hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
-    field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_dim(hspace), Mantis.FunctionSpaces.get_dim(hspace))
+    field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_num_basis(hspace), Mantis.FunctionSpaces.get_num_basis(hspace))
     field = Mantis.Fields.FEMField(hspace, field_coeffs)
 
     # Generate the Plot

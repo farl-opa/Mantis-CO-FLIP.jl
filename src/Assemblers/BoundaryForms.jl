@@ -24,7 +24,7 @@
 # # Returns a vector of the indices of the basis functions which have non-
 # # zero support on the boundary, assuming open knot vector.
 # function get_nz_boundary_indices(bspline::BSplineSpace)
-#     return [1, get_dim(bspline)]
+#     return [1, get_num_basis(bspline)]
 # end
 
 

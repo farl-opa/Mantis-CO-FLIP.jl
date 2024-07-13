@@ -18,7 +18,7 @@ struct ExtractionOperator
 end
 
 @doc raw"""
-    get_dim(extraction_op::ExtractionOperator)
+    get_num_basis(extraction_op::ExtractionOperator)
 
 Returns the dimension of the function space associated with the `ExtractionOperator`.
 
@@ -28,7 +28,7 @@ Returns the dimension of the function space associated with the `ExtractionOpera
 # Returns
 The dimension of the function space.
 """
-function get_dim(extraction_op::ExtractionOperator)
+function get_num_basis(extraction_op::ExtractionOperator)
     return extraction_op.space_dim
 end
 

@@ -156,7 +156,7 @@ function get_num_elements(hierarchical_space::HierarchicalFiniteElementSpace{n, 
 end
 
 """
-    get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    get_num_basis(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Returns the number of active functions in `hierarchical_space`.
 
@@ -165,7 +165,7 @@ Returns the number of active functions in `hierarchical_space`.
 # Returns
 - `::Int`: Number of active functions.
 """
-function get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function get_num_basis(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_num_active(hierarchical_space.active_basis)
 end
 
@@ -459,7 +459,7 @@ function get_active_objects(spaces::Vector{S}, two_scale_operators::Vector{T}, m
 
     # Initialize active basis and elements on first level
     active_elements_per_level = [collect(1:get_num_elements(spaces[1]))]
-    active_basis_per_level = [collect(1:get_dim(spaces[1]))]
+    active_basis_per_level = [collect(1:get_num_basis(spaces[1]))]
 
     for level in 1:L-1 # Loop over levels
         next_level_domain = [get_level_active(marked_domains, level+1)[2]]
@@ -747,7 +747,7 @@ end
 function get_basis_contained_in_next_level(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     basis_contained_in_next_level = Int[]
     inactive_domain = get_level_inactive_domain(hspace, level)
-    for basis ∈ setdiff(1:get_dim(hspace.spaces[level]), get_level_active(hspace.active_basis, level)[2])
+    for basis ∈ setdiff(1:get_num_basis(hspace.spaces[level]), get_level_active(hspace.active_basis, level)[2])
         basis_support = get_support(hspace.spaces[level], basis)
         support_in_omega, _ = Mesh.check_contained(basis_support, inactive_domain)
         if support_in_omega

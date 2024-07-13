@@ -15,13 +15,13 @@ struct RationalFiniteElementSpace{n,F} <: AbstractFiniteElementSpace{n}
 
     function RationalFiniteElementSpace(function_space::F, weights::Vector{Float64}) where {F <: AbstractFiniteElementSpace{n}} where {n}
         # Ensure that the dimension of the function space matches the length of the weights vector
-        @assert get_dim(function_space) == length(weights) "Dimension mismatch"
+        @assert get_num_basis(function_space) == length(weights) "Dimension mismatch"
         new{n,F}(function_space, weights)
     end
 end
 
 """
-    get_dim(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <: AbstractFiniteElementSpace{n}}
+    get_num_basis(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <: AbstractFiniteElementSpace{n}}
 
 Returns the dimension of the rational finite element space.
 
@@ -31,8 +31,8 @@ Returns the dimension of the rational finite element space.
 # Returns
 The dimension of the rational finite element space.
 """
-function get_dim(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <: AbstractFiniteElementSpace{n}}
-    return get_dim(rat_space.function_space)
+function get_num_basis(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <: AbstractFiniteElementSpace{n}}
+    return get_num_basis(rat_space.function_space)
 end
 
 """

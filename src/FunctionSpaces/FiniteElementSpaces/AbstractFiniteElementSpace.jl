@@ -6,7 +6,7 @@ Supertype for all scalar finite element spaces.
 abstract type AbstractFiniteElementSpace{n} <: AbstractFunctionSpace end
 
 # Getters for the function spaces
-get_n(f::AbstractFiniteElementSpace{n}) where {n} = n
+get_manifold_dim(f::AbstractFiniteElementSpace{n}) where {n} = n
 
 @doc raw"""
     evaluate(space::S, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {S<:AbstractFiniteElementSpace}
@@ -79,7 +79,7 @@ Evaluates all derivatives upto order `nderivatives` for all basis functions of `
 function _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, element_id::Int, xi::Float64, nderivatives::Int)
     local_basis, basis_indices = evaluate(fem_space, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
-    ndofs = get_dim(fem_space)
+    ndofs = get_num_basis(fem_space)
     I = zeros(Int, nloc * (nderivatives + 1))
     J = zeros(Int, nloc * (nderivatives + 1))
     V = zeros(Float64, nloc * (nderivatives + 1))

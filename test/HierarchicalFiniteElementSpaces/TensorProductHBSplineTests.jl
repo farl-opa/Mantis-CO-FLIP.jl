@@ -71,7 +71,7 @@ end
 xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
 nx = size(xs)[1]
 
-A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)

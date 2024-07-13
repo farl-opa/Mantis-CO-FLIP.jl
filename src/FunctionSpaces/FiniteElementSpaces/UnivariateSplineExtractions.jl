@@ -137,7 +137,7 @@ function extract_gtbspline_to_nurbs(nurbs::NTuple{m,F}, regularity::Vector{Int})
     # Construct cumulative sum of all B-spline dimensions
     bspl_dims = zeros(Int, m+1)
     for i in 2:m+1
-        bspl_dims[i] = bspl_dims[i-1] + get_dim(nurbs[i-1])
+        bspl_dims[i] = bspl_dims[i-1] + get_num_basis(nurbs[i-1])
     end
 
     # Number of elements for all NURBS
@@ -257,7 +257,7 @@ function extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFini
     # Construct cumulative sum of all canonical space dimensions
     canonical_dims = zeros(Int, m+1)
     for i = 2:m+1
-        canonical_dims[i] = canonical_dims[i-1] + get_dim(canonical_spaces[i-1])
+        canonical_dims[i] = canonical_dims[i-1] + get_num_basis(canonical_spaces[i-1])
     end
 
     # Initialize global extraction matrix as identity
@@ -314,7 +314,7 @@ function extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFini
     extraction_coefficients = Vector{Array{Float64}}(undef, m)
     basis_indices = Vector{Vector{Int}}(undef, m)
     for i = 1:m
-        cols_i = collect(1:get_dim(canonical_spaces[i]))
+        cols_i = collect(1:get_num_basis(canonical_spaces[i]))
         cols_i .+= canonical_dims[i]
         ei = SparseArrays.findnz(H[:,cols_i])
         # Unique indices for non-zero rows and columns

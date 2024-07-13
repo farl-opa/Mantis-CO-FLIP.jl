@@ -61,7 +61,7 @@ function get_num_elements(wf::WeakFormInputs)
 end
 
 function get_problem_size(wf::WeakFormInputs)
-    return FunctionSpaces.get_dim(wf.space_trial), FunctionSpaces.get_dim(wf.space_test)
+    return FunctionSpaces.get_num_basis(wf.space_trial), FunctionSpaces.get_num_basis(wf.space_test)
 end
 
 function get_estimated_nnz_per_elem(wf::WeakFormInputs)

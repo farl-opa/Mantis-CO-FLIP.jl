@@ -38,7 +38,7 @@ set of `basis_ids` with non-empty support in a given element.
 - `::NTuple{4, Int}`: corner basis function indices in the order "UR", "LR", "LL", "UL".
 """
 function get_corner_basis_ids(fe_space::AbstractFiniteElementSpace{n}, basis_ids::Vector{Int}) where {n}
-    max_ind_basis = _get_dim_per_space(fe_space)
+    max_ind_basis = _get_num_basis_per_space(fe_space)
     lower_left_bspline = minimum(basis_ids)
     upper_right_bspline = maximum(basis_ids)
 
@@ -195,7 +195,7 @@ Checks whether a pair of basis functions has a shortest chain between them.
 - `::Bool`: whether there is a shortest chain.
 """
 function check_shortest_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    max_id_basis = _get_dim_per_space(get_space(hspace, level))
+    max_id_basis = _get_num_basis_per_space(get_space(hspace, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k ∈ 1:2]
     diff_basis_per_dim = -(basis_per_dim...)
 
@@ -258,7 +258,7 @@ Returns the basis indices of basis functions in the L-chain between the basis in
 """
 function build_L_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     L_chain = Int[]
-    max_id_basis = _get_dim_per_space(get_space(hspace, level))
+    max_id_basis = _get_num_basis_per_space(get_space(hspace, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k ∈ 1:2]
 
     # Lower right L-chain

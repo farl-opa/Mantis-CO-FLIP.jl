@@ -35,7 +35,7 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n}
         n_partn_2 = length(dof_partition_2)
         
         # Dimensions of constituent function spaces
-        tp_dim = (get_dim(function_space_1), get_dim(function_space_2))
+        tp_dim = (get_num_basis(function_space_1), get_num_basis(function_space_2))
         
         # Allocate memory for degree of freedom partitioning
         dof_partition = Vector{Vector{Int}}(undef, n_partn_1 * n_partn_2)
@@ -64,20 +64,7 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n}
     end
 end
 
-"""
-    get_n(tp::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
 
-Get the total dimension of the tensor-product space.
-
-# Arguments
-- `tp::TensorProductSpace{n, F1, F2}`: The tensor-product space
-
-# Returns
-- `::Int`: The total dimension of the space
-"""
-function get_n(::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
-    return n
-end
 
 """
     get_num_elements(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
@@ -110,7 +97,7 @@ function _get_num_elements_per_space(tp_space::TensorProductSpace{n, F1, F2}) wh
 end
 
 """
-    get_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
+    get_num_basis(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
 
 Get the dimension of the tensor-product function space.
 
@@ -120,12 +107,12 @@ Get the dimension of the tensor-product function space.
 # Returns
 - `::Int`: The dimension of the space
 """
-function get_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
-    return prod(_get_dim_per_space(tp_space))
+function get_num_basis(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
+    return prod(_get_num_basis_per_space(tp_space))
 end
 
 """
-    _get_dim_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
+    _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
 
 Helper function to get the dimension of each constituent space.
 
@@ -135,8 +122,8 @@ Helper function to get the dimension of each constituent space.
 # Returns
 - `::Tuple{Int,Int}`: Dimensions of each constituent space
 """
-function _get_dim_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
-    return (get_dim(tp_space.function_space_1), get_dim(tp_space.function_space_2))
+function _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
+    return (get_num_basis(tp_space.function_space_1), get_num_basis(tp_space.function_space_2))
 end
 
 """
@@ -223,7 +210,7 @@ Helper function to get the support of a basis function in each constituent space
 - `::Tuple{Vector{Int},Vector{Int}}`: Support in each constituent space
 """
 function _get_support_per_dim(tp_space::TensorProductSpace{n, F1, F2}, basis_id::Int) where {n, F1, F2}
-    max_ind_basis = _get_dim_per_space(tp_space)
+    max_ind_basis = _get_num_basis_per_space(tp_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_basis)
 
     return get_support(tp_space.function_space_1, ordered_index[1]), get_support(tp_space.function_space_2, ordered_index[2])
@@ -245,7 +232,7 @@ Get the extraction operator for an element in the tensor-product space.
 - `::Tuple{Matrix{Float64}, Vector{Int}}`: Extraction coefficients and basis indices.
 """
 function get_extraction(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1, F2}
-    max_ind_basis = _get_dim_per_space(tp_space)
+    max_ind_basis = _get_num_basis_per_space(tp_space)
     extraction_per_dim = _get_extraction_per_dim(tp_space, el_id)
     
     # Compute Kronecker product of extraction coefficients

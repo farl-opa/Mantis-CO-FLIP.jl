@@ -45,7 +45,7 @@ xi = collect(range(0,1, nxi))
 xs = Vector{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi)
 nx = length(xs)
 
-A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     

@@ -58,11 +58,11 @@ end
 function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
     L = Mantis.FunctionSpaces.get_num_levels(hspace)
     
-    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_dim(hspace), 2))
+    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hspace), 2))
 
     id_sum = 1
     for level ∈ 1:1:L
-        max_ind_basis = Mantis.FunctionSpaces._get_dim_per_space(hspace.spaces[level])
+        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hspace.spaces[level])
         x_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
         y_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
         grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]

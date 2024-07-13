@@ -39,16 +39,16 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # First, store the left corner ...
         dof_partition[1] = [1]
         # ... then the interior dofs ...
-        dof_partition[2] = collect(2:get_dim(extraction_op)-1)
+        dof_partition[2] = collect(2:get_num_basis(extraction_op)-1)
         # ... and then finally the right corner.
-        dof_partition[3] = [get_dim(extraction_op)]
+        dof_partition[3] = [get_num_basis(extraction_op)]
 
         new{1,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 end
 
 """
-    get_dim(us_space::UnstructuredSpace)
+    get_num_basis(us_space::UnstructuredSpace)
 
 Get the dimension of the unstructured function space.
 
@@ -58,8 +58,8 @@ Get the dimension of the unstructured function space.
 # Returns
 - `::Int`: The dimension of the space.
 """
-function get_dim(us_space::UnstructuredSpace)
-    return get_dim(us_space.extraction_op)
+function get_num_basis(us_space::UnstructuredSpace)
+    return get_num_basis(us_space.extraction_op)
 end
 
 """

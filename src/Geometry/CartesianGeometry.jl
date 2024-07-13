@@ -1,5 +1,5 @@
 import LinearAlgebra
-struct CartesianGeometry{n} <: AbstractAnalGeometry{n}
+struct CartesianGeometry{n} <: AbstractAnalyticalGeometry{n}
     n_elements::NTuple{n,Int}
     breakpoints::NTuple{n,Vector{Float64}}
     cartesian_idxs::CartesianIndices{n, NTuple{n, Base.OneTo{Int}}}

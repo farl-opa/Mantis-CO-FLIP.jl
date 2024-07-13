@@ -39,7 +39,7 @@ struct FormField{manifold_dim, form_rank, FS} <: AbstractFormField{manifold_dim,
     """
     function FormField(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
         # Here we just generate the coefficients as zeros, i.e., initialize the coefficients
-        n_dofs = get_dim(form_space)
+        n_dofs = get_num_basis(form_space)
         coefficients = zeros(Float64, n_dofs)
         label = label * super("$form_rank")
         new{manifold_dim, form_rank, FS}(form_space, coefficients, label)
