@@ -20,14 +20,19 @@ struct CanonicalFiniteElementSpace{C} <: AbstractFiniteElementSpace{1}
     dof_partition::Vector{Vector{Int}}
 
     function CanonicalFiniteElementSpace(canonical_space::C) where {C <: AbstractCanonicalSpace}
+        CanonicalFiniteElementSpace(canonical_space, 1, 1)
+    end
+
+    function CanonicalFiniteElementSpace(canonical_space::C, n_dofs_left::Int, n_dofs_right::Int) where {C <: AbstractCanonicalSpace}
         # Allocate memory for degree of freedom partitioning
         dof_partition = Vector{Vector{Int}}(undef,3)
-        # First, store the left corner ...
-        dof_partition[1] = [1]
+        # First, store the left dofs ...
+        dof_partition[1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(2:canonical_space.p)
-        # ... and then finally the right corner.
-        dof_partition[3] = [canonical_space.p+1]
+        dof_partition[2] = collect(n_dofs_left+1:canonical_space.p-n_dofs_right)
+        # ... and then finally the right dofs.
+        dof_partition[3] = collect(canonical_space.p-n_dofs_right+1:canonical_space.p+1)
+        
         new{C}(canonical_space, dof_partition)
     end
 end

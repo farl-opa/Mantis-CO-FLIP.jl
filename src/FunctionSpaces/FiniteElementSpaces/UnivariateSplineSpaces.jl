@@ -260,6 +260,10 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
     dof_partition::Vector{Vector{Int}}
 
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
+        BSplineSpace(patch_1d, polynomial_degree, regularity, 1, 1)
+    end
+
+    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int}, n_dofs_left::Int, n_dofs_right::Int)
         # Check for errors in the construction 
         if polynomial_degree <0
             msg1 = "Polynomial degree must be greater or equal than 0."
@@ -292,12 +296,12 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
 
         # Allocate memory for degree of freedom partitioning
         dof_partition = Vector{Vector{Int}}(undef,3)
-        # First, store the left corner ...
-        dof_partition[1] = [1]
+        # First, store the left dofs ...
+        dof_partition[1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(2:(bspline_dim-1))
-        # ... and then finally the right corner.
-        dof_partition[3] = [bspline_dim]
+        dof_partition[2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right-1)
+        # ... and then finally the right dofs.
+        dof_partition[3] = collect(bspline_dim-n_dofs_right:bspline_dim)
         
         # Initialize the BSplineSpace struct
         new(knot_vector, extraction_op, Bernstein(polynomial_degree), dof_partition)
@@ -510,12 +514,12 @@ function get_max_local_dim(bspline::BSplineSpace)
 end
 
 """
-    get_dof_partition(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+    get_dof_partition(bspline::BSplineSpace)
 
-Get the partition of degrees of freedom for the canonical finite element space.
+Get the partition of degrees of freedom for the B-spline space
 
 # Arguments
-- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `bspline::BSplineSpace`: The B-spline space.
 
 # Returns
 The partition of degrees of freedom.
@@ -565,7 +569,11 @@ function GTBSplineSpace(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace},
     end
 
     # Construct and return the UnstructuredSpace
-    return UnstructuredSpace(canonical_spaces, extract_gtbspline_to_canonical(canonical_spaces, regularity), Dict("regularity" => regularity))
+    if regularity[m] > -1 # periodic space: non-default dof partitioning
+        return UnstructuredSpace(canonical_spaces, extract_gtbspline_to_canonical(canonical_spaces, regularity), 0, 0, Dict("regularity" => regularity))
+    else
+        return UnstructuredSpace(canonical_spaces, extract_gtbspline_to_canonical(canonical_spaces, regularity), Dict("regularity" => regularity))
+    end
 end
 
 @doc raw"""
@@ -608,5 +616,9 @@ function GTBSplineSpace(nurbs::NTuple{m,T}, regularity::Vector{Int}) where {m, T
     end
 
     # Construct and return the UnstructuredSpace
-    return UnstructuredSpace(nurbs, extract_gtbspline_to_nurbs(nurbs, regularity), Dict("regularity" => regularity))
+    if regularity[m] > -1 # periodic space: non-default dof partitioning
+        return UnstructuredSpace(nurbs, extract_gtbspline_to_nurbs(nurbs, regularity), 0, 0, Dict("regularity" => regularity))
+    else
+        return UnstructuredSpace(nurbs, extract_gtbspline_to_nurbs(nurbs, regularity), Dict("regularity" => regularity))
+    end
 end 

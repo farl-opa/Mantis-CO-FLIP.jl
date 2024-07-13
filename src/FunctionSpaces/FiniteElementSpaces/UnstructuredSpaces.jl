@@ -19,12 +19,16 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
     us_config::Dict
     data::Dict
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, us_config::Dict, data::Dict) where {n,m}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Int}}, us_config::Dict, data::Dict) where {n,m}
         # Initialize with empty dof partitioning
-        new{n,m}(function_spaces, extraction_op, Vector{Vector{Int}}(undef,0), us_config, data)
+        new{n,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
+        UnstructuredSpace(function_spaces, extraction_op, 1, 1, data)
+    end
+
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, n_dofs_left::Int, n_dofs_right::Int, data::Dict) where {m}
         # Build 1D topology
         patch_neighbours = [-1 (1:m-1)...
                             (2:m)... -1]
@@ -36,12 +40,12 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
 
         # Allocate memory for degree of freedom partitioning
         dof_partition = Vector{Vector{Int}}(undef,3)
-        # First, store the left corner ...
-        dof_partition[1] = [1]
+        # First, store the left dofs ...
+        dof_partition[1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(2:get_num_basis(extraction_op)-1)
-        # ... and then finally the right corner.
-        dof_partition[3] = [get_num_basis(extraction_op)]
+        dof_partition[2] = collect(n_dofs_left+1:get_num_basis(extraction_op)-n_dofs_right-1)
+        # ... and then finally the right dofs.
+        dof_partition[3] = collect(get_num_basis(extraction_op)-n_dofs_right:get_num_basis(extraction_op))
 
         new{1,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
