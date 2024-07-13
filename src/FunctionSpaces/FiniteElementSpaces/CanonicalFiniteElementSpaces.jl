@@ -29,9 +29,9 @@ struct CanonicalFiniteElementSpace{C} <: AbstractFiniteElementSpace{1}
         # First, store the left dofs ...
         dof_partition[1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(n_dofs_left+1:canonical_space.p-n_dofs_right)
+        dof_partition[2] = collect(n_dofs_left+1:canonical_space.p-n_dofs_right+1)
         # ... and then finally the right dofs.
-        dof_partition[3] = collect(canonical_space.p-n_dofs_right+1:canonical_space.p+1)
+        dof_partition[3] = collect(canonical_space.p-n_dofs_right+2:canonical_space.p+1)
         
         new{C}(canonical_space, dof_partition)
     end

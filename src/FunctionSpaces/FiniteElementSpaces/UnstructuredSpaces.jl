@@ -43,9 +43,9 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # First, store the left dofs ...
         dof_partition[1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(n_dofs_left+1:get_num_basis(extraction_op)-n_dofs_right-1)
+        dof_partition[2] = collect(n_dofs_left+1:get_num_basis(extraction_op)-n_dofs_right)
         # ... and then finally the right dofs.
-        dof_partition[3] = collect(get_num_basis(extraction_op)-n_dofs_right:get_num_basis(extraction_op))
+        dof_partition[3] = collect(get_num_basis(extraction_op)-n_dofs_right+1:get_num_basis(extraction_op))
 
         new{1,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end

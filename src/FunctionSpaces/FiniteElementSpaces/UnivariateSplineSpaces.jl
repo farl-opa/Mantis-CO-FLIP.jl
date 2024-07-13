@@ -299,9 +299,9 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
         # First, store the left dofs ...
         dof_partition[1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right-1)
+        dof_partition[2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right)
         # ... and then finally the right dofs.
-        dof_partition[3] = collect(bspline_dim-n_dofs_right:bspline_dim)
+        dof_partition[3] = collect(bspline_dim-n_dofs_right+1:bspline_dim)
         
         # Initialize the BSplineSpace struct
         new(knot_vector, extraction_op, Bernstein(polynomial_degree), dof_partition)
