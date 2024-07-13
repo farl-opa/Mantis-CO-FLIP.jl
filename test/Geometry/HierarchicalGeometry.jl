@@ -23,25 +23,19 @@ CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1);
 nsub1 = 2
 nsub2 = 2
 
-TS1,FB1 = Mantis.FunctionSpaces.subdivide_bspline(CB1, nsub1)
-TS2, FB2 = Mantis.FunctionSpaces.subdivide_bspline(CB2, nsub2)
-
 CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
-FTP = Mantis.FunctionSpaces.TensorProductSpace(FB1, FB2)
+CTS, FTP = Mantis.FunctionSpaces.subdivide_bspline(CTP, (nsub1, nsub2))
 spaces = [CTP, FTP]
 
 CTP_num_els = Mantis.FunctionSpaces.get_num_elements(CTP)
 
-CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(TS1,TS2)
-
-coarse_elements_to_refine = [3,4,5,8,9,10]
+coarse_elements_to_refine = [3,4,5,8,9,10,13,14,15]
 refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
 
-refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
+hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], [Int[], refined_elements], true)
 
 # Test if projection in space is exact
-nxi_per_dim = 3
+nxi_per_dim = max(deg1, deg2) + 1
 nxi = nxi_per_dim^2
 xi_per_dim = collect(range(0,1, nxi_per_dim))
 xi = Matrix{Float64}(undef, nxi,2)

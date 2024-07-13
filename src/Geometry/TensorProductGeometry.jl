@@ -70,41 +70,41 @@ is given by
 ```
 
 """
-struct TensorProductGeometry{n, m} <: AbstractGeometry{n, m}
-    geometry_1::AbstractGeometry
-    geometry_2::AbstractGeometry
+struct TensorProductGeometry{n, G1, G2} <: AbstractGeometry{n}
+    geometry_1::G1
+    geometry_2::G2
     domain_dims::NTuple{2, Int}
     image_dims::NTuple{2, Int}
     n_elements_per_geometry::NTuple{2, Int}
     n_elements::Int
     cartesian_indices::CartesianIndices
     
-    function TensorProductGeometry(geometry_1::AbstractGeometry{n_1, m_1}, geometry_2::AbstractGeometry{n_2, m_2}) where {n_1, m_1, n_2, m_2}
+    function TensorProductGeometry(geometry_1::G1, geometry_2::G2) where {G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
         n_elements_per_geometry = (get_num_elements(geometry_1), get_num_elements(geometry_2))
         n_elements = prod(n_elements_per_geometry)
-        domain_dims = (get_domain_dim(geometry_1), get_domain_dim(geometry_2))
+        domain_dims = (n1, n2)
         image_dims = (get_image_dim(geometry_1), get_image_dim(geometry_2))
-        n = sum(domain_dims)
-        m = sum(image_dims) 
+        n = n1 + n2
         cartesian_indices = CartesianIndices(n_elements_per_geometry)
-        return new{n, m}(geometry_1, geometry_2, domain_dims, image_dims, n_elements_per_geometry, n_elements, cartesian_indices)
+
+        return new{n, G1, G2}(geometry_1, geometry_2, domain_dims, image_dims, n_elements_per_geometry, n_elements, cartesian_indices)
     end
 end
 
-function get_num_elements(geometry::TensorProductGeometry{n, m}) where {n, m}
+function get_num_elements(geometry::TensorProductGeometry{n, G1, G2}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     return geometry.n_elements
 end
 
-function get_domain_dim(::TensorProductGeometry{n, m}) where {n, m}
+function get_domain_dim(_::TensorProductGeometry{n, G1, G2}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     return n
 end
 
-function get_image_dim(::TensorProductGeometry{n, m}) where {n, m}
-    return m
+function get_image_dim(geometry::TensorProductGeometry{n, G1, G2}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
+    return sum(geometry.image_dims)
 end
 
 @doc raw"""
-    evaluate(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::NTuple{n, Vector{Float64}})
+    evaluate(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n, Vector{Float64}})
 
 Evaluates the tensor product geometry `geometry` at element `element_idx` and at the tensor product of the 
 `NTuple` coordinates `ξ`.
@@ -126,7 +126,7 @@ embedding space to where the canonical element is mapped into. Specifically:
 where ``r = \mathtt{element\_idx}``, and ``k = j_{1} + \sum_{i=2}^{n} (j_{i} - 1)\prod_{l=1}^{i-1}m_{l}``, as before.
 
 # Arguments
-- `geometry::TensorProductGeometry{n, m}`: tensor product geometry of elements of dimension `n` embedded in a domain of 
+- `geometry::TensorProductGeometry{n, G1, G2}`: tensor product geometry of elements of dimension `n` embedded in a domain of 
    dimension `m`.
 - `element_idx::Int`: the index of the element of the tensor product geometry where to evaluate the geometry.
 - `ξ::NTuple{n,Vector{Float64}}`: the ``n`` unidimensional vectors with ``m_{i}``, ``i = 1, \dots, n``, 
@@ -139,10 +139,11 @@ where ``r = \mathtt{element\_idx}``, and ``k = j_{1} + \sum_{i=2}^{n} (j_{i} - 1
  of the unidimensional coordinates `\xi`. See above for more details.
 
 """
-function evaluate(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, m}
+function evaluate(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     element_geometries_idx = geometry.cartesian_indices[element_idx]
     
     n_points = prod(size.(ξ, 1))  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
+    m = get_image_dim(geometry)
     x = zeros(Float64, n_points, m)
 
     x[:, 1:geometry.image_dims[1]] .= evaluate(geometry.geometry_1, element_geometries_idx[1], ξ[1:geometry.domain_dims[1]])
@@ -151,12 +152,12 @@ function evaluate(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::N
     return x
 end
 
-function evaluate(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::Vector{Float64}) where {n, m}
+function evaluate(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::Vector{Float64}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     return evaluate(geometry, element_idx, ntuple(i -> [ξ[i]], n))[1, :]
 end
 
 @doc raw"""
-    jacobian(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::NTuple{n,Vector{Float64}})
+    jacobian(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n,Vector{Float64}})
 
 Evaluates the Jacobian of the tensor product geometry `geometry` at element `element_idx` and at the tensor product of the 
 `NTuple` coordinates `ξ`.
@@ -179,7 +180,7 @@ same as the dimension of the element's manifold). Specifically:
 where ``r = \mathtt{element\_idx}``, and ``k = j_{1} + \sum_{i=2}^{n} (j_{i} - 1)\prod_{l=1}^{i-1}m_{l}``, as before.
 
 # Arguments
-- `geometry::TensorProductGeometry{n, m}`: tensor product geometry of elements of dimension `n` embedded in a domain of 
+- `geometry::TensorProductGeometry{n, G1, G2}`: tensor product geometry of elements of dimension `n` embedded in a domain of 
    dimension `m`.
 - `element_idx::Int`: the index of the element of the tensor product geometry where to evaluate the geometry.
 - `ξ::NTuple{n,Vector{Float64}}`: the ``n`` unidimensional vectors with ``m_{i}``, ``i = 1, \dots, n``, 
@@ -192,10 +193,11 @@ where ``r = \mathtt{element\_idx}``, and ``k = j_{1} + \sum_{i=2}^{n} (j_{i} - 1
  and the tensor product points of the unidimensional coordinates `\xi`. See above for more details.
 
 """
-function jacobian(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, m}
+function jacobian(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     element_geometries_idx = geometry.cartesian_indices[element_idx]
 
     n_points = prod(size.(ξ, 1))  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
+    m = get_image_dim(geometry)
     J = zeros(Float64, n_points, m, n)
 
     J[:, 1:geometry.image_dims[1], 1:geometry.domain_dims[1]] .= jacobian(geometry.geometry_1, element_geometries_idx[1], ξ[1:geometry.domain_dims[1]])  # the Jacobian contribution from geometry 1
@@ -204,6 +206,6 @@ function jacobian(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::N
     return J
 end
 
-function jacobian(geometry::TensorProductGeometry{n, m}, element_idx::Int, ξ::Vector{Float64}) where {n, m}
+function jacobian(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::Vector{Float64}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     return jacobian(geometry, element_idx, ntuple(i -> [ξ[i]], n))
 end

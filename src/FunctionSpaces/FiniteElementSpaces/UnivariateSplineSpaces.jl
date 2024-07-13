@@ -32,6 +32,9 @@ struct KnotVector
 
         new(patch_1d, polynomial_degree, multiplicity)
     end
+    function KnotVector(patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Int)
+       return KnotVector(patch_1d, polynomial_degree, [multiplicity])
+    end
 end
 
 """
@@ -257,11 +260,11 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
     boundary_dof_indices::Vector{Int}
 
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
-        # Check for errors in the inputs
-        if polynomial_degree < 0
-            msg1 = "Polynomial degree must be greater or equal to 0."
-            msg2 = " The degree is $polynomial_degree."
-            throw(ArgumentError(msg1 * msg2))
+        # Check for errors in the construction 
+        if polynomial_degree <0
+            msg1 = "Polynomial degree must be greater or equal than 0."
+            msg2 = " The degree is $(polynomial_degree)."
+            throw(ArgumentError(msg1*msg2))
         end
 
         if (size(patch_1d) + 1) != length(regularity)
@@ -338,7 +341,8 @@ Compute the local basis functions and their derivatives for a B-spline element.
 - `::Matrix{Float64}`: Local basis functions and their derivatives.
 """
 function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
-    local_basis = bspline.polynomials(xi, nderivatives)
+    local_basis = evaluate(bspline.polynomials, xi, nderivatives)
+
     return local_basis
 end
 
@@ -474,17 +478,24 @@ function get_support(bspline::BSplineSpace, basis_id::Int)
     return first_element:last_element
 end
 
-"""
-    get_max_local_dim(bspline::BSplineSpace)
+function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)
+    knot_vector = bspline.knot_vector
+    deg = get_polynomial_degree(bspline)
 
-Returns the maximum local dimension of the B-Spline space.
+    knot_cum_sum = cumsum(knot_vector.multiplicity)
 
-# Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
+    first_breakpoint_idx = convert_knot_to_breakpoint_idx(knot_vector, basis_idx)
+    last_breakpoint_idx = convert_knot_to_breakpoint_idx(knot_vector, basis_idx + deg + 1)
 
-# Returns
-- `::Int`: The maximum local dimension.
-"""
+    first_knot_mult = knot_cum_sum[first_breakpoint_idx] - basis_idx + 1
+    last_knot_mult = basis_idx + deg + 1 - knot_cum_sum[last_breakpoint_idx - 1]
+
+    breakpoints = get_patch(bspline).breakpoints[first_breakpoint_idx:last_breakpoint_idx]
+    multiplicity = vcat(first_knot_mult, get_multiplicity_vector(bspline)[first_breakpoint_idx+1:last_breakpoint_idx-1], last_knot_mult)
+
+    return KnotVector(Mesh.Patch1D(breakpoints), deg, multiplicity)
+end
+
 function get_max_local_dim(bspline::BSplineSpace)
     return bspline.knot_vector.polynomial_degree + 1
 end
@@ -606,4 +617,4 @@ function GTBSplineSpace(nurbs::NTuple{m,T}, regularity::Vector{Int}) where {m, T
 
     # Construct and return the UnstructuredSpace
     return UnstructuredSpace(nurbs, extract_gtbspline_to_nurbs(nurbs, regularity), Dict("regularity" => regularity))
-end
+end 

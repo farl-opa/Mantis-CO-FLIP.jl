@@ -13,6 +13,5 @@ include("Geometry/Geometry.jl")  # Creates Module Geometry
 include("Forms/Forms.jl")  # Creates Module Forms
 include("Assemblers/Assemblers.jl")  # Creates Module Assemblers
 include("Plot/Plot.jl")  # Creates Module Plot
-# include("HierarchicalFiniteElementSpaces/HierarchicalFiniteElementSpaces.jl")  # Creates Module HierarchicalFiniteElementSpaces
 
 end

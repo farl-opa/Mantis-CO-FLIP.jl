@@ -1,6 +1,4 @@
-# some helper functions
 include("HelperFunctions.jl")
-
 # AbstractFiniteElementSpace: Common functionality accross FEM spaces
 include("AbstractFiniteElementSpace.jl")
 # Extraction operator: functionaly for extraction operator
@@ -19,4 +17,3 @@ include("TensorProductSpaces.jl")
 include("TwoScaleRelations/TwoScaleRelations.jl")
 # hierarchical function spaces
 include("HierarchicalFiniteElementSpaces.jl")
-

@@ -38,7 +38,7 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     # we need to add this, but it implies several changes (I started, but postponed it!)
 
     @doc raw"""
-        FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}) where {manifold_dim, comanifold_dim, G <: Geometry.AbstractGeometry{manifold_dim, comanifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
+        FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
 
     Constructor for 0-forms and n-forms.
 
@@ -48,13 +48,13 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     - `fem_space::Tuple{F}`: A tuple containing a single finite element space, since 0- and n-forms 
             contain only one component.
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}) where {manifold_dim, comanifold_dim, G <: Geometry.AbstractGeometry{manifold_dim, comanifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
+    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
         @assert form_rank in Set([0, manifold_dim])
         new{manifold_dim, form_rank, G, Tuple{F}}(geometry, fem_space)
     end
 
     @doc raw"""
-        FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}) where {manifold_dim, comanifold_dim, G <: Geometry.AbstractGeometry{manifold_dim, comanifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
+        FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
 
     Constructor for 1-forms in 2D.
 
@@ -63,7 +63,7 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     - `geometry::G`: The geometry of the space
     - `fem_space::Tuple{F_dξ, F_dη}`: A tuple containing two finite element spaces for dξ and dη components
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}) where {manifold_dim, comanifold_dim, G <: Geometry.AbstractGeometry{manifold_dim, comanifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
+    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
         @assert form_rank == 1
         form_components = binomial(manifold_dim, form_rank)
         @assert form_components == length(fem_space)
@@ -80,7 +80,7 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     - `geometry::G`: The geometry of the manifold
     - `fem_space::Tuple{F_dξ, F_dη, F_dζ}`: A tuple containing three finite element spaces for dξ, dη, and dζ components
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ}) where {manifold_dim, comanifold_dim, G <: Geometry.AbstractGeometry{manifold_dim, comanifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace, F_dζ <: FunctionSpaces.AbstractFunctionSpace}
+    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace, F_dζ <: FunctionSpaces.AbstractFunctionSpace}
         @assert form_rank in Set([1, 2])
         form_components = binomial(manifold_dim, form_rank)
         @assert form_components == length(fem_space)

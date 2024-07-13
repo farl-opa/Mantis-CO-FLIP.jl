@@ -19,8 +19,8 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n}
     boundary_dof_indices::Vector{Int}
     data::Dict
 
-    function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
-        n = get_n(function_space_1) + get_n(function_space_2)
+    function TensorProductSpace(function_space_1::F1, function_space_2::F2, data::Dict) where {F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}} where {n1, n2}
+        n = n1 + n2
         new{n,F1,F2}(function_space_1, function_space_2, Vector{Int}(undef,0), data)
     end
 
@@ -106,19 +106,11 @@ function _get_dim_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F
     return (get_dim(tp_space.function_space_1), get_dim(tp_space.function_space_2))
 end
 
-"""
-    get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
+function get_polynomial_degree_per_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    return (get_polynomial_degree(tp_space.function_space_1), get_polynomial_degree(tp_space.function_space_2))
+end
 
-Get the maximum local dimension of the tensor-product space.
-
-# Arguments
-- `tp_space::TensorProductSpace{n, F1, F2}`: tensor-product space
-
-# Returns
-- `::Int`: maximum local dimension
-"""
-function get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
-    # Multiply the maximum local dimensions of each constituent space
+function get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     return get_max_local_dim(tp_space.function_space_1) * get_max_local_dim(tp_space.function_space_2)
 end
 
@@ -133,10 +125,11 @@ Get the indices of boundary degrees of freedom for the tensor-product space.
 # Returns
 - `::Vector{Int}`: indices of boundary degrees of freedom
 """
-function get_boundary_dof_indices(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
-    if length(tp_space.boundary_dof_indices)==0
-        # Use default tensor-product dofs
-        boundary_dofs_1, boundary_dofs_2 = _get_boundary_dof_indices_per_dim(tp_space)
+function get_boundary_dof_indices(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    if length(tp_space.boundary_dof_indices)==0 # use default tp-dofs
+        #boundary_dofs_1, boundary_dofs_2 = _get_boundary_dof_indices_per_dim(tp_space)
+        boundary_dofs_1 = get_boundary_dof_indices(tp_space.function_space_1)
+        boundary_dofs_2 = get_boundary_dof_indices(tp_space.function_space_2)
         tp_dim = _get_dim_per_space(tp_space)
         
         # Calculate total number of boundary dofs
@@ -206,8 +199,8 @@ Helper function to get the support of a basis function in each constituent space
 function _get_support_per_dim(tp_space::TensorProductSpace{n, F1, F2}, basis_id::Int) where {n, F1, F2}
     max_ind_basis = _get_dim_per_space(tp_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_basis)
-    return (get_support(tp_space.function_space_1, ordered_index[1]), 
-            get_support(tp_space.function_space_2, ordered_index[2]))
+
+    return get_support(tp_space.function_space_1, ordered_index[1]), get_support(tp_space.function_space_2, ordered_index[2])
 end
 
 """
@@ -341,7 +334,5 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
     xi_1 = xi[1:n1]
     xi_2 = xi[n1+1:n]
 
-    # Compute local basis for each constituent space
-    return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), 
-           get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
+    return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
 end

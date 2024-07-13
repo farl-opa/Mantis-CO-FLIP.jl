@@ -46,7 +46,7 @@ struct FormField{manifold_dim, form_rank, FS} <: AbstractFormField{manifold_dim,
     end
 end
 
-"""
+@doc raw"""
     evaluate(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
 
 Evaluate a FormField at given points.
@@ -88,7 +88,7 @@ function evaluate(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int
     return form_eval
 end
 
-"""
+@doc raw"""
     evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
 
 Evaluate the exterior derivative of a FormField at given points.
@@ -155,7 +155,7 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, F
     return d_form_eval
 end
 
-"""
+@doc raw"""
     FormExpression{n, k, F} <: AbstractFormExpression{n, k}
 
 Represents an expression involving differential forms.
@@ -205,7 +205,7 @@ struct FormExpression{n, k, F} <:AbstractFormExpression{n, k}
     end
 end
 
-"""
+@doc raw"""
     evaluate(form::FormExpression{manifold_dim, form_rank, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, F <: AbstractFormExpression}
 
 Evaluate a unary FormExpression at given points.
@@ -235,7 +235,7 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, Tuple{F}}, eleme
     return form_eval
 end
 
-"""
+@doc raw"""
     evaluate(form::FormExpression{manifold_dim, form_rank, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
 
 Evaluate a binary FormExpression at given points.
@@ -259,7 +259,7 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, Tuple{F1, F2}}, 
     return form_eval
 end
 
-"""
+@doc raw"""
     wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
 
 Create a wedge product expression of two forms.
@@ -275,7 +275,7 @@ function wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{ma
     return FormExpression((form_1, form_2), form_rank_1 + form_rank_2, "∧")
 end
 
-"""
+@doc raw"""
     hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
 
 Create a Hodge star expression of a form.
@@ -290,7 +290,7 @@ function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_ra
     return FormExpression((form,), "⋆")
 end
 
-"""
+@doc raw"""
     exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
 
 Create an exterior derivative expression of a form.

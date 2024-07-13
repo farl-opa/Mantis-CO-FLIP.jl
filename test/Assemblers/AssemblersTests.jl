@@ -8,36 +8,32 @@ using LinearAlgebra
 
 
 
-# This is how MANTIS is called to solve a problem. The bc input is only for the 1D case.
+# This is how MANTIS is called to solve a problem.
 function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, 
                 q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
-                verbose=false, bc = (false, 0.0, 0.0))
+                verbose=false, bc_dirichlet = Dict{Int, Float64}())
     if verbose
         println("Starting setup of problem and assembler for case "*case*" ...")
     end
     # Setup the element assembler.
-    element_assembler = Mantis.Assemblers.PoissonBilinearForm(forcing_function,
-                                                              trial_space,
-                                                              test_space,
-                                                              geom,
-                                                              q_nodes,
-                                                              q_weights)
+    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(forcing_function,
+                                                        trial_space,
+                                                        test_space,
+                                                        geom,
+                                                        q_nodes,
+                                                        q_weights)
 
     # Setup the global assembler.
-    if bc[1] == false
-        global_assembler = Mantis.Assemblers.Assembler()
-    else
-        global_assembler = Mantis.Assemblers.Assembler(bc[2], bc[3])
-    end
+    global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
 
     if verbose
         println("Assembling ...")
     end
-    A, b = global_assembler(element_assembler)
+    A, b = global_assembler(Mantis.Assemblers.poisson_weak_form_1, weak_form_inputs)
 
-    if n != 1
+    if n > 1 && isempty(bc_dirichlet)
         # Add the average = 0 condition for Neumann b.c. (derivatives are 
-        # assumed to be zero!)
+        # assumed to be zero!). Note that this only sums the coefficients.
         A = vcat(A, ones((1,size(A)[2])))
         A = hcat(A, vcat(ones(size(A)[1]-1), 0.0))
         b = vcat(b, 0.0)
@@ -50,7 +46,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         if verbose
             println("Running tests ...")
         end
-        @test isapprox(A, A', rtol=1e-12)
+        #@test isapprox(A, A', rtol=1e-12)  # Full system matrices need not be symmetric due to the boundary conditions.
         @test isempty(nullspace(Matrix(A)))  # Only works on dense matrices!
         @test LinearAlgebra.cond(Matrix(A)) < 1e10
     end
@@ -59,16 +55,12 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if verbose
         println("Solving ",size(A,1)," x ",size(A,2)," sized system ...")
     end
-    if n == 1
-        sol = [bc[2], (A \ Vector(b))..., bc[3]]
-    else
-        sol = A \ Vector(b)
-    end
+    sol = A \ b
 
-    if n == 1
-        sol_rsh = reshape(sol, :, 1)
-    else
+    if n > 1 && isempty(bc_dirichlet)
         sol_rsh = reshape(sol[1:end-1], :, 1)
+    else
+        sol_rsh = reshape(sol, :, 1)
     end
 
 
@@ -80,15 +72,23 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
         end
         
         msave = Mantis.Geometry.get_num_elements(geom)
-        output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*".vtu"
+        if case == "sine2d-crazy"
+            output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*"-$crazy_c.vtu"
+            output_filename_error = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*"-$crazy_c-error.vtu"
+        else
+            output_filename = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*".vtu"
+            output_filename_error = "Poisson-$n-D-p$p-k$k-m$msave-case-"*case*"-error.vtu"
+        end
         output_file = joinpath(output_data_folder, output_filename)
+        output_file_error = joinpath(output_data_folder, output_filename_error)
         field = Mantis.Fields.FEMField(trial_space, sol_rsh)
         if n == 1
             out_deg = maximum([1, p])
         else
             out_deg = maximum([1, maximum(p)])
         end
-        Mantis.Plot.plot(geom, field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        Mantis.Plot.plot(geom, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        Mantis.Plot.plot(geom, field, exact_sol; vtk_filename = output_file_error, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
     end
 
     # Compute error
@@ -99,7 +99,15 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     err = err_assembler(trial_space, sol_rsh, geom, exact_sol)
     if verbose
         println("The L^2 error is: ",err)
-        println()  # Extra blank line to separate the different runs.
+    end
+
+    if test
+        if case == "const1d"
+            if verbose
+                println("Error tests ...")
+            end
+            @test err < 1e12
+        end
     end
 
     # Extra check to test if the metric computation was correct.
@@ -158,8 +166,6 @@ k_1d = 2
 const Lleft_1d = 0.0
 const Lright_1d = 1.0
 
-bc_sine_1d = (true, 0.0, 1.0)
-bc_const_1d = (true, 0.0, 0.0)
 
 function forcing_sine_1d(x::Float64)
     return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
@@ -188,12 +194,15 @@ kvec_1d[end] = -1
 trial_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 
+# Set Dirichlet boundary conditions.
+bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+
 # Create the geometry.
 geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
 
 # Setup the quadrature rule.
-q_nodes_1d, q_weights_1d = Mantis.Quadrature.gauss_legendre(p_1d+1)
-q_weights_1d_all = Mantis.Quadrature.tensor_product_weights((q_weights_1d,)) # Simply returns q_weights_1d
+q_nodes_1d, q_weights_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature.gauss_legendre)
 
 
 
@@ -216,10 +225,10 @@ k_2d = (2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-const Lleft = 0.25
-const Lright = 0.75
-const Lbottom = 0.25
-const Ltop = 0.75
+const Lleft = 0.0#0.25
+const Lright = 1.0#0.75
+const Lbottom = 0.0#0.25
+const Ltop = 1.0#0.75
 
 
 function forcing_sine_2d(x::Float64, y::Float64)
@@ -253,6 +262,9 @@ test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
 
 trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
 test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
+
+# Set Dirichlet boundary conditions to zero.
+bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d))
 
 # Create the geometry.
 geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
@@ -352,13 +364,7 @@ hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
 
 
 # Setup the quadrature rule.
-q_nodes_x, q_weights_x = Mantis.Quadrature.gauss_legendre(p_2d[1]+1)
-q_nodes_y, q_weights_y = Mantis.Quadrature.gauss_legendre(p_2d[2]+1)
-# This function computes the tensor product of the quadrature weights in 
-# the reference domain. This ensures that this only need to be computed 
-# once and makes the size compatible with our other outputs (it returns 
-# a vector of the weights in the right order).
-q_weights_all = Mantis.Quadrature.tensor_product_weights((q_weights_x, q_weights_y))
+q_nodes_2d, q_weights_2d = Mantis.Quadrature.tensor_product_rule(p_2d .+ 1, Mantis.Quadrature.gauss_legendre)
 
 
 
@@ -382,12 +388,12 @@ k_3d = (2, 2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-const Lx1 = 0.25
-const Lx2 = 0.75
-const Ly1 = 0.25
-const Ly2 = 0.75
-const Lz1 = 0.25
-const Lz2 = 0.75
+const Lx1 = 0.0
+const Lx2 = 1.0
+const Ly1 = 0.0
+const Ly2 = 1.0
+const Lz1 = 0.0
+const Lz2 = 1.0
 
 
 function forcing_sine_3d(x::Float64, y::Float64, z::Float64)
@@ -432,52 +438,66 @@ test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, tes
 trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
 test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
 
+# Set Dirichlet boundary conditions to zero.
+bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d))
+
 # Create the geometry.
 geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
 
 # Setup the quadrature rule.
-q_nodes_3d_x, q_weights_3d_x = Mantis.Quadrature.gauss_legendre(p_3d[1]+1)
-q_nodes_3d_y, q_weights_3d_y = Mantis.Quadrature.gauss_legendre(p_3d[2]+1)
-q_nodes_3d_z, q_weights_3d_z = Mantis.Quadrature.gauss_legendre(p_3d[3]+1)
-# This function computes the tensor product of the quadrature weights in 
-# the reference domain. This ensures that this only need to be computed 
-# once and makes the size compatible with our other outputs (it returns 
-# a vector of the weights in the right order).
-q_weights_3d_all = Mantis.Quadrature.tensor_product_weights((q_weights_3d_x, q_weights_3d_y, q_weights_3d_z))
+q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mantis.Quadrature.gauss_legendre)
 
 
 
 
 # Running all testcases.
-for case in ["sine1d", "const1d", "sine2d", "sine2d-crazy", "sine2dH", "sine3d"]
+println()
+cases = ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
+for case in cases
 
     if case == "sine1d"
-        fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d, 
-               (q_nodes_1d, ), q_weights_1d_all, exact_sol_sine_1d, p_1d, 
-               k_1d, case, n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
+        fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d,
+               q_nodes_1d, q_weights_1d, exact_sol_sine_1d, p_1d, k_1d, case, 
+               n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
     elseif case == "const1d"
         fe_run(forcing_const_1d, trial_space_1d, test_space_1d, geom_1d, 
-                (q_nodes_1d, ), q_weights_1d_all, exact_sol_const_1d, p_1d, 
-                k_1d, case, n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
-    elseif case == "sine2d"
+               q_nodes_1d, q_weights_1d, exact_sol_const_1d, p_1d, k_1d, case, 
+               n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
+    elseif case == "sine2d-Dirichlet"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
-               (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-               k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "sine2d-crazy"
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
+    elseif case == "sine2d-Neumann"
+        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose)
+    elseif case == "sine2d-crazy-Dirichlet"
         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
-                (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-                k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "sine2dH"
-        fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, 
-               (q_nodes_x, q_nodes_y), q_weights_all, exact_sol_sine_2d, p_2d, 
-               k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "sine3d"
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
+    elseif case == "sine2d-crazy-Neumann"
+        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
+               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+               n_2d, write_to_output_file, run_tests, verbose)
+    # elseif case == "sine2dH-Dirichlet"
+    #     fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
+    #            q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+    #            write_to_output_file, run_tests, verbose, bc_dirichlet_dict_2d)
+    elseif case == "sine2dH-Neumann"
+        fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
+               q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+               write_to_output_file, run_tests, verbose)
+    elseif case == "sine3d-Dirichlet"
         fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
-                (q_nodes_3d_x, q_nodes_3d_y, q_nodes_3d_z), q_weights_3d_all, 
-                exact_sol_sine_3d, p_3d, k_3d, case, n_3d, write_to_output_file, 
-                run_tests, verbose)
+               q_nodes_3d, q_weights_3d, exact_sol_sine_3d, p_3d, k_3d, case, 
+               n_3d, write_to_output_file, run_tests, verbose, bc_dirichlet_3d)
     else
-        println("Warning: case '"*case*"' unknown. Skipping.") 
+        if verbose
+            println("Warning: case '"*case*"' unknown. Skipping.") 
+        end
+    end
+    if verbose
+        println()  # Extra blank line to separate the different runs.
     end
 end
 
