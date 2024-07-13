@@ -1,4 +1,6 @@
-@doc raw"""
+using LinearAlgebra
+
+"""
     UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
 
 An `n`-variate multi-patch space with `m` patches, representing an unstructured finite element space.
@@ -6,20 +8,20 @@ An `n`-variate multi-patch space with `m` patches, representing an unstructured 
 # Fields
 - `function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}`: Collection of `m` (uni or multivariate) function spaces.
 - `extraction_op::ExtractionOperator`: Extraction operator that specifies how to combine functions from the `m` spaces into functions for the unstructured space.
-- `boundary_dof_indices::Vector{Int}`: Indices of the degrees of freedom on the boundary of the space.
+- `dof_partition::Vector{Vector{Int}}`: Partition of degrees of freedom.
 - `us_config::Dict`: Dictionary that stores helper functionality (e.g., connectivity) for the unstructured space.
 - `data::Dict`: Any auxiliary data that the user wants to store for this unstructured space.
 """
 struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
     function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}
     extraction_op::ExtractionOperator
-    boundary_dof_indices::Vector{Int}
+    dof_partition::Vector{Vector{Int}}
     us_config::Dict
     data::Dict
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, us_config::Dict, data::Dict) where {n,m}
-        # Initialize with empty boundary_dof_indices
-        new{n,m}(function_spaces, extraction_op, Vector{Int}(undef,0), us_config, data)
+        # Initialize with empty dof partitioning
+        new{n,m}(function_spaces, extraction_op, Vector{Vector{Int}}(undef,0), us_config, data)
     end
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
@@ -32,21 +34,23 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # Assemble patch config in a dictionary
         us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
 
-        # Set boundary_dof_indices based on regularity
-        if data["regularity"][end] > -1
-            boundary_dof_indices = Vector{Int}(undef,0)
-        else
-            boundary_dof_indices = [1, get_dim(extraction_op)]
-        end
+        # Allocate memory for degree of freedom partitioning
+        dof_partition = Vector{Vector{Int}}(undef,3)
+        # First, store the left corner ...
+        dof_partition[1] = [1]
+        # ... then the interior dofs ...
+        dof_partition[2] = collect(2:get_dim(extraction_op)-1)
+        # ... and then finally the right corner.
+        dof_partition[3] = [get_dim(extraction_op)]
 
-        new{1,m}(function_spaces, extraction_op, boundary_dof_indices, us_config, data)
+        new{1,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 end
 
-@doc raw"""
+"""
     get_dim(us_space::UnstructuredSpace)
 
-Returns the dimension of the unstructured function space.
+Get the dimension of the unstructured function space.
 
 # Arguments
 - `us_space::UnstructuredSpace`: The unstructured function space.
@@ -58,10 +62,10 @@ function get_dim(us_space::UnstructuredSpace)
     return get_dim(us_space.extraction_op)
 end
 
-@doc raw"""
+"""
     get_num_elements(us_space::UnstructuredSpace)
 
-Returns the total number of elements for the partition over which the function space is defined.
+Get the total number of elements for the partition over which the function space is defined.
 
 # Arguments 
 - `us_space::UnstructuredSpace`: The unstructured space.
@@ -73,10 +77,10 @@ function get_num_elements(us_space::UnstructuredSpace)
     return get_num_elements(us_space.extraction_op)
 end
 
-@doc raw"""
+"""
     get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
 
-Returns the polynomial degree of the specified element in the unstructured space.
+Get the polynomial degree of the specified element in the unstructured space.
 
 # Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
@@ -94,7 +98,7 @@ function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
     return get_polynomial_degree(us_space.function_spaces[space_id], space_element_id)
 end
 
-@doc raw"""
+"""
     get_extraction(us_space::UnstructuredSpace, element_id::Int)
 
 Get extraction coefficients and global basis indices for the specified global element ID.
@@ -111,7 +115,7 @@ function get_extraction(us_space::UnstructuredSpace, element_id::Int)
     return get_extraction(us_space.extraction_op, element_id)
 end
 
-@doc raw"""
+"""
     get_space_id(us_space::UnstructuredSpace, element_id::Int)
 
 Get the ID of the constituent space to which the specified element belongs.
@@ -127,10 +131,10 @@ function get_space_id(us_space::UnstructuredSpace, element_id::Int)
     return findlast(us_space.us_config["patch_nels"] .< element_id)
 end
 
-@doc raw"""
+"""
     get_max_local_dim(us_space::UnstructuredSpace)
 
-Returns the maximum local dimension across all constituent function spaces.
+Get the maximum local dimension across all constituent function spaces.
 
 # Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
@@ -142,42 +146,25 @@ function get_max_local_dim(us_space::UnstructuredSpace)
     return maximum(get_max_local_dim.(us_space.function_spaces))
 end
 
-@doc raw"""
-    set_boundary_dof_indices(us_space::UnstructuredSpace{1,m}, indices::Vector{Int}) where {m}
-
-Sets the boundary degrees of freedom indices for a 1D unstructured space.
-
-# Arguments
-- `us_space::UnstructuredSpace{1,m}`: The 1D unstructured space.
-- `indices::Vector{Int}`: The indices of the boundary degrees of freedom.
-
-# Returns
-- `nothing`
 """
-function set_boundary_dof_indices(us_space::UnstructuredSpace{1,m}, indices::Vector{Int}) where {m}
-    us_space.boundary_dof_indices = indices
-    return nothing
-end
+    get_dof_partition(us_space::UnstructuredSpace{1,m}) where {m}
 
-@doc raw"""
-    get_boundary_dof_indices(us_space::UnstructuredSpace{1,m}) where {m}
-
-Returns the boundary degrees of freedom indices for a 1D unstructured space.
+Get the dof partitioning for a 1D unstructured space.
 
 # Arguments
 - `us_space::UnstructuredSpace{1,m}`: The 1D unstructured space.
 
 # Returns
-- `::Vector{Int}`: The indices of the boundary degrees of freedom.
+- `::Vector{Vector{Int}}`: The dof partition.
 """
-function get_boundary_dof_indices(us_space::UnstructuredSpace{1,m}) where {m}
-    return us_space.boundary_dof_indices
+function get_dof_partition(us_space::UnstructuredSpace{1,m}) where {m}
+    return us_space.dof_partition
 end
 
-@doc raw"""
+"""
     get_local_basis(us_space::UnstructuredSpace{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,m}
 
-Evaluates the local basis functions for a given element in the unstructured space.
+Evaluate the local basis functions for a given element in the unstructured space.
 
 # Arguments 
 - `us_space::UnstructuredSpace`: The unstructured space.

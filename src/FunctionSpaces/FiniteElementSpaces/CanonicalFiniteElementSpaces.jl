@@ -1,49 +1,110 @@
-@doc raw"""
-    CanonicalFiniteElementSpace <: AbstractFiniteElementSpace{1}
+using LinearAlgebra
+using SparseArrays
+
+"""
+    CanonicalFiniteElementSpace{C} <: AbstractFiniteElementSpace{1}
 
 Wrapper that allows treating a canonical space as a finite element space.
 
 # Fields
-- `canonical_space::AbstractCanonicalSpace` : canonical space.
+- `canonical_space::C`: The underlying canonical space.
+- `dof_partition::Vector{Vector{Int}}`: Partition of degrees of freedom.
+
+# Constructor
+    CanonicalFiniteElementSpace(canonical_space::C) where C <: AbstractCanonicalSpace
+
+Constructs a `CanonicalFiniteElementSpace` from a given canonical space.
 """
 struct CanonicalFiniteElementSpace{C} <: AbstractFiniteElementSpace{1}
     canonical_space::C
-    boundary_dof_indices::Vector{Int}
+    dof_partition::Vector{Vector{Int}}
 
-    function CanonicalFiniteElementSpace(canonical_space::C) where C <: AbstractCanonicalSpace
-        new{C}(canonical_space, [1, canonical_space.p+1])
+    function CanonicalFiniteElementSpace(canonical_space::C) where {C <: AbstractCanonicalSpace}
+        # Allocate memory for degree of freedom partitioning
+        dof_partition = Vector{Vector{Int}}(undef,3)
+        # First, store the left corner ...
+        dof_partition[1] = [1]
+        # ... then the interior dofs ...
+        dof_partition[2] = collect(2:canonical_space.p)
+        # ... and then finally the right corner.
+        dof_partition[3] = [canonical_space.p+1]
+        new{C}(canonical_space, dof_partition)
     end
 end
 
+"""
+    get_polynomial_degree(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+
+Get the polynomial degree of the canonical finite element space.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+
+# Returns
+The polynomial degree of the space.
+"""
 function get_polynomial_degree(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
     return space.canonical_space.p
 end
 
+"""
+    get_polynomial_degree(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
+
+Get the polynomial degree of the canonical finite element space, ignoring the second argument.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `::Int`: Unused argument (placeholder).
+
+# Returns
+The polynomial degree of the space.
+"""
 function get_polynomial_degree(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
     return space.canonical_space.p
 end
 
+"""
+    get_num_elements(::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+
+Get the number of elements in the canonical finite element space.
+
+# Arguments
+- `::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+
+# Returns
+Always returns 1, as canonical spaces have a single element.
+"""
 function get_num_elements(::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
     return 1
 end
 
+"""
+    get_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+
+Get the dimension of the canonical finite element space.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+
+# Returns
+The dimension of the space, which is polynomial degree + 1.
+"""
 function get_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
-    return space.canonical_space.p+1
+    return space.canonical_space.p + 1
 end
 
 """
-_evaluate_all_at_point(canonical_space::CanonicalFiniteElementSpace{C}, xi::Float64, nderivatives::Int)
+    _evaluate_all_at_point(space::CanonicalFiniteElementSpace{C}, xi::Float64, nderivatives::Int) where {C<: AbstractCanonicalSpace}
 
-Returns the local basis functions for a `CanonicalFiniteElementSpace`.
+Evaluate all basis functions and their derivatives at a given point.
 
 # Arguments
-- `space::CanonicalFiniteElementSpace`: The `CanonicalFiniteElementSpace` object for which to retrieve the local basis functions.
-- `::Int`: Unused argument (placeholder).
-- `xi::NTuple{1,Vector{Float64}}`: The coordinates at which to evaluate the basis functions.
-- `nderivatives::Int`: The number of derivatives to apply.
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `xi::Float64`: The point at which to evaluate the basis functions.
+- `nderivatives::Int`: The number of derivatives to compute.
 
-# Return Value
-The local basis functions evaluated at `xi` with `nderivatives` derivatives.
+# Returns
+A sparse matrix containing the values of the basis functions and their derivatives.
 """
 function _evaluate_all_at_point(space::CanonicalFiniteElementSpace{C}, xi::Float64, nderivatives::Int) where {C<: AbstractCanonicalSpace}
     local_basis = evaluate(space.canonical_space, [xi], nderivatives)
@@ -65,37 +126,120 @@ function _evaluate_all_at_point(space::CanonicalFiniteElementSpace{C}, xi::Float
     return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
 end
 
+"""
+    _evaluate_all_at_point(space::CanonicalFiniteElementSpace{C}, ::Int, xi::Float64, nderivatives::Int) where {C<: AbstractCanonicalSpace}
+
+Evaluate all basis functions and their derivatives at a given point, ignoring the second argument.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `::Int`: Unused argument (placeholder).
+- `xi::Float64`: The point at which to evaluate the basis functions.
+- `nderivatives::Int`: The number of derivatives to compute.
+
+# Returns
+A sparse matrix containing the values of the basis functions and their derivatives.
+"""
 function _evaluate_all_at_point(space::CanonicalFiniteElementSpace{C}, ::Int, xi::Float64, nderivatives::Int) where {C<: AbstractCanonicalSpace}
     return _evaluate_all_at_point(space, xi, nderivatives)
 end
 
-function get_local_basis(space::CanonicalFiniteElementSpace{C},::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {C<: AbstractCanonicalSpace}
+"""
+    get_local_basis(space::CanonicalFiniteElementSpace{C}, ::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {C<: AbstractCanonicalSpace}
+
+Get the local basis functions and their derivatives at given points.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `::Int`: Unused argument (placeholder).
+- `xi::NTuple{1,Vector{Float64}}`: The points at which to evaluate the basis functions.
+- `nderivatives::Int`: The number of derivatives to compute.
+
+# Returns
+The local basis functions and their derivatives evaluated at the given points.
+"""
+function get_local_basis(space::CanonicalFiniteElementSpace{C}, ::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {C<: AbstractCanonicalSpace}
     return evaluate(space.canonical_space, xi[1], nderivatives)
 end
 
-function get_basis_indices(space::CanonicalFiniteElementSpace{C},::Int) where {C<: AbstractCanonicalSpace}
+"""
+    get_basis_indices(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
+
+Get the indices of the basis functions.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `::Int`: Unused argument (placeholder).
+
+# Returns
+A vector of indices for the basis functions.
+"""
+function get_basis_indices(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
     return collect(1:get_dim(space))
 end
 
+"""
+    get_max_local_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+
+Get the maximum local dimension of the canonical finite element space.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+
+# Returns
+The maximum local dimension, which is equal to the total dimension for canonical spaces.
+"""
 function get_max_local_dim(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
     return get_dim(space)
 end
 
-function set_boundary_dof_indices(space::CanonicalFiniteElementSpace{C}, indices::Vector{Int}) where {C<: AbstractCanonicalSpace}
-    space.boundary_dof_indices = indices
-    return nothing
+"""
+    get_dof_partition(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+
+Get the partition of degrees of freedom for the canonical finite element space.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+
+# Returns
+The partition of degrees of freedom.
+"""
+function get_dof_partition(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
+    return space.dof_partition
 end
 
-function get_boundary_dof_indices(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
-    return space.boundary_dof_indices
-end
+"""
+    get_extraction(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
 
-function get_extraction(space::CanonicalFiniteElementSpace{C},::Int) where {C<: AbstractCanonicalSpace}
+Get the extraction operator for the canonical finite element space.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `::Int`: Unused argument (placeholder).
+
+# Returns
+A tuple containing the extraction operator (identity matrix) and the basis indices.
+"""
+function get_extraction(space::CanonicalFiniteElementSpace{C}, ::Int) where {C<: AbstractCanonicalSpace}
     basis_indices = get_basis_indices(space, 1)
     nbasis = length(basis_indices)
     return Matrix(LinearAlgebra.I, nbasis, nbasis), basis_indices
 end
 
+"""
+    evaluate(space::CanonicalFiniteElementSpace{C}, ::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {C<: AbstractCanonicalSpace}
+
+Evaluate the basis functions and their derivatives at given points.
+
+# Arguments
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
+- `::Int`: Unused argument (placeholder).
+- `xi::NTuple{1,Vector{Float64}}`: The points at which to evaluate the basis functions.
+- `nderivatives::Int`: The number of derivatives to compute.
+
+# Returns
+A tuple containing the local basis functions and their derivatives, and the basis indices.
+"""
 function evaluate(space::CanonicalFiniteElementSpace{C}, ::Int, xi::NTuple{1,Vector{Float64}}, nderivatives::Int) where {C<: AbstractCanonicalSpace}
     local_basis = get_local_basis(space, 1, xi, nderivatives)
     basis_indices = get_basis_indices(space, 1)

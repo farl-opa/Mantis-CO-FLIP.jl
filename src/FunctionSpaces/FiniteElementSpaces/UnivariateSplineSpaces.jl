@@ -257,7 +257,7 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::Bernstein
-    boundary_dof_indices::Vector{Int}
+    dof_partition::Vector{Vector{Int}}
 
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
         # Check for errors in the construction 
@@ -290,8 +290,17 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
         # Get the dimension of the B-spline space
         bspline_dim = get_dim(extraction_op)
 
+        # Allocate memory for degree of freedom partitioning
+        dof_partition = Vector{Vector{Int}}(undef,3)
+        # First, store the left corner ...
+        dof_partition[1] = [1]
+        # ... then the interior dofs ...
+        dof_partition[2] = collect(2:(bspline_dim-1))
+        # ... and then finally the right corner.
+        dof_partition[3] = [bspline_dim]
+        
         # Initialize the BSplineSpace struct
-        new(knot_vector, extraction_op, Bernstein(polynomial_degree), [1, bspline_dim])
+        new(knot_vector, extraction_op, Bernstein(polynomial_degree), dof_partition)
     end
 end
 
@@ -501,35 +510,18 @@ function get_max_local_dim(bspline::BSplineSpace)
 end
 
 """
-    set_boundary_dof_indices(bspline::BSplineSpace, indices::Vector{Int})
+    get_dof_partition(space::CanonicalFiniteElementSpace{C}) where {C<: AbstractCanonicalSpace}
 
-Set the boundary degrees of freedom indices for the B-Spline space.
-
-# Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
-- `indices::Vector{Int}`: Indices of boundary degrees of freedom.
-
-# Returns
-- `nothing`
-"""
-function set_boundary_dof_indices(bspline::BSplineSpace, indices::Vector{Int})
-    bspline.boundary_dof_indices = indices
-    return nothing
-end
-
-"""
-    get_boundary_dof_indices(bspline::BSplineSpace)
-
-Get the boundary degrees of freedom indices for the B-Spline space.
+Get the partition of degrees of freedom for the canonical finite element space.
 
 # Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
+- `space::CanonicalFiniteElementSpace{C}`: The canonical finite element space.
 
 # Returns
-- `::Vector{Int}`: Indices of boundary degrees of freedom.
+The partition of degrees of freedom.
 """
-function get_boundary_dof_indices(bspline::BSplineSpace)
-    return bspline.boundary_dof_indices
+function get_dof_partition(bspline::BSplineSpace)
+    return bspline.dof_partition
 end
 
 
