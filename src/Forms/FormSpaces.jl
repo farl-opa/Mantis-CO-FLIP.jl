@@ -23,6 +23,7 @@ Concrete implementation of a function space for differential forms.
 # Fields
 - `geometry::G`: The geometry of the manifold
 - `fem_space::F`: The finite element space(s) used for the form components
+- `label::String`: Label for the form space
 
 # Type parameters
 - `n`: Dimension of the manifold
@@ -33,6 +34,7 @@ Concrete implementation of a function space for differential forms.
 struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     geometry::G
     fem_space::F
+    label::String
 
     # NOTE: FunctionSpaces.AbstractFunctionSpace does not have a parameter of dimension of manifold,
     # we need to add this, but it implies several changes (I started, but postponed it!)
@@ -47,10 +49,11 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     - `geometry::G`: The geometry of the manifold.
     - `fem_space::Tuple{F}`: A tuple containing a single finite element space, since 0- and n-forms 
             contain only one component.
+    - `label::String`: Label for the form space.
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
+    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}, label::String) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
         @assert form_rank in Set([0, manifold_dim])
-        new{manifold_dim, form_rank, G, Tuple{F}}(geometry, fem_space)
+        new{manifold_dim, form_rank, G, Tuple{F}}(geometry, fem_space, label)
     end
 
     @doc raw"""
@@ -62,12 +65,13 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     - `form_rank::Int`: Rank of the differential form (must be 1)
     - `geometry::G`: The geometry of the space
     - `fem_space::Tuple{F_dξ, F_dη}`: A tuple containing two finite element spaces for dξ and dη components
+    - `label::String`: Label for the form space.
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
+    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}, label::String) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
         @assert form_rank == 1
         form_components = binomial(manifold_dim, form_rank)
         @assert form_components == length(fem_space)
-        new{manifold_dim, form_rank, G, Tuple{F_dξ, F_dη}}(geometry, fem_space)
+        new{manifold_dim, form_rank, G, Tuple{F_dξ, F_dη}}(geometry, fem_space, label)
     end
 
     @doc raw"""
@@ -79,12 +83,13 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
     - `form_rank::Int`: Rank of the differential form (must be 1 or 2)
     - `geometry::G`: The geometry of the manifold
     - `fem_space::Tuple{F_dξ, F_dη, F_dζ}`: A tuple containing three finite element spaces for dξ, dη, and dζ components
+    - `label::String`: Label for the form space.
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace, F_dζ <: FunctionSpaces.AbstractFunctionSpace}
+    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ}, label::String) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace, F_dζ <: FunctionSpaces.AbstractFunctionSpace}
         @assert form_rank in Set([1, 2])
         form_components = binomial(manifold_dim, form_rank)
         @assert form_components == length(fem_space)
-        new{manifold_dim, form_rank, G, Tuple{F_dξ, F_dη, F_dζ}}(geometry, fem_space)
+        new{manifold_dim, form_rank, G, Tuple{F_dξ, F_dη, F_dζ}}(geometry, fem_space, label)
     end
 end
 

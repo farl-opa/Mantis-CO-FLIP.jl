@@ -69,6 +69,8 @@ Evaluate a FormField at given points.
         2-forms:
             3D: ``[\mathrm{d}\xi_{2}\wedge\mathrm{d}\xi_{3}, \mathrm{d}\xi_{3}\wedge\mathrm{d}\xi_{1}, \mathrm{d}\xi_{1}\wedge\mathrm{d}\xi_{2}]``
         n-forms: single component
+- `form_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length 1 with value 1, since for a 
+        `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 
 # Sizes
 - `form_eval`: Vector of length `n_form_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
@@ -85,7 +87,9 @@ function evaluate(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int
         form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices[form_component_idx]]
     end
 
-    return form_eval
+    form_indices = ones(n_form_components)
+
+    return form_eval, form_indices
 end
 
 @doc raw"""
@@ -108,6 +112,8 @@ Evaluate the exterior derivative of a FormField at given points.
 # Sizes
 - `d_form_eval`: Vector of length `n_derivative_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
         `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
+- `d_form_indices`: Vector of length `n_derivative_components`, where each element is a Vector{Int} of length 1 of value 1, since for a 
+        `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 """
 function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
     print("Evaluating exterior derivative of $(form.label) \n")
@@ -152,7 +158,9 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, F
         d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices[derivative_form_component_idx]]
     end
 
-    return d_form_eval
+    d_form_indices = ones(n_derivative_components)
+
+    return d_form_eval, d_form_indices
 end
 
 @doc raw"""
@@ -181,7 +189,7 @@ struct FormExpression{n, k, F} <:AbstractFormExpression{n, k}
             form_rank = manifold_dim - child_form_rank
 
         elseif op == "d"
-            @assert F <: FormField "Exterior derivative can only be applied to FormFields."
+            @assert (F <: FormField) || (F <: AbstractFormSpace) "Exterior derivative can only be applied to FormFields."
             form_rank = child_form_rank + 1
         end
         new{manifold_dim, form_rank, Tuple{F}}(form, op, label)
