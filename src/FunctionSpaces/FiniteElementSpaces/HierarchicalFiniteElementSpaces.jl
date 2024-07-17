@@ -833,8 +833,12 @@ function _compute_hb_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S
         max_ind_els = _get_num_elements_per_space(hspace.spaces[level])
         ordered_index = linear_to_ordered_index(element_id, max_ind_els)
 
-        borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
-        borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
+        borders_x = [hspace.spaces[level].function_space_1.knot_vector.patch_1d.breakpoints[ordered_index[1]], 
+                     hspace.spaces[level].function_space_1.knot_vector.patch_1d.breakpoints[ordered_index[1]+1]
+        ]
+        borders_y = [hspace.spaces[level].function_space_2.knot_vector.patch_1d.breakpoints[ordered_index[2]], 
+                     hspace.spaces[level].function_space_2.knot_vector.patch_1d.breakpoints[ordered_index[2]+1]
+        ]
 
         x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
 

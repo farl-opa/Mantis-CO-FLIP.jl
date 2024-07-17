@@ -95,10 +95,10 @@ verbose_step = false
 verbose_convergence = false
 
 all_cases = ["h", "HB", "THB", "THB-L-chain"]
-cases = ["h", "THB"] # Use this to choose the cases.
+cases = ["h", "HB", "THB", "THB-L-chain"] # Use this to choose the cases being tested.
 
 # Parameters
-nsteps = 5
+nsteps = 3
 hsteps = 2
 dorfler_parameter = 0.3
 
@@ -140,10 +140,10 @@ for case ∈ cases
                 println("Maximum error: $(h_errors[subdiv_factor+1]). \n")
             end
         end
-        plot!(h_dofs, h_errors, label="h")
+        plt = plot!(h_dofs, h_errors, label="h")
     end
     if case == "HB"
-        patches = map(n -> Mantis.Mesh.Patch1D(collect(range(0, 1, n+1))), nels)
+        patches = map(n -> Mantis.Mesh.Patch1D(collect(range(-1, 1, n+1))), nels)
         bsplines = [Mantis.FunctionSpaces.BSplineSpace(patches[i], p[i], [-1; fill(k[i], nels[i]-1); -1]) for i ∈ 1:2]
         tensor_bspline = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
 
@@ -209,7 +209,7 @@ for case ∈ cases
             #SparseArrays.dropzeros!(A)
             #hb_nnz[step+1] = SparseArrays.nnz(A)
         end
-        plot!(hb_dofs, hb_errors, label="HB")
+        plt = plot!(hb_dofs, hb_errors, label="HB")
     end
     if case == "THB"
         patches = map(n -> Mantis.Mesh.Patch1D(collect(range(-1, 1, n+1))), nels)
@@ -278,26 +278,25 @@ for case ∈ cases
             #SparseArrays.dropzeros!(A)
             #thb_nnz[step+1] = SparseArrays.nnz(A)
         end
-        plot!(thb_dofs, thb_errors, label="THB")
+        plt = plot!(thb_dofs, thb_errors, label="THB")
     end
     if case == "THB-L-chain"
-        patches = map(n -> Mantis.Mesh.Patch1D(collect(range(0, 1, n+1))), nels)
+        patches = map(n -> Mantis.Mesh.Patch1D(collect(range(-1, 1, n+1))), nels)
         bsplines = [Mantis.FunctionSpaces.BSplineSpace(patches[i], p[i], [-1; fill(k[i], nels[i]-1); -1]) for i ∈ 1:2]
         tensor_bspline = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
     
         spaces = [tensor_bspline]
         operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
-        hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]])
+        hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]], true)
         hspace_geo = Mantis.Geometry.compute_geometry(hspace)
         bc = Dict{Int, Float64}()
         q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule(p .+ 2, Mantis.Quadrature.gauss_legendre)
 
         err_per_element, max_error, A = fe_run(source_function, hspace, hspace, hspace_geo, q_nodes, q_weights, source_function, p, k, source, case, bc, false, test, verbose)
 
-        nsteps = 12
         global lchain_errors = Vector{Float64}(undef, nsteps+1)
         global lchain_dofs = Vector{Int}(undef, nsteps+1)
-        lchain_nnz = Vector{Int}(undef, nsteps+1)
+        #lchain_nnz = Vector{Int}(undef, nsteps+1)
 
         lchain_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
         lchain_errors[1] = max_error
@@ -338,7 +337,7 @@ for case ∈ cases
             #SparseArrays.dropzeros!(A)
             #lchain_nnz[step+1] = SparseArrays.nnz(A)
         end
-        plot!(lchain_dofs, lchain_errors, label="THB L-chain")
+        plt = plot!(lchain_dofs, lchain_errors, label="THB L-chain")
     end
     display(plt)
 end

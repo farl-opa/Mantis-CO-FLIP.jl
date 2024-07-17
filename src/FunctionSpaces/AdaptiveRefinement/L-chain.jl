@@ -422,8 +422,6 @@ function get_marked_domains(hspace::HierarchicalFiniteElementSpace{n, S, T}, mar
             end
         end
     end
-    
 
     return marked_domains
 end
-
