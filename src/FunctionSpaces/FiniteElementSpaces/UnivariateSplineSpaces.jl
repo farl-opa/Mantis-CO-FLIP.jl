@@ -70,21 +70,6 @@ function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition
 end
 
 """
-    get_element_size(knot_vector::KnotVector, element_id::Int)
-
-Returns the size of the element specified by `element_id`.
-
-# Arguments
-- `knot_vector::KnotVector`: The B-Spline function space.
-- `element_id::Int`: The id of the element.
-# Returns
-- `::Float64`: The size of the element.
-"""
-function get_element_size(knot_vector::KnotVector, element_id::Int)
-    return Mesh.get_element_size(knot_vector.patch_1d, element_id)
-end
-
-"""
     get_knot_vector_length(knot_vector::KnotVector)
 
 Determines the length of `knot_vector` by summing the multiplicites of each knot vector.
@@ -368,19 +353,8 @@ function get_num_elements(bspline::BSplineSpace)
     return size(bspline.knot_vector.patch_1d)
 end
 
-"""
-    get_element_size(bspline::BSplineSpace, element_id::Int)
-
-Returns the size of the element specified by `element_id`.
-
-# Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
-- `element_id::Int`: The id of the element.
-# Returns
-- `::Float64`: The size of the element.
-"""
-function get_element_size(bspline::BSplineSpace, element_id::Int)
-    return get_element_size(bspline.knot_vector, element_id)
+function _get_element_measure(bspline::BSplineSpace, element_id::Int)
+    return bspline.knot_vector.patch_1d.breakpoints[element_id+1] - bspline.knot_vector.patch_1d.breakpoints[element_id]
 end
 
 """

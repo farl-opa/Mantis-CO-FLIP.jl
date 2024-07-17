@@ -149,11 +149,14 @@ Assemble a continuous Galerkin problem with given bilinear form.
 # Arguments
 - `bilinear_form::AbstractBilinearForms`: bilinear form.
 """
-function (self::AssemblerErrorPerElement)(space, dofs, geom, exact_sol, norm="L2")
+function (self::AssemblerErrorPerElement)(space, dofs, geom, exact_sol, norm="L2", measure_normalized=false)
     result = 0.0
     num_els = Geometry.get_num_elements(geom)
 
     errors = Vector{Float64}(undef, num_els)
+    if measure_normalized
+        element_measures = Vector{Float64}(undef, num_els)
+    end
 
     # Loop over all active elements
     for elem_id in 1:num_els
@@ -171,7 +174,17 @@ function (self::AssemblerErrorPerElement)(space, dofs, geom, exact_sol, norm="L2
         end
 
         errors[elem_id] = result
+        if measure_normalized
+            element_measures[elem_id] = Geometry.get_element_measure(geom, elem_id)
+        end
     end
 
-    return errors
+    max_error = maximum(errors)
+
+    if !measure_normalized
+        return errors, max_error
+    else
+        max_measure = maximum(element_measures)
+        return errors .* (1 .- (element_measures ./ max_measure)), max_error
+    end
 end

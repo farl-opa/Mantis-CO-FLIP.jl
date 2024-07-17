@@ -46,9 +46,10 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
     multilevel_elements::SparseArrays.SparseVector{Int, Int}
     multilevel_extraction_coeffs::Vector{Matrix{Float64}}
     multilevel_basis_indices::Vector{Vector{Int}}
+    truncated::Bool
 
     # General constructor which checks for argument logic
-    function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, active_elements::HierarchicalActiveInfo, active_basis::HierarchicalActiveInfo, multilevel_elements::SparseArrays.SparseVector{Int, Int}, multilevel_extraction_coeffs::Vector{Array{Float64, 2}}, multilevel_basis_indices::Vector{Vector{Int}}) where {n,  S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, active_elements::HierarchicalActiveInfo, active_basis::HierarchicalActiveInfo, multilevel_elements::SparseArrays.SparseVector{Int, Int}, multilevel_extraction_coeffs::Vector{Array{Float64, 2}}, multilevel_basis_indices::Vector{Vector{Int}}, truncated::Bool) where {n,  S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
         L = length(spaces)
 
         # Checks for incompatible arguments
@@ -66,7 +67,7 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
             throw(ArgumentError(msg1*msg2))
         end
         
-        new{n, S, T}(spaces, two_scale_operators, active_elements, active_basis, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
+        new{n, S, T}(spaces, two_scale_operators, active_elements, active_basis, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices, truncated)
     end
 
     # Constructor that builds the space
@@ -74,7 +75,7 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
         active_elements, active_basis = get_active_objects(spaces, two_scale_operators, marked_domains)
         multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(spaces, two_scale_operators, active_elements, active_basis, truncated)
 
-        return HierarchicalFiniteElementSpace(spaces, two_scale_operators, active_elements, active_basis, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices)
+        return HierarchicalFiniteElementSpace(spaces, two_scale_operators, active_elements, active_basis, multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices, truncated)
     end
 
     # Helper constructor for domains given on a per-level way.
@@ -696,17 +697,17 @@ function get_local_basis(hierarchical_space::HierarchicalFiniteElementSpace{n, S
     return get_local_basis(hierarchical_space.spaces[element_level], element_id, xi, nderivatives)
 end
 
-function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, element::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    if hierarchical_space.multilevel_elements[element] == 0
-        element_level = get_active_level(hierarchical_space.active_elements, element)
-        element_id = get_active_id(hierarchical_space.active_elements, element)
+function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, element_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    if hierarchical_space.multilevel_elements[element_id] == 0
+        element_level = get_active_level(hierarchical_space.active_elements, element_id)
+        element_level_id = get_active_id(hierarchical_space.active_elements, element_id)
 
-        coeffs, level_basis_indices = get_extraction(hierarchical_space.spaces[element_level], element_id)
+        coeffs, level_basis_indices = get_extraction(hierarchical_space.spaces[element_level], element_level_id)
 
         # Convert level space basis indices to hierarchical space basis indices
         basis_indices = get_active_indices(hierarchical_space.active_basis, level_basis_indices, element_level)
     else
-        multilevel_idx = hierarchical_space.multilevel_elements[element]
+        multilevel_idx = hierarchical_space.multilevel_elements[element_id]
         coeffs = hierarchical_space.multilevel_extraction_coeffs[multilevel_idx]
         basis_indices = hierarchical_space.multilevel_basis_indices[multilevel_idx]
     end
@@ -714,7 +715,7 @@ function get_extraction(hierarchical_space::HierarchicalFiniteElementSpace{n, S,
     return coeffs, basis_indices
 end
 
-# Useful for L-chain
+# Useful for refinement 
 
 function get_level_inactive_domain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     inactive_basis = setdiff(1:get_num_elements(hspace.spaces[level]), get_level_active(hspace.active_elements, level)[2])
@@ -754,6 +755,13 @@ function get_level_domain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level
     end
 end
 
+function _get_element_measure(hspace::HierarchicalFiniteElementSpace{n, S, T}, element_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    element_level = get_active_level(hspace.active_elements, element_id)
+    element_level_id = get_active_id(hspace.active_elements, element_id)
+
+    return _get_element_measure(hspace.spaces[element_level], element_level_id)
+end
+
 # Boundary methods
 
 function get_boundary_dof_indices(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
@@ -769,5 +777,85 @@ function get_boundary_dof_indices(hspace::HierarchicalFiniteElementSpace{n, S, T
     end
 
     return boundary_dof_indices
+end
+
+# Geometry methods
+
+function _compute_thb_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    L = get_num_levels(hspace)
+    
+    coefficients = Matrix{Float64}(undef, (get_dim(hspace), 2))
+
+    id_sum = 1
+    for level ∈ 1:1:L
+        max_ind_basis = _get_dim_per_space(hspace.spaces[level])
+        x_greville_points = get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
+        y_greville_points = get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
+        grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
+        
+        _, level_active_basis = get_level_active(hspace.active_basis, level)
+
+        for (y_count, y_id) ∈ enumerate(y_greville_points)
+            for (x_count, x_id) ∈ enumerate(x_greville_points)
+                if ordered_to_linear_index((x_count, y_count), max_ind_basis) ∈ level_active_basis
+                    coefficients[id_sum, :] .= [x_id, y_id]
+                    id_sum += 1
+                end
+            end
+        end
+    end
+
+    return coefficients
+end
+
+function _compute_hb_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    degrees = get_polynomial_degree_per_dim(hspace.spaces[1])
+    nxi_per_dim = maximum(degrees) + 1
+    nxi = nxi_per_dim^2
+    xi_per_dim = collect(range(0,1, nxi_per_dim))
+    xi = Matrix{Float64}(undef, nxi,2)
+
+    xi_eval = (xi_per_dim, xi_per_dim)
+
+    for (idx,x) ∈ enumerate(Iterators.product(xi_per_dim, xi_per_dim))
+        xi[idx,:] = [x[1] x[2]]
+    end
+
+    xs = Matrix{Float64}(undef, get_num_elements(hspace)*nxi,2)
+    nx = size(xs)[1]
+
+    A = zeros(nx, get_dim(hspace))
+
+    for el ∈ 1:1:get_num_elements(hspace)
+        level = get_active_level(hspace.active_elements, el)
+        element_id = get_active_id(hspace.active_elements, el)
+
+        max_ind_els = _get_num_elements_per_space(hspace.spaces[level])
+        ordered_index = linear_to_ordered_index(element_id, max_ind_els)
+
+        borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
+        borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
+
+        x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
+
+        idx = (el-1)*nxi+1:el*nxi
+        xs[idx,:] = x
+
+        local eval = evaluate(hspace, el, xi_eval, 0)
+
+        A[idx, eval[2]] = eval[1][0,0]
+    end
+
+    coeffs = A \ xs
+
+    return coeffs
+end
+
+function _compute_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    if hspace.truncated
+        return _compute_thb_geometry_coeffs(hspace)
+    else
+        return _compute_hb_geometry_coeffs(hspace)
+    end
 end
 

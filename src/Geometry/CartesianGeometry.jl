@@ -80,3 +80,14 @@ function jacobian(geometry::CartesianGeometry{n}, element_idx::Int, ξ::NTuple{n
     return J
     
 end
+
+function _get_element_measure(geometry::CartesianGeometry{n}, element_id::Int) where {n}
+    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, geometry.n_elements)
+
+    element_measure = 1
+    for k ∈ 1:1:n
+        element_measure *= abs(geometry.breakpoints[k][ordered_index[k]+1] - geometry.breakpoints[k][ordered_index[k]])
+    end
+
+    return element_measure
+end

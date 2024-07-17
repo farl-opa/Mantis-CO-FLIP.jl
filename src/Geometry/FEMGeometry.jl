@@ -46,3 +46,25 @@ function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vec
     end
     return J #, fem_basis[Tuple(zeros(Float64,n))...] * geometry.geometry_coeffs[fem_basis_indices,:]
 end
+
+function _get_element_measure(geometry::FEMGeometry{n, F}, element_id::Int) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
+    return FunctionSpaces._get_element_measure(geometry.fem_space, element_id)
+end
+
+# compute FEMGeometry for different FESpaces
+@doc raw"""
+    compute_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+
+Returns the geometry associated with `fem_space` by computing the geometry coefficients of the space.
+
+# Arguments
+- 'fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}': Finite element space for which to compute the geometry.
+
+# Returns
+- '::FEMGeometry{n, F}': structure of the finite element geometry.
+"""
+function compute_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+    geometry_coefficients = FunctionSpaces._compute_geometry_coeffs(fem_space)
+
+    return FEMGeometry(fem_space, geometry_coefficients)
+end

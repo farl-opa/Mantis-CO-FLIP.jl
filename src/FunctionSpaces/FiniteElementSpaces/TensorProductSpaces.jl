@@ -250,3 +250,13 @@ function _integer_sums(n, k)
     end
     return solutions
 end
+
+function _get_element_measure(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    space_1_measure = _get_element_measure(tp_space.function_space_1, ordered_index[1])
+    space_2_measure = _get_element_measure(tp_space.function_space_2, ordered_index[2])
+
+    return space_1_measure * space_2_measure
+end
