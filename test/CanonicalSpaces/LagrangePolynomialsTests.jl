@@ -322,7 +322,9 @@ for p in degrees_to_test
   ell_poly = Mantis.FunctionSpaces.EdgeLobattoLegendre(p)
   
   # Compute the evaluation points (quadrature points)
-  ξ_quad, w_quad = Mantis.Quadrature.gauss_legendre(2 * (p + 1))  # compute the quadrature nodes and weights to compute the integrals 
+  quad_rule = Mantis.Quadrature.gauss_legendre(2 * (p + 1))  # compute the quadrature nodes and weights to compute the integrals 
+  ξ_quad = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
+  w_quad = Mantis.Quadrature.get_quadrature_weights(quad_rule)
 
   # Evaluate at the evaluation points
   ell_poly_eval = Mantis.FunctionSpaces.evaluate(ell_poly, ξ_quad, 1)
@@ -335,7 +337,9 @@ for p in degrees_to_test
   # between the Gauss-Lobatto-Legendre nodes
   
   # Compute the evaluation points
-  ξ_quad, w_quad = Mantis.Quadrature.gauss_legendre(p + 1)  # compute the quadrature nodes and weights to compute the integrals 
+  quad_rule = Mantis.Quadrature.gauss_legendre(p + 1)  # compute the quadrature nodes and weights to compute the integrals 
+  ξ_quad = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
+  w_quad = Mantis.Quadrature.get_quadrature_weights(quad_rule)
   ell_nodes = ell_poly.nodes
   ξ = zeros(Float64, p+1, p+1)  # allocate the memory to store all the quadrature nodes for each interval between nodes
   for k_interval in 1:(p+1) 

@@ -35,9 +35,8 @@ end
 marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_finer_elements(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_finer_elements(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
 hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
-x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
-x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
-xi = (x1, x2)
+qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
 # Tests for coefficients and evaluation
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)

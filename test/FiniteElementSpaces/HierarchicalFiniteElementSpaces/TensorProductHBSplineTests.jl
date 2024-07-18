@@ -41,9 +41,8 @@ ae, ab = Mantis.FunctionSpaces.get_active_objects(spaces, [CTS], refined_domains
 ###
 hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
 
-x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
-x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
-xi = (x1, x2)
+qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
 # Tests for coefficients and evaluation
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
