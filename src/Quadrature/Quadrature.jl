@@ -39,6 +39,7 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 - [`gauss_lobatto(p::Integer)`](@ref).
 - [`gauss_legendre(p::Integer)`](@ref).
 - [`tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}`](@ref).
+- [`tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}) where {domain_dim}`](@ref).
 """
 struct QuadratureRule{domain_dim} <: AbstractQuadratureRule{domain_dim}
     nodes::NTuple{domain_dim, Vector{Float64}}

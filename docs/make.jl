@@ -57,6 +57,7 @@ format_setup = Documenter.HTML(
         "assets/citations.css"
     ],
     mathengine=math_engine,
+    size_threshold = nothing, # Prevents errors for large HTML files. Temporary only.
 )
 
 
