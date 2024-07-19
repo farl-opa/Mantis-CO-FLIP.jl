@@ -107,6 +107,7 @@ dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+#display(Mantis.Forms.inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
 println("Starting inner product computations")
 # Note that we cannot do mixed inner products
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
