@@ -1,34 +1,51 @@
 # Priority 1: Inner products for abstract form fields
 
-function inner_product(f1::AbstractFormExpression{domain_dim, 0}, f2::AbstractFormExpression{domain_dim, 0}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, form_rank}
-    xi = get_quad_nodes(quad_rule)  # Tuple of quad nodes for tensor product 
-    weights = get_quad_weights(quad_rule)  # weights: either the tensor product
+# 0-forms in any dimension
+function inner_product(f1::AbstractFormExpression{domain_dim, 0, G}, f2::AbstractFormExpression{domain_dim, 0, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}}
+    # Quadrature information.
+    xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
+    weights = Quadrature.get_quadrature_weights(quad_rule)  # Vector of tensor product weights.
 
-    f1_eval, f1_indices = Mantis.Forms.evaluate(f1, elment_idx, xi)
-    f2_eval, f2_indices = Mantis.Forms.evaluate(f2, elment_idx, xi)
+    # Forms evaluated at quadrature nodes.
+    f1_eval, f1_indices = evaluate(f1, element_idx, xi)
+    f2_eval, f2_indices = evaluate(f2, element_idx, xi)
 
-    n_basis_1 = size(f1_eval[1], 2)  # how many basis in f1, if field only 1 if space then the number of basis in this component
+    # Count the number of active basis functions.
+    n_basis_1 = size(f1_eval[1], 2)  # number of basis functions in f1, if field only 1, if space then the number of basis in this component
     n_basis_2 = size(f2_eval[1], 2)  # the same as above 
+    n_basis_total = n_basis_1 * n_basis_2
 
-    A_values = zeros(n_basis_1, n_basis_2)
-    A_row_idx = zeros(n_basis_1, n_basis_2)
-    A_column_idx = zeros(n_basis_1, n_basis_2)
+    # Pre-allocate the inner product data: row indices, colum indices, and values.
+    A_row_idx = Vector{Int}(undef, n_basis_total)
+    A_column_idx = Vector{Int}(undef, n_basis_total)
+    A_values = Vector{Float64}(undef, n_basis_total)
 
-    det_g = inv_metric(f1, element_idx, xi) # we need this functionality for both form expressions and guarantee that both share the same geometry
+    # Get geometry information, immediately checking if f1 and f2 have the same geometry.
+    _, det_g = Geometry.metric(get_geometry(f1, f2), element_idx, xi)
+    for (f1_linear, f1_basis_idx) in enumerate(f1_indices)
+        for (f2_linear, f2_basis_idx) in enumerate(f2_indices)
+            inner_prod_idx = f2_linear + (f1_linear - 1) * n_basis_1  # get the linear index of the inner product (f1_basis_idx, f2_basis_idx)
+            
+            A_row_idx[inner_prod_idx] = f1_indices[1][f1_basis_idx]
+            A_column_idx[inner_prod_idx] = f2_indices[1][f2_basis_idx]
 
-    for f1_basis_idx = 1:n_basis_1
-        for f2_basis_idx = 1:n_basis_2
-            A_values[f1_basis_idx, f2_basis_idx] = sum(f1_eval[1][:, f1_basis_idx] .* det_g .* f2_eval[1][:, f2_basis_idx])
-            A_row_idx[f1_basis_idx, f2_basis_idx] = f1_indices[1][f1_basis_idx]
-            A_column_idx[f1_basis_idx, f2_basis_idx] = f2_indices[1][f2_basis_idx]
+            # Compute the value of the inner product. Note that 
+            # `A_values` is initialised as undef, so we cannot add the 
+            # values directly.
+            inner_product_value = 0.0
+            for quad_node_idx in eachindex(weights)
+                inner_product_value += det_g[quad_node_idx] * weights[quad_node_idx] * f1_eval[1][quad_node_idx, f1_basis_idx] * f2_eval[1][quad_node_idx, f2_basis_idx]
+            end
+            A_values[inner_prod_idx] = inner_product_value
+            
         end
     end
 
-    return 
+    return (A_row_idx, A_column_idx, A_values)
 end
 
 # 1-forms in 2D
-function inner_product(f1::AbstractFormExpression{2, 1}, f2::AbstractFormExpression{2, 1}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{2})
+function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpression{2, 1, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G <: Geometry.AbstractGeometry{2}}
     xi = get_quad_nodes(quad_rule)  # Tuple of quad nodes for tensor product 
     weights = get_quad_weights(quad_rule)  # weights: either the tensor product
 
@@ -70,7 +87,7 @@ function inner_product(f1::AbstractFormExpression{2, 1}, f2::AbstractFormExpress
 end
 
 # (0-forms, 0-forms)
-function inner_product(f1::FormSpace{domain_dim, 0, G, Tuple{F1}}, f2::FormSpace{domain_dim, 0, G, Tuple{F2}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim} where {codomain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}, F2 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}}
+function inner_product(f1::FormSpace{domain_dim, 0, G, Tuple{F1}}, f2::FormSpace{domain_dim, 0, G, Tuple{F2}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace, F2 <: FunctionSpaces.AbstractFunctionSpace}
 
     # Compute bases
     basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.xi)
@@ -116,7 +133,7 @@ function inner_product(f1::FormSpace{domain_dim, 0, G, Tuple{F1}}, f2::FormSpace
 end
 
 # (n-forms, n-forms)
-function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::FormSpace{domain_dim, domain_dim, G, Tuple{F2}}, element_id::Int, quad_rule::Quadrature.Quadrature.{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim} where {codomain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}, F2 <: FunctionSpaces.AbstractFunctionSpace{domain_dim}}
+function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::FormSpace{domain_dim, domain_dim, G, Tuple{F2}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace, F2 <: FunctionSpaces.AbstractFunctionSpace}
 
     # Compute bases and their derivatives.
     basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.xi)
@@ -157,14 +174,14 @@ function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::
 end
 
 # (1-forms, 1-forms) in 2D
-function inner_product(f1::FormSpace{2,1,G,Tuple{F1x,F1y}}, f2::FormSpace{2,1,G,Tuple{F2x,F2y}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2,m} where {m}, F1x <: FunctionSpaces.AbstractFunctionSpace{2}, F1y <: FunctionSpaces.AbstractFunctionSpace{2}, F2x <: FunctionSpaces.AbstractFunctionSpace{2}, F2y <: FunctionSpaces.AbstractFunctionSpace{2}}
+function inner_product(f1::FormSpace{2,1,G,Tuple{F1x,F1y}}, f2::FormSpace{2,1,G,Tuple{F2x,F2y}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}, F1x <: FunctionSpaces.AbstractFunctionSpace, F1y <: FunctionSpaces.AbstractFunctionSpace, F2x <: FunctionSpaces.AbstractFunctionSpace, F2y <: FunctionSpaces.AbstractFunctionSpace}
 
 
 
 end
 
 # (1-forms, 1-forms) in 2D with expressions
-function inner_product(f1::AbstractFormSpace{2,1}, f2::AbstractFormSpace{2,1}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2,m} where {m}}
+function inner_product(f1::AbstractFormSpace{2,1,G}, f2::AbstractFormSpace{2,1,G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}}
 
     # 1. evaluate f1 and f2 using evaluate methods for AbstractFormSpaces
     # 2. compute inner product
@@ -172,14 +189,14 @@ function inner_product(f1::AbstractFormSpace{2,1}, f2::AbstractFormSpace{2,1}, e
 end
 
 # 1-forms in 3D
-function inner_product(f1::FormSpace{3,1,G,Tuple{F1x,F1y,F1z}}, f2::FormSpace{3,1,G,Tuple{F2x,F2y,F2z}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3,m} where {m}, F1x <: FunctionSpaces.AbstractFunctionSpace{3}, F1y <: FunctionSpaces.AbstractFunctionSpace{3}, F1z <: FunctionSpaces.AbstractFunctionSpace{3}, F2x <: FunctionSpaces.AbstractFunctionSpace{3}, F2y <: FunctionSpaces.AbstractFunctionSpace{3}, F2z <: FunctionSpaces.AbstractFunctionSpace{3}}
+function inner_product(f1::FormSpace{3,1,G,Tuple{F1x,F1y,F1z}}, f2::FormSpace{3,1,G,Tuple{F2x,F2y,F2z}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}, F1x <: FunctionSpaces.AbstractFunctionSpace, F1y <: FunctionSpaces.AbstractFunctionSpace, F1z <: FunctionSpaces.AbstractFunctionSpace, F2x <: FunctionSpaces.AbstractFunctionSpace, F2y <: FunctionSpaces.AbstractFunctionSpace, F2z <: FunctionSpaces.AbstractFunctionSpace}
 
 
 
 end
 
 # 2-forms in 3D
-function inner_product(f1::FormSpace{3,2,G,Tuple{F1x,F1y,F1z}}, f2::FormSpace{3,2,G,Tuple{F2x,F2y,F2z}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3,m} where {m}, F1x <: FunctionSpaces.AbstractFunctionSpace{3}, F1y <: FunctionSpaces.AbstractFunctionSpace{3}, F1z <: FunctionSpaces.AbstractFunctionSpace{3}, F2x <: FunctionSpaces.AbstractFunctionSpace{3}, F2y <: FunctionSpaces.AbstractFunctionSpace{3}, F2z <: FunctionSpaces.AbstractFunctionSpace{3}}
+function inner_product(f1::FormSpace{3,2,G,Tuple{F1x,F1y,F1z}}, f2::FormSpace{3,2,G,Tuple{F2x,F2y,F2z}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}, F1x <: FunctionSpaces.AbstractFunctionSpace, F1y <: FunctionSpaces.AbstractFunctionSpace, F1z <: FunctionSpaces.AbstractFunctionSpace, F2x <: FunctionSpaces.AbstractFunctionSpace, F2y <: FunctionSpaces.AbstractFunctionSpace, F2z <: FunctionSpaces.AbstractFunctionSpace}
 
 
 

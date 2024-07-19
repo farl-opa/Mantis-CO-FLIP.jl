@@ -26,6 +26,9 @@ line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 # Tensor product geometry 
 tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
 
+# This seems to be a bug:
+#println(Mantis.Geometry.jacobian(tensor_prod_geo, 1, ([0.0, 0.0], [0.0, 0.0])))
+
 # Then the form space 
 zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, (TP_Space,), "ν")
 d_zero_form_space = Mantis.Forms.exterior_derivative(zero_form_space)
@@ -78,6 +81,24 @@ dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
 dα⁰_eval = Mantis.Forms.evaluate(dα⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
 ξ¹_eval = Mantis.Forms.evaluate(ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
 dξ¹_eval = Mantis.Forms.evaluate(dξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
+
+println()
+geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
+zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
+d_zero_form_space_cart = Mantis.Forms.exterior_derivative(zero_form_space)
+one_form_space_cart = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
+top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
+
+# Generate the form expressions
+α⁰ = Mantis.Forms.FormField(zero_form_space_cart, "α")
+α⁰.coefficients .= 1.0
+β⁰ = Mantis.Forms.FormField(zero_form_space_cart, "β")
+β⁰.coefficients .= 1.0
+println(α⁰.coefficients)
+dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+println("Starting inner product computation")
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+println(Mantis.Forms.inner_product(α⁰, β⁰, 1, q_rule))
 
 
 # abstract type AbstractMyStruct{n} end

@@ -1,22 +1,7 @@
 
-@doc raw"""
-    AbstractFormSpace{manifold_dim, form_rank} <: AbstractFormField{manifold_dim, form_rank}
-
-Supertype for all function spaces representing differential forms.
-
-# Type parameters
-- `manifold_dim`: Dimension of the manifold
-- `form_rank`: Rank of the differential form
-
-# Inner Constructors
-- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F})`: Constructor for 0-forms and n-forms
-- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη})`: Constructor for 1-forms in 2D
-- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ})`: Constructor for 1-forms and 2-forms in 3D
-"""
-abstract type AbstractFormSpace{manifold_dim, form_rank} <: AbstractFormField{manifold_dim, form_rank} end
 
 @doc raw"""
-    FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
+    FormSpace{manifold_dim, form_rank, G, F} <: AbstractFormSpace{manifold_dim, form_rank, G}
 
 Concrete implementation of a function space for differential forms.
 
@@ -26,12 +11,12 @@ Concrete implementation of a function space for differential forms.
 - `label::String`: Label for the form space
 
 # Type parameters
-- `n`: Dimension of the manifold
-- `k`: Rank of the differential form
+- `manifold_dim`: Dimension of the manifold
+- `form_rank`: Rank of the differential form
 - `G`: Type of the geometry
 - `F`: Type of the finite element space
 """
-struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
+struct FormSpace{manifold_dim, form_rank, G, F} <: AbstractFormSpace{manifold_dim, form_rank, G}
     geometry::G
     fem_space::F
     label::String
@@ -94,7 +79,7 @@ struct FormSpace{n, k, G, F} <: AbstractFormSpace{n,k}
 end
 
 @doc raw"""
-    evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}
+    evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}
 
 Evaluate the basis functions of a differential form space at given points `xi`.
 
@@ -120,7 +105,7 @@ Evaluate the basis functions of a differential form space at given points `xi`.
 - `local_form_basis`: Vector of length `n_form_components`, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions)
 - `form_basis_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length n_basis_functions
 """
-function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}
+function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}
     n_form_components = binomial(manifold_dim, form_rank)
     
     # Compute the offset in the numbering of the degrees of freedom 
@@ -161,7 +146,7 @@ end
 
 
 @doc raw"""
-    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0}}
+    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0, G}} where {G <: Geometry.AbstractGeometry}
 
 Evaluate the exterior derivative of a 0-form (scalar function) at given points.
 
@@ -176,7 +161,7 @@ Evaluate the exterior derivative of a 0-form (scalar function) at given points.
 - `local_d_form_basis_eval`: Vector of arrays containing evaluated exterior derivative basis functions
         `local_d_form_basis_eval[i][j, k]` is the component `i` of the exterior derivative of global basis 
         `form_basis_indices[i][k]` evaluated at the tensor product point `j`. 
-        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}`](@ref)
+        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}`](@ref)
         for more details: the formats are identical.
 - `form_basis_indices`: Vector of vectors containing indices of the basis functions
         `form_basis_indices[i][k]` is the global index of the  exterior derivative of the 
@@ -186,7 +171,7 @@ Evaluate the exterior derivative of a 0-form (scalar function) at given points.
 - `local_d_form_basis_eval`: Vector of length `manifold_dim`, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions).
 - `form_basis_indices`: Vector of length `manifold_dim`, where each element is a Vector{Int} of length n_basis_functions
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0}}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0, G}} where {G <: Geometry.AbstractGeometry}
 #    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
     first_derivative_base_key = [0 for k in 1:manifold_dim]
 
@@ -213,12 +198,12 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     return local_d_form_basis_eval, form_basis_indices
 end
 
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{n, n} where n}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{n, n, G}} where {n, G <: Geometry.AbstractGeometry}
     throw("Manifold dim == Form rank: Unable to compute exterior derivative of volume forms.")
 end
 
 @doc raw"""
-    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1}}
+    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1, G}} where {G <: Geometry.AbstractGeometry}
 
 Evaluate the exterior derivative of a 1-form in 2D.
 
@@ -233,7 +218,7 @@ Evaluate the exterior derivative of a 1-form in 2D.
 - `local_d_form_basis_eval`: Vector of arrays containing evaluated exterior derivative basis functions
         `local_d_form_basis_eval[i][j, k]` is the component `i` of the exterior derivative of global basis 
         `form_basis_indices[i][k]` evaluated at the tensor product point `j`. 
-        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}`](@ref)
+        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}`](@ref)
         for more details: the formats are identical.
 - `form_basis_indices`: Vector of vectors containing indices of the basis functions
         `form_basis_indices[i][k]` is the global index of the  exterior derivative of the 
@@ -243,7 +228,7 @@ Evaluate the exterior derivative of a 1-form in 2D.
 - `local_d_form_basis_eval`: Vector of length 1, where the element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions_dξ_1 + n_basis_functions_dξ_2)
 - `form_basis_indices`: Vector of length 1, where the element is a Vector{Int} of length (n_basis_functions_dξ_1 + n_basis_functions_dξ_2)
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1}}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1, G}} where {G <: Geometry.AbstractGeometry}
     # manifold_dim = 2
     n_form_components = 2 # binomial(manifold_dim, 1)
     n_derivative_form_components = 1 # binomial(manifold_dim, 2)
@@ -274,7 +259,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
 end
 
 @doc raw"""
-    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1}}
+    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1, G}} where {G <: Geometry.AbstractGeometry}
 
 Evaluate the exterior derivative of a 1-form in 3D.
 
@@ -289,7 +274,7 @@ Evaluate the exterior derivative of a 1-form in 3D.
 - `local_d_form_basis_eval`: Vector of arrays containing evaluated exterior derivative basis functions
         `local_d_form_basis_eval[i][j, k]` is the component `i` of the exterior derivative of global basis 
         `form_basis_indices[i][k]` evaluated at the tensor product point `j`. 
-        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}`](@ref)
+        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}`](@ref)
         for more details: the formats are identical.
 - `form_basis_indices`: Vector of vectors containing indices of the basis functions
         `form_basis_indices[i][k]` is the global index of the  exterior derivative of the 
@@ -299,7 +284,7 @@ Evaluate the exterior derivative of a 1-form in 3D.
 - `local_d_form_basis_eval`: Vector of length 3, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions_dξ_i + n_basis_functions_dξ_j)
 - `form_basis_indices`: Vector of length 3, where each element is a Vector{Int} of length (n_basis_functions_dξ_i + n_basis_functions_dξ_j)
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1}}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1, G}} where {G <: Geometry.AbstractGeometry}
     # manifold_dim = 3
     n_form_components = 3 # binomial(manifold_dim, 1)
     n_derivative_form_components = 3 # binomial(manifold_dim, 2)
@@ -346,7 +331,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
 end
 
 @doc raw"""
-    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2}}
+    evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2, G}} where {G <: Geometry.AbstractGeometry}
 
 Evaluate the exterior derivative of a 2-form in 3D.
 
@@ -361,7 +346,7 @@ Evaluate the exterior derivative of a 2-form in 3D.
 - `local_d_form_basis_eval`: Vector of arrays containing evaluated exterior derivative basis functions
         `local_d_form_basis_eval[i][j, k]` is the component `i` of the exterior derivative of global basis 
         `form_basis_indices[i][k]` evaluated at the tensor product point `j`. 
-        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank}} where {form_rank}`](@ref)
+        See [`(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}`](@ref)
         for more details: the formats are identical.
 - `form_basis_indices`: Vector of vectors containing indices of the basis functions
         `form_basis_indices[i][k]` is the global index of the  exterior derivative of the 
@@ -371,7 +356,7 @@ Evaluate the exterior derivative of a 2-form in 3D.
 - `local_d_form_basis_eval`: Vector of length 1, where the element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions_dξ_2_dξ_3 + n_basis_functions_dξ_3_dξ_1 + n_basis_functions_dξ_1_dξ_2)
 - `form_basis_indices`: Vector of length 1, where the element is a Vector{Int} of length (n_basis_functions_dξ_2_dξ_3 + n_basis_functions_dξ_3_dξ_1 + n_basis_functions_dξ_1_dξ_2)
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2}}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2, G}} where {G <: Geometry.AbstractGeometry}
     # manifold_dim = 3
     n_form_components = 3 # binomial(manifold_dim, 1)
     n_derivative_form_components = 1 # binomial(manifold_dim, 2)
@@ -412,7 +397,7 @@ end
 
 
 @doc raw"""
-    get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+    get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry}
 
 Returns the number of degrees of freedom of the FormSpace `form_space`.
 
@@ -422,7 +407,7 @@ Returns the number of degrees of freedom of the FormSpace `form_space`.
 # Returns
 - `::Int`: The total number of degrees of freedom of the space.
 """
-function get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+function get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry}
     # Get the total number of dofs for the form space by looping 
     # over all the FEM spaces. Each FEM space is associated to a 
     # component of the form: 0- and n-forms have one component, and 
