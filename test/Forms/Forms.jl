@@ -96,13 +96,16 @@ top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
 α⁰.coefficients .= 1.0
 β⁰ = Mantis.Forms.FormField(zero_form_space_cart2, "β")
 β⁰.coefficients .= 1.0
+ζ¹ = Mantis.Forms.FormField(one_form_space_cart, "ζ")
+ζ¹.coefficients .= 1.0
+dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 γ² = Mantis.Forms.FormField(top_form_space_cart, "γ")
 γ².coefficients .= 1.0
-println(α⁰.coefficients)
-dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
 println("Starting inner product computations")
+# Note that we cannot do mixed inner products
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
     ordered_idx = Tuple(geo_2d_cart.cartesian_idxs[elem_id])
     elem_area = 1.0
@@ -112,12 +115,19 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
         elem_area *= geo_2d_cart.breakpoints[dim_idx][end_breakpoint_idx] - geo_2d_cart.breakpoints[dim_idx][start_breakpoint_idx]
     end
 
+    g, det_g = Mantis.Geometry.metric(geo_2d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+
     # 0-forms
-    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, rtol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, atol=1e-14)
     @test_throws ArgumentError Mantis.Forms.inner_product(α⁰, β⁰, elem_id, q_rule)
 
+    # 1-forms
+    @test isapprox(Mantis.Forms.inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1,1,:,:], (g./det_g)[1,:,:], atol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1,1,:,:], [0.0 0.0; 0.0 0.0], atol=1e-14)
+
     # n-forms
-    @test isapprox(Mantis.Forms.inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, rtol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, atol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-14)
 end
 
 

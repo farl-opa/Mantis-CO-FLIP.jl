@@ -45,6 +45,11 @@ function inner_product(f1::AbstractFormExpression{domain_dim, 0, G}, f2::Abstrac
 end
 
 # 1-forms in 2D
+# This is essentially an inner product of (n-1)-forms in n dimensions. 
+# Unfortunately, we cannot (easily) write domain_dim-1 as type parameter. 
+# Something along the lines of `ComputedFieldTypes.jl` might be 
+# interesting, though it is focused on structs. We might also find a 
+# work around.
 function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpression{2, 1, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G <: Geometry.AbstractGeometry{2}}
     # Quadrature information.
     xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
@@ -61,9 +66,9 @@ function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpr
     n_basis_total = n_basis_1 * n_basis_2
 
     # Pre-allocate the inner product data: row indices, colum indices, and values.
-    A_row_idx = Vector{Int}(undef, n_basis_total)
-    A_column_idx = Vector{Int}(undef, n_basis_total)
-    A_values = Vector{Float64}(undef, n_basis_total)
+    # A_row_idx = Vector{Int}(undef, n_basis_total)
+    # A_column_idx = Vector{Int}(undef, n_basis_total)
+    # A_values = Vector{Float64}(undef, n_basis_total)
 
     A_values = zeros(n_basis_1, n_basis_2, 2, 2)
     A_row_idx = zeros(n_basis_1, n_basis_2, 2, 2)
@@ -71,29 +76,43 @@ function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpr
 
     # Get geometry information, immediately checking if f1 and f2 have the same geometry.
     g, det_g = Geometry.metric(get_geometry(f1, f2), element_idx, xi)
-
     for f1_basis_idx = 1:n_basis_1
         for f2_basis_idx = 1:n_basis_2
             # α¹ = α¹₁dξ¹ + α¹₂dξ²
             # β¹ = β¹₁dξ¹ + β¹₂dξ²
-            # <α¹, β²> = <α¹₁dξ¹, β¹₁dξ¹> + <α¹₁dξ¹, β¹₂dξ²> + ...
+            # <α¹, β²> = <α¹₁dξ¹, β¹₁dξ¹> + <α¹₁dξ¹, β¹₂dξ²> + <α¹₂dξ¹, β¹₁dξ²> + <α¹₂dξ¹, β¹₂dξ²>
 
             # <α¹₁dξ¹, β¹₁dξ¹>
-            A_values[f1_basis_idx, f2_basis_idx, 1, 1] += sum(f1_eval[1][:, f1_basis_idx] .* g[:, 1, 1] .* f2_eval[1][:, f2_basis_idx])
             A_row_idx[f1_basis_idx, f2_basis_idx, 1, 1] = f1_indices[1][f1_basis_idx]
             A_column_idx[f1_basis_idx, f2_basis_idx, 1, 1] = f2_indices[1][f2_basis_idx]
-
+            for quad_node_idx in eachindex(weights)
+                A_values[f1_basis_idx, f2_basis_idx, 1, 1] += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[1][quad_node_idx, f1_basis_idx] * g[quad_node_idx, 1, 1] * f2_eval[1][quad_node_idx, f2_basis_idx]
+            end
             
             # <α¹₁dξ¹, β¹₂dξ²>
-            A_values[f1_basis_idx, f2_basis_idx, 1, 2] += sum(f1_eval[1][:, f1_basis_idx] .* g[:, 1, 2] .* f2_eval[2][:, f2_basis_idx])
             A_row_idx[f1_basis_idx, f2_basis_idx, 1, 2] = f1_indices[1][f1_basis_idx]
             A_column_idx[f1_basis_idx, f2_basis_idx, 1, 2] = f2_indices[2][f2_basis_idx]
+            for quad_node_idx in eachindex(weights)
+                A_values[f1_basis_idx, f2_basis_idx, 1, 2] += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[1][quad_node_idx, f1_basis_idx] * g[quad_node_idx, 1, 2] * f2_eval[2][quad_node_idx, f2_basis_idx]
+            end
 
-            # the other terms (...)
+            # <α¹₂dξ¹, β¹₁dξ²>
+            A_row_idx[f1_basis_idx, f2_basis_idx, 2, 1] = f1_indices[1][f1_basis_idx]
+            A_column_idx[f1_basis_idx, f2_basis_idx, 2, 1] = f2_indices[2][f2_basis_idx]
+            for quad_node_idx in eachindex(weights)
+                A_values[f1_basis_idx, f2_basis_idx, 2, 1] += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[2][quad_node_idx, f1_basis_idx] * g[quad_node_idx, 2, 1] * f2_eval[1][quad_node_idx, f2_basis_idx]
+            end
+
+            # <α¹₂dξ¹, β¹₂dξ²>
+            A_row_idx[f1_basis_idx, f2_basis_idx, 2, 2] = f1_indices[2][f1_basis_idx]
+            A_column_idx[f1_basis_idx, f2_basis_idx, 2, 2] = f2_indices[2][f2_basis_idx]
+            for quad_node_idx in eachindex(weights)
+                A_values[f1_basis_idx, f2_basis_idx, 2, 2] += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[2][quad_node_idx, f1_basis_idx] * g[quad_node_idx, 2, 2] * f2_eval[2][quad_node_idx, f2_basis_idx]
+            end
         end
     end
-
-    return 
+    
+    return (A_row_idx, A_column_idx, A_values)
 end
 
 # n-forms in any dimension (dimension larger than 0, because the method 
