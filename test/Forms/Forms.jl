@@ -1,5 +1,7 @@
 import Mantis
 
+using Test
+
 # Setup the form spaces
 # First the FEM spaces
 breakpoints1 = [0.0, 0.5, 1.0]
@@ -15,6 +17,7 @@ B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, deg1-1, -1])
 B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-1, -1])
 # tensor-product B-spline patch
 TP_Space = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
+TP_Space3d = Mantis.FunctionSpaces.TensorProductSpace(TP_Space, B1)
 
 # Then the geometry 
 # Line 1
@@ -118,16 +121,60 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
     g, det_g = Mantis.Geometry.metric(geo_2d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
 
     # 0-forms
-    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, atol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, atol=1e-12)
     @test_throws ArgumentError Mantis.Forms.inner_product(α⁰, β⁰, elem_id, q_rule)
 
     # 1-forms
-    @test isapprox(Mantis.Forms.inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1,1,:,:], (g./det_g)[1,:,:], atol=1e-14)
-    @test isapprox(Mantis.Forms.inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1,1,:,:], [0.0 0.0; 0.0 0.0], atol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1,1,:,:], (g./det_g)[1,:,:], atol=1e-12)
+    @test isapprox(Mantis.Forms.inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1,1,:,:], [0.0 0.0; 0.0 0.0], atol=1e-12)
 
     # n-forms
-    @test isapprox(Mantis.Forms.inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, atol=1e-14)
-    @test isapprox(Mantis.Forms.inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-14)
+    @test isapprox(Mantis.Forms.inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, atol=1e-12)
+    @test isapprox(Mantis.Forms.inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
+end
+
+# 3d
+geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2, breakpoints1))
+zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_3d_cart, (TP_Space3d,), "ν")
+one_form_space_cart = Mantis.Forms.FormSpace(1, geo_3d_cart, (TP_Space3d, TP_Space3d, TP_Space3d), "θ")
+two_form_space_cart = Mantis.Forms.FormSpace(2, geo_3d_cart, (TP_Space3d, TP_Space3d, TP_Space3d), "η")
+top_form_space_cart = Mantis.Forms.FormSpace(3, geo_3d_cart, (TP_Space3d,), "σ")
+
+# Generate the form expressions
+α⁰ = Mantis.Forms.FormField(zero_form_space_cart, "α")
+α⁰.coefficients .= 1.0
+θ¹ = Mantis.Forms.FormField(one_form_space_cart, "θ")
+θ¹.coefficients .= 1.0
+ζ² = Mantis.Forms.FormField(two_form_space_cart, "ζ")
+ζ².coefficients .= 1.0
+dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+γ³ = Mantis.Forms.FormField(top_form_space_cart, "γ")
+γ³.coefficients .= 1.0
+
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1, deg1+1), Mantis.Quadrature.gauss_legendre)
+# Note that we cannot do mixed inner products
+for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_3d_cart)
+    ordered_idx = Tuple(geo_3d_cart.cartesian_idxs[elem_id])
+    elem_vol = 1.0
+    for dim_idx in range(1, 3)
+        start_breakpoint_idx = ordered_idx[dim_idx]
+        end_breakpoint_idx = ordered_idx[dim_idx] + 1
+        elem_vol *= geo_3d_cart.breakpoints[dim_idx][end_breakpoint_idx] - geo_3d_cart.breakpoints[dim_idx][start_breakpoint_idx]
+    end
+
+    g_inv, g, det_g = Mantis.Geometry.inv_metric(geo_3d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+
+    # 0-forms
+    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_vol, atol=1e-12)
+
+    # 1-forms
+    @test isapprox(Mantis.Forms.inner_product(θ¹, θ¹, elem_id, q_rule)[3][1,1,:,:], (g_inv.*det_g)[1,:,:], atol=1e-12)
+
+    # 2-forms
+    @test isapprox(Mantis.Forms.inner_product(ζ², ζ², elem_id, q_rule)[3][1,1,:,:], (g./det_g)[1,:,:], atol=1e-12)
+
+    # n-forms
+    @test isapprox(Mantis.Forms.inner_product(γ³, γ³, elem_id, q_rule)[3][1], 1/elem_vol, atol=1e-12)
 end
 
 

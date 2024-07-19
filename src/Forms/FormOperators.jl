@@ -45,11 +45,7 @@ function inner_product(f1::AbstractFormExpression{domain_dim, 0, G}, f2::Abstrac
 end
 
 # 1-forms in 2D
-# This is essentially an inner product of (n-1)-forms in n dimensions. 
-# Unfortunately, we cannot (easily) write domain_dim-1 as type parameter. 
-# Something along the lines of `ComputedFieldTypes.jl` might be 
-# interesting, though it is focused on structs. We might also find a 
-# work around.
+# This would be covered by the computation below if we could do type parameter arithmetic.
 function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpression{2, 1, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G <: Geometry.AbstractGeometry{2}}
     # Quadrature information.
     xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
@@ -72,7 +68,7 @@ function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpr
 
     A_values = zeros(n_basis_1, n_basis_2, 2, 2)
     A_row_idx = zeros(n_basis_1, n_basis_2, 2, 2)
-    A_column_idx = zeros(n_basis_1, n_basis_2, 2 ,2)
+    A_column_idx = zeros(n_basis_1, n_basis_2, 2, 2)
 
     # Get geometry information, immediately checking if f1 and f2 have the same geometry.
     g, det_g = Geometry.metric(get_geometry(f1, f2), element_idx, xi)
@@ -109,6 +105,110 @@ function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpr
             for quad_node_idx in eachindex(weights)
                 A_values[f1_basis_idx, f2_basis_idx, 2, 2] += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[2][quad_node_idx, f1_basis_idx] * g[quad_node_idx, 2, 2] * f2_eval[2][quad_node_idx, f2_basis_idx]
             end
+        end
+    end
+    
+    return (A_row_idx, A_column_idx, A_values)
+end
+
+# 1-forms in 3D
+# This is essentially an inner product of (n-2)-forms in n dimensions. 
+# Unfortunately, we cannot (easily) write domain_dim-2 as type parameter. 
+# Something along the lines of `ComputedFieldTypes.jl` might be 
+# interesting, though it is focused on structs. We might also find a 
+# work around.
+function inner_product(f1::AbstractFormExpression{3, 1, G}, f2::AbstractFormExpression{3, 1, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G <: Geometry.AbstractGeometry{3}}
+    # Quadrature information.
+    xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
+    weights = Quadrature.get_quadrature_weights(quad_rule)  # Vector of tensor product weights.
+
+    # Forms evaluated at quadrature nodes.
+    f1_eval, f1_indices = evaluate(f1, element_idx, xi)
+    f2_eval, f2_indices = evaluate(f2, element_idx, xi)
+
+    # We need to recheck this, we need the number of active basis
+    # Count the number of active basis functions.
+    n_basis_1 = size(f1_eval[1], 2)  # number of basis functions in f1, if field only 1, if space then the number of basis in this component
+    n_basis_2 = size(f2_eval[1], 2)  # the same as above 
+    n_basis_total = n_basis_1 * n_basis_2
+
+    # Pre-allocate the inner product data: row indices, colum indices, and values.
+    # A_row_idx = Vector{Int}(undef, n_basis_total)
+    # A_column_idx = Vector{Int}(undef, n_basis_total)
+    # A_values = Vector{Float64}(undef, n_basis_total)
+
+    A_values = zeros(n_basis_1, n_basis_2, 3, 3) # manifold_dim x manifold_dim
+    A_row_idx = zeros(n_basis_1, n_basis_2, 3, 3)
+    A_column_idx = zeros(n_basis_1, n_basis_2, 3, 3)
+
+    # Get geometry information, immediately checking if f1 and f2 have the same geometry.
+    g_inv, _, det_g = Geometry.inv_metric(get_geometry(f1, f2), element_idx, xi)
+    for f1_basis_idx = 1:n_basis_1
+        for f2_basis_idx = 1:n_basis_2
+            
+            for component_1 in 1:1:3 # manifold_dim
+                for component_2 in 1:1:3 # manifold_dim
+
+                    A_row_idx[f1_basis_idx, f2_basis_idx, component_1, component_2] = f1_indices[component_1][f1_basis_idx]
+                    A_column_idx[f1_basis_idx, f2_basis_idx, component_1, component_2] = f2_indices[component_2][f2_basis_idx]
+                    for quad_node_idx in eachindex(weights)
+                        A_values[f1_basis_idx, f2_basis_idx, component_1, component_2] += det_g[quad_node_idx] * weights[quad_node_idx] * f1_eval[component_1][quad_node_idx, f1_basis_idx] * g_inv[quad_node_idx, component_1, component_2] * f2_eval[component_2][quad_node_idx, f2_basis_idx]
+                    end
+                end
+            end
+            
+        end
+    end
+    
+    return (A_row_idx, A_column_idx, A_values)
+end
+
+# 2-forms in 3D
+# This is essentially an inner product of (n-1)-forms in n dimensions. 
+# Unfortunately, we cannot (easily) write domain_dim-1 as type parameter. 
+# Something along the lines of `ComputedFieldTypes.jl` might be 
+# interesting, though it is focused on structs. We might also find a 
+# work around.
+function inner_product(f1::AbstractFormExpression{3, 2, G}, f2::AbstractFormExpression{3, 2, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G <: Geometry.AbstractGeometry{3}}
+    # Quadrature information.
+    xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
+    weights = Quadrature.get_quadrature_weights(quad_rule)  # Vector of tensor product weights.
+
+    # Forms evaluated at quadrature nodes.
+    f1_eval, f1_indices = evaluate(f1, element_idx, xi)
+    f2_eval, f2_indices = evaluate(f2, element_idx, xi)
+
+    # We need to recheck this, we need the number of active basis
+    # Count the number of active basis functions.
+    n_basis_1 = size(f1_eval[1], 2)  # number of basis functions in f1, if field only 1, if space then the number of basis in this component
+    n_basis_2 = size(f2_eval[1], 2)  # the same as above 
+    n_basis_total = n_basis_1 * n_basis_2
+
+    # Pre-allocate the inner product data: row indices, colum indices, and values.
+    # A_row_idx = Vector{Int}(undef, n_basis_total)
+    # A_column_idx = Vector{Int}(undef, n_basis_total)
+    # A_values = Vector{Float64}(undef, n_basis_total)
+
+    A_values = zeros(n_basis_1, n_basis_2, 3, 3) # manifold_dim x manifold_dim
+    A_row_idx = zeros(n_basis_1, n_basis_2, 3, 3)
+    A_column_idx = zeros(n_basis_1, n_basis_2, 3, 3)
+
+    # Get geometry information, immediately checking if f1 and f2 have the same geometry.
+    g, det_g = Geometry.metric(get_geometry(f1, f2), element_idx, xi)
+    for f1_basis_idx = 1:n_basis_1
+        for f2_basis_idx = 1:n_basis_2
+            
+            for component_1 in 1:1:3 # manifold_dim
+                for component_2 in 1:1:3 # manifold_dim
+
+                    A_row_idx[f1_basis_idx, f2_basis_idx, component_1, component_2] = f1_indices[component_1][f1_basis_idx]
+                    A_column_idx[f1_basis_idx, f2_basis_idx, component_1, component_2] = f2_indices[component_2][f2_basis_idx]
+                    for quad_node_idx in eachindex(weights)
+                        A_values[f1_basis_idx, f2_basis_idx, component_1, component_2] += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[component_1][quad_node_idx, f1_basis_idx] * g[quad_node_idx, component_1, component_2] * f2_eval[component_2][quad_node_idx, f2_basis_idx]
+                    end
+                end
+            end
+            
         end
     end
     
