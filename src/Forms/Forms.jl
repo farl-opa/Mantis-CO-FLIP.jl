@@ -61,10 +61,10 @@ function get_geometry(form_space1::FS1, form_space2::FS2) where {FS1 <: Abstract
         tpg1 = typeof(geom1)
         geom2 = get_geometry(form_space2)
         tpg2 = typeof(geom2)
-        msg1 = "The form spaces do not have the same geometry. "
+        msg1 = "The given forms do not have the same geometry. "
         msg2 = "The first has geometry: $geom1 of type $tpg1. "
         msg3 = "The second has geometry: $geom2 of type $tpg2."
-        error(msg1*msg2*msg3)
+        throw(ArgumentError(msg1*msg2*msg3))
     end
 end
 

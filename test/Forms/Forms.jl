@@ -84,7 +84,9 @@ dξ¹_eval = Mantis.Forms.evaluate(dξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 println()
 geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
+geo_2d_cart2 = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints1))
 zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
+zero_form_space_cart2 = Mantis.Forms.FormSpace(0, geo_2d_cart2, (TP_Space,), "ν")
 d_zero_form_space_cart = Mantis.Forms.exterior_derivative(zero_form_space)
 one_form_space_cart = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
 top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
@@ -92,13 +94,31 @@ top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
 # Generate the form expressions
 α⁰ = Mantis.Forms.FormField(zero_form_space_cart, "α")
 α⁰.coefficients .= 1.0
-β⁰ = Mantis.Forms.FormField(zero_form_space_cart, "β")
+β⁰ = Mantis.Forms.FormField(zero_form_space_cart2, "β")
 β⁰.coefficients .= 1.0
+γ² = Mantis.Forms.FormField(top_form_space_cart, "γ")
+γ².coefficients .= 1.0
 println(α⁰.coefficients)
 dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-println("Starting inner product computation")
+
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
-println(Mantis.Forms.inner_product(α⁰, β⁰, 1, q_rule))
+println("Starting inner product computations")
+for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
+    ordered_idx = Tuple(geo_2d_cart.cartesian_idxs[elem_id])
+    elem_area = 1.0
+    for dim_idx in range(1, 2)
+        start_breakpoint_idx = ordered_idx[dim_idx]
+        end_breakpoint_idx = ordered_idx[dim_idx] + 1
+        elem_area *= geo_2d_cart.breakpoints[dim_idx][end_breakpoint_idx] - geo_2d_cart.breakpoints[dim_idx][start_breakpoint_idx]
+    end
+
+    # 0-forms
+    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, rtol=1e-14)
+    @test_throws ArgumentError Mantis.Forms.inner_product(α⁰, β⁰, elem_id, q_rule)
+
+    # n-forms
+    @test isapprox(Mantis.Forms.inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, rtol=1e-14)
+end
 
 
 # abstract type AbstractMyStruct{n} end

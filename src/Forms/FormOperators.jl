@@ -25,7 +25,7 @@ function inner_product(f1::AbstractFormExpression{domain_dim, 0, G}, f2::Abstrac
     for (f1_linear, f1_basis_idx) in enumerate(f1_indices)
         for (f2_linear, f2_basis_idx) in enumerate(f2_indices)
             inner_prod_idx = f2_linear + (f1_linear - 1) * n_basis_1  # get the linear index of the inner product (f1_basis_idx, f2_basis_idx)
-            
+
             A_row_idx[inner_prod_idx] = f1_indices[1][f1_basis_idx]
             A_column_idx[inner_prod_idx] = f2_indices[1][f2_basis_idx]
 
@@ -46,21 +46,31 @@ end
 
 # 1-forms in 2D
 function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpression{2, 1, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G <: Geometry.AbstractGeometry{2}}
-    xi = get_quad_nodes(quad_rule)  # Tuple of quad nodes for tensor product 
-    weights = get_quad_weights(quad_rule)  # weights: either the tensor product
+    # Quadrature information.
+    xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
+    weights = Quadrature.get_quadrature_weights(quad_rule)  # Vector of tensor product weights.
 
-    f1_eval, f1_indices = Mantis.Forms.evaluate(f1, elment_idx, xi)
-    f2_eval, f2_indices = Mantis.Forms.evaluate(f2, elment_idx, xi)
+    # Forms evaluated at quadrature nodes.
+    f1_eval, f1_indices = evaluate(f1, element_idx, xi)
+    f2_eval, f2_indices = evaluate(f2, element_idx, xi)
 
     # We need to recheck this, we need the number of active basis
-    n_basis_1 = size(f1_eval[1], 2)  # how many basis in f1, if field only 1 if space then the number of basis in this component
+    # Count the number of active basis functions.
+    n_basis_1 = size(f1_eval[1], 2)  # number of basis functions in f1, if field only 1, if space then the number of basis in this component
     n_basis_2 = size(f2_eval[1], 2)  # the same as above 
+    n_basis_total = n_basis_1 * n_basis_2
+
+    # Pre-allocate the inner product data: row indices, colum indices, and values.
+    A_row_idx = Vector{Int}(undef, n_basis_total)
+    A_column_idx = Vector{Int}(undef, n_basis_total)
+    A_values = Vector{Float64}(undef, n_basis_total)
 
     A_values = zeros(n_basis_1, n_basis_2, 2, 2)
     A_row_idx = zeros(n_basis_1, n_basis_2, 2, 2)
     A_column_idx = zeros(n_basis_1, n_basis_2, 2 ,2)
 
-    g, det_g = inv_metric(f1, element_idx, xi) # we need this functionality for both form expressions and guarantee that both share the same geometry
+    # Get geometry information, immediately checking if f1 and f2 have the same geometry.
+    g, det_g = Geometry.metric(get_geometry(f1, f2), element_idx, xi)
 
     for f1_basis_idx = 1:n_basis_1
         for f2_basis_idx = 1:n_basis_2
@@ -68,7 +78,7 @@ function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpr
             # β¹ = β¹₁dξ¹ + β¹₂dξ²
             # <α¹, β²> = <α¹₁dξ¹, β¹₁dξ¹> + <α¹₁dξ¹, β¹₂dξ²> + ...
 
-            #  <α¹₁dξ¹, β¹₁dξ¹>
+            # <α¹₁dξ¹, β¹₁dξ¹>
             A_values[f1_basis_idx, f2_basis_idx, 1, 1] += sum(f1_eval[1][:, f1_basis_idx] .* g[:, 1, 1] .* f2_eval[1][:, f2_basis_idx])
             A_row_idx[f1_basis_idx, f2_basis_idx, 1, 1] = f1_indices[1][f1_basis_idx]
             A_column_idx[f1_basis_idx, f2_basis_idx, 1, 1] = f2_indices[1][f2_basis_idx]
@@ -84,6 +94,52 @@ function inner_product(f1::AbstractFormExpression{2, 1, G}, f2::AbstractFormExpr
     end
 
     return 
+end
+
+# n-forms in any dimension (dimension larger than 0, because the method 
+# signature will be identical to the 0-form case when the dimension is 
+# 0). Note that this is not prevented at the moment.
+function inner_product(f1::AbstractFormExpression{domain_dim, domain_dim, G}, f2::AbstractFormExpression{domain_dim, domain_dim, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}}
+    # Quadrature information.
+    xi = Quadrature.get_quadrature_nodes(quad_rule)  # Tuple of quad nodes.
+    weights = Quadrature.get_quadrature_weights(quad_rule)  # Vector of tensor product weights.
+
+    # Forms evaluated at quadrature nodes.
+    f1_eval, f1_indices = evaluate(f1, element_idx, xi)
+    f2_eval, f2_indices = evaluate(f2, element_idx, xi)
+
+    # Count the number of active basis functions.
+    n_basis_1 = size(f1_eval[1], 2)  # number of basis functions in f1, if field only 1, if space then the number of basis in this component
+    n_basis_2 = size(f2_eval[1], 2)  # the same as above 
+    n_basis_total = n_basis_1 * n_basis_2
+
+    # Pre-allocate the inner product data: row indices, colum indices, and values.
+    A_row_idx = Vector{Int}(undef, n_basis_total)
+    A_column_idx = Vector{Int}(undef, n_basis_total)
+    A_values = Vector{Float64}(undef, n_basis_total)
+
+    # Get geometry information, immediately checking if f1 and f2 have the same geometry.
+    _, det_g = Geometry.metric(get_geometry(f1, f2), element_idx, xi)
+    for (f1_linear, f1_basis_idx) in enumerate(f1_indices)
+        for (f2_linear, f2_basis_idx) in enumerate(f2_indices)
+            inner_prod_idx = f2_linear + (f1_linear - 1) * n_basis_1  # get the linear index of the inner product (f1_basis_idx, f2_basis_idx)
+
+            A_row_idx[inner_prod_idx] = f1_indices[1][f1_basis_idx]
+            A_column_idx[inner_prod_idx] = f2_indices[1][f2_basis_idx]
+
+            # Compute the value of the inner product. Note that 
+            # `A_values` is initialised as undef, so we cannot add the 
+            # values directly.
+            inner_product_value = 0.0
+            for quad_node_idx in eachindex(weights)
+                inner_product_value += (1.0/det_g[quad_node_idx]) * weights[quad_node_idx] * f1_eval[1][quad_node_idx, f1_basis_idx] * f2_eval[1][quad_node_idx, f2_basis_idx]
+            end
+            A_values[inner_prod_idx] = inner_product_value
+            
+        end
+    end
+
+    return (A_row_idx, A_column_idx, A_values)
 end
 
 # (0-forms, 0-forms)
