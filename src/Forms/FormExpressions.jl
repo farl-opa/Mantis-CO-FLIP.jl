@@ -87,7 +87,7 @@ function evaluate(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int
         form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices[form_component_idx]]
     end
 
-    form_indices = ones(n_form_components)
+    form_indices = ones(Int, n_form_components)
 
     return form_eval, form_indices
 end
@@ -158,7 +158,7 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, F
         d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices[derivative_form_component_idx]]
     end
 
-    d_form_indices = ones(n_derivative_components)
+    d_form_indices = ones(Int, n_derivative_components)
 
     return d_form_eval, d_form_indices
 end
