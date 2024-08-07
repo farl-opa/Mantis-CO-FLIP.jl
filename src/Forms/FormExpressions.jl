@@ -164,6 +164,44 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, F
 end
 
 @doc raw"""
+    evaluate_hodge_star(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
+
+Evaluate the Hodge star ⋆ of a FormField at given points.
+
+# Arguments
+- `form::FormField`: The form field to evaluate
+- `element_idx::Int`: Index of the element to evaluate
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+        Points are the tensor product of the coordinates per dimension, therefore there will be
+        ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `form_eval::Vector{Vector{Float64}}`: Evaluated Hodge star of the form field.
+        Follows the same data format as evaluate: `d_form_eval[i][j]` is the component `i` 
+        of the exterior derivative evaluated at the tensor product `j`.
+
+# Sizes
+- `form_eval`: Vector of length `n_derivative_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
+        `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
+- `form_indices`: Vector of length `n_derivative_components`, where each element is a Vector{Int} of length 1 of value 1, since for a 
+        `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
+"""
+function evaluate_hodge_star(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
+    n_form_components = binomial(manifold_dim, form_rank)
+    form_basis_eval, form_basis_indices = evaluate_hodge_star(form.form_space, element_idx, xi)
+
+    form_eval = Vector{Vector{Float64}}(undef, n_form_components)
+
+    for form_component ∈ 1:n_form_components
+        form_eval[form_component] = form_basis_eval[form_component] * form.coefficients[form_basis_indices[form_component]]
+    end
+
+    form_indices = ones(Int, n_form_components)
+
+    return form_eval, form_indices
+end
+
+@doc raw"""
     FormExpression{n, k, F} <: AbstractFormExpression{n, k}
 
 Represents an expression involving differential forms.
@@ -185,7 +223,7 @@ struct FormExpression{n, k, F} <:AbstractFormExpression{n, k}
 
     function FormExpression(form::Tuple{F}, op::String) where {F <: AbstractFormExpression{manifold_dim, child_form_rank}} where {manifold_dim, child_form_rank}
         label = op * form[1].label
-        if op == "⋆"
+        if op == "🟉"
             form_rank = manifold_dim - child_form_rank
 
         elseif op == "d"
@@ -234,10 +272,10 @@ Evaluate a unary FormExpression at given points.
 function evaluate(form::FormExpression{manifold_dim, form_rank, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, F <: AbstractFormExpression}
     print("Evaluating: " * form.label * "\n")
     if form.op == "d"
-        form_eval = evaluate_exterior_derivative(form.children[1], element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}})
+        form_eval = evaluate_exterior_derivative(form.children[1], element_idx, xi)
 
-    elseif form.op == "⋆"
-        throw("⋆ not implemented yet: form[1].label")
+    elseif form.op == "🟉"
+        form_eval = evaluate_hodge_star(form.children[1], element_idx, xi)
     end
 
     return form_eval
@@ -295,7 +333,7 @@ Create a Hodge star expression of a form.
 - `FormExpression`: A new FormExpression representing the Hodge star operation
 """
 function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
-    return FormExpression((form,), "⋆")
+    return FormExpression((form,), "🟉")
 end
 
 @doc raw"""
