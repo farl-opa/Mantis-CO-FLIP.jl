@@ -87,13 +87,13 @@ Mantis_folder = dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
 output_data_folder = joinpath(data_folder, "output", "L2Projecton") # Create this folder first if you haven't done so yet.
 output_to_file = false
-test = false
+test = true
 verbose = false
-verbose_convergence = true
+verbose_convergence = false
 
-nsubdivs = 4
+nsubdivs = 3
 min_p = 0
-max_p = 4
+max_p = 3
 base_nels = (10, 10)
 
 for p ∈ min_p:max_p
@@ -109,11 +109,11 @@ for p ∈ min_p:max_p
         test_space = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
         bc = Dict{Int, Float64}()
 
-        geom_cartesian = Mantis.Geometry.CartesianGeometry(Tuple(patches[i].breakpoints for i ∈ 1:2))
+        geometry_cartesian = Mantis.Geometry.CartesianGeometry(Tuple(patches[i].breakpoints for i ∈ 1:2))
 
         # Setup the quadrature rule.
         q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule((p,p) .+ 2, Mantis.Quadrature.gauss_legendre)
-        errors[subdiv_factor+1] = fe_run(source_function, trial_space, test_space, geom_cartesian, q_nodes, q_weights, source_function, p, p-1, case, 2, bc, output_to_file, test, verbose)
+        errors[subdiv_factor+1] = fe_run(source_function, trial_space, test_space, geometry_cartesian, q_nodes, q_weights, source_function, p, p-1, case, 2, bc, output_to_file, false, verbose)
         dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_dim(trial_space)
     end
     error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])

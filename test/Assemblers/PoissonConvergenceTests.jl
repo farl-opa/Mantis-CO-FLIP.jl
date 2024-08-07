@@ -95,11 +95,11 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 output_to_file = false
 test = true
 verbose = false
-verbose_convergence = true
+verbose_convergence = false
 
 nsubdivs = 3
 min_p = 1
-max_p = 4
+max_p = 3
 base_nels = (10, 10)
 
 for p ∈ min_p:max_p
@@ -115,11 +115,11 @@ for p ∈ min_p:max_p
         test_space = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
         bc = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space))
 
-        geom_cartesian = Mantis.Geometry.CartesianGeometry(Tuple(patches[i].breakpoints for i ∈ 1:2))
+        geometry_cartesian = Mantis.Geometry.CartesianGeometry(Tuple(patches[i].breakpoints for i ∈ 1:2))
 
         # Setup the quadrature rule.
         q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule((p,p) .+ 1, Mantis.Quadrature.gauss_legendre)
-        errors[subdiv_factor+1] = fe_run(forcing_sine, trial_space, test_space, geom_cartesian, q_nodes, q_weights, exact_sol_sine, p, p-1, case, bc, output_to_file, test, verbose)
+        errors[subdiv_factor+1] = fe_run(forcing_sine, trial_space, test_space, geometry_cartesian, q_nodes, q_weights, exact_sol_sine, p, p-1, case, bc, output_to_file, false, verbose)
         dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_dim(trial_space)
     end
     error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
