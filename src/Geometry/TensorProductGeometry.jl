@@ -214,14 +214,14 @@ function jacobian(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, 
     m = get_image_dim(geometry)
     J = zeros(Float64, n_points, m, n)
 
-    J1 = jacobian(geometry.geometry_1, element_geometries_idx[1], ξ[1:geometry.domain_dims[1]])  # the Jacobian contribution from geometry 1
-    J2 = jacobian(geometry.geometry_2, element_geometries_idx[2], ξ[(geometry.domain_dims[1]+1):end])  # the Jacobian contribution from geometry 2
+    J1 = jacobian(geometry.geometry_1, element_geometries_idx[1], ξ[1:n1])  # the Jacobian contribution from geometry 1
+    J2 = jacobian(geometry.geometry_2, element_geometries_idx[2], ξ[(n1+1):end])  # the Jacobian contribution from geometry 2
 
     linear_id = 1
     for j ∈ 1:prod(n_points_per_dim[n1+1:end])
         for i ∈ 1:prod(n_points_per_dim[1:n1])
-            J[linear_id, 1:geometry.image_dims[1], 1:geometry.domain_dims[1]] .= @view J1[i,:,:]
-            J[linear_id, (geometry.image_dims[1]+1):end, (geometry.domain_dims[1]+1):end] .= @view J2[j,:,:]
+            J[linear_id, 1:geometry.image_dims[1], 1:n1] .= @view J1[i,:,:]
+            J[linear_id, (geometry.image_dims[1]+1):end, (n1+1):end] .= @view J2[j,:,:]
 
             linear_id += 1
         end
