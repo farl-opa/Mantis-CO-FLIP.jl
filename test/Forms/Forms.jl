@@ -85,11 +85,19 @@ hodge_top_form_space_eval, hodge_top_form_space_idx = Mantis.Forms.evaluate_hodg
 
 dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
+🟉α⁰ = Mantis.Forms.hodge(α⁰)
+🟉ξ¹ = Mantis.Forms.hodge(ξ¹)
+🟉β² = Mantis.Forms.hodge(β²)
 
 α⁰_eval = Mantis.Forms.evaluate(α⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
 dα⁰_eval = Mantis.Forms.evaluate(dα⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
+🟉α⁰_eval = Mantis.Forms.evaluate(🟉α⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
 ξ¹_eval = Mantis.Forms.evaluate(ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
 dξ¹_eval = Mantis.Forms.evaluate(dξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
+🟉ξ¹_eval = Mantis.Forms.evaluate(🟉ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
+β²_eval = Mantis.Forms.evaluate(β², 1, ([0.0, 1.0], [0.0, 1.0]))
+🟉β²_eval = Mantis.Forms.evaluate(🟉β², 1, ([0.0, 1.0], [0.0, 1.0]))
+
 
 println()
 geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
@@ -185,9 +193,11 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_3d_cart)
 end
 
 🟉α⁰ = Mantis.Forms.hodge(α⁰)
-🟉ξ¹ = Mantis.Forms.hodge(ξ¹)
-🟉β² = Mantis.Forms.hodge(β²)
+🟉θ¹ = Mantis.Forms.hodge(θ¹)
+🟉ζ² = Mantis.Forms.hodge(ζ²)
+🟉γ³ = Mantis.Forms.hodge(γ³)
 
-🟉α⁰_eval = Mantis.Forms.evaluate(🟉α⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
-🟉ξ¹_eval = Mantis.Forms.evaluate(🟉ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
-🟉β²_eval = Mantis.Forms.evaluate(🟉β², 1, ([0.0, 1.0], [0.0, 1.0]))
+🟉α⁰_eval = Mantis.Forms.evaluate(🟉α⁰, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+🟉θ¹_eval = Mantis.Forms.evaluate(🟉θ¹, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+🟉ζ²_eval = Mantis.Forms.evaluate(🟉ζ², 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+🟉γ³_eval = Mantis.Forms.evaluate(🟉γ³, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))

@@ -617,24 +617,24 @@ function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vect
     local_fem_basis_dξ_1, local_fem_basis_indices_dξ_1 = FunctionSpaces.evaluate(form_space.fem_space[1], element_id, xi, 0)
 
     local_fem_basis_dξ_2, local_fem_basis_indices_dξ_2 = FunctionSpaces.evaluate(form_space.fem_space[2], element_id, xi, 0)
-    local_form_basis_indices_dξ_2 .+= dof_offset_component[2]
+    local_fem_basis_indices_dξ_2 .+= dof_offset_component[2]
 
     local_fem_basis_dξ_3, local_fem_basis_indices_dξ_3 = FunctionSpaces.evaluate(form_space.fem_space[3], element_id, xi, 0)
-    local_form_basis_indices_dξ_3 .+= dof_offset_component[3]
+    local_fem_basis_indices_dξ_3 .+= dof_offset_component[3]
 
     # ⋆(α₁²dξ₂∧dξ₃ + α₂²dξ₃∧dξ₁ + α₃²dξ₁∧dξ₂) = [(α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹ +
     #                                            (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ² +
     #                                            (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³ ]√det(gᵢⱼ). 
     # First: (α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹
-    local_star_form_basis_eval[1] = @views hcat(local_fem_basis_dξ_1[1][1].*(inv_g[:,2,2]*inv_g[:,3,3]-inv_g[:,2,3]*inv_g[:,3,2]), local_fem_basis_dξ_2[1][1].*(inv_g[:,2,3]*inv_g[:,3,1]-inv_g[:,2,1]*inv_g[:,3,3]), local_fem_basis_dξ_3[1][1].*(inv_g[:,2,1]*inv_g[:,3,2]-inv_g[:,2,2]*inv_g[:,3,1])).*sqrt_g
+    local_star_form_basis_eval[1] = @views hcat(local_fem_basis_dξ_1[1][1].*(inv_g[:,2,2].*inv_g[:,3,3]-inv_g[:,2,3].*inv_g[:,3,2]), local_fem_basis_dξ_2[1][1].*(inv_g[:,2,3].*inv_g[:,3,1]-inv_g[:,2,1].*inv_g[:,3,3]), local_fem_basis_dξ_3[1][1].*(inv_g[:,2,1].*inv_g[:,3,2]-inv_g[:,2,2].*inv_g[:,3,1])).*sqrt_g
     local_star_form_basis_indices[1] = vcat(local_fem_basis_indices_dξ_1, local_fem_basis_indices_dξ_2, local_fem_basis_indices_dξ_3)
 
     # Second: (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ²
-    local_star_form_basis_eval[2] = @views hcat(local_fem_basis_dξ_1[1][1].*(inv_g[:,3,2]*inv_g[:,1,3]-inv_g[:,3,3]*inv_g[:,1,2]), local_fem_basis_dξ_2[1][1].*(inv_g[:,3,3]*inv_g[:,1,1]-inv_g[:,3,1]*inv_g[:,1,3]), local_fem_basis_dξ_3[1][1].*(inv_g[:,3,1]*inv_g[:,1,2]-inv_g[:,3,2]*inv_g[:,1,1])).*sqrt_g
+    local_star_form_basis_eval[2] = @views hcat(local_fem_basis_dξ_1[1][1].*(inv_g[:,3,2].*inv_g[:,1,3]-inv_g[:,3,3].*inv_g[:,1,2]), local_fem_basis_dξ_2[1][1].*(inv_g[:,3,3].*inv_g[:,1,1]-inv_g[:,3,1].*inv_g[:,1,3]), local_fem_basis_dξ_3[1][1].*(inv_g[:,3,1].*inv_g[:,1,2]-inv_g[:,3,2].*inv_g[:,1,1])).*sqrt_g
     local_star_form_basis_indices[2] = vcat(local_fem_basis_indices_dξ_1, local_fem_basis_indices_dξ_2, local_fem_basis_indices_dξ_3)
 
     # Third: (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³
-    local_star_form_basis_eval[3] = @views hcat(local_fem_basis_dξ_1[1][1].*(inv_g[:,1,2]*inv_g[:,2,3]-inv_g[:,1,3]*inv_g[:,2,2]), local_fem_basis_dξ_2[1][1].*(inv_g[:,1,3]*inv_g[:,2,1]-inv_g[:,1,1]*inv_g[:,2,3]), local_fem_basis_dξ_3[1][1].*(inv_g[:,1,1]*inv_g[:,2,2]-inv_g[:,1,2]*inv_g[:,2,1])).*sqrt_g
+    local_star_form_basis_eval[3] = @views hcat(local_fem_basis_dξ_1[1][1].*(inv_g[:,1,2].*inv_g[:,2,3]-inv_g[:,1,3].*inv_g[:,2,2]), local_fem_basis_dξ_2[1][1].*(inv_g[:,1,3].*inv_g[:,2,1]-inv_g[:,1,1].*inv_g[:,2,3]), local_fem_basis_dξ_3[1][1].*(inv_g[:,1,1].*inv_g[:,2,2]-inv_g[:,1,2].*inv_g[:,2,1])).*sqrt_g
     local_star_form_basis_indices[3] = vcat(local_fem_basis_indices_dξ_1, local_fem_basis_indices_dξ_2, local_fem_basis_indices_dξ_3)
 
     return local_star_form_basis_eval, local_star_form_basis_indices

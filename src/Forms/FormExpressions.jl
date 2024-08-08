@@ -188,7 +188,7 @@ Evaluate the Hodge star ⋆ of a FormField at given points.
 - `form_indices`: Vector of length `n_derivative_components`, where each element is a Vector{Int} of length 1 of value 1, since for a 
         `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 """
-function evaluate_hodge_star(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
+function evaluate_hodge_star(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank}}
     n_form_components = binomial(manifold_dim, form_rank)
     form_basis_eval, form_basis_indices = evaluate_hodge_star(form.form_space, element_idx, xi)
 
@@ -336,7 +336,7 @@ Create a Hodge star expression of a form.
 # Returns
 - `FormExpression`: A new FormExpression representing the Hodge star operation
 """
-function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     return FormExpression((form,), "🟉")
 end
 
