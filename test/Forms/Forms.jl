@@ -70,12 +70,18 @@ print("\n")
 
 zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+hodge_zero_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+hodge_one_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+
+top_form_space_eval, top_form_space_idx = Mantis.Forms.evaluate(top_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+hodge_top_form_space_eval, hodge_top_form_space_idx = Mantis.Forms.evaluate_hodge_star(top_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 α⁰.coefficients .= 1.0
 ξ¹.coefficients .= 1.0
+β².coefficients .= 1.0
 
 dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
@@ -178,19 +184,10 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_3d_cart)
     @test isapprox(Mantis.Forms.inner_product(γ³, γ³, elem_id, q_rule)[3][1], 1/elem_vol, atol=1e-12)
 end
 
+🟉α⁰ = Mantis.Forms.hodge(α⁰)
+🟉ξ¹ = Mantis.Forms.hodge(ξ¹)
+🟉β² = Mantis.Forms.hodge(β²)
 
-# abstract type AbstractMyStruct{n} end
-# abstract type AbstractOtherStruct{n} end
-
-# struct OtherStruct{k} <: AbstractOtherStruct{k}
-#     a::Int
-# end
-
-#  struct MyStruct{k, F} <: AbstractMyStruct{k}
-#     fem_space::F
-
-#     # 0- and n-form constructor
-#     function MyStruct(form_rank::Int, fem_space::F) where {F <: AbstractOtherStruct{k}} where {k}
-#         new{k, F}(fem_space)
-#     end
-# end
+🟉α⁰_eval = Mantis.Forms.evaluate(🟉α⁰, 1, ([0.0, 1.0], [0.0, 1.0]))
+🟉ξ¹_eval = Mantis.Forms.evaluate(🟉ξ¹, 1, ([0.0, 1.0], [0.0, 1.0]))
+🟉β²_eval = Mantis.Forms.evaluate(🟉β², 1, ([0.0, 1.0], [0.0, 1.0]))
