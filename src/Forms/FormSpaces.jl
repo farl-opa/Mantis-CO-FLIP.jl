@@ -105,7 +105,7 @@ Evaluate the basis functions of a differential form space at given points `xi`.
 - `local_form_basis`: Vector of length `n_form_components`, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions)
 - `form_basis_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length n_basis_functions
 """
-function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {form_rank, G <: Geometry.AbstractGeometry}
+function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G} where {G <: Geometry.AbstractGeometry{manifold_dim}}} where {form_rank}
     n_form_components = binomial(manifold_dim, form_rank)
     
     # Compute the offset in the numbering of the degrees of freedom 
@@ -171,7 +171,7 @@ Evaluate the exterior derivative of a 0-form (scalar function) at given points.
 - `local_d_form_basis_eval`: Vector of length `manifold_dim`, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions).
 - `form_basis_indices`: Vector of length `manifold_dim`, where each element is a Vector{Int} of length n_basis_functions
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0, G}} where {G <: Geometry.AbstractGeometry}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0, G}  where {G <: Geometry.AbstractGeometry{manifold_dim}}}
 #    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space[1], element_idx, xi, 1)
     first_derivative_base_key = [0 for k in 1:manifold_dim]
 
@@ -198,7 +198,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     return local_d_form_basis_eval, form_basis_indices
 end
 
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{n, n, G}} where {n, G <: Geometry.AbstractGeometry}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{n, n, G}} where {n, G <: Geometry.AbstractGeometry{n}}
     throw("Manifold dim == Form rank: Unable to compute exterior derivative of volume forms.")
 end
 
@@ -228,7 +228,7 @@ Evaluate the exterior derivative of a 1-form in 2D.
 - `local_d_form_basis_eval`: Vector of length 1, where the element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions_dξ_1 + n_basis_functions_dξ_2)
 - `form_basis_indices`: Vector of length 1, where the element is a Vector{Int} of length (n_basis_functions_dξ_1 + n_basis_functions_dξ_2)
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1, G}} where {G <: Geometry.AbstractGeometry}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1, G}} where {G <: Geometry.AbstractGeometry{2}}
     # manifold_dim = 2
     n_form_components = 2 # binomial(manifold_dim, 1)
     n_derivative_form_components = 1 # binomial(manifold_dim, 2)
@@ -284,7 +284,7 @@ Evaluate the exterior derivative of a 1-form in 3D.
 - `local_d_form_basis_eval`: Vector of length 3, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions_dξ_i + n_basis_functions_dξ_j)
 - `form_basis_indices`: Vector of length 3, where each element is a Vector{Int} of length (n_basis_functions_dξ_i + n_basis_functions_dξ_j)
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1, G}} where {G <: Geometry.AbstractGeometry}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1, G}} where {G <: Geometry.AbstractGeometry{3}}
     # manifold_dim = 3
     n_form_components = 3 # binomial(manifold_dim, 1)
     n_derivative_form_components = 3 # binomial(manifold_dim, 2)
@@ -356,7 +356,7 @@ Evaluate the exterior derivative of a 2-form in 3D.
 - `local_d_form_basis_eval`: Vector of length 1, where the element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions_dξ_2_dξ_3 + n_basis_functions_dξ_3_dξ_1 + n_basis_functions_dξ_1_dξ_2)
 - `form_basis_indices`: Vector of length 1, where the element is a Vector{Int} of length (n_basis_functions_dξ_2_dξ_3 + n_basis_functions_dξ_3_dξ_1 + n_basis_functions_dξ_1_dξ_2)
 """
-function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2, G}} where {G <: Geometry.AbstractGeometry}
+function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2, G}} where {G <: Geometry.AbstractGeometry{3}}
     # manifold_dim = 3
     n_form_components = 3 # binomial(manifold_dim, 1)
     n_derivative_form_components = 1 # binomial(manifold_dim, 2)
@@ -417,7 +417,7 @@ Evaluates the Hodge star operator ⋆ of a 0-form in n dimensions.
 - `local_star_form_basis_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0}}
+function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0, G} where {G <: Geometry.AbstractGeometry{manifold_dim}}}
     _, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
 
     local_star_form_basis_eval, local_star_form_basis_indices = evaluate(form_space, element_id, xi)
@@ -445,7 +445,7 @@ Evaluates the Hodge star operator ⋆ of a n-form in n dimensions.
 - `local_star_form_basis_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, manifold_dim}}
+function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, manifold_dim, G} where {G <: Geometry.AbstractGeometry{manifold_dim}}}
     _, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
 
     local_star_form_basis_eval, local_star_form_basis_indices = evaluate(form_space, element_id, xi)
@@ -473,7 +473,7 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 2 dimensions.
 - `local_star_form_basis_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1}}
+function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1, G} where {G <: Geometry.AbstractGeometry{2}}}
     g, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
     inv_g = mapslices(inv, g, dims=(2,3))
 
@@ -509,7 +509,7 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
 - `local_star_form_basis_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1}}
+function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1, G} where {G <: Geometry.AbstractGeometry{3}}}
     g, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
     inv_g = mapslices(inv, g, dims=(2,3))
 
@@ -549,7 +549,7 @@ Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
 - `local_star_form_basis_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2}}
+function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2, G} where {G <: Geometry.AbstractGeometry{3}}}
     g, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
     inv_g = mapslices(inv, g, dims=(2,3))
     

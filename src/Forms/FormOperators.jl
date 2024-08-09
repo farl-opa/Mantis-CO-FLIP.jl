@@ -1,5 +1,5 @@
 # Priority 1: Inner products for abstract form fields
-
+#=
 # 0-forms in any dimension
 function inner_product(f1::AbstractFormExpression{domain_dim, 0, G}, f2::AbstractFormExpression{domain_dim, 0, G}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}}
     # Quadrature information.
@@ -265,13 +265,13 @@ end
 # function inner_product(f1::FormSpace{domain_dim, 0, G, Tuple{F1}}, f2::FormSpace{domain_dim, 0, G, Tuple{F2}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace, F2 <: FunctionSpaces.AbstractFunctionSpace}
 
 #     # Compute bases
-#     basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.xi)
-#     basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.xi)
+#     basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.nodes)
+#     basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.nodes)
 
 #     # Compute the quantities related to the geometry.
 #     # The geometries of f1 and f2 are assumed equal, so we use one. 
 #     # We need to add a check for the equality of both geometries
-#     _, _, sqrt_g = Geometry.inv_metric(f1.geometry, element_id, quad_rule.xi, nderivatives)
+#     _, _, sqrt_g = Geometry.inv_metric(f1.geometry, element_id, quad_rule.nodes, nderivatives)
 
 #     # Count the number of supported basis on this element.
 #     n_basis_1 = length(basis_1_inds)
@@ -311,13 +311,13 @@ end
 # function inner_product(f1::FormSpace{domain_dim, domain_dim, G, Tuple{F1}}, f2::FormSpace{domain_dim, domain_dim, G, Tuple{F2}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{domain_dim}) where {domain_dim, G <: Geometry.AbstractGeometry{domain_dim}, F1 <: FunctionSpaces.AbstractFunctionSpace, F2 <: FunctionSpaces.AbstractFunctionSpace}
 
 #     # Compute bases and their derivatives.
-#     basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.xi)
-#     basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.xi)
+#     basis_1_eval, basis_1_inds = FunctionSpaces.evaluate(f1.fem_space[1], element_id, quad_rule.nodes)
+#     basis_2_eval, basis_2_inds = FunctionSpaces.evaluate(f2.fem_space[1], element_id, quad_rule.nodes)
 
 #     # Compute the quantities related to the geometry.
 #     # The geometries of f1 and f2 are assumed equal, so we use one. 
 #     # We need to add a check for the equality of both geometries
-#     _, _, sqrt_g = Geometry.inv_metric(f1.geometry, element_id, quad_rule.xi, nderivatives)
+#     _, _, sqrt_g = Geometry.inv_metric(f1.geometry, element_id, quad_rule.nodes, nderivatives)
 
 #     # Count the number of supported basis on this element.
 #     n_basis_1 = length(basis_1_inds)
@@ -348,33 +348,226 @@ end
 #     return M_row, M_col, M_val
 # end
 
-# (1-forms, 1-forms) in 2D
-function inner_product(f1::FormSpace{2,1,G,Tuple{F1x,F1y}}, f2::FormSpace{2,1,G,Tuple{F2x,F2y}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}, F1x <: FunctionSpaces.AbstractFunctionSpace, F1y <: FunctionSpaces.AbstractFunctionSpace, F2x <: FunctionSpaces.AbstractFunctionSpace, F2y <: FunctionSpaces.AbstractFunctionSpace}
+=#
 
+# (0-forms, 0-forms) 
+function inner_product(form_space1::AbstractFormSpace{manifold_dim, 0, G}, form_space2::AbstractFormSpace{manifold_dim, 0, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
+    _, sqrt_g = Geometry.metric(form_space1.geometry, element_id, quad_rule.nodes)
 
+    form1_basis_eval, form1_basis_indices = evaluate(form_space1, element_id, quad_rule.nodes)
+    form2_basis_eval, form2_basis_indices = evaluate(form_space2, element_id, quad_rule.nodes)
+    
+    n_basis_1 = length(form1_basis_indices[1])
+    n_basis_2 = length(form2_basis_indices[1])
 
+    # Form space 1: α⁰ = α⁰₁
+    # Form space 2: β⁰ = β⁰₁
+    # ⟨α¹, β¹⟩ = ∫α⁰₁β⁰₁ⱼ√det(g)dξ¹∧…∧dξⁿ
+    
+    prod_form_rows = [Vector{Int}(undef, n_basis_1*n_basis_2)]
+    prod_form_cols = [Vector{Int}(undef, n_basis_1*n_basis_2)]
+    prod_form_basis_eval = [Vector{Float64}(undef, n_basis_1*n_basis_2)]
+
+    prod_form_rows, prod_form_cols, prod_form_basis_eval = inner_product_0_form_component!(
+        prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, sqrt_g, 
+        form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
+        n_basis_1, n_basis_2
+    ) # Evaluates α¹₀β¹₀
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
 end
 
-# (1-forms, 1-forms) in 2D with expressions
-function inner_product(f1::AbstractFormSpace{2,1,G}, f2::AbstractFormSpace{2,1,G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}}
+# (n-forms, n-forms) 
+function inner_product(form_space1::AbstractFormSpace{manifold_dim, manifold_dim, G}, form_space2::AbstractFormSpace{manifold_dim, manifold_dim, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
 
-    # 1. evaluate f1 and f2 using evaluate methods for AbstractFormSpaces
-    # 2. compute inner product
+    form1_basis_eval, form1_basis_indices = evaluate(form_space1, element_id, quad_rule.nodes)
+    form2_basis_eval, form2_basis_indices = evaluate(form_space2, element_id, quad_rule.nodes)
+    
+    n_basis_1 = length(form1_basis_indices[1])
+    n_basis_2 = length(form2_basis_indices[1])
 
+    # Form space 1: α⁰ = α⁰₁
+    # Form space 2: β⁰ = β⁰₁
+    # ⟨α¹, β¹⟩ = ∫α⁰₁β⁰₁ⱼ√det(g)dξ¹∧…∧dξⁿ
+    
+    prod_form_rows = [Vector{Int}(undef, n_basis_1*n_basis_2)]
+    prod_form_cols = [Vector{Int}(undef, n_basis_1*n_basis_2)]
+    prod_form_basis_eval = [Vector{Float64}(undef, n_basis_1*n_basis_2)]
+
+    prod_form_rows, prod_form_cols, prod_form_basis_eval = inner_product_n_form_component!(
+        prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, 
+        form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
+        n_basis_1, n_basis_2
+    ) # Evaluates α¹₀β¹₀
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
+end 
+
+# (1-forms, 1-forms) 2D
+function inner_product(form_space1::AbstractFormSpace{2, 1, G}, form_space2::AbstractFormSpace{2, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}}
+    g, sqrt_g = Geometry.metric(form_space1.geometry, element_id, quad_rule.nodes)
+    inv_g = mapslices(inv, g, dims=(2,3))
+
+    form1_basis_eval, form1_basis_indices = evaluate(form_space1, element_id, quad_rule.nodes)
+    form2_basis_eval, form2_basis_indices = evaluate(form_space2, element_id, quad_rule.nodes)
+    
+    n_basis_1 = map(basis_indices -> length(basis_indices), form1_basis_indices)
+    n_basis_2 = map(basis_indices -> length(basis_indices), form2_basis_indices)
+
+    # Form space 1: α¹ = α¹₁dξ¹ +  α¹₂dξ²
+    # Form space 2: β¹ = β¹₁dξ¹ +  β¹₂dξ²
+    # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²
+    
+    prod_form_rows = vec([Vector{Int}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:2, j ∈ 1:2])
+    prod_form_cols = vec([Vector{Int}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:2, j ∈ 1:2])
+    prod_form_basis_eval = vec([Vector{Float64}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:2, j ∈ 1:2])
+
+    for i ∈1:2
+        for j ∈1:2
+            prod_form_rows, prod_form_cols, prod_form_basis_eval = inner_product_1_form_component!(
+                prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, 
+                inv_g, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
+                n_basis_1, n_basis_2, j + (i-1)*2, (i,j)
+            ) # Evaluates α¹ᵢβ¹ⱼgⁱʲ
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
+end 
+
+# (1-forms, 1-forms) 3D
+function inner_product(form_space1::AbstractFormSpace{3, 1, G}, form_space2::AbstractFormSpace{3, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
+    g, sqrt_g = Geometry.metric(form_space1.geometry, element_id, quad_rule.nodes)
+    inv_g = mapslices(inv, g, dims=(2,3))
+
+    form1_basis_eval, form1_basis_indices = evaluate(form_space1, element_id, quad_rule.nodes)
+    form2_basis_eval, form2_basis_indices = evaluate(form_space2, element_id, quad_rule.nodes)
+    
+    n_basis_1 = map(basis_indices -> length(basis_indices), form1_basis_indices)
+    n_basis_2 = map(basis_indices -> length(basis_indices), form2_basis_indices)
+
+    # Form space 1: α¹ = α¹₁dξ¹ +  α¹₂dξ² + α¹₃dξ³
+    # Form space 2: β¹ = β¹₁dξ¹ +  β¹₂dξ² + β¹₃dξ³
+    # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²∧dξ³
+    
+    prod_form_rows = vec([Vector{Int}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:3, j ∈ 1:3])
+    prod_form_cols = vec([Vector{Int}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:3, j ∈ 1:3])
+    prod_form_basis_eval = vec([Vector{Float64}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:3, j ∈ 1:3])
+
+    for i ∈1:3
+        for j ∈1:3
+            prod_form_rows, prod_form_cols, prod_form_basis_eval = inner_product_1_form_component!(
+                prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, 
+                inv_g, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
+                n_basis_1, n_basis_2, j + (i-1)*3, (i,j)
+            ) # Evaluates α¹ᵢβ¹ⱼgⁱʲ
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
 end
 
-# 1-forms in 3D
-function inner_product(f1::FormSpace{3,1,G,Tuple{F1x,F1y,F1z}}, f2::FormSpace{3,1,G,Tuple{F2x,F2y,F2z}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}, F1x <: FunctionSpaces.AbstractFunctionSpace, F1y <: FunctionSpaces.AbstractFunctionSpace, F1z <: FunctionSpaces.AbstractFunctionSpace, F2x <: FunctionSpaces.AbstractFunctionSpace, F2y <: FunctionSpaces.AbstractFunctionSpace, F2z <: FunctionSpaces.AbstractFunctionSpace}
+# (2-forms, 2-forms) 3D
+function inner_product(form_space1::AbstractFormSpace{3, 2, G}, form_space2::AbstractFormSpace{3, 2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
+    g, sqrt_g = Geometry.metric(form_space1.geometry, element_id, quad_rule.nodes)
+    inv_g = mapslices(inv, g, dims=(2,3))
 
+    form1_basis_eval, form1_basis_indices = evaluate(form_space1, element_id, quad_rule.nodes)
+    form2_basis_eval, form2_basis_indices = evaluate(form_space2, element_id, quad_rule.nodes)
+    
+    n_basis_1 = map(basis_indices -> length(basis_indices), form1_basis_indices)
+    n_basis_2 = map(basis_indices -> length(basis_indices), form2_basis_indices)
 
+    # Form space 1: α² = α₁²dξ₂∧dξ₃ + α₂²dξ₃∧dξ₁ + α₃²dξ₁∧dξ₂
+    # Form space 2: β² = β₁²dξ₂∧dξ₃ + β₂²dξ₃∧dξ₁ + β₃²dξ₁∧dξ₂
+    # ⟨α², β²⟩ = ∫α¹ᵢβ¹ⱼ(gⁱ¹ʲ¹gⁱ²ʲ²-gⁱ¹ʲ²gⁱ²ʲ¹)√det(g)dξ¹∧dξ²∧dξ³
+    
+    prod_form_rows = vec([Vector{Int}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:3, j ∈ 1:3])
+    prod_form_cols = vec([Vector{Int}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:3, j ∈ 1:3])
+    prod_form_basis_eval = vec([Vector{Float64}(undef, n_basis_1[i]*n_basis_2[j]) for i ∈ 1:3, j ∈ 1:3])
 
+    for i ∈1:3
+        for j ∈1:3
+            prod_form_rows, prod_form_cols, prod_form_basis_eval = inner_product_2_form_component!(
+                prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, 
+                inv_g, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
+                n_basis_1, n_basis_2, j + (i-1)*3, (i,j)
+            ) # Evaluates α¹ᵢβ¹ⱼ(gⁱ¹ʲ¹gⁱ²ʲ²-gⁱ¹ʲ²gⁱ²ʲ¹)√det(g)
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
 end
 
-# 2-forms in 3D
-function inner_product(f1::FormSpace{3,2,G,Tuple{F1x,F1y,F1z}}, f2::FormSpace{3,2,G,Tuple{F2x,F2y,F2z}}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}, F1x <: FunctionSpaces.AbstractFunctionSpace, F1y <: FunctionSpaces.AbstractFunctionSpace, F1z <: FunctionSpaces.AbstractFunctionSpace, F2x <: FunctionSpaces.AbstractFunctionSpace, F2y <: FunctionSpaces.AbstractFunctionSpace, F2z <: FunctionSpaces.AbstractFunctionSpace}
+# Helpers for inner product
 
+function inner_product_0_form_component!(prod_form_rows::Vector{Vector{Int}}, prod_form_cols::Vector{Vector{Int}}, prod_form_basis_eval::Vector{Vector{Float64}}, quad_rule, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, n_basis_1, n_basis_2)
 
+    for j ∈ 1:n_basis_2
+        for i ∈ 1:n_basis_1
+            linear_idx = i + (j-1) * n_basis_1
 
+            prod_form_rows[1][linear_idx] = form1_basis_indices[1][i]
+            prod_form_cols[1][linear_idx] = form2_basis_indices[1][j]
+
+            prod_form_basis_eval[1][linear_idx] = @views (quad_rule.weights .* form1_basis_eval[1][:,i])' * (form2_basis_eval[1][:,j] .* sqrt_g)    
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
+end
+
+function inner_product_n_form_component!(prod_form_rows::Vector{Vector{Int}}, prod_form_cols::Vector{Vector{Int}}, prod_form_basis_eval::Vector{Vector{Float64}}, quad_rule, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, n_basis_1, n_basis_2)
+
+    for j ∈ 1:n_basis_2
+        for i ∈ 1:n_basis_1
+            linear_idx = i + (j-1) * n_basis_1
+
+            prod_form_rows[1][linear_idx] = form1_basis_indices[1][i]
+            prod_form_cols[1][linear_idx] = form2_basis_indices[1][j]
+
+            prod_form_basis_eval[1][linear_idx] = @views (quad_rule.weights .* form1_basis_eval[1][:,i])' * (form2_basis_eval[1][:,j])    
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
+end
+
+function inner_product_1_form_component!(prod_form_rows::Vector{Vector{Int}}, prod_form_cols::Vector{Vector{Int}}, prod_form_basis_eval::Vector{Vector{Float64}}, quad_rule, inv_g, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, n_basis_1, n_basis_2, component_idx::Int, form_idxs::NTuple{2, Int})
+
+    for j ∈ 1:n_basis_2[form_idxs[2]]
+        for i ∈ 1:n_basis_1[form_idxs[1]]
+            linear_idx = i + (j-1) * n_basis_1[form_idxs[1]]
+
+            prod_form_rows[component_idx][linear_idx] = form1_basis_indices[form_idxs[1]][i]
+            prod_form_cols[component_idx][linear_idx] = form2_basis_indices[form_idxs[2]][j]
+
+            prod_form_basis_eval[component_idx][linear_idx] = @views (quad_rule.weights .* form1_basis_eval[form_idxs[1]][:,i])' * (form2_basis_eval[form_idxs[2]][:,j] .* inv_g[:,form_idxs[1],form_idxs[2]] .* sqrt_g)    
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
+end
+
+function inner_product_2_form_component!(prod_form_rows::Vector{Vector{Int}}, prod_form_cols::Vector{Vector{Int}}, prod_form_basis_eval::Vector{Vector{Float64}}, quad_rule, inv_g, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, n_basis_1, n_basis_2, component_idx::Int, form_idxs::NTuple{2, Int})
+
+    inv_indices_1 = (mod(form_idxs[1], 3) + 1, mod(form_idxs[1]+1, 3) + 1)
+    inv_indices_2 = (mod(form_idxs[2], 3) + 1, mod(form_idxs[2]+1, 3) + 1)
+
+    inv_g_factor = inv_g[:,inv_indices_1[1],inv_indices_2[1]].*inv_g[:,inv_indices_1[2],inv_indices_2[2]] .- inv_g[:,inv_indices_1[1],inv_indices_2[2]].*inv_g[:,inv_indices_1[2],inv_indices_2[1]]
+
+    for j ∈ 1:n_basis_2[form_idxs[2]]
+        for i ∈ 1:n_basis_1[form_idxs[1]]
+            linear_idx = i + (j-1) * n_basis_1[form_idxs[1]]
+
+            prod_form_rows[component_idx][linear_idx] = form1_basis_indices[form_idxs[1]][i]
+            prod_form_cols[component_idx][linear_idx] = form2_basis_indices[form_idxs[2]][j]
+
+            prod_form_basis_eval[component_idx][linear_idx] = @views (quad_rule.weights .* form1_basis_eval[form_idxs[1]][:,i])' * (form2_basis_eval[form_idxs[2]][:,j] .* inv_g_factor .* sqrt_g)    
+        end
+    end
+
+    return prod_form_rows, prod_form_cols, prod_form_basis_eval
 end
 
 # Priority 2: Wedge products
