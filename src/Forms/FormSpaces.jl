@@ -474,8 +474,7 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 2 dimensions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
 function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {FS <: AbstractFormSpace{2, 1, G} where {G <: Geometry.AbstractGeometry{2}}}
-    g, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
-    inv_g = mapslices(inv, g, dims=(2,3))
+    inv_g, _, sqrt_g = Geometry.inv_metric(form_space.geometry, element_id, xi)
 
     local_star_form_basis_eval, local_star_form_basis_indices = evaluate(form_space, element_id, xi)
     star_form_basis_eval, star_form_basis_indices = similar(local_star_form_basis_eval), similar(local_star_form_basis_indices)
@@ -510,8 +509,7 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
 function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 1, G} where {G <: Geometry.AbstractGeometry{3}}}
-    g, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
-    inv_g = mapslices(inv, g, dims=(2,3))
+    inv_g, g, sqrt_g = Geometry.inv_metric(form_space.geometry, element_id, xi)
 
     local_star_form_basis_eval, local_star_form_basis_indices = evaluate(form_space, element_id, xi)
     star_form_basis_eval, star_form_basis_indices = similar(local_star_form_basis_eval), similar(local_star_form_basis_indices)
@@ -550,8 +548,7 @@ Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
 - `local_star_form_basis_indices`: Vector of vectors containing indices of the basis functions.
 """
 function evaluate_hodge_star(form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {FS <: AbstractFormSpace{3, 2, G} where {G <: Geometry.AbstractGeometry{3}}}
-    g, sqrt_g = Geometry.metric(form_space.geometry, element_id, xi)
-    inv_g = mapslices(inv, g, dims=(2,3))
+    inv_g, _, sqrt_g = Geometry.inv_metric(form_space.geometry, element_id, xi)
     
     local_star_form_basis_eval, local_star_form_basis_indices = evaluate(form_space, element_id, xi)
     star_form_basis_eval, star_form_basis_indices = similar(local_star_form_basis_eval), similar(local_star_form_basis_indices)

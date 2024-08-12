@@ -227,7 +227,7 @@ struct FormExpression{manifold_dim, form_rank, G, F} <:AbstractFormExpression{ma
 
     function FormExpression(form::Tuple{F}, op::String) where {F <: AbstractFormExpression{manifold_dim, child_form_rank, G}} where {manifold_dim, child_form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
         label = op * form[1].label
-        if op == "🟉"
+        if op == "★"
             form_rank = manifold_dim - child_form_rank
 
         elseif op == "d"
@@ -278,7 +278,7 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F}}, el
     if form.op == "d"
         form_eval = evaluate_exterior_derivative(form.children[1], element_idx, xi)
 
-    elseif form.op == "🟉"
+    elseif form.op == "★"
         form_eval = evaluate_hodge_star(form.children[1], element_idx, xi)
     end
 
@@ -337,7 +337,7 @@ Create a Hodge star expression of a form.
 - `FormExpression`: A new FormExpression representing the Hodge star operation
 """
 function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    return FormExpression((form,), "🟉")
+    return FormExpression((form,), "★")
 end
 
 @doc raw"""

@@ -116,8 +116,7 @@ Compute the inner product of two differential 1-forms over a specified element o
 - `prod_form_eval::Vector{Vector{Float64}}`: Evaluation of the inner product in each component m. Hence, prod_form_eval[m][l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. If the form expressions given have coefficients for the evaluate method, the return format is [x] where x is the inner product value.
 """
 function evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G}, form_expression2::AbstractFormExpression{2, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}}
-    g, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
-    inv_g = mapslices(inv, g, dims=(2,3))
+    inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
@@ -172,8 +171,7 @@ Compute the inner product of two differential 1-forms over a specified element o
 - `prod_form_eval::Vector{Vector{Float64}}`: Evaluation of the inner product in each component m. Hence, prod_form_eval[m][l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. If the form expressions given have coefficients for the evaluate method, the return format is [x] where x is the inner product value.
 """
 function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G}, form_expression2::AbstractFormExpression{3, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
-    g, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
-    inv_g = mapslices(inv, g, dims=(2,3))
+    inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
@@ -228,8 +226,7 @@ Compute the inner product of two differential 2-forms over a specified element o
 - `prod_form_eval::Vector{Vector{Float64}}`: Evaluation of the inner product in each component m. Hence, prod_form_eval[m][l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. If the form expressions given have coefficients for the evaluate method, the return format is [x] where x is the inner product value.
 """
 function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G}, form_expression2::AbstractFormExpression{3, 2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
-    g, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
-    inv_g = mapslices(inv, g, dims=(2,3))
+    inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
