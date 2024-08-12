@@ -387,9 +387,9 @@ function inner_product(form_space1::AbstractFormSpace{manifold_dim, manifold_dim
     n_basis_1 = length(form1_basis_indices[1])
     n_basis_2 = length(form2_basis_indices[1])
 
-    # Form space 1: α⁰ = α⁰₁
-    # Form space 2: β⁰ = β⁰₁
-    # ⟨α¹, β¹⟩ = ∫α⁰₁β⁰₁ⱼ√det(g)dξ¹∧…∧dξⁿ
+    # Form space 1: αⁿ = αⁿ₁dξ¹∧…∧dξⁿ
+    # Form space 2: βⁿ = βⁿ₁dξ¹∧…∧dξⁿ
+    # ⟨α¹, β¹⟩ = ∫αⁿ₁βⁿ₁ⱼ√det(g)⁻¹dξ¹∧…∧dξⁿ
     
     prod_form_rows = [Vector{Int}(undef, n_basis_1*n_basis_2)]
     prod_form_cols = [Vector{Int}(undef, n_basis_1*n_basis_2)]
@@ -399,7 +399,7 @@ function inner_product(form_space1::AbstractFormSpace{manifold_dim, manifold_dim
         prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, sqrt_g,
         form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
         n_basis_1, n_basis_2
-    ) # Evaluates α¹₀β¹₀
+    ) # Evaluates αⁿ₁βⁿ₁ⱼ√det(g)⁻¹
 
     return prod_form_rows, prod_form_cols, prod_form_basis_eval
 end 
