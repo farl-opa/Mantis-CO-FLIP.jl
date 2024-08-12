@@ -51,7 +51,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # check Hierarchical B-spline evaluation
     h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[0,0]) >= 0.0
+    @test minimum(h_eval[1][1]) >= 0.0
 end
 
 hspace.active_elements
@@ -71,7 +71,7 @@ end
 xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
 nx = size(xs)[1]
 
-A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -90,7 +90,7 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 
     local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
 
-    A[idx, eval[2]] = eval[1][0,0]
+    A[idx, eval[2]] = eval[1][1][1]
 end
 
 coeffs = A \ xs

@@ -123,7 +123,7 @@ end
 
 
 
-
+using InteractiveUtils
 # Here we setup and specify the inputs to the FE problem.
 
 # Compute base directories for data input and output
@@ -335,7 +335,7 @@ end
 xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
 nx = size(xs)[1]
 
-A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -354,7 +354,7 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 
     eval_space = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
 
-    A[idx, eval_space[2]] = eval_space[1][0,0]
+    A[idx, eval_space[2]] = eval_space[1][1][1]
 end
 
 coeffs = A \ xs

@@ -35,9 +35,8 @@ end
 marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_finer_elements(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_finer_elements(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
 hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
-x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
-x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
-xi = (x1, x2)
+qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
 # Tests for coefficients and evaluation
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
@@ -48,9 +47,9 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # check Hierarchical B-spline evaluation
     h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[0,0]) >= 0.0
+    @test minimum(h_eval[1][1]) >= 0.0
     # Partition of unity
-    @test all(isapprox.(sum(h_eval[0,0], dims=2), 1.0, atol=1e-14))
+    @test all(isapprox.(sum(h_eval[1][1], dims=2), 1.0, atol=1e-14))
 end
 
 # Geometry visualization
@@ -58,11 +57,11 @@ end
 function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
     L = Mantis.FunctionSpaces.get_num_levels(hspace)
     
-    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_dim(hspace), 2))
+    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hspace), 2))
 
     id_sum = 1
     for level ∈ 1:1:L
-        max_ind_basis = Mantis.FunctionSpaces._get_dim_per_space(hspace.spaces[level])
+        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hspace.spaces[level])
         x_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
         y_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
         grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]

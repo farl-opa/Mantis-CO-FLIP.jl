@@ -114,7 +114,7 @@ for p ∈ min_p:max_p
         # Setup the quadrature rule.
         q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule((p,p) .+ 2, Mantis.Quadrature.gauss_legendre)
         errors[subdiv_factor+1] = fe_run(source_function, trial_space, test_space, geom_cartesian, q_nodes, q_weights, source_function, p, p-1, case, 2, bc, output_to_file, test, verbose)
-        dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_dim(trial_space)
+        dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_num_basis(trial_space)
     end
     error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
     if verbose_convergence

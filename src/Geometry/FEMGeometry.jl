@@ -27,9 +27,9 @@ end
 function evaluate(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
     # evaluate fem space
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(geometry.fem_space, element_id, xi, 0)
-    # combine with coefficients and return
-    key = Tuple(zeros(Int,n))
-    return fem_basis[key...] * geometry.geometry_coeffs[fem_basis_indices,:]
+    
+    # Combine basis functions with geometry coefficients and return
+    return fem_basis[1][1] * geometry.geometry_coeffs[fem_basis_indices,:]
 end
 
 function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
@@ -42,7 +42,10 @@ function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vec
     m = get_image_dim(geometry)
     J = zeros(n_eval_points, m, n)
     for k = 1:n 
-        J[:, :, k] .= fem_basis[Tuple(keys[k,:])...] * geometry.geometry_coeffs[fem_basis_indices,:]
+        der_idx = FunctionSpaces._get_derivative_idx(keys[k,:])  # Get derivative index
+        # Compute partial derivatives and store in Jacobian matrix
+        J[:, :, k] .= fem_basis[2][der_idx] * geometry.geometry_coeffs[fem_basis_indices,:]
     end
-    return J #, fem_basis[Tuple(zeros(Float64,n))...] * geometry.geometry_coeffs[fem_basis_indices,:]
+    
+    return J
 end

@@ -1,20 +1,13 @@
-"""
-This (sub-)module provides functionality related with hierarchical refinment.
-
-The exported names are:
-"""
-
 @doc raw"""
     struct HierarchicalActiveInfo
 
-A structure that contains hierarchical information of active objects. `ids` is a collection of linear ids of 
-active objects, whether elements or functions, and `levels` contains information about the level
-of each active object by enconding the indexes of the last active objects, of the `ids` vector, from each level. I.e., if `levels = [0, n1, n2, ...]`, then `ids[1:n1]` will contain all active objects
-from level 1, `ids[n1+1:n2]` all active objects from level 2, and so forth.
-
-# Fiels
-- `ids::Vector{Int}`: the index of the object in its corresponding structure.
-- `levels::Vector{Int}`: level information of active objects.
+# Description
+`ids` is a collection of linear ids of active objects, whether elements or functions.
+`levels` contains information about the level of each active object by encoding the 
+indexes of the last active objects, of the `ids` vector, from each level. 
+For example, if `levels = [0, n1, n2, ...]`, then:
+- `ids[1:n1]` will contain all active objects from level 1
+- `ids[n1+1:n2]` will contain all active objects from level 2, and so forth.
 """
 struct HierarchicalActiveInfo
     ids::Vector{Int}
@@ -139,9 +132,10 @@ end
 Returns the number of active objects in `active_info`.
 
 # Arguments 
-- `active_info::HierarchicalActiveInfo`: information about active objects.
+- `active_info::HierarchicalActiveInfo`: Information about active objects.
+
 # Returns
-- `::Int`: number of active objects.
+- `::Int`: Number of active objects.
 """
 function get_num_active(active_info::HierarchicalActiveInfo)
     return length(active_info.ids)
@@ -155,23 +149,23 @@ Returns the number of active elements in `hierarchical_space`.
 # Arguments 
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 # Returns
-- `::Int`: number of active elements.
+- `::Int`: Number of active elements.
 """
 function get_num_elements(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_num_active(hierarchical_space.active_elements)
 end
 
 """
-    get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    get_num_basis(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Returns the number of active functions in `hierarchical_space`.
 
 # Arguments 
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 # Returns
-- `::Int`: number of active functions.
+- `::Int`: Number of active functions.
 """
-function get_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function get_num_basis(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_num_active(hierarchical_space.active_basis)
 end
 
@@ -187,12 +181,13 @@ end
 Returns the number of levels in `active_info`.
 
 # Arguments 
-- `active_info::HierarchicalActiveInfo`: information about active objects.
+- `active_info::HierarchicalActiveInfo`: Information about active objects.
+
 # Returns
-- `::Int`: number of levels.
+- `::Int`: Number of levels.
 """
 function get_num_levels(active_info::HierarchicalActiveInfo)
-    return length(active_info.levels)-1
+    return length(active_info.levels) - 1
 end
 
 """
@@ -203,7 +198,7 @@ Returns the number of levels in `hierarchical_space`.
 # Arguments 
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 # Returns
-- `::Int`: number of levels.
+- `::Int`: Number of levels.
 """
 function get_num_levels(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_num_levels(hierarchical_space.active_elements)
@@ -215,13 +210,14 @@ end
 Returns the level of the object given by `index`.
 
 # Arguments 
-- `active_info::HierarchicalActiveInfo`: information about active objects.
-- `index::Int`: index of the active object.
+- `active_info::HierarchicalActiveInfo`: Information about active objects.
+- `index::Int`: Index of the active object.
+
 # Returns
-- `::Int`: level of the object.
+- `::Int`: Level of the object.
 """
 function get_active_level(active_info::HierarchicalActiveInfo, index::Int)
-    return findlast( x -> x < index, active_info.levels)
+    return findlast(x -> x < index, active_info.levels)
 end
 
 """
@@ -233,7 +229,7 @@ Returns the level of the element given by `index`.
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 - `index::Int`: index of the active element.
 # Returns
-- `::Int`: level of the element.
+- `::Int`: Level of the element.
 """
 function get_element_level(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, index::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_active_level(hierarchical_space.active_elements, index)
@@ -248,7 +244,7 @@ Returns the level of the function given by `index`.
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 - `index::Int`: index of the active function.
 # Returns
-- `::Int`: level of the function.
+- `::Int`: Level of the function.
 """
 function get_function_level(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, index::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_active_level(hierarchical_space.active_basis, index)
@@ -260,10 +256,11 @@ end
 Returns the corresponding id of the object given by `index` in the objects' structure.
 
 # Arguments 
-- `active_info::HierarchicalActiveInfo`: information about active objects.
-- `index::Int`: index of the active object.
+- `active_info::HierarchicalActiveInfo`: Information about active objects.
+- `index::Int`: Index of the active object.
+
 # Returns
-- `::Int`: id of the active object.
+- `::Int`: ID of the active object.
 """
 function get_active_id(active_info::HierarchicalActiveInfo, index::Int)
     return active_info.ids[index]
@@ -278,7 +275,7 @@ Returns the corresponding id of the element given by `index`.
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 - `index::Int`: index of the active element.
 # Returns
-- `::Int`: id of the active element.
+- `::Int`: ID of the active element.
 """
 function get_element_id(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, index::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_active_id(hierarchical_space.active_elements, index)
@@ -293,7 +290,7 @@ Returns the corresponding id of the function given by `index`.
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 - `index::Int`: index of the active function.
 # Returns
-- `::Int`: id of the active function.
+- `::Int`: ID of the active function.
 """
 function get_function_id(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, index::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_active_id(hierarchical_space.active_basis, index)
@@ -302,7 +299,7 @@ end
 """
     get_function_id(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
-Returns the function space at `level`.
+Returns the function space at the specified `level` from the hierarchical space.
 
 # Arguments 
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
@@ -317,28 +314,44 @@ end
 """
     get_level_active(active_info::HierarchicalActiveInfo, level::Int)
 
-Returns the indices and active objects of `active_info` at `level`.
+Returns the indices and active objects of `active_info` at the specified `level`.
 
 # Arguments 
-- `active_info::HierarchicalActiveInfo`: information about active objects.
-- `level::Int`: refinement level.
+- `active_info::HierarchicalActiveInfo`: Information about active objects.
+- `level::Int`: Refinement level.
+
 # Returns
-- `::Tuple{UnitRange{Int}, @view Vector{Int}}`: indices and active objects at `level`.
+- `::Tuple{UnitRange{Int}, SubArray{Int,1}}`: A tuple containing:
+  1. A `UnitRange` of indices for the specified level.
+  2. A view of the active object IDs for the specified level.
+
+# Notes
+- The function uses the `levels` field of `active_info` to determine the range of indices for the given level.
+- The active object IDs are accessed using a view to avoid unnecessary copying.
 """
 function get_level_active(active_info::HierarchicalActiveInfo, level::Int)
-    return active_info.levels[level]+1:active_info.levels[level+1], @view active_info.ids[active_info.levels[level]+1:active_info.levels[level+1]]
+    # Calculate the range of indices for the specified level
+    index_range = active_info.levels[level]+1:active_info.levels[level+1]
+    
+    # Return the range and a view of the active IDs for the level
+    return index_range, @view active_info.ids[index_range]
 end
 
 """
     get_level_elements(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
-Returns the active elements of `hierarchical_space` at `level`.
+Returns the active elements of `hierarchical_space` at the specified `level`.
 
 # Arguments 
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 - `level::Int`: refinement level.
 # Returns
-- `::@view Vector{Int}`: active elements at `level`.
+- `::Tuple{UnitRange{Int}, SubArray{Int,1}}`: A tuple containing:
+  1. A `UnitRange` of indices for the active elements at the specified level.
+  2. A view of the active element IDs for the specified level.
+
+# Notes
+- This function delegates to `get_level_active` using the `active_elements` field of the hierarchical space.
 """
 function get_level_elements(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_level_active(hierarchical_space.active_elements, level)
@@ -347,13 +360,18 @@ end
 """
     get_level_functions(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
-Returns the active functions of `hierarchical_space` at `level`.
+Returns the active functions of `hierarchical_space` at the specified `level`.
 
 # Arguments 
 - `hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}`: Hierarchical function space.
 - `level::Int`: refinement level.
 # Returns
-- `::@view Vector{Int}`: active functions at `level`.
+- `::Tuple{UnitRange{Int}, SubArray{Int,1}}`: A tuple containing:
+  1. A `UnitRange` of indices for the active functions at the specified level.
+  2. A view of the active function IDs for the specified level.
+
+# Notes
+- This function delegates to `get_level_active` using the `active_functions` field of the hierarchical space.
 """
 function get_level_functions(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_level_active(hierarchical_space.active_basis, level)
@@ -385,6 +403,7 @@ end
 Equivalent to `get_active_index` for multiple `ids` in `level`.
 """
 function get_active_indices(active_info::HierarchicalActiveInfo, ids, level::Int)
+    # Determine the range of indices for the given level
     ids_range = active_info.levels[level]+1:active_info.levels[level+1]
 
     return ids_range[findall(x -> x ∈ ids, @view active_info.ids[ids_range])]
@@ -440,7 +459,7 @@ function get_active_objects(spaces::Vector{S}, two_scale_operators::Vector{T}, m
 
     # Initialize active basis and elements on first level
     active_elements_per_level = [collect(1:get_num_elements(spaces[1]))]
-    active_basis_per_level = [collect(1:get_dim(spaces[1]))]
+    active_basis_per_level = [collect(1:get_num_basis(spaces[1]))]
 
     for level in 1:L-1 # Loop over levels
         next_level_domain = [get_level_active(marked_domains, level+1)[2]]
@@ -728,7 +747,7 @@ end
 function get_basis_contained_in_next_level(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     basis_contained_in_next_level = Int[]
     inactive_domain = get_level_inactive_domain(hspace, level)
-    for basis ∈ setdiff(1:get_dim(hspace.spaces[level]), get_level_active(hspace.active_basis, level)[2])
+    for basis ∈ setdiff(1:get_num_basis(hspace.spaces[level]), get_level_active(hspace.active_basis, level)[2])
         basis_support = get_support(hspace.spaces[level], basis)
         support_in_omega, _ = Mesh.check_contained(basis_support, inactive_domain)
         if support_in_omega

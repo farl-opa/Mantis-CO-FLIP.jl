@@ -6,11 +6,11 @@ using LinearAlgebra, Plots, SparseArrays
 function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
     L = Mantis.FunctionSpaces.get_num_levels(hspace)
     
-    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_dim(hspace), 2))
+    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hspace), 2))
 
     id_sum = 1
     for level ∈ 1:1:L
-        max_ind_basis = Mantis.FunctionSpaces._get_dim_per_space(hspace.spaces[level])
+        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hspace.spaces[level])
         x_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
         y_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
         grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
@@ -46,7 +46,7 @@ function get_hb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElement
     xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
     nx = size(xs)[1]
 
-    A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
     for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
         level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -65,7 +65,7 @@ function get_hb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElement
 
         local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
 
-        A[idx, eval[2]] = eval[1][0,0]
+        A[idx, eval[2]] = eval[1][1][1]
     end
 
     coeffs = A \ xs
@@ -191,7 +191,7 @@ if verbose_step
     println("Step 0:")
     println("Polynomial degrees: $p with regularities: $k.")
     println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-    println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)).")
+    println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)).")
     println("Maximum error: $max_error. \n")
 end
 
@@ -199,7 +199,7 @@ thb_errors = Vector{Float64}(undef, nsteps+1)
 thb_dofs = Vector{Int}(undef, nsteps+1)
 thb_nnz = Vector{Int}(undef, nsteps+1)
 
-thb_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
+thb_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
 thb_errors[1] = max_error
 SparseArrays.dropzeros!(A)
 thb_nnz[1] = SparseArrays.nnz(A)
@@ -229,10 +229,10 @@ for step ∈ 1:nsteps
         println("Number of marked_elements: $(length(dorfler_marking)).")
 
         println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-        println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)). \n")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
     end
     thb_errors[step+1] = max_error
-    thb_dofs[step+1] = Mantis.FunctionSpaces.get_dim(hspace)
+    thb_dofs[step+1] = Mantis.FunctionSpaces.get_num_basis(hspace)
     SparseArrays.dropzeros!(A)
     thb_nnz[step+1] = SparseArrays.nnz(A)
 end
@@ -251,7 +251,7 @@ hb_errors = Vector{Float64}(undef, nsteps+1)
 hb_dofs = Vector{Int}(undef, nsteps+1)
 hb_nnz = Vector{Int}(undef, nsteps+1)
 
-hb_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
+hb_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
 hb_errors[1] = max_error
 SparseArrays.dropzeros!(A)
 hb_nnz[1] = SparseArrays.nnz(A)
@@ -281,10 +281,10 @@ for step ∈ 1:nsteps
         println("Number of marked_elements: $(length(dorfler_marking)).")
 
         println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-        println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)). \n")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
     end
     hb_errors[step+1] = max_error
-    hb_dofs[step+1] = Mantis.FunctionSpaces.get_dim(hspace)
+    hb_dofs[step+1] = Mantis.FunctionSpaces.get_num_basis(hspace)
     SparseArrays.dropzeros!(A)
     hb_nnz[step+1] = SparseArrays.nnz(A)
 end
@@ -303,7 +303,7 @@ lchain_errors = Vector{Float64}(undef, nsteps)
 lchain_dofs = Vector{Int}(undef, nsteps)
 lchain_nnz = Vector{Int}(undef, nsteps)
 
-lchain_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
+lchain_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
 lchain_errors[1] = max_error
 SparseArrays.dropzeros!(A)
 lchain_nnz[1] = SparseArrays.nnz(A)
@@ -333,10 +333,10 @@ for step ∈ 1:nsteps-1
         println("Number of marked_elements: $(length(dorfler_marking)).")
 
         println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-        println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)). \n")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
     end
     lchain_errors[step+1] = max_error
-    lchain_dofs[step+1] = Mantis.FunctionSpaces.get_dim(hspace)
+    lchain_dofs[step+1] = Mantis.FunctionSpaces.get_num_basis(hspace)
     SparseArrays.dropzeros!(A)
     lchain_nnz[step+1] = SparseArrays.nnz(A)
 end
@@ -364,7 +364,7 @@ for subdiv_factor ∈ 0:nsubdivs
     # Setup the quadrature rule.
     q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule(p .+ 2, Mantis.Quadrature.gauss_legendre)
     h_errors[subdiv_factor+1] = fe_run(source_function, trial_space, test_space, geom_cartesian, q_nodes, q_weights, source_function, p, k, case, bc, output_to_file, test, verbose)[2]
-    h_dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_dim(trial_space)
+    h_dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_num_basis(trial_space)
 end
 
 println("HB number of non-zero entries")

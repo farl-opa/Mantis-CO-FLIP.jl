@@ -142,13 +142,26 @@ where ``r = \mathtt{element\_idx}``, and ``k = j_{1} + \sum_{i=2}^{n} (j_{i} - 1
 function evaluate(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     element_geometries_idx = geometry.cartesian_indices[element_idx]
     
-    n_points = prod(size.(ξ, 1))  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
+    n_points_per_dim = size.(ξ, 1)  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
+    n_points = prod(n_points_per_dim)
     m = get_image_dim(geometry)
     x = zeros(Float64, n_points, m)
 
-    x[:, 1:geometry.image_dims[1]] .= evaluate(geometry.geometry_1, element_geometries_idx[1], ξ[1:geometry.domain_dims[1]])
-    x[:, (geometry.image_dims[1]+1):end] .= evaluate(geometry.geometry_2, element_geometries_idx[2], ξ[(geometry.domain_dims[1]+1):end])
-    
+    # Evaluate the subgeometries at their associated evaluation points
+    x1 = evaluate(geometry.geometry_1, element_geometries_idx[1], ξ[1:n1])  # the geometry evaluation contribution from geometry 1
+    x2 = evaluate(geometry.geometry_2, element_geometries_idx[2], ξ[(n1+1):end])  # the geometry evaluation contribution from geometry 2
+
+    # Repeat the evaluated geometries to construct the full geometry
+    linear_id = 1
+    for j ∈ 1:prod(n_points_per_dim[n1+1:end])
+        for i ∈ 1:prod(n_points_per_dim[1:n1])
+            x[linear_id, 1:geometry.image_dims[1]] .= @view x1[i,:]
+            x[linear_id, (geometry.image_dims[1]+1):end] .= @view x2[j,:]
+
+            linear_id += 1
+        end
+    end
+
     return x
 end
 
@@ -196,12 +209,23 @@ where ``r = \mathtt{element\_idx}``, and ``k = j_{1} + \sum_{i=2}^{n} (j_{i} - 1
 function jacobian(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
     element_geometries_idx = geometry.cartesian_indices[element_idx]
 
-    n_points = prod(size.(ξ, 1))  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
+    n_points_per_dim = size.(ξ, 1)  # the total number of points to evaluate, it is a tensor product of the coordinates to sample in each direction
+    n_points = prod(n_points_per_dim)
     m = get_image_dim(geometry)
     J = zeros(Float64, n_points, m, n)
 
-    J[:, 1:geometry.image_dims[1], 1:geometry.domain_dims[1]] .= jacobian(geometry.geometry_1, element_geometries_idx[1], ξ[1:geometry.domain_dims[1]])  # the Jacobian contribution from geometry 1
-    J[:, (geometry.image_dims[1]+1):end, (geometry.domain_dims[1]+1):end] .= jacobian(geometry.geometry_2, element_geometries_idx[2], ξ[(geometry.domain_dims[1]+1):end])  # the Jacobian contribution from geometry 2
+    J1 = jacobian(geometry.geometry_1, element_geometries_idx[1], ξ[1:n1])  # the Jacobian contribution from geometry 1
+    J2 = jacobian(geometry.geometry_2, element_geometries_idx[2], ξ[(n1+1):end])  # the Jacobian contribution from geometry 2
+
+    linear_id = 1
+    for j ∈ 1:prod(n_points_per_dim[n1+1:end])
+        for i ∈ 1:prod(n_points_per_dim[1:n1])
+            J[linear_id, 1:geometry.image_dims[1], 1:n1] .= @view J1[i,:,:]
+            J[linear_id, (geometry.image_dims[1]+1):end, (n1+1):end] .= @view J2[j,:,:]
+
+            linear_id += 1
+        end
+    end
     
     return J
 end

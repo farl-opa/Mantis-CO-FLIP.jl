@@ -23,7 +23,7 @@ Contains the required data for a one variable FEM.
 - `quad_weights::Vector{Float64}`: Vector of the tensor product of the quadrature weights.
 
 # See also
-[`Quadrature.tensor_product_rule(p::NTuple{n, Int}, quad_rule::F) where {n, F <: Function}`](@ref) to compute the quadrature weights.
+[`Quadrature.tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}`](@ref) to compute the quadrature weights.
 """
 struct WeakFormInputs{n, Frhs, Ttrial, Ttest, TG} <: AbstractInputs
     forcing::Frhs
@@ -61,7 +61,7 @@ function get_num_elements(wf::WeakFormInputs)
 end
 
 function get_problem_size(wf::WeakFormInputs)
-    return FunctionSpaces.get_dim(wf.space_trial), FunctionSpaces.get_dim(wf.space_test)
+    return FunctionSpaces.get_num_basis(wf.space_trial), FunctionSpaces.get_num_basis(wf.space_test)
 end
 
 function get_estimated_nnz_per_elem(wf::WeakFormInputs)

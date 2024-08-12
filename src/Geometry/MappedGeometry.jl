@@ -21,7 +21,7 @@ function evaluate(mapping::Mapping{M, dM}, x::Matrix{Float64}) where {M<:Functio
     m = get_image_dim(mapping)
     y = zeros(size(x,1),m)
     for i = 1:size(x,1)
-        y[i,:] .= mapping.mapping(x[i,:])
+        y[i,:] .= mapping.mapping(x[i,:])  # Apply mapping function to each input point
     end
     return y
 end
@@ -31,7 +31,7 @@ function jacobian(mapping::Mapping{M, dM}, x::Matrix{Float64}) where {M<:Functio
     m = get_image_dim(mapping)
     J = zeros(size(x,1),m,n)
     for i = 1:size(x,1)
-        J[i,:,:] .= mapping.dmapping(x[i,:])
+        J[i,:,:] .= mapping.dmapping(x[i,:])  # Compute Jacobian for each input point
     end
     return J
 end
@@ -74,7 +74,8 @@ function jacobian(geometry::MappedGeometry{n, G, Map}, element_idx::Int, ξ::NTu
     J = zeros(n_eval, m, n)
     k = get_image_dim(geometry.geometry)
     for i = 1:n_eval
-        J[i,:,:] .= reshape(J_2[i,:,:],m,k) * reshape(J_1[i,:,:],k,n)
+        # Compute combined Jacobian using chain rule: J = J_2 * J_1
+        J[i,:,:] .= reshape(J_2[i,:,:], m, k) * reshape(J_1[i,:,:], k, n)
     end
 
     return J

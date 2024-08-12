@@ -22,7 +22,7 @@ for p in degrees_for_test
     coarse_regularity[1] = coarse_regularity[end] = -1
     coarse_bspline = BSplineSpace(Patch1D(collect(range(0,1, nel+1))), p, coarse_regularity)
 
-    coarse_coeffs = (rand(Mantis.FunctionSpaces.get_dim(coarse_bspline)) .* 2 .- 1 ) .* coeff_factor
+    coarse_coeffs = (rand(Mantis.FunctionSpaces.get_num_basis(coarse_bspline)) .* 2 .- 1 ) .* coeff_factor
     
     for nsubdivision in subdivisions_to_test
         coarse_x = collect(range(0, 1, nq * nsubdivision + 1))
@@ -38,7 +38,7 @@ for p in degrees_for_test
 
             fine_spline_eval = Mantis.FunctionSpaces.evaluate(fine_bspline, fine_el, (fine_x,), 0, fine_coeffs)
             
-            @test all(isapprox.(fine_spline_eval[0] .- coarse_spline_eval[0][1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
+            @test all(isapprox.(fine_spline_eval[1][1] .- coarse_spline_eval[1][1][1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
         end
     end
 end
