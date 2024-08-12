@@ -379,6 +379,7 @@ end
 
 # (n-forms, n-forms) 
 function inner_product(form_space1::AbstractFormSpace{manifold_dim, manifold_dim, G}, form_space2::AbstractFormSpace{manifold_dim, manifold_dim, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
+    _, sqrt_g = Geometry.metric(form_space1.geometry, element_id, quad_rule.nodes)
 
     form1_basis_eval, form1_basis_indices = evaluate(form_space1, element_id, quad_rule.nodes)
     form2_basis_eval, form2_basis_indices = evaluate(form_space2, element_id, quad_rule.nodes)
@@ -395,7 +396,7 @@ function inner_product(form_space1::AbstractFormSpace{manifold_dim, manifold_dim
     prod_form_basis_eval = [Vector{Float64}(undef, n_basis_1*n_basis_2)]
 
     prod_form_rows, prod_form_cols, prod_form_basis_eval = inner_product_n_form_component!(
-        prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, 
+        prod_form_rows, prod_form_cols, prod_form_basis_eval, quad_rule, sqrt_g,
         form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, 
         n_basis_1, n_basis_2
     ) # Evaluates α¹₀β¹₀
@@ -517,7 +518,7 @@ function inner_product_0_form_component!(prod_form_rows::Vector{Vector{Int}}, pr
     return prod_form_rows, prod_form_cols, prod_form_basis_eval
 end
 
-function inner_product_n_form_component!(prod_form_rows::Vector{Vector{Int}}, prod_form_cols::Vector{Vector{Int}}, prod_form_basis_eval::Vector{Vector{Float64}}, quad_rule, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, n_basis_1, n_basis_2)
+function inner_product_n_form_component!(prod_form_rows::Vector{Vector{Int}}, prod_form_cols::Vector{Vector{Int}}, prod_form_basis_eval::Vector{Vector{Float64}}, quad_rule, sqrt_g, form1_basis_eval, form1_basis_indices, form2_basis_eval, form2_basis_indices, n_basis_1, n_basis_2)
 
     for j ∈ 1:n_basis_2
         for i ∈ 1:n_basis_1
@@ -526,7 +527,7 @@ function inner_product_n_form_component!(prod_form_rows::Vector{Vector{Int}}, pr
             prod_form_rows[1][linear_idx] = form1_basis_indices[1][i]
             prod_form_cols[1][linear_idx] = form2_basis_indices[1][j]
 
-            prod_form_basis_eval[1][linear_idx] = @views (quad_rule.weights .* form1_basis_eval[1][:,i])' * (form2_basis_eval[1][:,j])    
+            prod_form_basis_eval[1][linear_idx] = @views (quad_rule.weights .* form1_basis_eval[1][:,i])' * (form2_basis_eval[1][:,j] .*(sqrt_g.^(-1)))    
         end
     end
 

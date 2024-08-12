@@ -151,7 +151,7 @@ end
 =#
 prod_rows, prod_cols, prod_val = Mantis.Forms.inner_product(one_form_space, one_form_space, 1, q_rule)
 
-Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, 1, q_rule)
+Mantis.Forms.evaluate_inner_product(γ², γ², 1, q_rule)
 
 # 3d
 geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2, breakpoints1))
