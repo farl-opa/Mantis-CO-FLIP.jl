@@ -168,7 +168,7 @@ end
 @doc raw"""
     evaluate_hodge_star(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
 
-Evaluate the Hodge star ⋆ of a FormField at given points.
+Evaluates the Hodge star ⋆ of a FormField at given points.
 
 # Arguments
 - `form::FormField`: The form field to evaluate
@@ -201,43 +201,6 @@ function evaluate_hodge_star(form::FormField{manifold_dim, form_rank, G, FS}, el
     form_indices = ones(Int, n_form_components)
 
     return form_eval, form_indices
-end
-
-@doc raw"""
-    evaluate_inner_product(form::FormField{manifold_dim, form_rank, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, FS <: AbstractFormSpace{manifold_dim, form_rank}}
-
-Evaluate the Hodge star ⋆ of a FormField at given points.
-
-# Arguments
-- `form::FormField`: The form field to evaluate
-- `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
-        Points are the tensor product of the coordinates per dimension, therefore there will be
-        ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
-
-# Returns
-- `form_eval::Vector{Vector{Float64}}`: Evaluated Hodge star of the form field.
-        Follows the same data format as evaluate: `d_form_eval[i][j]` is the component `i` 
-        of the exterior derivative evaluated at the tensor product `j`.
-
-# Sizes
-- `form_eval`: Vector of length `n_derivative_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
-        `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
-- `form_indices`: Vector of length `n_derivative_components`, where each element is a Vector{Int} of length 1 of value 1, since for a 
-        `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
-"""
-function evaluate_inner_product(form1::FormField{manifold_dim, form_rank, G, FS1}, form2::FormField{manifold_dim, form_rank, G, FS2}, element_idx::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS1 <: AbstractFormSpace{manifold_dim, form_rank, G}, FS2 <: AbstractFormSpace{manifold_dim, form_rank, G}}
-
-    product_rows, product_cols, product_basis_eval = inner_product(form1.form_space,form2.form_space, element_idx, quad_rule)
-    n_components = length(product_basis_eval)
-
-    product_sum = 0.0
-
-    for component ∈ 1:n_components
-        product_sum += product_basis_eval[component]' * (form2.coefficients[product_cols[component]] .* form1.coefficients[product_rows[component]])
-    end
-
-    return product_sum
 end
 
 @doc raw"""

@@ -121,10 +121,10 @@ dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
-#display(Mantis.Forms.inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
+#display(Mantis.Forms.evaluate_inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
 println("Starting inner product computations")
 # Note that we cannot do mixed inner products
-#=
+
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
     ordered_idx = Tuple(geo_2d_cart.cartesian_idxs[elem_id])
     elem_area = 1.0
@@ -135,23 +135,18 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
     end
 
     g, det_g = Mantis.Geometry.metric(geo_2d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-
     # 0-forms
-    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, atol=1e-12)
-    @test_throws ArgumentError Mantis.Forms.inner_product(α⁰, β⁰, elem_id, q_rule)
-
+    @test isapprox(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1][1], elem_area, atol=1e-12)
+    @test_throws ArgumentError Mantis.Forms.evaluate_inner_product(α⁰, β⁰, elem_id, q_rule)
+    
     # 1-forms
-    @test isapprox(Mantis.Forms.inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1,1,:,:], (g./det_g)[1,:,:], atol=1e-12)
-    @test isapprox(Mantis.Forms.inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1,1,:,:], [0.0 0.0; 0.0 0.0], atol=1e-12)
-
+    @test isapprox(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1][1], sum((g./det_g)[1,:,:]), atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1][1], 0.0, atol=1e-12)
+    
     # n-forms
-    @test isapprox(Mantis.Forms.inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, atol=1e-12)
-    @test isapprox(Mantis.Forms.inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1][1], 1/elem_area, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1][1], 0.0, atol=1e-12)
 end
-=#
-prod_rows, prod_cols, prod_val = Mantis.Forms.inner_product(one_form_space, one_form_space, 1, q_rule)
-
-Mantis.Forms.evaluate_inner_product(γ², γ², 1, q_rule)
 
 # 3d
 geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2, breakpoints1))
@@ -173,7 +168,7 @@ dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1, deg1+1), Mantis.Quadrature.gauss_legendre)
 # Note that we cannot do mixed inner products
-#=
+
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_3d_cart)
     ordered_idx = Tuple(geo_3d_cart.cartesian_idxs[elem_id])
     elem_vol = 1.0
@@ -186,23 +181,17 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_3d_cart)
     g_inv, g, det_g = Mantis.Geometry.inv_metric(geo_3d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
 
     # 0-forms
-    @test isapprox(Mantis.Forms.inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_vol, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1][1], elem_vol, atol=1e-12)
 
     # 1-forms
-    @test isapprox(Mantis.Forms.inner_product(θ¹, θ¹, elem_id, q_rule)[3][1,1,:,:], (g_inv.*det_g)[1,:,:], atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(θ¹, θ¹, elem_id, q_rule)[3][1][1], sum((g_inv.*det_g)[1,:,:]), atol=1e-12)
 
     # 2-forms
-    @test isapprox(Mantis.Forms.inner_product(ζ², ζ², elem_id, q_rule)[3][1,1,:,:], (g./det_g)[1,:,:], atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(ζ², ζ², elem_id, q_rule)[3][1][1], sum((g./det_g)[1,:,:]), atol=1e-12)
 
     # n-forms
-    @test isapprox(Mantis.Forms.inner_product(γ³, γ³, elem_id, q_rule)[3][1], 1/elem_vol, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(γ³, γ³, elem_id, q_rule)[3][1][1], 1/elem_vol, atol=1e-12)
 end
-=#
-
-prod_rows, prod_cols, prod_val = Mantis.Forms.inner_product(one_form_space_cart, one_form_space_cart, 1, q_rule)
-prod_rows, prod_cols, prod_val = Mantis.Forms.inner_product(two_form_space_cart, two_form_space_cart, 1, q_rule)
-
-Mantis.Forms.evaluate_inner_product(γ³, γ³, 1, q_rule)
 
 🟉α⁰ = Mantis.Forms.hodge(α⁰)
 🟉θ¹ = Mantis.Forms.hodge(θ¹)
