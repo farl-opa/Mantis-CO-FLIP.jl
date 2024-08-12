@@ -389,7 +389,7 @@ function inner_product(form_space1::AbstractFormSpace{manifold_dim, manifold_dim
 
     # Form space 1: αⁿ = αⁿ₁dξ¹∧…∧dξⁿ
     # Form space 2: βⁿ = βⁿ₁dξ¹∧…∧dξⁿ
-    # ⟨α¹, β¹⟩ = ∫αⁿ₁βⁿ₁ⱼ√det(g)⁻¹dξ¹∧…∧dξⁿ
+    # ⟨αⁿ, βⁿ⟩ = ∫αⁿ₁βⁿ₁ⱼ√det(g)⁻¹dξ¹∧…∧dξⁿ
     
     prod_form_rows = [Vector{Int}(undef, n_basis_1*n_basis_2)]
     prod_form_cols = [Vector{Int}(undef, n_basis_1*n_basis_2)]
