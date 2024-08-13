@@ -35,7 +35,7 @@ coarse_elements_to_refine = [3,4,5,8,9,10]
 refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
 
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
+hspace = Mantis.FunctionSpaces.get_hierarchical_space(spaces, [CTS], refined_domains)
 
 x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
 x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
@@ -51,7 +51,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # check Hierarchical B-spline evaluation
     h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[0,0]) >= 0.0
+    @test minimum(h_eval[1][1]) >= 0.0
 end
 
 hspace.active_elements
@@ -71,7 +71,7 @@ end
 xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
 nx = size(xs)[1]
 
-A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -90,7 +90,7 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 
     local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
 
-    A[idx, eval[2]] = eval[1][0,0]
+    A[idx, eval[2]] = eval[1][1][1]
 end
 
 coeffs = A \ xs

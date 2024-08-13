@@ -160,7 +160,7 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
     @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_2_2_inh)) ≈ 0 atol = 1e-14
 end
 # -----------------------------------------------------------------------------
-
+#=
 # FEMGeometry (2, 3) ----------------------------------------------------------
 deg = 2
 Wt = pi/2
@@ -190,14 +190,4 @@ n_evaluation_points = nx_evaluate * ny_evaluate
 g_fem, sqrt_g_fem = Mantis.Geometry.metric(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
 inv_g_fem, g_fem_2, sqrt_g_fem = Mantis.Geometry.inv_metric(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
 
-g_deepesh, sqrt_g_deepesh = Mantis.Geometry.metric_deepesh(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
-inv_g_deepesh, sqrt_g_deepesh = Mantis.Geometry.inv_metric_deepesh(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
-
-# Just checks if results are the same as Deepesh's 
-# This is not a test, is just to check that both implementations give the same results 
-# Must be deleted and replaced by a proper test and one of the implementations should
-# also be deleted.
-@test sum(abs.(g_fem - g_deepesh)) ≈ 0.0 atol = 2e-13
-@test sum(abs.(sqrt_g_fem - sqrt_g_deepesh)) ≈ 0.0 atol = 1e-13
-@test sum(abs.(inv_g_fem - inv_g_deepesh)) ≈ 0.0 atol = 1e-13
-# -----------------------------------------------------------------------------
+=#

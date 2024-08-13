@@ -13,7 +13,7 @@ struct Bernstein <: AbstractCanonicalSpace
 end
 
 @doc raw"""
-    evaluate(polynomial::Bernstein, ξ::Vector{Float64}, nderivatives::Int64)
+    evaluate(polynomial::Bernstein, ξ::Vector{Float64}, nderivatives::Int)
 
 Compute derivatives up to order `nderivatives` for all Bernstein 
 polynomials of degree `p` at `ξ` for ``\xi \in [0.0, 1.0]``. 
@@ -21,18 +21,30 @@ polynomials of degree `p` at `ξ` for ``\xi \in [0.0, 1.0]``.
 # Arguments
 - `polynomial::Bernstein`: Bernstein polynomial
 - `ξ::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
-- `nderivatives::Int64`: maximum order of derivatives to be computed (nderivatives ``\leq p``).
+- `nderivatives::Int`: maximum order of derivatives to be computed (nderivatives ``\leq p``).
 
 See also [`evaluate(polynomial::Bernstein, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int64)
+function evaluate(polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int)
     # store the values and derivatives here
     neval = length(ξ)
-    ders = zeros(Float64, neval, polynomials.p + 1, nderivatives + 1)
-    for i = 1:neval
-        ders[i,:,:] = _evaluate(polynomials, ξ[i], nderivatives)
+
+    # allocate space for derivatives
+    # - ders[j+1][1] contains the matrix of evaluations of the j-th derivative
+    ders = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
+    for j = 0:nderivatives
+        ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
+        ders[j+1][1] = zeros(Float64, neval, polynomials.p + 1)
     end
-    return Dict{Int,Matrix{Float64}}(i => ders[:,:,i+1] for i = 0:nderivatives)
+    # loop over the evaluation points and evaluate all derivatives at each point
+    for i = 1:neval
+        tmp = _evaluate(polynomials, ξ[i], nderivatives)
+        for j = 0:nderivatives
+            ders[j+1][1][i,:] .= tmp[1,:,j+1]
+        end
+    end
+
+    return ders
 end
 
 @doc raw"""

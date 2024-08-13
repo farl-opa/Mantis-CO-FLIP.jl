@@ -1,3 +1,24 @@
+"""
+    PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1})
+
+Create a polar spline space from the given poloidal and radial finite element spaces.
+
+# Arguments
+- `space_p::AbstractFiniteElementSpace{1}`: The poloidal finite element space.
+- `space_r::AbstractFiniteElementSpace{1}`: The radial finite element space.
+
+# Returns
+- `UnstructuredSpace`: The resulting polar spline space.
+
+# Throws
+- `ArgumentError`: If the poloidal space has boundary degrees of freedom (DOFs), indicating it is likely not periodic.
+
+# Example
+```julia
+space_p = SomeFiniteElementSpace(...)
+space_r = SomeFiniteElementSpace(...)
+polar_space = PolarSplineSpace(space_p, space_r)
+"""
 function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1})
 
     # number of dofs for the poloidal and radial spaces
@@ -86,6 +107,21 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     return UnstructuredSpace((tp_space,), extraction_op, us_config, Dict("regularity" => 1))
 end
 
+"""
+    build_base_polar_control_points(n_p::Int, n_r::Int, R::Float64)
+
+Generate the base polar control points for a given number of poloidal and radial divisions.
+
+# Arguments
+- n_p::Int: Number of poloidal divisions.
+- n_r::Int: Number of radial divisions.
+- R::Float64: Radius of the polar space.
+
+# Returns
+- polar_control_points::Matrix{Float64}: The generated polar control points.
+- radii::Vector{Float64}: The radii values.
+- theta::Vector{Float64}: The theta values.
+"""
 function build_base_polar_control_points(n_p::Int, n_r::Int, R::Float64)
     radii = LinRange(0.0, R, n_r)
     theta = 2*pi .+ (1 .- 2 .* (1:n_p)) .* pi / n_p

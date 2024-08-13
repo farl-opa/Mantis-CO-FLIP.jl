@@ -27,6 +27,5 @@ function evaluate(field::FEMField{n,m}, element_id::Int, xi::NTuple{n,Vector{Flo
     # evaluate fem space
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(field.fem_space, element_id, xi, 0)
     # combine with coefficients and return
-    key = Tuple(zeros(Float64,n))
-    return fem_basis[key...] * field.field_coeffs[fem_basis_indices,:]
+    return fem_basis[1][1] * field.field_coeffs[fem_basis_indices,:]
 end

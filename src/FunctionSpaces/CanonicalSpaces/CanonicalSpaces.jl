@@ -32,6 +32,6 @@ include("ECTSpaces.jl")
 # - [`evaluate(elem_loc_basis::Bernstein, xi::Float64)`](@ref),
 # - [`evaluate(elem_loc_basis::Bernstein, xi::Float64, nderivatives::Int64)`](@ref).
 # """
-function (elem_loc_basis::T where {T <: AbstractCanonicalSpace})(xi::Vector{Float64}, args...)
+function (elem_loc_basis::C where {C <: AbstractCanonicalSpace})(xi::Vector{Float64}, args...)
     return evaluate(elem_loc_basis, xi, args...)
 end
