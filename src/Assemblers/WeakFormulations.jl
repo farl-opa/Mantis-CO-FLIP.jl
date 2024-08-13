@@ -39,8 +39,8 @@ struct WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest} <: AbstractInputs
                             space_test::Ttest,
                             quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, 
                             G <: Geometry.AbstractGeometry{manifold_dim},
-                            Frhs <: Forms.AbstractFormExpression{manifold_dim, form_rank, G},#Function, 
-                            Ttrial <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, # manifold_dim, form_rank = manifold_dim, geometry
+                            Frhs <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, # These spaces current have the same form_rank, do we want this?
+                            Ttrial <: Forms.AbstractFormExpression{manifold_dim, form_rank, G},
                             Ttest <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}}
         
         new{manifold_dim, Frhs, Ttrial, Ttest}(forcing, space_trial, space_test, quad_rule)
@@ -50,7 +50,8 @@ end
 # Every bilinear form will need the functions defined below. These are 
 # used by the global assembler to set up the problem.
 function get_num_elements(wf::WeakFormInputs)
-    return Geometry.get_num_elements(wf.geometry)
+    geo = Forms.get_geometry(wf.Ttrial)
+    return Geometry.get_num_elements(geo)
 end
 
 function get_problem_size(wf::WeakFormInputs)
@@ -99,7 +100,7 @@ function poisson_top_form_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, T
         trial_form = Forms.exterior_derivative(inputs.space_trial)
         test_form = Forms.exterior_derivative(inputs.space_test)
     end
-    
+
     A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(trial_form, test_form, element_id, inputs.quad_rule)
 
     # The linear form is the inner product between the trial form and 

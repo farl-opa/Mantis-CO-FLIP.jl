@@ -9,8 +9,8 @@ using LinearAlgebra
 
 
 # This is how MANTIS is called to solve a problem.
-function fe_run(forcing_function, trial_space, test_space, geom, q_nodes, 
-                q_weights, exact_sol, p, k, case, n, output_to_file, test=true, 
+function fe_run(forcing_function, trial_space, test_space, geom, q_rule, 
+                exact_sol, p, k, case, n, output_to_file, test=true, 
                 verbose=false, bc_dirichlet = Dict{Int, Float64}())
     if verbose
         println("Starting setup of problem and assembler for case "*case*" ...")
@@ -19,9 +19,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(forcing_function,
                                                         trial_space,
                                                         test_space,
-                                                        geom,
-                                                        q_nodes,
-                                                        q_weights)
+                                                        q_rule)
 
     # Setup the global assembler.
     global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
@@ -29,7 +27,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if verbose
         println("Assembling ...")
     end
-    A, b = global_assembler(Mantis.Assemblers.poisson_weak_form_1, weak_form_inputs)
+    A, b = global_assembler(Mantis.Assemblers.poisson_top_form_non_mixed, weak_form_inputs)
 
     if n > 1 && isempty(bc_dirichlet)
         # Add the average = 0 condition for Neumann b.c. (derivatives are 
@@ -95,7 +93,7 @@ function fe_run(forcing_function, trial_space, test_space, geom, q_nodes,
     if verbose
         println("Computing L^2 error w.r.t. exact solution ...")
     end
-    err_assembler = Mantis.Assemblers.AssemblerError(q_nodes, q_weights)
+    err_assembler = Mantis.Assemblers.AssemblerError(q_rule)
     err = err_assembler(trial_space, sol_rsh, geom, exact_sol)
     if verbose
         println("The L^2 error is: ",err)
@@ -195,264 +193,282 @@ trial_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 
 # Set Dirichlet boundary conditions.
-bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
-bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+# bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+# bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+bc_sine_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 1.0)
+bc_const_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 1.0)
 
 # Create the geometry.
 geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
 
 # Setup the quadrature rule.
-q_nodes_1d, q_weights_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature.gauss_legendre)
+q_rule_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature.gauss_legendre)
+# q_nodes_1d = Mantis.Quadrature.get_quadrature_nodes(qrule1d)
+# q_weights_1d = Mantis.Quadrature.get_quadrature_weights(qrule1d)
+
+# Create form spaces (both test and trial)
+zero_form_space_trial_1d = Mantis.Forms.FormSpace(0, geom_1d, (trial_space_1d,), "φ")
+zero_form_space_test_1d = Mantis.Forms.FormSpace(0, geom_1d, (test_space_1d,), "ϕ")
+top_form_space_trial_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (trial_space_1d,), "φ")
+top_form_space_test_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (test_space_1d,), "ϕ")
+
+# Create the forms
+φ⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "φ")
+ϕ⁰ = Mantis.Forms.FormField(zero_form_space_test_1d, "ϕ")
+f⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")  # Forcing function
+φⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "φ")
+ϕⁿ = Mantis.Forms.FormField(top_form_space_test_1d, "ϕ")
+fⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "f")  # Forcing function
 
 
 
-########################################################################
-## Test cases for the 2D Poisson problem.                             ##
-########################################################################
+# ########################################################################
+# ## Test cases for the 2D Poisson problem.                             ##
+# ########################################################################
 
-if verbose
-    println("Creating 2D Geometry and spaces ...")
-end
+# if verbose
+#     println("Creating 2D Geometry and spaces ...")
+# end
 
-# Dimension
-n_2d = 2
-# Number of elements.
-m_x = 5
-m_y = 5
-# polynomial degree and inter-element continuity.
-p_2d = (3, 2)
-k_2d = (2, 0)
-# Domain. The length of the domain is chosen so that the normal 
-# derivatives of the exact solution are zero at the boundary. This is 
-# the only Neumann b.c. that we can specify at the moment.
-const Lleft = 0.0#0.25
-const Lright = 1.0#0.75
-const Lbottom = 0.0#0.25
-const Ltop = 1.0#0.75
-
-
-function forcing_sine_2d(x::Float64, y::Float64)
-    return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
-end
-
-function exact_sol_sine_2d(x::Float64, y::Float64)
-    return sinpi(2.0 * x) * sinpi(2.0 * y)
-end
+# # Dimension
+# n_2d = 2
+# # Number of elements.
+# m_x = 5
+# m_y = 5
+# # polynomial degree and inter-element continuity.
+# p_2d = (3, 2)
+# k_2d = (2, 0)
+# # Domain. The length of the domain is chosen so that the normal 
+# # derivatives of the exact solution are zero at the boundary. This is 
+# # the only Neumann b.c. that we can specify at the moment.
+# const Lleft = 0.0#0.25
+# const Lright = 1.0#0.75
+# const Lbottom = 0.0#0.25
+# const Ltop = 1.0#0.75
 
 
+# function forcing_sine_2d(x::Float64, y::Float64)
+#     return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
+# end
 
-# Tensor product b-spline case on a Cartesian geometry.
-# Create Patch.
-brk_x = collect(LinRange(Lleft, Lright, m_x+1))
-brk_y = collect(LinRange(Lbottom, Ltop, m_y+1))
-patch_x = Mantis.Mesh.Patch1D(brk_x)
-patch_y = Mantis.Mesh.Patch1D(brk_y)
-# Continuity vector for OPEN knot vector.
-kvec_x = fill(k_2d[1], (m_x+1,))
-kvec_x[1] = -1
-kvec_x[end] = -1
-kvec_y = fill(k_2d[2], (m_y+1,))
-kvec_y[1] = -1
-kvec_y[end] = -1
-# Create function spaces (b-splines here).
-trial_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
-test_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
-trial_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
-test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
-
-trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
-test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
-
-# Set Dirichlet boundary conditions to zero.
-bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d))
-
-# Create the geometry.
-geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
+# function exact_sol_sine_2d(x::Float64, y::Float64)
+#     return sinpi(2.0 * x) * sinpi(2.0 * y)
+# end
 
 
 
-# Same problem as above, but on the 'crazy' mesh
-if verbose
-    println("Creating crazy mesh ...")
-end
-const crazy_c = 0.3
-function mapping(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
-end
-function dmapping(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
-end
-dimension = (n_2d, n_2d)
-curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
-geom_crazy = Mantis.Geometry.MappedGeometry(geom_cartesian, curved_mapping)
+# # Tensor product b-spline case on a Cartesian geometry.
+# # Create Patch.
+# brk_x = collect(LinRange(Lleft, Lright, m_x+1))
+# brk_y = collect(LinRange(Lbottom, Ltop, m_y+1))
+# patch_x = Mantis.Mesh.Patch1D(brk_x)
+# patch_y = Mantis.Mesh.Patch1D(brk_y)
+# # Continuity vector for OPEN knot vector.
+# kvec_x = fill(k_2d[1], (m_x+1,))
+# kvec_x[1] = -1
+# kvec_x[end] = -1
+# kvec_y = fill(k_2d[2], (m_y+1,))
+# kvec_y[1] = -1
+# kvec_y[end] = -1
+# # Create function spaces (b-splines here).
+# trial_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
+# test_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
+# trial_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
+# test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
+
+# trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
+# test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
+
+# # Set Dirichlet boundary conditions to zero.
+# bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d))
+
+# # Create the geometry.
+# geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
 
 
 
-# Hierarchical refinement on the same mesh as the first 2D case.
-if verbose
-    println("Creating 2D Hierarchical geometry and spaces ...")
-end
-# Create the space
-CB1 = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], [-1; fill(p_2d[1]-1, m_x-1); -1])
-CB2 = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], [-1; fill(p_2d[2]-1, m_y-1); -1])
-
-nsub1 = 2
-nsub2 = 2
-
-TS1,FB1 = Mantis.FunctionSpaces.subdivide_bspline(CB1, nsub1)
-TS2, FB2 = Mantis.FunctionSpaces.subdivide_bspline(CB2, nsub2)
-
-CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
-FTP = Mantis.FunctionSpaces.TensorProductSpace(FB1, FB2)
-spaces = [CTP, FTP]
-
-CTP_num_els = Mantis.FunctionSpaces.get_num_elements(CTP)
-
-CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(TS1,TS2)
-
-coarse_elements_to_refine = [3,4,5,8,9,10]
-refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
-
-refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
-
-# Test if projection in space is exact
-nxi_per_dim = 3
-nxi = nxi_per_dim^2
-xi_per_dim = collect(range(0,1, nxi_per_dim))
-xi = Matrix{Float64}(undef, nxi,2)
-
-xi_eval = (xi_per_dim, xi_per_dim)
-
-for (idx,x) ∈ enumerate(Iterators.product(xi_per_dim, xi_per_dim))
-    xi[idx,:] = [x[1] x[2]]
-end
-
-xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
-nx = size(xs)[1]
-
-A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
-
-for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
-    level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
-    element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
-
-    max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hspace.spaces[level])
-    ordered_index = Mantis.FunctionSpaces.linear_to_ordered_index(element_id, max_ind_els)
-
-    borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
-    borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
-
-    x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
-
-    idx = (el-1)*nxi+1:el*nxi
-    xs[idx,:] = x
-
-    eval_space = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
-
-    A[idx, eval_space[2]] = eval_space[1][1][1]
-end
-
-coeffs = A \ xs
-
-hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
+# # Same problem as above, but on the 'crazy' mesh
+# if verbose
+#     println("Creating crazy mesh ...")
+# end
+# const crazy_c = 0.3
+# function mapping(x::Vector{Float64})
+#     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+#     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+#     return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+# end
+# function dmapping(x::Vector{Float64})
+#     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+#     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+#     return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+# end
+# dimension = (n_2d, n_2d)
+# curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
+# geom_crazy = Mantis.Geometry.MappedGeometry(geom_cartesian, curved_mapping)
 
 
 
-# Setup the quadrature rule.
-q_nodes_2d, q_weights_2d = Mantis.Quadrature.tensor_product_rule(p_2d .+ 1, Mantis.Quadrature.gauss_legendre)
+# # Hierarchical refinement on the same mesh as the first 2D case.
+# if verbose
+#     println("Creating 2D Hierarchical geometry and spaces ...")
+# end
+# # Create the space
+# CB1 = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], [-1; fill(p_2d[1]-1, m_x-1); -1])
+# CB2 = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], [-1; fill(p_2d[2]-1, m_y-1); -1])
+
+# nsub1 = 2
+# nsub2 = 2
+
+# TS1,FB1 = Mantis.FunctionSpaces.subdivide_bspline(CB1, nsub1)
+# TS2, FB2 = Mantis.FunctionSpaces.subdivide_bspline(CB2, nsub2)
+
+# CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
+# FTP = Mantis.FunctionSpaces.TensorProductSpace(FB1, FB2)
+# spaces = [CTP, FTP]
+
+# CTP_num_els = Mantis.FunctionSpaces.get_num_elements(CTP)
+
+# CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(TS1,TS2)
+
+# coarse_elements_to_refine = [3,4,5,8,9,10]
+# refined_elements = vcat(Mantis.FunctionSpaces.get_finer_elements.((CTS,), coarse_elements_to_refine)...)
+
+# refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1:CTP_num_els;refined_elements], [0, CTP_num_els, CTP_num_els + length(refined_elements)])
+# hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
+
+# # Test if projection in space is exact
+# nxi_per_dim = 3
+# nxi = nxi_per_dim^2
+# xi_per_dim = collect(range(0,1, nxi_per_dim))
+# xi = Matrix{Float64}(undef, nxi,2)
+
+# xi_eval = (xi_per_dim, xi_per_dim)
+
+# for (idx,x) ∈ enumerate(Iterators.product(xi_per_dim, xi_per_dim))
+#     xi[idx,:] = [x[1] x[2]]
+# end
+
+# xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
+# nx = size(xs)[1]
+
+# A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
+
+# for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
+#     level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
+#     element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
+
+#     max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hspace.spaces[level])
+#     ordered_index = Mantis.FunctionSpaces.linear_to_ordered_index(element_id, max_ind_els)
+
+#     borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
+#     borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
+
+#     x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
+
+#     idx = (el-1)*nxi+1:el*nxi
+#     xs[idx,:] = x
+
+#     eval_space = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
+
+#     A[idx, eval_space[2]] = eval_space[1][1][1]
+# end
+
+# coeffs = A \ xs
+
+# hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
 
 
 
-########################################################################
-## Test cases for the 3D Poisson problem.                             ##
-########################################################################
-
-if verbose
-    println("Creating 3D Geometry and spaces ...")
-end
-
-# Dimension
-n_3d = 3
-# Number of elements.
-m_3d_x = 5
-m_3d_y = 5
-m_3d_z = 5
-# polynomial degree and inter-element continuity.
-p_3d = (3, 4, 1)
-k_3d = (2, 2, 0)
-# Domain. The length of the domain is chosen so that the normal 
-# derivatives of the exact solution are zero at the boundary. This is 
-# the only Neumann b.c. that we can specify at the moment.
-const Lx1 = 0.0
-const Lx2 = 1.0
-const Ly1 = 0.0
-const Ly2 = 1.0
-const Lz1 = 0.0
-const Lz2 = 1.0
-
-
-function forcing_sine_3d(x::Float64, y::Float64, z::Float64)
-    return 12.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
-end
-
-function exact_sol_sine_3d(x::Float64, y::Float64, z::Float64)
-    return sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
-end
+# # Setup the quadrature rule.
+# q_nodes_2d, q_weights_2d = Mantis.Quadrature.tensor_product_rule(p_2d .+ 1, Mantis.Quadrature.gauss_legendre)
 
 
 
-# Tensor product b-spline case on a Cartesian geometry.
-# Create Patch.
-brk_3d_x = collect(LinRange(Lx1, Lx2, m_3d_x+1))
-brk_3d_y = collect(LinRange(Ly1, Ly2, m_3d_y+1))
-brk_3d_z = collect(LinRange(Lz1, Lz2, m_3d_z+1))
-patch_3d_x = Mantis.Mesh.Patch1D(brk_3d_x)
-patch_3d_y = Mantis.Mesh.Patch1D(brk_3d_y)
-patch_3d_z = Mantis.Mesh.Patch1D(brk_3d_z)
-# Continuity vector for OPEN knot vector.
-kvec_3d_x = fill(k_3d[1], (m_3d_x+1,))
-kvec_3d_x[1] = -1
-kvec_3d_x[end] = -1
-kvec_3d_y = fill(k_3d[2], (m_3d_y+1,))
-kvec_3d_y[1] = -1
-kvec_3d_y[end] = -1
-kvec_3d_z = fill(k_3d[3], (m_3d_z+1,))
-kvec_3d_z[1] = -1
-kvec_3d_z[end] = -1
-# Create function spaces (b-splines here).
-trial_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
-test_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
-trial_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
-test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
-trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
-test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+# ########################################################################
+# ## Test cases for the 3D Poisson problem.                             ##
+# ########################################################################
 
-trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
-test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
+# if verbose
+#     println("Creating 3D Geometry and spaces ...")
+# end
 
-trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
-test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
+# # Dimension
+# n_3d = 3
+# # Number of elements.
+# m_3d_x = 5
+# m_3d_y = 5
+# m_3d_z = 5
+# # polynomial degree and inter-element continuity.
+# p_3d = (3, 4, 1)
+# k_3d = (2, 2, 0)
+# # Domain. The length of the domain is chosen so that the normal 
+# # derivatives of the exact solution are zero at the boundary. This is 
+# # the only Neumann b.c. that we can specify at the moment.
+# const Lx1 = 0.0
+# const Lx2 = 1.0
+# const Ly1 = 0.0
+# const Ly2 = 1.0
+# const Lz1 = 0.0
+# const Lz2 = 1.0
 
-# Set Dirichlet boundary conditions to zero.
-bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d))
 
-# Create the geometry.
-geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
+# function forcing_sine_3d(x::Float64, y::Float64, z::Float64)
+#     return 12.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
+# end
 
-# Setup the quadrature rule.
-q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mantis.Quadrature.gauss_legendre)
+# function exact_sol_sine_3d(x::Float64, y::Float64, z::Float64)
+#     return sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
+# end
+
+
+
+# # Tensor product b-spline case on a Cartesian geometry.
+# # Create Patch.
+# brk_3d_x = collect(LinRange(Lx1, Lx2, m_3d_x+1))
+# brk_3d_y = collect(LinRange(Ly1, Ly2, m_3d_y+1))
+# brk_3d_z = collect(LinRange(Lz1, Lz2, m_3d_z+1))
+# patch_3d_x = Mantis.Mesh.Patch1D(brk_3d_x)
+# patch_3d_y = Mantis.Mesh.Patch1D(brk_3d_y)
+# patch_3d_z = Mantis.Mesh.Patch1D(brk_3d_z)
+# # Continuity vector for OPEN knot vector.
+# kvec_3d_x = fill(k_3d[1], (m_3d_x+1,))
+# kvec_3d_x[1] = -1
+# kvec_3d_x[end] = -1
+# kvec_3d_y = fill(k_3d[2], (m_3d_y+1,))
+# kvec_3d_y[1] = -1
+# kvec_3d_y[end] = -1
+# kvec_3d_z = fill(k_3d[3], (m_3d_z+1,))
+# kvec_3d_z[1] = -1
+# kvec_3d_z[end] = -1
+# # Create function spaces (b-splines here).
+# trial_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
+# test_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
+# trial_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
+# test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
+# trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+# test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+
+# trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
+# test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
+
+# trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
+# test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
+
+# # Set Dirichlet boundary conditions to zero.
+# bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d))
+
+# # Create the geometry.
+# geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
+
+# # Setup the quadrature rule.
+# q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mantis.Quadrature.gauss_legendre)
 
 
 
 
 # Running all testcases.
 println()
-cases = ["sine1d", "const1d", "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
+cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
 for case in cases
 
     if case == "sine1d"
