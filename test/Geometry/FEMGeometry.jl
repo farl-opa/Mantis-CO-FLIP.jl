@@ -21,10 +21,10 @@ B = ntuple( i -> b, 4)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(3))
 PSplines = Mantis.FunctionSpaces.PolarSplineSpace(GB, b1)
-geom_coeffs, _, _ = Mantis.FunctionSpaces.build_base_polar_control_points(Mantis.FunctionSpaces.get_dim(GB),Mantis.FunctionSpaces.get_dim(b1),1.0)
+geom_coeffs, _, _ = Mantis.FunctionSpaces.build_base_polar_control_points(Mantis.FunctionSpaces.get_num_basis(GB),Mantis.FunctionSpaces.get_num_basis(b1),1.0)
 geom = Mantis.Geometry.FEMGeometry(PSplines, geom_coeffs)
 
-field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_dim(PSplines), Mantis.FunctionSpaces.get_dim(PSplines))
+field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_num_basis(PSplines), Mantis.FunctionSpaces.get_num_basis(PSplines))
 polar_surface_field = Mantis.Fields.FEMField(PSplines, field_coeffs)
 
 # Generate the plot

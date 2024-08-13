@@ -12,21 +12,18 @@ Create a polar spline space from the given poloidal and radial finite element sp
 
 # Throws
 - `ArgumentError`: If the poloidal space has boundary degrees of freedom (DOFs), indicating it is likely not periodic.
-
-# Example
-```julia
-space_p = SomeFiniteElementSpace(...)
-space_r = SomeFiniteElementSpace(...)
-polar_space = PolarSplineSpace(space_p, space_r)
 """
 function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1})
 
     # number of dofs for the poloidal and radial spaces
-    n_p = get_dim(space_p)
-    n_r = get_dim(space_r)
+    n_p = get_num_basis(space_p)
+    n_r = get_num_basis(space_r)
 
-    # check that the poloidal space has no bounday dofs
-    bdof_p = get_boundary_dof_indices(space_p)
+    # Get dof partitions of the poloidal space ...
+    dof_partition_p = get_dof_partition(space_p)
+    # ... and check that the poloidal space has no bounday dofs ...
+    bdof_p = vcat(dof_partition_p[1], dof_partition_p[end])
+    # ... and throw an error if it does.
     if length(bdof_p) > 0
         throw(ArgumentError("Poloidal space has boundary dofs and is likely not periodic."))
     end
@@ -56,7 +53,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     num_elements = get_num_elements(tp_space)
 
     # number of polar dofs
-    space_dim = get_dim(tp_space) - pole_offset
+    space_dim = get_num_basis(tp_space) - pole_offset
 
     # allocate space for extraction coefficients and basis indices
     extraction_coefficients = Vector{Array{Float64}}(undef,num_elements)
@@ -103,8 +100,24 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     # assemble patch config in a dictionary
     us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
 
+    # dof partitioning for the tensor product space
+    dof_partition_tp = get_dof_partition(tp_space)
+    n_partn = length(dof_partition_tp)
+    dof_partition = Vector{Vector{Int}}(undef, n_partn)
+    for i ∈ 1:n_partn
+        if length(dof_partition_tp[i]) == 0
+            dof_partition[i] = []
+        else
+            if dof_partition_tp[i][1] <= n_p
+                dof_partition[i] = []
+            else
+                dof_partition[i] = dof_partition_tp[i] .- pole_offset
+            end
+        end
+    end
+    
     # return Polar spline space
-    return UnstructuredSpace((tp_space,), extraction_op, us_config, Dict("regularity" => 1))
+    return UnstructuredSpace((tp_space,), extraction_op, dof_partition, us_config, Dict("regularity" => 1))
 end
 
 """
