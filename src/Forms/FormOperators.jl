@@ -333,3 +333,180 @@ end
 # Priority 2: Wedge products
 
 # Priority 3: Triple products
+
+# Musical Isomorphisms (♯ and ♭)
+
+@doc raw"""
+    evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, G}, 
+                   element_id::Int, 
+                   xi::NTuple{manifold_dim, Vector{Float64}}) 
+                   where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the sharp of a differential 1-form over a specified element of a manifold, converting the form into a vector field.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, 1, G}`: An expression representing the 1-form on the manifold.
+- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the 1-form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `sharp_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the indices of the evaluated basis functions.
+"""
+function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    manifold_dim >= 2 || throw(ArgumentError("Manifold dimension should be 2 or 3 for 1-forms. Dimension $manifold_dim was given."))
+
+    inv_g, _, _ = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+
+    n_form_components = manifold_dim #binomial(manifold_dim, 1)
+
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+
+    sharp_eval = Vector{Matrix{Float64}}(undef, n_form_components)
+
+    # ♯: dξⁱ ↦ gⁱʲ∂ⱼ
+    if all(indices -> length(indices) == 1, form_indices)
+        for component ∈ 1:n_form_components
+            sharp_eval[component] = @views sum(hcat([form_eval[i] .* inv_g[:, component, i] for i in 1:n_form_components]...), dims=2)
+        end
+        
+        sharp_indices = repeat([[1]], n_form_components)
+    else
+        for component ∈ 1:n_form_components
+            sharp_eval[component] = @views hcat([form_eval[i] .* inv_g[:, component, i] for i in 1:n_form_components]...)
+        end
+
+        sharp_indices = repeat([vcat(form_indices...)], n_form_components)
+    end
+
+    return sharp_eval, sharp_indices
+end
+
+@doc raw"""
+    evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 2, G}, 
+                   element_id::Int, 
+                   xi::NTuple{manifold_dim, Vector{Float64}}) 
+                   where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the sharp of a differential 2-form over a specified element of a manifold, converting the form into a vector field.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, 2, G}`: An expression representing the 2-form on the manifold.
+- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the 2-form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `hodge_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the indices of the evaluated basis functions. Uses the indices of the hodge evaluation because they are the same.
+"""
+function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    manifold_dim == 3 || throw(ArgumentError("Manifold dimension should be 3 for 2-forms. Dimension $manifold_dim was given."))
+
+    inv_g, _, _ = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+
+    n_form_components = manifold_dim #binomial(manifold_dim, 2)
+
+    hodge_eval, hodge_indices = evaluate(hodge(form_expression), element_id, xi)
+
+    sharp_eval = Vector{Matrix{Float64}}(undef, n_form_components)
+
+    # ♯: dξⁱ∧dξʲ ↦ ♯★dξⁱ∧dξʲ
+    if all(indices -> length(indices) == 1, hodge_indices)
+        for component ∈ 1:n_form_components
+            sharp_eval[component] = @views sum(reduce(+,[hodge_eval[i] .* inv_g[:, component, i] for i in 1:n_form_components]), dims=2)
+        end
+    else
+        for component ∈ 1:n_form_components
+            sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, component, i] for i in 1:n_form_components])
+        end
+    end
+
+    return sharp_eval, hodge_indices
+end
+
+@doc raw"""
+    evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 1, G}, 
+                   element_id::Int, 
+                   xi::NTuple{manifold_dim, Vector{Float64}}) 
+                   where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the flat of a vector field over a specified element of a manifold, converting the vector field into a form.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, 1, G}`: An expression representing the vector field on the manifold.
+- `element_id::Int`: The identifier of the element on which the flat is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the 1-form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `flat_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each dξⁱ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `flat_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each dξⁱ, stores the indices of the evaluated basis functions.
+"""
+function evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 1, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    manifold_dim >= 2 || throw(ArgumentError("Manifold dimension should be 2 or 3 for 1-forms. Dimension $manifold_dim was given."))
+
+    g, _ = Geometry.metric(form_expression.geometry, element_id, xi)
+
+    n_form_components = manifold_dim #binomial(manifold_dim, 1)
+
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+
+    flat_eval = Vector{Matrix{Float64}}(undef, n_form_components)
+
+    if all(indices -> length(indices) == 1, form_indices)
+        for component ∈ 1:n_form_components
+            flat_eval[component] = @views sum(hcat([form_eval[i] .* g[:, component, i] for i in 1:n_form_components]...), dims=2)
+        end
+        
+        flat_indices = repeat([[1]], n_form_components)
+    else
+        for component ∈ 1:n_form_components
+            flat_eval[component] = @views hcat([form_eval[i] .* g[:, component, i] for i in 1:n_form_components]...)
+        end
+
+        flat_indices = repeat([vcat(form_indices...)], n_form_components)
+    end
+
+    return flat_eval, flat_indices
+end
+
+@doc raw"""
+    evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 2, G}, 
+                   element_id::Int, 
+                   xi::NTuple{manifold_dim, Vector{Float64}}) 
+                   where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the flat of a vector field over a specified element of a manifold, converting the vector field into a form.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, 2, G}`: An expression representing the vector field on the manifold.
+- `element_id::Int`: The identifier of the element on which the flat is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the 2-form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `flat_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each dξⁱ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `hodge_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each dξⁱ, stores the indices of the evaluated basis functions. Uses the indices of the hodge evaluation because they are the same.
+"""
+function evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    manifold_dim == 3 || throw(ArgumentError("Manifold dimension should be 3 for 2-forms. Dimension $manifold_dim was given."))
+
+    g, _ = Geometry.metric(form_expression.geometry, element_id, xi)
+
+    n_form_components = manifold_dim #binomial(manifold_dim, 2)
+
+    hodge_eval, hodge_indices = evaluate(hodge(form_expression), element_id, xi)
+
+    flat_eval = Vector{Matrix{Float64}}(undef, n_form_components)
+
+    # ♯: dξⁱ∧dξʲ ↦ ♯★dξⁱ∧dξʲ
+    if all(indices -> length(indices) == 1, hodge_indices)
+        for component ∈ 1:n_form_components
+            flat_eval[component] = @views sum(reduce(+, [hodge_eval[i] .* g[:, component, i] for i in 1:n_form_components]), dims=2)
+        end
+    else
+        for component ∈ 1:n_form_components
+            flat_eval[component] = @views reduce(+, [hodge_eval[i] .* g[:, component, i] for i in 1:n_form_components])
+        end
+    end
+
+    return flat_eval, hodge_indices
+end
