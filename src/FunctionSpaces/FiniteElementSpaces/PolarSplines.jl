@@ -108,10 +108,12 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         if length(dof_partition_tp[i]) == 0
             dof_partition[i] = []
         else
-            if dof_partition_tp[i][1] <= n_p
-                dof_partition[i] = []
-            else
+            i_unmodified = findall(dof_partition_tp[i] .> 2*n_p)
+            i_modified = findall(dof_partition_tp[i] .<= 2*n_p)
+            if length(i_modified) == 0
                 dof_partition[i] = dof_partition_tp[i] .- pole_offset
+            else
+                dof_partition[i] = cat([1,2,3],dof_partition_tp[i][i_unmodified] .- pole_offset,dims=1)
             end
         end
     end
