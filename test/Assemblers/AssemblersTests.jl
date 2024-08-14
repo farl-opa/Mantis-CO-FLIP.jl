@@ -141,84 +141,112 @@ verbose = false               # false
 
 
 
-########################################################################
-## Test cases for the 1D Poisson problem.                             ##
-########################################################################
+# ########################################################################
+# ## Test cases for the 1D Poisson problem.                             ##
+# ########################################################################
 
-if verbose
-    println("Creating 1D Geometry and spaces ...")
-end
+# if verbose
+#     println("Creating 1D Geometry and spaces ...")
+# end
 
-# Dimension
-n_1d = 1
-# Number of elements.
-m_1d = 5
-# polynomial degree and inter-element continuity.
-p_1d = 3
-k_1d = 2
-# Domain. The length of the domain is chosen so that the normal 
-# derivatives of the exact solution are zero at the boundary. This is 
-# the only Neumann b.c. that we can specify at the moment. These are 
-# specified as constants to make sure that the forcing function can use 
-# them while remaining type stable.
-const Lleft_1d = 0.0
-const Lright_1d = 1.0
+# # Dimension
+# n_1d = 1
+# # Number of elements.
+# m_1d = 5
+# # polynomial degree and inter-element continuity.
+# p_1d = 3
+# k_1d = 2
+# # Domain. The length of the domain is chosen so that the normal 
+# # derivatives of the exact solution are zero at the boundary. This is 
+# # the only Neumann b.c. that we can specify at the moment. These are 
+# # specified as constants to make sure that the forcing function can use 
+# # them while remaining type stable.
+# const Lleft_1d = 0.0
+# const Lright_1d = 2.0
 
 
-function forcing_sine_1d(x::Float64)
-    return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
-end
+# function forcing_sine_1d(x::Float64)
+#     return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
+# end
 
-function exact_sol_sine_1d(x::Float64)
-    return sinpi(x)
-end
+# function exact_sol_sine_1d(x::Float64)
+#     return sinpi(x)
+# end
 
-function forcing_const_1d(x)
-    return -2.0
-end
+# function forcing_const_1d(x)
+#     return -2.0
+# end
 
-function exact_sol_const_1d(x::Float64)
-    return x * (x - Lright_1d)
-end
+# function exact_sol_const_1d(x::Float64)
+#     return x * (x - Lright_1d)
+# end
 
-# Create Patch.
-brk_1d = collect(LinRange(Lleft_1d, Lright_1d, m_1d+1))
-patch_1d = Mantis.Mesh.Patch1D(brk_1d)
-# Continuity vector for OPEN knot vector.
-kvec_1d = fill(k_1d, (m_1d+1,))
-kvec_1d[1] = -1
-kvec_1d[end] = -1
-# Create function spaces (b-splines here).
-trial_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
-test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
+# # Create Patch.
+# brk_1d = collect(LinRange(Lleft_1d, Lright_1d, m_1d+1))
+# patch_1d = Mantis.Mesh.Patch1D(brk_1d)
+# # Continuity vector for OPEN knot vector.
+# kvec_1d = fill(k_1d, (m_1d+1,))
+# kvec_1d[1] = -1
+# kvec_1d[end] = -1
+# # Create function spaces (b-splines here).
+# trial_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
+# test_space_1d = Mantis.FunctionSpaces.BSplineSpace(patch_1d, p_1d, kvec_1d)
 
-# Set Dirichlet boundary conditions.
-# bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
-# bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
-bc_sine_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 1.0)
-bc_const_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 1.0)
+# # Set Dirichlet boundary conditions.
+# # bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+# # bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
+# bc_sine_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 1.0)
+# bc_const_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 0.0)
 
-# Create the geometry.
-geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
+# # Create the geometry.
+# geom_1d = Mantis.Geometry.CartesianGeometry((brk_1d,))
 
-# Setup the quadrature rule.
-q_rule_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature.gauss_legendre)
-# q_nodes_1d = Mantis.Quadrature.get_quadrature_nodes(qrule1d)
-# q_weights_1d = Mantis.Quadrature.get_quadrature_weights(qrule1d)
+# # Setup the quadrature rule.
+# q_rule_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature.gauss_legendre)
+# # q_nodes_1d = Mantis.Quadrature.get_quadrature_nodes(qrule1d)
+# # q_weights_1d = Mantis.Quadrature.get_quadrature_weights(qrule1d)
 
-# Create form spaces (both test and trial)
-zero_form_space_trial_1d = Mantis.Forms.FormSpace(0, geom_1d, (trial_space_1d,), "φ")
-zero_form_space_test_1d = Mantis.Forms.FormSpace(0, geom_1d, (test_space_1d,), "ϕ")
-top_form_space_trial_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (trial_space_1d,), "φ")
-top_form_space_test_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (test_space_1d,), "ϕ")
+# # Create form spaces (both test and trial)
+# zero_form_space_trial_1d = Mantis.Forms.FormSpace(0, geom_1d, (trial_space_1d,), "φ")
+# zero_form_space_test_1d = Mantis.Forms.FormSpace(0, geom_1d, (test_space_1d,), "ϕ")
+# top_form_space_trial_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (trial_space_1d,), "φ")
+# top_form_space_test_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (test_space_1d,), "ϕ")
 
-# Create the forms
-φ⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "φ")
-ϕ⁰ = Mantis.Forms.FormField(zero_form_space_test_1d, "ϕ")
-f⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")  # Forcing function
-φⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "φ")
-ϕⁿ = Mantis.Forms.FormField(top_form_space_test_1d, "ϕ")
-fⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "f")  # Forcing function
+# # Create the forms
+# #φ⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "φ")
+# #ϕ⁰ = Mantis.Forms.FormField(zero_form_space_test_1d, "ϕ")
+# f⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")  # Forcing function
+# f⁰.coefficients .= 1.0
+# #φⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "φ")
+# #ϕⁿ = Mantis.Forms.FormField(top_form_space_test_1d, "ϕ")
+# #fⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "f")  # Forcing function
+
+
+
+# weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)  # forcing, trial, test, quad
+
+# # Setup the global assembler.
+# global_assembler = Mantis.Assemblers.Assembler(bc_const_1d)
+
+# if verbose
+#     println("Assembling ...")
+# end
+# A, b = global_assembler(Mantis.Assemblers.poisson_non_mixed, weak_form_inputs)
+# display(A)
+# display(b)
+# sol = A \ b
+
+# sol_rsh = reshape(sol, :, 1)
+
+
+
+# msave = Mantis.Geometry.get_num_elements(geom_1d)
+# output_filename = "Poisson-form-test.vtu"
+
+# output_file = joinpath(output_data_folder, output_filename)
+# field = Mantis.Fields.FEMField(zero_form_space_trial_1d.fem_space[1], sol_rsh)
+# out_deg = 2
+# Mantis.Plot.plot(geom_1d, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
 
 
 
@@ -230,61 +258,119 @@ fⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "f")  # Forcing function
 #     println("Creating 2D Geometry and spaces ...")
 # end
 
-# # Dimension
-# n_2d = 2
-# # Number of elements.
-# m_x = 5
-# m_y = 5
-# # polynomial degree and inter-element continuity.
-# p_2d = (3, 2)
-# k_2d = (2, 0)
-# # Domain. The length of the domain is chosen so that the normal 
-# # derivatives of the exact solution are zero at the boundary. This is 
-# # the only Neumann b.c. that we can specify at the moment.
-# const Lleft = 0.0#0.25
-# const Lright = 1.0#0.75
-# const Lbottom = 0.0#0.25
-# const Ltop = 1.0#0.75
+# Dimension
+n_2d = 2
+# Number of elements.
+m_x = 4
+m_y = 4
+# polynomial degree and inter-element continuity.
+p_2d = (8, 8)
+k_2d = (7, 7)
+# Domain. The length of the domain is chosen so that the normal 
+# derivatives of the exact solution are zero at the boundary. This is 
+# the only Neumann b.c. that we can specify at the moment.
+const Lleft = 0.0#0.25
+const Lright = 1.0#0.75
+const Lbottom = 0.0#0.25
+const Ltop = 1.0#0.75
 
 
-# function forcing_sine_2d(x::Float64, y::Float64)
-#     return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
-# end
+function forcing_sine_2d(x::Float64, y::Float64)
+    return 8.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y)
+end
 
-# function exact_sol_sine_2d(x::Float64, y::Float64)
-#     return sinpi(2.0 * x) * sinpi(2.0 * y)
-# end
+function exact_sol_sine_2d(x::Float64, y::Float64)
+    return sinpi(2.0 * x) * sinpi(2.0 * y)
+end
 
 
 
-# # Tensor product b-spline case on a Cartesian geometry.
-# # Create Patch.
-# brk_x = collect(LinRange(Lleft, Lright, m_x+1))
-# brk_y = collect(LinRange(Lbottom, Ltop, m_y+1))
-# patch_x = Mantis.Mesh.Patch1D(brk_x)
-# patch_y = Mantis.Mesh.Patch1D(brk_y)
-# # Continuity vector for OPEN knot vector.
-# kvec_x = fill(k_2d[1], (m_x+1,))
-# kvec_x[1] = -1
-# kvec_x[end] = -1
-# kvec_y = fill(k_2d[2], (m_y+1,))
-# kvec_y[1] = -1
-# kvec_y[end] = -1
-# # Create function spaces (b-splines here).
-# trial_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
-# test_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
-# trial_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
-# test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
+# Tensor product b-spline case on a Cartesian geometry.
+# Create Patch.
+brk_x = collect(LinRange(Lleft, Lright, m_x+1))
+brk_y = collect(LinRange(Lbottom, Ltop, m_y+1))
+patch_x = Mantis.Mesh.Patch1D(brk_x)
+patch_y = Mantis.Mesh.Patch1D(brk_y)
+# Continuity vector for OPEN knot vector.
+kvec_x = fill(k_2d[1], (m_x+1,))
+kvec_x[1] = -1
+kvec_x[end] = -1
+kvec_y = fill(k_2d[2], (m_y+1,))
+kvec_y[1] = -1
+kvec_y[end] = -1
+# Create function spaces (b-splines here).
+trial_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
+test_space_x = Mantis.FunctionSpaces.BSplineSpace(patch_x, p_2d[1], kvec_x)
+trial_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
+test_space_y = Mantis.FunctionSpaces.BSplineSpace(patch_y, p_2d[2], kvec_y)
 
-# trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
-# test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
+trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
+test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
 
-# # Set Dirichlet boundary conditions to zero.
-# bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_2d))
+# Set Dirichlet boundary conditions to zero.
 
-# # Create the geometry.
-# geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
+bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in trial_space_2d.dof_partition[j])
 
+# Create the geometry.
+geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_x, brk_y))
+
+const crazy_c = 0.3
+function mapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+end
+function dmapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+end
+dimension = (n_2d, n_2d)
+curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
+geom_crazy = Mantis.Geometry.MappedGeometry(geom_cartesian, curved_mapping)
+
+
+# Setup the quadrature rule.
+q_rule_2d = Mantis.Quadrature.tensor_product_rule((p_2d[1] + 1, p_2d[2] + 1), Mantis.Quadrature.gauss_legendre)
+# q_nodes_1d = Mantis.Quadrature.get_quadrature_nodes(qrule1d)
+# q_weights_1d = Mantis.Quadrature.get_quadrature_weights(qrule1d)
+
+# Create form spaces (both test and trial)
+zero_form_space_trial_2d = Mantis.Forms.FormSpace(0, geom_crazy, (trial_space_2d,), "φ")
+zero_form_space_test_2d = Mantis.Forms.FormSpace(0, geom_crazy, (test_space_2d,), "ϕ")
+
+# Create the forms
+f⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d, "f")  # Forcing function
+f⁰.coefficients .= 1.0
+
+
+
+weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰, zero_form_space_trial_2d, zero_form_space_test_2d, q_rule_2d)  # forcing, trial, test, quad
+
+# Setup the global assembler.
+global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet_2d)
+
+if verbose
+    println("Assembling ...")
+end
+A, b = global_assembler(Mantis.Assemblers.poisson_non_mixed, weak_form_inputs)
+display(A)
+display(b)
+sol = A \ b
+
+sol_rsh = reshape(sol, :, 1)
+
+println(sol_rsh)
+
+
+
+msave = Mantis.Geometry.get_num_elements(geom_crazy)
+output_filename = "Poisson-form-test-2d.vtu"
+
+output_file = joinpath(output_data_folder, output_filename)
+field = Mantis.Fields.FEMField(zero_form_space_trial_2d.fem_space[1], sol_rsh)
+out_deg = maximum(p_2d)
+Mantis.Plot.plot(geom_crazy, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
 
 
 # # Same problem as above, but on the 'crazy' mesh
@@ -466,55 +552,55 @@ fⁿ = Mantis.Forms.FormField(top_form_space_trial_1d, "f")  # Forcing function
 
 
 
-# Running all testcases.
-println()
-cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
-for case in cases
+# # Running all testcases.
+# println()
+# cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
+# for case in cases
 
-    if case == "sine1d"
-        fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d,
-               q_nodes_1d, q_weights_1d, exact_sol_sine_1d, p_1d, k_1d, case, 
-               n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
-    elseif case == "const1d"
-        fe_run(forcing_const_1d, trial_space_1d, test_space_1d, geom_1d, 
-               q_nodes_1d, q_weights_1d, exact_sol_const_1d, p_1d, k_1d, case, 
-               n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
-    elseif case == "sine2d-Dirichlet"
-        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
-               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
-    elseif case == "sine2d-Neumann"
-        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
-               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "sine2d-crazy-Dirichlet"
-        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
-               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
-    elseif case == "sine2d-crazy-Neumann"
-        fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
-               q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
-               n_2d, write_to_output_file, run_tests, verbose)
-    # elseif case == "sine2dH-Dirichlet"
-    #     fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
-    #            q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
-    #            write_to_output_file, run_tests, verbose, bc_dirichlet_dict_2d)
-    elseif case == "sine2dH-Neumann"
-        fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
-               q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
-               write_to_output_file, run_tests, verbose)
-    elseif case == "sine3d-Dirichlet"
-        fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
-               q_nodes_3d, q_weights_3d, exact_sol_sine_3d, p_3d, k_3d, case, 
-               n_3d, write_to_output_file, run_tests, verbose, bc_dirichlet_3d)
-    else
-        if verbose
-            println("Warning: case '"*case*"' unknown. Skipping.") 
-        end
-    end
-    if verbose
-        println()  # Extra blank line to separate the different runs.
-    end
-end
+#     if case == "sine1d"
+#         fe_run(forcing_sine_1d, trial_space_1d, test_space_1d, geom_1d,
+#                q_nodes_1d, q_weights_1d, exact_sol_sine_1d, p_1d, k_1d, case, 
+#                n_1d, write_to_output_file, run_tests, verbose, bc_sine_1d)
+#     elseif case == "const1d"
+#         fe_run(forcing_const_1d, trial_space_1d, test_space_1d, geom_1d, 
+#                q_nodes_1d, q_weights_1d, exact_sol_const_1d, p_1d, k_1d, case, 
+#                n_1d, write_to_output_file, run_tests, verbose, bc_const_1d)
+#     elseif case == "sine2d-Dirichlet"
+#         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
+#                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+#                n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
+#     elseif case == "sine2d-Neumann"
+#         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_cartesian, 
+#                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+#                n_2d, write_to_output_file, run_tests, verbose)
+#     elseif case == "sine2d-crazy-Dirichlet"
+#         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
+#                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+#                n_2d, write_to_output_file, run_tests, verbose, bc_dirichlet_2d)
+#     elseif case == "sine2d-crazy-Neumann"
+#         fe_run(forcing_sine_2d, trial_space_2d, test_space_2d, geom_crazy, 
+#                q_nodes_2d, q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, 
+#                n_2d, write_to_output_file, run_tests, verbose)
+#     # elseif case == "sine2dH-Dirichlet"
+#     #     fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
+#     #            q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+#     #            write_to_output_file, run_tests, verbose, bc_dirichlet_dict_2d)
+#     elseif case == "sine2dH-Neumann"
+#         fe_run(forcing_sine_2d, hspace, hspace, hierarchical_geo, q_nodes_2d, 
+#                q_weights_2d, exact_sol_sine_2d, p_2d, k_2d, case, n_2d, 
+#                write_to_output_file, run_tests, verbose)
+#     elseif case == "sine3d-Dirichlet"
+#         fe_run(forcing_sine_3d, trial_space_3d, test_space_3d, geom_3d_cartesian, 
+#                q_nodes_3d, q_weights_3d, exact_sol_sine_3d, p_3d, k_3d, case, 
+#                n_3d, write_to_output_file, run_tests, verbose, bc_dirichlet_3d)
+#     else
+#         if verbose
+#             println("Warning: case '"*case*"' unknown. Skipping.") 
+#         end
+#     end
+#     if verbose
+#         println()  # Extra blank line to separate the different runs.
+#     end
+# end
 
 

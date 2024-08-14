@@ -23,7 +23,7 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
     # Pre-allocate
     nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
 
-    nvals_A = nnz_elem[1] * get_num_elements(weak_form_inputs)
+    nvals_A = 4 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 4 times due to the forms being per component. This needs to be updated.
     A_column_idxs = Vector{Int}(undef, nvals_A)
     A_row_idxs = Vector{Int}(undef, nvals_A)
     A_vals = Vector{Float64}(undef, nvals_A)
@@ -61,6 +61,8 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
 
 
     # Set Dirichlet conditions if needed.
+    # WARNING: This may not work as intended if the boundary indices are 
+    # duplicated in the given row and column vectors!
     if ~isempty(self.dirichlet_bcs)
         # Set the bc value for the rhs.
         for (bc_idx, bc_value) in pairs(self.dirichlet_bcs)

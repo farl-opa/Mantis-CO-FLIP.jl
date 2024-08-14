@@ -49,6 +49,25 @@ struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_d
 end
 
 @doc raw"""
+    get_num_basis(form_field::FF) where {FF <: AbstractFormField{manifold_dim, form_rank, G, FS}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
+
+Returns the number of degrees of freedom of the FormSpace `form_space`.
+
+# Arguments
+- `form_space::AbstractFormSpace`: The FormSpace to compute the number of degrees of freedom.
+
+# Returns
+- `::Int`: The total number of degrees of freedom of the space.
+"""
+function get_num_basis(form_field::FF) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, G}}
+    return get_num_basis(form_field.form_space)
+end
+
+function get_max_local_dim(form_field::FF) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, G}}
+    return get_max_local_dim(form_field.form_space)
+end
+
+@doc raw"""
     evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
 
 Evaluate a FormField at given points.

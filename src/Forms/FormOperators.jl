@@ -146,7 +146,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G
         return [[1]], [[1]], [sum(prod_form_eval)]
     end
 
-    return prod_form_rows, prod_form_cols, prod_form_eval
+    return vcat(prod_form_rows...), vcat(prod_form_cols...), vcat(prod_form_eval...)
 end 
 
 # (1-forms, 1-forms) 3D

@@ -50,25 +50,25 @@ end
 # Every bilinear form will need the functions defined below. These are 
 # used by the global assembler to set up the problem.
 function get_num_elements(wf::WeakFormInputs)
-    geo = Forms.get_geometry(wf.Ttrial)
+    geo = Forms.get_geometry(wf.space_trial)
     return Geometry.get_num_elements(geo)
 end
 
 function get_problem_size(wf::WeakFormInputs)
-    return FunctionSpaces.get_num_basis(wf.space_trial), FunctionSpaces.get_num_basis(wf.space_test)
+    return Forms.get_num_basis(wf.space_trial), Forms.get_num_basis(wf.space_test)
 end
 
 function get_estimated_nnz_per_elem(wf::WeakFormInputs)
-    return FunctionSpaces.get_max_local_dim(wf.space_trial) * FunctionSpaces.get_max_local_dim(wf.space_test), FunctionSpaces.get_max_local_dim(wf.space_test)
+    return Forms.get_max_local_dim(wf.space_trial) * Forms.get_max_local_dim(wf.space_test), Forms.get_max_local_dim(wf.space_test)
 end
 
 function get_boundary_dof_indices(wf::WeakFormInputs)
-    return FunctionSpaces.get_boundary_dof_indices(wf.space_trial)
+    return Forms.get_boundary_dof_indices(wf.space_trial)
 end
 
 
 @doc raw"""
-    poisson_top_form_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+    poisson_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
 
 Bilinear form for the computation of the Poisson equation on the given element.
 
@@ -85,7 +85,7 @@ For given ``f^n \in L^2 \Lambda^n (\Omega)``, find ``\phi^n \in H^1_0 \Lambda^n 
 - `inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}`: weak form setup.
 - `elem_id::NTuple{n,Int}`: element for which to compute the contribution.
 """
-function poisson_top_form_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+function poisson_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
     
     if Forms.get_form_rank(inputs.space_trial) == manifold_dim
         # Top form, so codifferentials are needed
@@ -101,18 +101,26 @@ function poisson_top_form_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, T
         test_form = Forms.exterior_derivative(inputs.space_test)
     end
 
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(trial_form, test_form, element_id, inputs.quad_rule)
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(test_form, trial_form, element_id, inputs.quad_rule)
+
+    println(element_id)
+    display(A_row_idx)
+    display(A_col_idx)
+    display(A_elem)
 
     # The linear form is the inner product between the trial form and 
     # the forcing function which is a form of an appropriate rank.
-    b_row_idx, b_col_idx, b_elem = Forms.evaluate_inner_product(inputs.forcing, inputs.space_test, element_id, inputs.quad_rule)
+    b_row_idx, b_col_idx, b_elem = Forms.evaluate_inner_product(inputs.space_test, inputs.forcing, element_id, inputs.quad_rule)
+    display(b_row_idx)
+    display(b_col_idx)
+    display(b_elem)
     
     # The output should be the contribution to the left-hand-side matrix 
     # A and right-hand-side vector b. The outputs are tuples of 
     # row_indices, column_indices, values for the matrix part and 
     # row_indices, values for the vector part. For this case, no shifts 
     # or offsets are needed.
-    return (A_row_idx, A_col_idx, A_elem), (b_row_idx, b_elem)
+    return (A_row_idx, A_col_idx, A_elem), (b_row_idx[1], b_elem[1]) # Take the first component out of one component
     
 end
 
@@ -288,83 +296,83 @@ end
 # end
 
 
-@doc raw"""
-    poisson_weak_form_1(inputs::WeakFormInputs{n, Frhs, Ttrial, Ttest, TG}, element_id) where {n, Frhs, Ttrial, Ttest, TG}
+# @doc raw"""
+#     poisson_weak_form_1(inputs::WeakFormInputs{n, Frhs, Ttrial, Ttest}, element_id) where {n, Frhs, Ttrial, Ttest, TG}
 
-Bilinear form for the computation of the Poisson equation on the given element.
+# Bilinear form for the computation of the Poisson equation on the given element.
 
-This function computes the contribution of the given element of both the 
-bilinear and linear form for the Poisson equation. The associated weak 
-formulation is:
+# This function computes the contribution of the given element of both the 
+# bilinear and linear form for the Poisson equation. The associated weak 
+# formulation is:
 
-For given ``f \in L^2(\Omega)``, find ``\phi \in H^1(\Omega)`` such that 
-```math
-\int_{\Omega} \nabla \varphi \cdot \nabla \phi \;d\Omega = \int_{\Omega} \varphi f(x) \;d\Omega \quad \forall \ \varphi \in H^1(\Omega)
-```
+# For given ``f \in L^2(\Omega)``, find ``\phi \in H^1(\Omega)`` such that 
+# ```math
+# \int_{\Omega} \nabla \varphi \cdot \nabla \phi \;d\Omega = \int_{\Omega} \varphi f(x) \;d\Omega \quad \forall \ \varphi \in H^1(\Omega)
+# ```
 
-Note that there are not boundary conditions specified. To solve what the 
-global assembler returns, one should add an extra condition (e.g. average 
-of ``\phi`` is zero)
+# Note that there are not boundary conditions specified. To solve what the 
+# global assembler returns, one should add an extra condition (e.g. average 
+# of ``\phi`` is zero)
 
-# Arguments
-- `elem_id::NTuple{n,Int}`: element for which to compute the contribution.
-"""
-function l2_weak_form(inputs::WeakFormInputs{n, Frhs, Ttrial, Ttest, TG}, element_id) where {n, Frhs, Ttrial, Ttest, TG}
-    # Computed bases and their derivatives.
-    trial_basis_evals, trial_supported_bases = FunctionSpaces.evaluate(inputs.space_trial, element_id, inputs.quad_nodes, 0)
-    test_basis_evals, test_supported_bases = FunctionSpaces.evaluate(inputs.space_test, element_id, inputs.quad_nodes, 0)
+# # Arguments
+# - `elem_id::NTuple{n,Int}`: element for which to compute the contribution.
+# """
+# function l2_weak_form(inputs::WeakFormInputs{n, Frhs, Ttrial, Ttest, TG}, element_id) where {n, Frhs, Ttrial, Ttest, TG}
+#     # Computed bases and their derivatives.
+#     trial_basis_evals, trial_supported_bases = FunctionSpaces.evaluate(inputs.space_trial, element_id, inputs.quad_nodes, 0)
+#     test_basis_evals, test_supported_bases = FunctionSpaces.evaluate(inputs.space_test, element_id, inputs.quad_nodes, 0)
     
-    # Compute the quantities related to the geometry.
-    mapped_nodes = Geometry.evaluate(inputs.geometry, element_id, inputs.quad_nodes)
-    _, _, jac_det = Geometry.inv_metric(inputs.geometry, element_id, inputs.quad_nodes)
+#     # Compute the quantities related to the geometry.
+#     mapped_nodes = Geometry.evaluate(inputs.geometry, element_id, inputs.quad_nodes)
+#     _, _, jac_det = Geometry.inv_metric(inputs.geometry, element_id, inputs.quad_nodes)
 
-    # Compute rhs on mapped nodes.
-    # It can be more efficient to avoid this, but that is easier when we 
-    # have a better interface for the inner products.
-    fxy = inputs.forcing.(NTuple{n, Vector{Float64}}(mapped_nodes[:,i] for i in 1:1:n)...)
+#     # Compute rhs on mapped nodes.
+#     # It can be more efficient to avoid this, but that is easier when we 
+#     # have a better interface for the inner products.
+#     fxy = inputs.forcing.(NTuple{n, Vector{Float64}}(mapped_nodes[:,i] for i in 1:1:n)...)
     
-    # Count the number of supported basis on this element.
-    n_supported_bases_trial = length(trial_supported_bases)
-    n_supported_bases_test = length(test_supported_bases)
-    n_supported_total = n_supported_bases_trial * n_supported_bases_test
+#     # Count the number of supported basis on this element.
+#     n_supported_bases_trial = length(trial_supported_bases)
+#     n_supported_bases_test = length(test_supported_bases)
+#     n_supported_total = n_supported_bases_trial * n_supported_bases_test
 
-    # Pre-allocate the local matrices (their row, colum, and value vectors).
-    A_row_idx = Vector{Int}(undef, n_supported_total)
-    A_col_idx = Vector{Int}(undef, n_supported_total)
-    A_elem = Vector{Float64}(undef, n_supported_total)
-    b_col_idx = Vector{Int}(undef, n_supported_bases_test)
-    b_elem = Vector{Float64}(undef, n_supported_bases_test)
+#     # Pre-allocate the local matrices (their row, colum, and value vectors).
+#     A_row_idx = Vector{Int}(undef, n_supported_total)
+#     A_col_idx = Vector{Int}(undef, n_supported_total)
+#     A_elem = Vector{Float64}(undef, n_supported_total)
+#     b_col_idx = Vector{Int}(undef, n_supported_bases_test)
+#     b_elem = Vector{Float64}(undef, n_supported_bases_test)
 
-    for test_linear_idx in 1:1:n_supported_bases_test
+#     for test_linear_idx in 1:1:n_supported_bases_test
 
-        for trial_linear_idx in 1:1:n_supported_bases_trial
-            idx = (test_linear_idx - 1) * n_supported_bases_test + trial_linear_idx
+#         for trial_linear_idx in 1:1:n_supported_bases_trial
+#             idx = (test_linear_idx - 1) * n_supported_bases_test + trial_linear_idx
 
-            A_row_idx[idx] = trial_supported_bases[trial_linear_idx]
-            A_col_idx[idx] = test_supported_bases[test_linear_idx]
+#             A_row_idx[idx] = trial_supported_bases[trial_linear_idx]
+#             A_col_idx[idx] = test_supported_bases[test_linear_idx]
 
-            Aij = compute_inner_product_L2(jac_det, inputs.quad_weights, 
-                                           LinearAlgebra.I, view(trial_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, trial_linear_idx), 
-                                           view(test_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, test_linear_idx))
+#             Aij = compute_inner_product_L2(jac_det, inputs.quad_weights, 
+#                                            LinearAlgebra.I, view(trial_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, trial_linear_idx), 
+#                                            view(test_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, test_linear_idx))
             
-            A_elem[idx] = Aij
-        end
+#             A_elem[idx] = Aij
+#         end
 
 
-        b_col_idx[test_linear_idx] = test_supported_bases[test_linear_idx]
+#         b_col_idx[test_linear_idx] = test_supported_bases[test_linear_idx]
 
-        bi = compute_inner_product_L2(jac_det, inputs.quad_weights, 
-                                      LinearAlgebra.I, fxy,
-                                      view(test_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, test_linear_idx))
+#         bi = compute_inner_product_L2(jac_det, inputs.quad_weights, 
+#                                       LinearAlgebra.I, fxy,
+#                                       view(test_basis_evals[n == 1 ? 0 : NTuple{n, Int}(zeros(Int, n))], :, test_linear_idx))
 
-        b_elem[test_linear_idx] = bi
-    end
+#         b_elem[test_linear_idx] = bi
+#     end
     
-    # The output should be the contribution to the left-hand-side matrix 
-    # A and right-hand-side vector b. The outputs are tuples of 
-    # row_indices, column_indices, values for the matrix part and 
-    # column_indices, values for the vector part.
-    return (A_row_idx, A_col_idx, A_elem), (b_col_idx, b_elem)
+#     # The output should be the contribution to the left-hand-side matrix 
+#     # A and right-hand-side vector b. The outputs are tuples of 
+#     # row_indices, column_indices, values for the matrix part and 
+#     # column_indices, values for the vector part.
+#     return (A_row_idx, A_col_idx, A_elem), (b_col_idx, b_elem)
     
-end
+# end
 
