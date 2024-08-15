@@ -23,6 +23,10 @@ end
 
 # This is how MANTIS can be called to solve a problem.
 function fe_run(weak_form_inputs, weak_form, bc_dirichlet, geom, p, k, case, n, output_to_file, test, verbose)
+    if verbose
+        println("Running case "*case*" ...")
+    end
+
     # Setup the global assembler.
     global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
 
@@ -74,7 +78,7 @@ function fe_run(weak_form_inputs, weak_form, bc_dirichlet, geom, p, k, case, n, 
         output_file = joinpath(output_data_folder, output_filename)
         #output_file_error = joinpath(output_data_folder, output_filename_error)
         if occursin("mixed", case)
-            field = Mantis.Fields.FEMField(weak_form_inputs.space_trial_phi_2.fem_space[1], reshape(sol_rsh[Mantis.Forms.get_num_basis(one_form_space_trial_2d)+1:end], (:,1)))
+            field = Mantis.Fields.FEMField(weak_form_inputs.space_trial_phi_2.fem_space[1], reshape(sol_rsh[Mantis.Forms.get_num_basis(weak_form_inputs.space_trial_u_1)+1:end], (:,1)))
         else
             field = Mantis.Fields.FEMField(weak_form_inputs.space_trial.fem_space[1], sol_rsh)
         end
@@ -128,9 +132,9 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 # Choose whether to write the output to a file, run the tests, and/or 
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
-write_to_output_file = false  # false
+write_to_output_file = true  # false
 run_tests = true              # true
-verbose = false               # false
+verbose = true               # false
 
 
 
@@ -168,11 +172,15 @@ end
 trial_space_1d = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d, k_1d)
 test_space_1d = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d, k_1d)
 
+trial_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1d-1)
+test_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1d-1)
+
 # Set Dirichlet boundary conditions.
 # bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
 # bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
 bc_sine_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 1.0)
 bc_const_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 0.0)
+bc_const_1d_empty = Dict{Int, Float64}()
 
 # Create the geometry.
 brk_1d = collect(LinRange(Lleft_1d, Lright_1d, m_1d+1))
@@ -184,6 +192,9 @@ q_rule_1d = Mantis.Quadrature.tensor_product_rule((p_1d + 1,), Mantis.Quadrature
 # Create form spaces (both test and trial)
 zero_form_space_trial_1d = Mantis.Forms.FormSpace(0, geom_1d, (trial_space_1d,), "φ")
 zero_form_space_test_1d = Mantis.Forms.FormSpace(0, geom_1d, (test_space_1d,), "ϕ")
+one_form_space_trial_1d = Mantis.Forms.FormSpace(1, geom_1d, (trial_space_1d_pm1,), "φ")
+one_form_space_test_1d = Mantis.Forms.FormSpace(1, geom_1d, (test_space_1d_pm1,), "ϕ")
+
 top_form_space_trial_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (trial_space_1d,), "φ")
 top_form_space_test_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (test_space_1d,), "ϕ")
 
@@ -191,6 +202,8 @@ top_form_space_test_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (test_space_1d,),
 # Constant forcing
 f⁰_const = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")
 f⁰_const.coefficients .= 1.0
+f¹_const = Mantis.Forms.FormField(one_form_space_trial_1d, "f")
+f¹_const.coefficients .= 1.0
 # Sine forcing
 # Define the function that we want.
 function forcing_sine_1d(x::Float64)
@@ -418,27 +431,25 @@ f²_crazy.coefficients .= 1.0
 # Running all testcases.
 println()
 #cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
-cases = ["const1d-Dirichlet", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "const2d-Dirichlet-mixed", "const2d-Dirichlet-mixed-crazy"]
+cases = ["const1d-Dirichlet", "const1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "const2d-Dirichlet-mixed", "const2d-Dirichlet-mixed-crazy"]
 for case in cases
 
     if case == "const1d-Dirichlet"
-        # Setup the weak formulation and run
         weak_form_inputs_const1dD = Mantis.Assemblers.WeakFormInputs(f⁰_const, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
         fe_run(weak_form_inputs_const1dD, Mantis.Assemblers.poisson_non_mixed, bc_const_1d, geom_1d, p_1d, k_1d, case, n_1d, write_to_output_file, run_tests, verbose)
+    elseif case == "const1d-Dirichlet-mixed"
+        weak_form_inputs_const1dDm = Mantis.Assemblers.WeakFormInputsMixed(f¹_const, zero_form_space_trial_1d, one_form_space_trial_1d, zero_form_space_test_1d, one_form_space_test_1d, q_rule_1d)
+        fe_run(weak_form_inputs_const1dDm, Mantis.Assemblers.poisson_mixed, bc_const_1d_empty, geom_1d, p_1d, k_1d, case, n_1d, write_to_output_file, run_tests, verbose)
     elseif case == "const2d-Dirichlet"
-        # Non-mixed
         weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_cart, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
         fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "const2d-Dirichlet-crazy"
-        # Non-mixed
         weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
         fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "const2d-Dirichlet-mixed"
-        # Mixed
         weak_form_inputs_const2dDm = Mantis.Assemblers.WeakFormInputsMixed(f²_cart, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
         fe_run(weak_form_inputs_const2dDm, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "const2d-Dirichlet-mixed-crazy"
-        # Mixed
         weak_form_inputs_const2dDmc = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
         fe_run(weak_form_inputs_const2dDmc, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
     else
