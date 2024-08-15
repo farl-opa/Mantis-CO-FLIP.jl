@@ -77,7 +77,7 @@ For given ``f^0 \in L^2 \Lambda^n (\Omega)``, find ``\phi^0 \in H^1_0 \Lambda^n 
 ```
 
 # Arguments
-- `inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}`: weak form setup.
+- `inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}`: weak form setup. Requires one test and one trial space for 0-forms.
 - `elem_id`: element for which to compute the contribution.
 """
 function poisson_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
@@ -116,7 +116,7 @@ For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k \in L^2 \Lambda^k (\
 ```
 
 # Arguments
-- `inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}`: weak form setup.
+- `inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}`: weak form setup. Requires one test and one trial space for 0-forms.
 - `elem_id`: element for which to compute the contribution.
 """
 function l2_weak_form(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
