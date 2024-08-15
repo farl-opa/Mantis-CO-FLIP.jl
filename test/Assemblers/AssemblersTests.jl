@@ -132,9 +132,9 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 # Choose whether to write the output to a file, run the tests, and/or 
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
-write_to_output_file = true  # false
+write_to_output_file = false  # false
 run_tests = true              # true
-verbose = true               # false
+verbose = false               # false
 
 
 
