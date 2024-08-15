@@ -202,3 +202,24 @@ end
 ★θ¹_eval = Mantis.Forms.evaluate(★θ¹, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
 ★ζ²_eval = Mantis.Forms.evaluate(★ζ², 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
 ★γ³_eval = Mantis.Forms.evaluate(★γ³, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+
+
+# Test AnalyticalFormField
+function one_form_function(x::Matrix{Float64})
+    return [x[:, 1], x[:, 2]]
+end
+
+function zero_form_function(x::Matrix{Float64})
+    return [x[:, 2]]
+end
+
+function volume_form_function(x::Matrix{Float64})
+    return [ones(size(x, 1))]
+end
+
+β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, geo_2d_cart, "β")
+σ² = Mantis.Forms.AnalyticalFormField(2, volume_form_function, geo_2d_cart, "σ")
+α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geo_2d_cart, "α")
+
+β⁰_eval = Mantis.Forms.evaluate(β⁰, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
+σ²_eval = Mantis.Forms.evaluate(σ², 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
