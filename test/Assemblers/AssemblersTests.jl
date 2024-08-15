@@ -432,6 +432,7 @@ f²_crazy.coefficients .= 1.0
 println()
 #cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
 cases = ["const1d-Dirichlet", "const1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "const2d-Dirichlet-mixed", "const2d-Dirichlet-mixed-crazy"]
+cases = ["const2d-Dirichlet-mixed-crazy"]
 for case in cases
 
     if case == "const1d-Dirichlet"
@@ -451,7 +452,22 @@ for case in cases
         fe_run(weak_form_inputs_const2dDm, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
     elseif case == "const2d-Dirichlet-mixed-crazy"
         weak_form_inputs_const2dDmc = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
-        fe_run(weak_form_inputs_const2dDmc, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
+        sol = fe_run(weak_form_inputs_const2dDmc, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
+
+        β² = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "β")
+        β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)+1:end]
+
+        # Compute base directories for data input and output
+        Mantis_folder =  dirname(dirname(pathof(Mantis)))
+        data_folder = joinpath(Mantis_folder, "test", "data")
+        output_data_folder = joinpath(data_folder, "output", "Forms")
+
+        two_form_filename = "crazy_two_form_test.vtu"
+        two_form_file = joinpath(output_data_folder, two_form_filename)
+
+        #Mantis.Plot.plot(α⁰; vtk_filename = zero_form_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        #Mantis.Plot.plot(ξ¹; vtk_filename = one_form_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        Mantis.Plot.plot(β²; vtk_filename = two_form_file, n_subcells = 1, degree = 8, ascii = false, compress = false)
     else
         if verbose
             println("Warning: case '"*case*"' unknown. Skipping.") 
