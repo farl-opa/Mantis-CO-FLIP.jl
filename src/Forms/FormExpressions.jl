@@ -49,6 +49,25 @@ struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_d
 end
 
 @doc raw"""
+    get_num_basis(form_field::FF) where {FF <: AbstractFormField{manifold_dim, form_rank, G, FS}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
+
+Returns the number of degrees of freedom of the FormSpace `form_space`.
+
+# Arguments
+- `form_space::AbstractFormSpace`: The FormSpace to compute the number of degrees of freedom.
+
+# Returns
+- `::Int`: The total number of degrees of freedom of the space.
+"""
+function get_num_basis(form_field::FF) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, G}}
+    return get_num_basis(form_field.form_space)
+end
+
+function get_max_local_dim(form_field::FF) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, G}}
+    return get_max_local_dim(form_field.form_space)
+end
+
+@doc raw"""
     evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
 
 Evaluate a FormField at given points.
@@ -79,7 +98,7 @@ Evaluate a FormField at given points.
         `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
 """
 function evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
-    print("Evaluating $(form.label) \n")
+    #print("Evaluating $(form.label) \n")
     n_form_components = binomial(manifold_dim, form_rank)
     form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
 
@@ -118,7 +137,7 @@ Evaluate the exterior derivative of a FormField at given points.
         `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 """
 function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
-    print("Evaluating exterior derivative of $(form.label) \n")
+    #print("Evaluating exterior derivative of $(form.label) \n")
     n_form_components = binomial(manifold_dim, form_rank)
     d_form_basis_eval, form_basis_indices = evaluate_exterior_derivative(form.form_space, element_idx, xi)
     n_derivative_components = size(d_form_basis_eval, 1)
@@ -274,7 +293,7 @@ Evaluate a unary FormExpression at given points.
 - `form_eval`: Vector of length `n_form_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
 """
 function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F <: AbstractFormExpression}
-    print("Evaluating: " * form.label * "\n")
+    #print("Evaluating: " * form.label * "\n")
     if form.op == "d"
         form_eval = evaluate_exterior_derivative(form.children[1], element_idx, xi)
 
@@ -303,7 +322,7 @@ Evaluate a binary FormExpression at given points.
 # Note: This function is not fully implemented yet.
 """
 function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
-    print("Evaluating: " * form.label * "\n")
+    #print("Evaluating: " * form.label * "\n")
     throw("∧ not imlemented yet: (form.children[1].label, form.children[2].label)")
     form_eval = 1.0
     return form_eval

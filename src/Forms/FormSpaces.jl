@@ -597,3 +597,19 @@ function get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_d
 
     return form_space_n_dofs
 end
+
+
+
+function get_max_local_dim(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry}
+    max_local_dim = 0  # initialize to 0
+    
+    # Loop over the spaces and take the maximum between the current and 
+    # the maximum so far
+    for space in form_space.fem_space
+        if FunctionSpaces.get_max_local_dim(space) > max_local_dim
+            max_local_dim = FunctionSpaces.get_max_local_dim(space)
+        end
+    end
+
+    return max_local_dim
+end

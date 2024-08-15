@@ -8,7 +8,7 @@ using Test
 @testset "FiniteElementSpaces" begin include("FiniteElementSpaces/runtests.jl") end
 @testset "Geometry" begin include("Geometry/runtests.jl") end
 @testset "Forms" begin include("Forms/Forms.jl") end
-# @testset "Assembly" begin include("Assemblers/runtests.jl") end
+@testset "Assembly" begin include("Assemblers/runtests.jl") end
 @testset "Plot" begin include("Plot/runtests.jl") end
 
 end; nothing

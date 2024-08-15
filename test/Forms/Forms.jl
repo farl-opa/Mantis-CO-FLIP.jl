@@ -136,16 +136,17 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
 
     g, det_g = Mantis.Geometry.metric(geo_2d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
     # 0-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1][1], elem_area, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_area, atol=1e-12)
     @test_throws ArgumentError Mantis.Forms.evaluate_inner_product(α⁰, β⁰, elem_id, q_rule)
     
     # 1-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1][1], sum((g./det_g)[1,:,:]), atol=1e-12)
-    @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1][1], 0.0, atol=1e-12)
+    println(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3])
+    @test isapprox(sum(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3]), sum((g./det_g)[1,:,:]), atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
     
     # n-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1][1], 1/elem_area, atol=1e-12)
-    @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1][1], 0.0, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], 1/elem_area, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
 end
 
 # 3d
@@ -181,16 +182,16 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_3d_cart)
     g_inv, g, det_g = Mantis.Geometry.inv_metric(geo_3d_cart, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
 
     # 0-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1][1], elem_vol, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], elem_vol, atol=1e-12)
 
     # 1-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(θ¹, θ¹, elem_id, q_rule)[3][1][1], sum((g_inv.*det_g)[1,:,:]), atol=1e-12)
+    @test isapprox(sum(Mantis.Forms.evaluate_inner_product(θ¹, θ¹, elem_id, q_rule)[3]), sum((g_inv.*det_g)[1,:,:]), atol=1e-12)
 
     # 2-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(ζ², ζ², elem_id, q_rule)[3][1][1], sum((g./det_g)[1,:,:]), atol=1e-12)
+    @test isapprox(sum(Mantis.Forms.evaluate_inner_product(ζ², ζ², elem_id, q_rule)[3]), sum((g./det_g)[1,:,:]), atol=1e-12)
 
     # n-forms
-    @test isapprox(Mantis.Forms.evaluate_inner_product(γ³, γ³, elem_id, q_rule)[3][1][1], 1/elem_vol, atol=1e-12)
+    @test isapprox(Mantis.Forms.evaluate_inner_product(γ³, γ³, elem_id, q_rule)[3][1], 1/elem_vol, atol=1e-12)
 end
 
 ★α⁰ = Mantis.Forms.hodge(α⁰)
