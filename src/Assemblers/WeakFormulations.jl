@@ -212,8 +212,10 @@ formulation is:
 
 For given ``f^n \in L^2 \Lambda^n (\Omega)``, find ``u^{n-1} \in H(div, \Omega) \Lambda^{n-1} (\Omega)`` and ``\phi^n \in L^2 \Lambda^n (\Omega)`` such that 
 ```math
+\begin{gather}
 \langle \varepsilon^{n-1}, u^{n-1} \rangle - \langle d \varepsilon^{n-1}, \phi^n \rangle = 0 \quad \forall \ \varepsilon^{n-1} \in H(div, \Omega) \Lambda^{n-1} (\Omega) \\
 \langle \varepsilon^n, d u^{n-1} \rangle = -\langle \varepsilon^n f^n \rangle \quad \forall \ \varepsilon^n \in L^2 \Lambda^n (\Omega)
+\end{gather}
 ```
 
 # Arguments
