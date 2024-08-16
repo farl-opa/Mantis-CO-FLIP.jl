@@ -366,7 +366,7 @@ function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1,
 
     # ♯: dξⁱ ↦ gⁱʲ∂ⱼ
     for component ∈ 1:n_form_components
-        sharp_eval[component] = @views hcat([form_eval[i] .* inv_g[:, component, i] for i in 1:n_form_components]...)
+        sharp_eval[component] = @views hcat([form_eval[i] .* inv_g[:, i, component] for i in 1:n_form_components]...)
     end
 
     sharp_indices = repeat([vcat(form_indices...)], n_form_components)
@@ -405,7 +405,7 @@ function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 2,
     # ♯: dξⁱ∧dξʲ ↦ ♯★dξⁱ∧dξʲ
     
     for component ∈ 1:n_form_components
-        sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, component, i] for i in 1:n_form_components])
+        sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, i, component] for i in 1:n_form_components])
     end
 
     return sharp_eval, hodge_indices
@@ -440,7 +440,7 @@ function evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 1, 
     flat_eval = Vector{Matrix{Float64}}(undef, n_form_components)
 
     for component ∈ 1:n_form_components
-        flat_eval[component] = @views hcat([form_eval[i] .* g[:, component, i] for i in 1:n_form_components]...)
+        flat_eval[component] = @views hcat([form_eval[i] .* g[:, i, component] for i in 1:n_form_components]...)
     end
 
     flat_indices = repeat([vcat(form_indices...)], n_form_components)
@@ -478,7 +478,7 @@ function evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 2, 
 
     # ♯: dξⁱ∧dξʲ ↦ ♯★dξⁱ∧dξʲ
     for component ∈ 1:n_form_components
-        flat_eval[component] = @views reduce(+, [hodge_eval[i] .* g[:, component, i] for i in 1:n_form_components])
+        flat_eval[component] = @views reduce(+, [hodge_eval[i] .* g[:, i, component] for i in 1:n_form_components])
     end
 
     return flat_eval, hodge_indices
