@@ -133,7 +133,7 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
 write_to_output_file = false  # false
-run_tests = true              # true
+run_tests = false              # true
 verbose = false               # false
 
 
@@ -235,8 +235,8 @@ end
 # Dimension
 n_2d = 2
 # Number of elements.
-m_x = 4
-m_y = 4
+m_x = 2
+m_y = 2
 # polynomial degree and inter-element continuity.
 p_2d = (8, 8)
 k_2d = (7, 7)
@@ -300,6 +300,29 @@ function dmapping(x::Vector{Float64})
     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
     return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
 end
+
+
+#=
+const crazy_c = 0.2
+function mapping(x::Vector{Float64})
+    return [x[1] + crazy_c*sinpi(x[1]-1.0)*sinpi(x[2]-1.0), x[2] + crazy_c*sinpi(x[1]-1.0)*sinpi(x[2]-1.0)]
+end
+function dmapping(x::Vector{Float64})
+    return [(1.0 + crazy_c*pi*cospi(x[1]-1.0)*sinpi(x[2]-1.0)) (crazy_c*pi*sinpi(x[1]-1.0)*cospi(x[2]-1.0));(crazy_c*pi*cospi(x[1]-1.0)*sinpi(x[2]-1.0)) (1.0 + crazy_c*pi*sinpi(x[1]-1.0)*cospi(x[2]-1.0))]
+end
+=#
+
+#=
+function mapping(x::Vector{Float64})
+    return [x[1]^2+x[1], (x[2]^2)/2 + 2*x[2]]
+end
+
+function dmapping(x::Vector{Float64})
+    return [(2*x[1]+1) 0; 0 (x[2]+2)]
+end
+=#
+
+
 dimension = (n_2d, n_2d)
 curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
 geom_crazy = Mantis.Geometry.MappedGeometry(geom_cartesian, curved_mapping)
@@ -454,19 +477,24 @@ for case in cases
         weak_form_inputs_const2dDmc = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
         sol = fe_run(weak_form_inputs_const2dDmc, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
 
+        ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_crazy, "α")
         β² = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "β")
+        ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)]
         β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)+1:end]
+        #β².coefficients .= ones(Mantis.Forms.get_num_basis(two_form_space_test_2d_crazy))
 
         # Compute base directories for data input and output
         Mantis_folder =  dirname(dirname(pathof(Mantis)))
         data_folder = joinpath(Mantis_folder, "test", "data")
         output_data_folder = joinpath(data_folder, "output", "Forms")
 
+        one_form_filename = "crazy_one_form_test.vtu"
         two_form_filename = "crazy_two_form_test.vtu"
+        one_form_file = joinpath(output_data_folder, one_form_filename)
         two_form_file = joinpath(output_data_folder, two_form_filename)
 
         #Mantis.Plot.plot(α⁰; vtk_filename = zero_form_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
-        #Mantis.Plot.plot(ξ¹; vtk_filename = one_form_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        #Mantis.Plot.plot(ξ¹; vtk_filename = one_form_file, n_subcells = 1, degree = 8, ascii = false, compress = false) Not implemented in this branch yet.
         Mantis.Plot.plot(β²; vtk_filename = two_form_file, n_subcells = 1, degree = 8, ascii = false, compress = false)
     else
         if verbose
