@@ -8,7 +8,7 @@ Wrapper that allows treating a canonical space as a finite element space.
 
 # Fields
 - `canonical_space::C`: The underlying canonical space.
-- `dof_partition::Vector{Vector{Int}}`: Partition of degrees of freedom.
+- `dof_partition::Vector{Vector{Vector{Int}}}`: Partition of degrees of freedom.
 
 # Constructor
     CanonicalFiniteElementSpace(canonical_space::C) where C <: AbstractCanonicalSpace
@@ -17,7 +17,7 @@ Constructs a `CanonicalFiniteElementSpace` from a given canonical space.
 """
 struct CanonicalFiniteElementSpace{C} <: AbstractFiniteElementSpace{1}
     canonical_space::C
-    dof_partition::Vector{Vector{Int}}
+    dof_partition::Vector{Vector{Vector{Int}}}
 
     function CanonicalFiniteElementSpace(canonical_space::C) where {C <: AbstractCanonicalSpace}
         CanonicalFiniteElementSpace(canonical_space, 1, 1)
@@ -25,13 +25,14 @@ struct CanonicalFiniteElementSpace{C} <: AbstractFiniteElementSpace{1}
 
     function CanonicalFiniteElementSpace(canonical_space::C, n_dofs_left::Int, n_dofs_right::Int) where {C <: AbstractCanonicalSpace}
         # Allocate memory for degree of freedom partitioning
-        dof_partition = Vector{Vector{Int}}(undef,3)
+        dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
+        dof_partition[1] = Vector{Vector{Int}}(undef,3)
         # First, store the left dofs ...
-        dof_partition[1] = collect(1:n_dofs_left)
+        dof_partition[1][1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(n_dofs_left+1:canonical_space.p-n_dofs_right+1)
+        dof_partition[1][2] = collect(n_dofs_left+1:canonical_space.p-n_dofs_right+1)
         # ... and then finally the right dofs.
-        dof_partition[3] = collect(canonical_space.p-n_dofs_right+2:canonical_space.p+1)
+        dof_partition[1][3] = collect(canonical_space.p-n_dofs_right+2:canonical_space.p+1)
         
         new{C}(canonical_space, dof_partition)
     end

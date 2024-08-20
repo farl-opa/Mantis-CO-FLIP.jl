@@ -22,7 +22,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     # Get dof partitions of the poloidal space ...
     dof_partition_p = get_dof_partition(space_p)
     # ... and check that the poloidal space has no bounday dofs ...
-    bdof_p = vcat(dof_partition_p[1], dof_partition_p[end])
+    bdof_p = vcat(dof_partition_p[1][1], dof_partition_p[1][end])
     # ... and throw an error if it does.
     if length(bdof_p) > 0
         throw(ArgumentError("Poloidal space has boundary dofs and is likely not periodic."))
@@ -103,17 +103,18 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     # dof partitioning for the tensor product space
     dof_partition_tp = get_dof_partition(tp_space)
     n_partn = length(dof_partition_tp)
-    dof_partition = Vector{Vector{Int}}(undef, n_partn)
+    dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
+    dof_partition[1] = Vector{Vector{Int}}(undef, n_partn)
     for i ∈ 1:n_partn
         if length(dof_partition_tp[i]) == 0
-            dof_partition[i] = []
+            dof_partition[1][i] = []
         else
             i_unmodified = findall(dof_partition_tp[i] .> 2*n_p)
             i_modified = findall(dof_partition_tp[i] .<= 2*n_p)
             if length(i_modified) == 0
-                dof_partition[i] = dof_partition_tp[i] .- pole_offset
+                dof_partition[1][i] = dof_partition_tp[i] .- pole_offset
             else
-                dof_partition[i] = cat([1,2,3],dof_partition_tp[i][i_unmodified] .- pole_offset,dims=1)
+                dof_partition[1][i] = cat([1,2,3],dof_partition_tp[i][i_unmodified] .- pole_offset,dims=1)
             end
         end
     end

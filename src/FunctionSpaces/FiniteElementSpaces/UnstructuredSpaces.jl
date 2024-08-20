@@ -15,7 +15,7 @@ An `n`-variate multi-patch space with `m` patches, representing an unstructured 
 struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
     function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}
     extraction_op::ExtractionOperator
-    dof_partition::Vector{Vector{Int}}
+    dof_partition::Vector{Vector{Vector{Int}}}
     us_config::Dict
     data::Dict
 
@@ -38,14 +38,15 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # Assemble patch config in a dictionary
         us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
 
-        # Allocate memory for degree of freedom partitioning
-        dof_partition = Vector{Vector{Int}}(undef,3)
+        # Allocate memory for degree of freedom partitioning: note, even if the 1D space is implemented as a multipatch object, the dof partition treats it as a single patch!
+        dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
+        dof_partition[1] = Vector{Vector{Int}}(undef,3)
         # First, store the left dofs ...
-        dof_partition[1] = collect(1:n_dofs_left)
+        dof_partition[1][1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(n_dofs_left+1:get_num_basis(extraction_op)-n_dofs_right)
+        dof_partition[1][2] = collect(n_dofs_left+1:get_num_basis(extraction_op)-n_dofs_right)
         # ... and then finally the right dofs.
-        dof_partition[3] = collect(get_num_basis(extraction_op)-n_dofs_right+1:get_num_basis(extraction_op))
+        dof_partition[1][3] = collect(get_num_basis(extraction_op)-n_dofs_right+1:get_num_basis(extraction_op))
 
         new{1,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end

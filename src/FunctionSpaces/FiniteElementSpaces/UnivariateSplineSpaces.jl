@@ -257,7 +257,7 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::Bernstein
-    dof_partition::Vector{Vector{Int}}
+    dof_partition::Vector{Vector{Vector{Int}}}
 
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
         BSplineSpace(patch_1d, polynomial_degree, regularity, 1, 1)
@@ -294,14 +294,15 @@ struct BSplineSpace <: AbstractFiniteElementSpace{1}
         # Get the dimension of the B-spline space
         bspline_dim = get_num_basis(extraction_op)
 
-        # Allocate memory for degree of freedom partitioning
-        dof_partition = Vector{Vector{Int}}(undef,3)
+        # Allocate memory for degree of freedom partitioning for this single patch
+        dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
+        dof_partition[1] = Vector{Vector{Int}}(undef,3)
         # First, store the left dofs ...
-        dof_partition[1] = collect(1:n_dofs_left)
+        dof_partition[1][1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right)
+        dof_partition[1][2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right)
         # ... and then finally the right dofs.
-        dof_partition[3] = collect(bspline_dim-n_dofs_right+1:bspline_dim)
+        dof_partition[1][3] = collect(bspline_dim-n_dofs_right+1:bspline_dim)
         
         # Initialize the BSplineSpace struct
         new(knot_vector, extraction_op, Bernstein(polynomial_degree), dof_partition)
