@@ -19,7 +19,7 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
     us_config::Dict
     data::Dict
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Int}}, us_config::Dict, data::Dict) where {n,m}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Vector{Int}}}, us_config::Dict, data::Dict) where {n,m}
         # Initialize with empty dof partitioning
         new{n,m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end

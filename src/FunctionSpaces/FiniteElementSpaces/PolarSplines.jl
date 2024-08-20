@@ -102,19 +102,19 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
 
     # dof partitioning for the tensor product space
     dof_partition_tp = get_dof_partition(tp_space)
-    n_partn = length(dof_partition_tp)
+    n_partn = length(dof_partition_tp[1])
     dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
     dof_partition[1] = Vector{Vector{Int}}(undef, n_partn)
     for i ∈ 1:n_partn
-        if length(dof_partition_tp[i]) == 0
+        if length(dof_partition_tp[1][i]) == 0
             dof_partition[1][i] = []
         else
-            i_unmodified = findall(dof_partition_tp[i] .> 2*n_p)
-            i_modified = findall(dof_partition_tp[i] .<= 2*n_p)
+            i_unmodified = findall(dof_partition_tp[1][i] .> 2*n_p)
+            i_modified = findall(dof_partition_tp[1][i] .<= 2*n_p)
             if length(i_modified) == 0
-                dof_partition[1][i] = dof_partition_tp[i] .- pole_offset
+                dof_partition[1][i] = dof_partition_tp[1][i] .- pole_offset
             else
-                dof_partition[1][i] = cat([1,2,3],dof_partition_tp[i][i_unmodified] .- pole_offset,dims=1)
+                dof_partition[1][i] = cat([1,2,3],dof_partition_tp[1][i][i_unmodified] .- pole_offset,dims=1)
             end
         end
     end

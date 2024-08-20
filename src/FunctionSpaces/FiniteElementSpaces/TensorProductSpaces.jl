@@ -30,31 +30,31 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n}
 
         # Get dof partitions of the constituent spaces
         dof_partition_1 = get_dof_partition(function_space_1)
-        n_partn_1 = length(dof_partition_1)
+        n_patches_1 = length(dof_partition_1)
         dof_partition_2 = get_dof_partition(function_space_2)
-        n_partn_2 = length(dof_partition_2)
+        n_patches_2 = length(dof_partition_2)
         
         # Dimensions of constituent function spaces
         tp_dim = (get_num_basis(function_space_1), get_num_basis(function_space_2))
         
         # Allocate memory for degree of freedom partitioning
-        dof_partition = Vector{Vector{Vector{Int}}}(undef, n_partn_1 * n_partn_2)
+        dof_partition = Vector{Vector{Vector{Int}}}(undef, n_patches_1 * n_patches_2)
         
         # Loop over all dimensions and build the appropriate index subsets
-        for i ∈ 1:n_partn_1
-            subset_1 = dof_partition_1[i]
-            for l_1 ∈ eachindex(subset_1)
-                for j ∈ 1:n_partn_2
-                    subset_2 = dof_partition_2[j]
-                    k = i + (j-1)*n_partn_1
-                    dof_partition[k] = Vector{Vector{Int}}(undef, length(subset_1)*length(subset_2))
-                    for l_2 ∈ eachindex(subset_2)
-                        l = l_1 + (l_2-1)*length(subset_1)
-                        dof_partition[k][l] = Vector{Int}(undef, length(subset_1[l_1])*length(subset_2[l_2]))
+        for i ∈ 1:n_patches_1
+            partition_patch_1 = dof_partition_1[i]
+            for j ∈ 1:n_patches_2
+                partition_patch_2 = dof_partition_2[j]
+                ij = i + (j-1)*n_patches_1
+                dof_partition[ij] = Vector{Vector{Int}}(undef, length(partition_patch_1)*length(partition_patch_2))
+                for l_1 ∈ eachindex(partition_patch_1)
+                    for l_2 ∈ eachindex(partition_patch_2)
+                        l = l_1 + (l_2-1)*length(partition_patch_1)
+                        dof_partition[ij][l] = Vector{Int}(undef, length(partition_patch_1[l_1])*length(partition_patch_2[l_2]))
                         # Compute and store linearly indexed indices
                         idx = 1
-                        for id in Iterators.product(subset_1[l_1], subset_2[l_2])
-                            dof_partition[k][l][idx] = ordered_to_linear_index(id, tp_dim)
+                        for id in Iterators.product(partition_patch_1[l_1], partition_patch_2[l_2])
+                            dof_partition[ij][l][idx] = ordered_to_linear_index(id, tp_dim)
                             idx += 1
                         end
                     end
