@@ -57,6 +57,7 @@ function fe_run(weak_form_inputs, weak_form, bc_dirichlet, geom, p, k, case, n, 
         println("Solving ",size(A,1)," x ",size(A,2)," sized system ...")
     end
     sol = A \ b
+    println(LinearAlgebra.cond(Matrix(A)), " ", size(A))
 
     # if n > 1 && isempty(bc_dirichlet)
     #     sol_rsh = reshape(sol[1:end-1], :, 1)
@@ -89,7 +90,13 @@ function fe_run(weak_form_inputs, weak_form, bc_dirichlet, geom, p, k, case, n, 
         else
             out_deg = maximum([1, maximum(p)])
         end
-        Mantis.Plot.plot(geom, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        if ~occursin("mixed", case) #&& n >= 2
+            println("Saving 0-form for case ",case," with filename ",output_file)
+            sol0 = Mantis.Forms.FormField(weak_form_inputs.space_trial, "β")
+            sol0.coefficients .= sol_rsh
+            Mantis.Plot.plot(sol0; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
+        end
+        #Mantis.Plot.plot(geom, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
         #Mantis.Plot.plot(geom, field, exact_sol; vtk_filename = output_file_error, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
     end
 
@@ -132,9 +139,9 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 # Choose whether to write the output to a file, run the tests, and/or 
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
-write_to_output_file = false  # false
+write_to_output_file = true  # false
 run_tests = false              # true
-verbose = false               # false
+verbose = true               # false
 
 
 
@@ -209,16 +216,14 @@ f¹_const.coefficients .= 1.0
 function forcing_sine_1d(x::Float64)
     return pi^2 * sinpi(x) + (1.0 - sinpi(Lright_1d))*x
 end
+# function forcing_sine_1d(x::Matrix{Float64})
+#     return pi^2 * sinpi.(x[:,1]) + (1.0 - sinpi.(Lright_1d))*x[:,1]
+# end
 # This part requires the analytical form field so that we don't have to 
 # do this manually. This also uses the old inner product function 
 # because that can be used without forms.
-# Find the required coefficients by L2 projection.
-# weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
-# Af, bf = global_assembler(Mantis.Assemblers.l2_weak_form, weak_form_inputs)
-# coeffs_forcing_sine_1d = Af \ bf
-# create the forcing form.
-# f⁰_sine = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")
-# f⁰_sine.coefficients .= coeffs_forcing_sine_1d
+f¹_sine_1d = Mantis.Forms.AnalyticalFormField(1, forcing_sine_1d, geom_1d, "f")
+f⁰_sine_1d = Mantis.Forms.AnalyticalFormField(0, forcing_sine_1d, geom_1d, "f")
 
 
 
@@ -235,18 +240,18 @@ end
 # Dimension
 n_2d = 2
 # Number of elements.
-m_x = 2
-m_y = 2
+m_x = 4
+m_y = 4
 # polynomial degree and inter-element continuity.
-p_2d = (8, 8)
-k_2d = (7, 7)
+p_2d = (4, 4)
+k_2d = (3, 3)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
 const Lleft = 0.0#0.25
-const Lright = 2.0#0.75
+const Lright = 1.0#0.75
 const Lbottom = 0.0#0.25
-const Ltop = 2.0#0.75
+const Ltop = 1.0#0.75
 
 
 function forcing_sine_2d(x::Float64, y::Float64)
@@ -289,7 +294,7 @@ brk_2d_x = collect(LinRange(Lleft, Lright, m_x+1))
 brk_2d_y = collect(LinRange(Lbottom, Ltop, m_y+1))
 geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_2d_x, brk_2d_y))
 
-const crazy_c = 0.3
+const crazy_c = 0.2
 function mapping(x::Vector{Float64})
     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
@@ -353,17 +358,28 @@ one_form_space_trial_2d_crazy = Mantis.Forms.FormSpace(1, geom_crazy, (trial_spa
 one_form_space_test_2d_crazy = Mantis.Forms.FormSpace(1, geom_crazy, (test_space_2d_1_form_x, test_space_2d_1_form_y), "q")
 
 # Create the forcing forms
-f⁰_cart = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "f")  # Forcing function
-f⁰_cart.coefficients .= 1.0
+f⁰_cart = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "f")
+f⁰_crazy = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "f")
 
-f⁰_crazy = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "f")  # Forcing function
-f⁰_crazy.coefficients .= 1.0
+f²_cart = Mantis.Forms.FormField(two_form_space_trial_2d_cart, "f")
+f²_crazy = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "f")
 
-f²_cart = Mantis.Forms.FormField(two_form_space_trial_2d_cart, "f")  # Forcing function
-f²_cart.coefficients .= 1.0
 
-f²_crazy = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "f")  # Forcing function
-f²_crazy.coefficients .= 1.0
+function forcing_function_const_2d(x::Matrix{Float64})
+    return [ones(size(x, 1))]
+end
+
+function forcing_function_sine_2d(x::Matrix{Float64})
+    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+end
+
+f²_crazy = Mantis.Forms.AnalyticalFormField(2, forcing_function_sine_2d, geom_crazy, "f")
+
+f⁰_cart_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_cartesian, "f")
+f⁰_crazy_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_crazy, "f")
+
+f⁰_cart_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_cartesian, "f")
+f⁰_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_crazy, "f")
 
 
 
@@ -454,22 +470,35 @@ f²_crazy.coefficients .= 1.0
 # Running all testcases.
 println()
 #cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
-cases = ["const1d-Dirichlet", "const1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "const2d-Dirichlet-mixed", "const2d-Dirichlet-mixed-crazy"]
-cases = ["const2d-Dirichlet-mixed-crazy"]
+cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "const1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "const2d-Dirichlet-mixed", "const2d-Dirichlet-mixed-crazy"]
+cases = ["const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy"]#["const2d-Dirichlet-mixed-crazy"]
 for case in cases
 
     if case == "const1d-Dirichlet"
         weak_form_inputs_const1dD = Mantis.Assemblers.WeakFormInputs(f⁰_const, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
         fe_run(weak_form_inputs_const1dD, Mantis.Assemblers.poisson_non_mixed, bc_const_1d, geom_1d, p_1d, k_1d, case, n_1d, write_to_output_file, run_tests, verbose)
+    elseif case == "sine1d-Dirichlet"
+        weak_form_inputs_sine1dD = Mantis.Assemblers.WeakFormInputs(f⁰_sine_1d, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
+        fe_run(weak_form_inputs_sine1dD, Mantis.Assemblers.poisson_non_mixed, bc_sine_1d, geom_1d, p_1d, k_1d, case, n_1d, write_to_output_file, run_tests, verbose)
     elseif case == "const1d-Dirichlet-mixed"
         weak_form_inputs_const1dDm = Mantis.Assemblers.WeakFormInputsMixed(f¹_const, zero_form_space_trial_1d, one_form_space_trial_1d, zero_form_space_test_1d, one_form_space_test_1d, q_rule_1d)
         fe_run(weak_form_inputs_const1dDm, Mantis.Assemblers.poisson_mixed, bc_const_1d_empty, geom_1d, p_1d, k_1d, case, n_1d, write_to_output_file, run_tests, verbose)
     elseif case == "const2d-Dirichlet"
-        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_cart, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
+        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_cart_const_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
         fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+        println(bc_dirichlet_2d)
     elseif case == "const2d-Dirichlet-crazy"
-        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
-        fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
+        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_const_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
+        sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
+        println(sol)
+    elseif case == "sine2d-Dirichlet"
+        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_cart_sine_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
+        fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
+        println(bc_dirichlet_2d)
+    elseif case == "sine2d-Dirichlet-crazy"
+        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_sine_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
+        sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
+        println(sol)
     elseif case == "const2d-Dirichlet-mixed"
         weak_form_inputs_const2dDm = Mantis.Assemblers.WeakFormInputsMixed(f²_cart, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
         fe_run(weak_form_inputs_const2dDm, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
