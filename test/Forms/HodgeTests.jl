@@ -97,12 +97,12 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         #@test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(★α⁰), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1], α⁰, atol=1e-12))
 
         # 1-forms
-        @test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][2], (g./det_g)[:,2,2], atol=1e-12))
-        @test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1], -(g./det_g)[:,1,1], atol=1e-12))
+        @test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][2][:,1], (g./det_g)[:,2,2], atol=1e-12))
+        @test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1][:,2], -(g./det_g)[:,1,1], atol=1e-12))
         
         hodge_1_eval = Mantis.Forms.evaluate(★ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_1_eval[1][1], -((g./det_g)[:,1,1] - (g./det_g)[:,1,2]), atol=1e-12))
-        @test all(isapprox(hodge_1_eval[1][2], (g./det_g)[:,2,2] - (g./det_g)[:,2,1], atol=1e-12))
+        @test all(isapprox(hodge_1_eval[1][1], hcat((g./det_g)[:,1,2], -(g./det_g)[:,1,1]), atol=1e-12))
+        @test all(isapprox(hodge_1_eval[1][2], hcat((g./det_g)[:,2,2], -(g./det_g)[:,2,1]), atol=1e-12))
 
         # n-forms
         # Hodge of a unity n-form is a form and has only 1 component.
