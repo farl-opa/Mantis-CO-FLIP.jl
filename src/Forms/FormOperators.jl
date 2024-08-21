@@ -350,3 +350,187 @@ end
 # Priority 2: Wedge products
 
 # Priority 3: Triple products
+
+# Hodge star Operator (⋆) evaluation methods
+
+# ωⁿ = √det(gᵢⱼ) dx¹∧…∧dxⁿ denotes the volume form of a Riemannian manifold.
+# αⱼᵏ denotes the j-th component of a k-form αᵏ. 
+
+# 0-forms (n dimensions)
+@doc raw"""
+    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}})
+
+Evaluates the Hodge star operator ⋆ of a 0-form in n dimensions.
+
+# Arguments
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, G}`: The differential 0-form expression. It represents a form on a manifold.
+- `element_idx::Int`: Index of the element to evaluate,
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+        Points are the tensor product of the coordinates per dimension, therefore there will be
+        ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
+- `form_indices`: Vector of vectors containing indices of the basis functions.
+"""
+function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
+
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+    n_indices = length(form_indices[1])
+
+    hodge_eval = Vector{Matrix{Float64}}(undef, 1)
+
+    # ⋆α₁⁰ = α₁⁰√det(gᵢⱼ) dξ₁∧…∧dξₙ. 
+    hodge_eval[1] = reshape(form_eval[1] .* sqrt_g, (:, n_indices))
+ 
+    return hodge_eval, form_indices
+end
+
+# n-forms (n dimensions)
+ @doc raw"""
+    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Evaluates the Hodge star operator ⋆ of a n-form in n dimensions.
+
+# Arguments
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, manifold_dim, G}`: The differential n-form expression. It represents a form on a manifold.
+- `element_idx::Int`: Index of the element to evaluate
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+        Points are the tensor product of the coordinates per dimension, therefore there will be
+        ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
+- `form_indices`: Vector of vectors containing indices of the basis functions.
+"""
+function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
+
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+    n_indices = length(form_indices[1])
+
+    hodge_eval = Vector{Matrix{Float64}}(undef, 1)
+
+    # ⋆α₁ⁿdξ₁∧…∧dξₙ = α₁ⁿ(√det(gᵢⱼ))⁻¹. 
+    hodge_eval[1] = reshape(form_eval[1] .* (sqrt_g.^(-1)), (:, n_indices))
+ 
+    return hodge_eval, form_indices
+end
+
+# 1-forms (2 dimensions)
+@doc raw"""
+    evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+
+Evaluates the Hodge star operator ⋆ of a 1-form in 2 dimensions.
+
+# Arguments
+- `form_expression::form_expression::AbstractFormExpression{2, 1, G}`: The differential 1-form expression. It represents a form on a manifold.
+- `element_idx::Int`: Index of the element to evaluate
+- `xi::NTuple{2, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+    Points are the tensor product of the coordinates per dimension, therefore there will be
+    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `hodge_eval::Vector{Matrix{Float64}}`: Vector of arrays containing evaluated hodge star of the basis functions.
+- `hodge_indices`: Vector of vectors containing indices of the basis functions.
+"""
+function evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+    inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+    
+    hodge_eval = Vector{Matrix{Float64}}(undef, 2)
+
+    # ⋆(α₁¹dξ₁+α₂¹dξ₂) = [-(α₁¹g²¹+α₂¹g²²)dξ₁ + (α₁¹g¹¹+α₂¹g¹²)dξ₂]√det(gᵢⱼ). 
+
+    # First: -(α₁¹g²¹+α₂¹g²²)dξ₁
+    hodge_eval[1] = @views hcat([-form_eval[i] .* inv_g[:, 2, i] for i in 1:2]...) .* sqrt_g
+
+    # Second: (α₁¹g¹¹+α₂¹g¹²)dξ₂
+    hodge_eval[2] = @views hcat([form_eval[i] .* inv_g[:, 1, i] for i in 1:2]...) .* sqrt_g
+
+    hodge_indices = repeat([vcat(form_indices...)], 2)
+
+    return hodge_eval, hodge_indices
+end
+
+# 1-forms (3 dimensions)
+@doc raw"""
+    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+
+Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
+
+# Arguments
+- `form_expression::form_expression::AbstractFormExpression{3, 1, G}`: The differential 1-form expression. It represents a form on a manifold.
+- `element_idx::Int`: Index of the element to evaluate
+- `xi::NTuple{3, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+    Points are the tensor product of the coordinates per dimension, therefore there will be
+    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
+- `hodge_indices`: Vector of vectors containing indices of the basis functions.
+"""
+function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+    inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+
+    hodge_eval = Vector{Matrix{Float64}}(undef, 3)
+
+    # ⋆(α₁¹dξ₁+α₂¹dξ₂+α₃¹dξ₃) = [(α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃ + (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁ + (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂]√det(gᵢⱼ). 
+    # First: (α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃
+    hodge_eval[1] = @views hcat([form_eval[i] .* inv_g[:, 1, i] for i in 1:3]...).*sqrt_g
+
+    # Second: (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁
+    hodge_eval[2] = @views hcat([form_eval[i] .* inv_g[:, 2, i] for i in 1:3]...).*sqrt_g
+
+    # Third: (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂
+    hodge_eval[3] = @views hcat([form_eval[i] .* inv_g[:, 3, i] for i in 1:3]...).*sqrt_g
+
+    hodge_indices = repeat([vcat(form_indices...)], 3)
+
+    return hodge_eval, hodge_indices
+end
+
+# 2-forms (3 dimensions)
+@doc raw"""
+    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+
+Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
+
+# Arguments
+- `form_expression::form_expression::AbstractFormExpression{3, 2, G}`: The differential 2-form expression. It represents a form on a manifold.
+- `element_idx::Int`: Index of the element to evaluate
+- `xi::NTuple{3, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+    Points are the tensor product of the coordinates per dimension, therefore there will be
+    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
+- `hodge_indices`: Vector of vectors containing indices of the basis functions.
+"""
+function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+    inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+    
+    form_eval, form_indices = evaluate(form_expression, element_id, xi)
+
+    hodge_eval = Vector{Matrix{Float64}}(undef, 3)
+
+    # ⋆(α₁²dξ₂∧dξ₃ + α₂²dξ₃∧dξ₁ + α₃²dξ₁∧dξ₂) = [(α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹ +
+    #                                            (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ² +
+    #                                            (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³ ]√det(gᵢⱼ). 
+    # First: (α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹
+    hodge_eval[1] = @views hcat(form_eval[1].*(inv_g[:,2,2].*inv_g[:,3,3]-inv_g[:,2,3].*inv_g[:,3,2]), form_eval[2].*(inv_g[:,2,3].*inv_g[:,3,1]-inv_g[:,2,1].*inv_g[:,3,3]), form_eval[3].*(inv_g[:,2,1].*inv_g[:,3,2]-inv_g[:,2,2].*inv_g[:,3,1])).*sqrt_g
+
+    # Second: (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ²
+    hodge_eval[2] = @views hcat(form_eval[1].*(inv_g[:,3,2].*inv_g[:,1,3]-inv_g[:,3,3].*inv_g[:,1,2]), form_eval[2].*(inv_g[:,3,3].*inv_g[:,1,1]-inv_g[:,3,1].*inv_g[:,1,3]), form_eval[3].*(inv_g[:,3,1].*inv_g[:,1,2]-inv_g[:,3,2].*inv_g[:,1,1])).*sqrt_g
+
+    # Third: (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³
+    hodge_eval[3] = @views hcat(form_eval[1].*(inv_g[:,1,2].*inv_g[:,2,3]-inv_g[:,1,3].*inv_g[:,2,2]), form_eval[2].*(inv_g[:,1,3].*inv_g[:,2,1]-inv_g[:,1,1].*inv_g[:,2,3]), form_eval[3].*(inv_g[:,1,1].*inv_g[:,2,2]-inv_g[:,1,2].*inv_g[:,2,1])).*sqrt_g
+
+    hodge_indices = repeat([vcat(form_indices...)], 3)
+
+    return hodge_eval, hodge_indices
+end
