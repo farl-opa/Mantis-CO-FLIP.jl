@@ -6,7 +6,7 @@ using Test
 # First the FEM spaces
 breakpoints1 = [0.0, 0.5, 1.0]
 patch1 = Mantis.Mesh.Patch1D(breakpoints1)
-breakpoints2 = [0.0, 0.5, 0.6, 1.0]
+breakpoints2 = [0.0, 0.3, 0.5, 1.0]
 patch2 = Mantis.Mesh.Patch1D(breakpoints2)
 
 # first B-spline patch
@@ -100,7 +100,7 @@ dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
 
 
 # println()
-# geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
+geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
 # geo_2d_cart2 = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints1))
 # zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
 # zero_form_space_cart2 = Mantis.Forms.FormSpace(0, geo_2d_cart2, (TP_Space,), "ν")
@@ -225,17 +225,20 @@ end
 β⁰_eval = Mantis.Forms.evaluate(β⁰, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
 σ²_eval = Mantis.Forms.evaluate(σ², 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
 
+using SparseArrays
+
 q_rule_high = Mantis.Quadrature.tensor_product_rule((deg1+10, deg2+10), Mantis.Quadrature.gauss_legendre)
 alpha1_l2_norm_square = 0.0
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
-    global alpha1_l2_norm_square += Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)[3][1][1]
+    global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
 end
 @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
 
-const Lleft = 0.0#0.25
-const Lright = 1.0#0.75
-const Lbottom = 0.0#0.25
-const Ltop = 1.0#0.75
+const Lleft = 0.0
+const Lright = 1.0
+const Lbottom = 0.0
+const Ltop = 1.0
+
 const crazy_c = 0.2
 function mapping(x::Vector{Float64})
     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
@@ -253,6 +256,6 @@ geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, curved_mapping)
 α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geom_crazy, "α")
 alpha1_l2_norm_square = 0.0
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom_crazy)
-    global alpha1_l2_norm_square += Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)[3][1][1]
+    global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
 end
 @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)

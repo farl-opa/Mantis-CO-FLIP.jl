@@ -240,8 +240,8 @@ end
 # Dimension
 n_2d = 2
 # Number of elements.
-m_x = 20
-m_y = 20
+m_x = 10
+m_y = 10
 # polynomial degree and inter-element continuity.
 p_2d = (4, 4)
 k_2d = (3, 3)

@@ -57,7 +57,7 @@ dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
 geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, crazy_mapping)
 
-q_rule = Mantis.Quadrature.tensor_product_rule((deg1+10, deg2+10), Mantis.Quadrature.gauss_legendre)
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+25, deg2+25), Mantis.Quadrature.gauss_legendre)
 
 # Create some non-constant analytical form fields to test the inner product.
 function analytical_form_func(x::Matrix{Float64})
@@ -103,7 +103,7 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         # Note that we cannot do mixed inner products
 
         # Tests to see if the integrated metric terms are correctly recovered.
-        g, det_g = Mantis.Geometry.metric(geom, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        inv_g, g, det_g = Mantis.Geometry.inv_metric(geom, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
         # 0-forms
         integrated_metric_0 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* det_g)
         @test all(isapprox.(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3][1], integrated_metric_0, atol=1e-12))
@@ -112,9 +112,8 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         # 1-forms
         integrated_metric_1 = zeros((2,2))
         for node_idx in eachindex(Mantis.Quadrature.get_quadrature_weights(q_rule))
-            integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* (g./det_g)[node_idx,:,:]
+            integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* (inv_g.*det_g)[node_idx,:,:]
         end
-        println(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule))
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...))[1], sum(integrated_metric_1), atol=1e-12)
         @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)...))[1], integrated_metric_1[1,2], atol=1e-12)
@@ -137,25 +136,16 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
 
         # Test if the inner product of the hodges of the forms equals that of the forms
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)...)), atol=1e-12)
-        # println(elem_id)
-        # println((g./det_g)[:,1,1])
-        # println((g./det_g)[:,1,2])
-        # println((g./det_g)[:,2,1])
-        # println((g./det_g)[:,2,2])
-        # println(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule))
-        # println(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule))
-        #@test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
+        @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)...)), atol=1e-12)
 
 
         # AnalyticalFormField tests
         # 0-form
-        #println(Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule))
-        println(Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule))
         #total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
         total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
     end
-    println(total_integrated_analytical_field)
+    @test isapprox(total_integrated_analytical_field, 1558.5454565440389, atol=1e-12)
 end
 
 # # 3d

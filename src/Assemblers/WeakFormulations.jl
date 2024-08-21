@@ -92,6 +92,7 @@ function poisson_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Tt
     # The linear form is the inner product between the trial form and 
     # the forcing function which is a form of an appropriate rank.
     b_row_idx, b_col_idx, b_elem = Forms.evaluate_inner_product(inputs.space_test, inputs.forcing, element_id, inputs.quad_rule)
+    b_elem .*= -1.0
     
     # The output should be the contribution to the left-hand-side matrix 
     # A and right-hand-side vector b. The outputs are tuples of 
