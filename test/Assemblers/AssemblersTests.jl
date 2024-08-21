@@ -240,8 +240,8 @@ end
 # Dimension
 n_2d = 2
 # Number of elements.
-m_x = 4
-m_y = 4
+m_x = 20
+m_y = 20
 # polynomial degree and inter-element continuity.
 p_2d = (4, 4)
 k_2d = (3, 3)
@@ -373,13 +373,17 @@ function forcing_function_sine_2d(x::Matrix{Float64})
     return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
 
-f²_crazy = Mantis.Forms.AnalyticalFormField(2, forcing_function_sine_2d, geom_crazy, "f")
-
 f⁰_cart_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_cartesian, "f")
 f⁰_crazy_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_crazy, "f")
 
 f⁰_cart_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_cartesian, "f")
 f⁰_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_crazy, "f")
+
+f²_cart_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_2d, geom_cartesian, "f")
+f²_crazy_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_2d, geom_crazy, "f")
+
+f²_cart_sine_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_sine_2d, geom_cartesian, "f")
+f²_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_sine_2d, geom_crazy, "f")
 
 
 
@@ -471,7 +475,7 @@ f⁰_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2
 println()
 #cases = ["sine1d", "const1d"]#, "sine2d-Dirichlet", "sine2d-Neumann", "sine2d-crazy-Dirichlet", "sine2d-crazy-Neumann", "sine2dH-Dirichlet", "sine2dH-Neumann", "sine3d-Dirichlet"]
 cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "const1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "const2d-Dirichlet-mixed", "const2d-Dirichlet-mixed-crazy"]
-cases = ["const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy"]#["const2d-Dirichlet-mixed-crazy"]
+cases = ["const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "sine2d-Dirichlet-mixed", "sine2d-Dirichlet-mixed-crazy"]#["const2d-Dirichlet-mixed-crazy"]
 for case in cases
 
     if case == "const1d-Dirichlet"
@@ -499,11 +503,11 @@ for case in cases
         weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_sine_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
         sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
         println(sol)
-    elseif case == "const2d-Dirichlet-mixed"
-        weak_form_inputs_const2dDm = Mantis.Assemblers.WeakFormInputsMixed(f²_cart, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
+    elseif case == "sine2d-Dirichlet-mixed"
+        weak_form_inputs_const2dDm = Mantis.Assemblers.WeakFormInputsMixed(f²_cart_sine_2d, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
         fe_run(weak_form_inputs_const2dDm, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_cartesian, p_2d, k_2d, case, n_2d, write_to_output_file, run_tests, verbose)
-    elseif case == "const2d-Dirichlet-mixed-crazy"
-        weak_form_inputs_const2dDmc = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
+    elseif case == "sine2d-Dirichlet-mixed-crazy"
+        weak_form_inputs_const2dDmc = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy_sine_2d, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
         sol = fe_run(weak_form_inputs_const2dDmc, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, write_to_output_file, run_tests, verbose)
 
         ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_crazy, "α")

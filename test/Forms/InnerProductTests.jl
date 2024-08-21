@@ -114,6 +114,7 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         for node_idx in eachindex(Mantis.Quadrature.get_quadrature_weights(q_rule))
             integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* (g./det_g)[node_idx,:,:]
         end
+        println(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule))
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...))[1], sum(integrated_metric_1), atol=1e-12)
         @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)...))[1], integrated_metric_1[1,2], atol=1e-12)
@@ -143,13 +144,14 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         # println((g./det_g)[:,2,2])
         # println(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule))
         # println(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule))
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
+        #@test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)...)), atol=1e-12)
 
 
         # AnalyticalFormField tests
         # 0-form
         #println(Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule))
+        println(Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule))
         #total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
         total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
     end
