@@ -104,6 +104,26 @@ function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, e
     return form_eval, form_indices
 end
 
+function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
+    print("Evaluating $(form.label) \n")
+    
+    n_form_components = manifold_dim
+
+    x = Geometry.evaluate(form.geometry, element_idx, ξ)
+    J = Geometry.jacobian(form.geometry, element_idx, ξ)  # Jₖⱼ = ∂Φᵏ\∂ξⱼ
+    form_eval = form.expression(x) # size: num_points x image_dim
+
+    num_eval_points = size(x,1)
+    form_pullback = zeros(num_eval_points, manifold_dim)
+    for i = 1:num_eval_points
+        form_pullback[i,:] = form_eval[i,:] * J[i,:,:]
+    end
+    
+    form_indices = ones(Int, n_form_components)
+
+    return form_pullback, form_indices
+end
+
 """
     FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_dim, form_rank, G}
 
