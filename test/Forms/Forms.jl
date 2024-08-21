@@ -223,3 +223,35 @@ end
 
 β⁰_eval = Mantis.Forms.evaluate(β⁰, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
 σ²_eval = Mantis.Forms.evaluate(σ², 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
+
+q_rule_high = Mantis.Quadrature.tensor_product_rule((deg1+10, deg2+10), Mantis.Quadrature.gauss_legendre)
+alpha1_l2_norm_square = 0.0
+for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
+    global alpha1_l2_norm_square += Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)[3][1][1]
+end
+@test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
+
+const Lleft = 0.0#0.25
+const Lright = 1.0#0.75
+const Lbottom = 0.0#0.25
+const Ltop = 1.0#0.75
+const crazy_c = 0.2
+function mapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+end
+function dmapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+end
+dimension = (2, 2)
+curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
+geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, curved_mapping)
+α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geom_crazy, "α")
+alpha1_l2_norm_square = 0.0
+for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom_crazy)
+    global alpha1_l2_norm_square += Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)[3][1][1]
+end
+@test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
