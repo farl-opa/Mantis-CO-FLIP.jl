@@ -57,7 +57,15 @@ dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
 geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, crazy_mapping)
 
-q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+10, deg2+10), Mantis.Quadrature.gauss_legendre)
+
+# Create some non-constant analytical form fields to test the inner product.
+function analytical_form_func(x::Matrix{Float64})
+    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+end
+function analytical_1_form_func(x::Matrix{Float64})
+    return [@. sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]), @. cospi(2.0 * x[:,1]) * cospi(2.0 * x[:,2])]
+end
 
 # Test on multiple geometries. Type-wise and content/metric wise.
 for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
@@ -84,7 +92,13 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     ★α⁰ = Mantis.Forms.hodge(α⁰)
     ★ζ¹ = Mantis.Forms.hodge(ζ¹)
     ★γ² = Mantis.Forms.hodge(γ²)
+
+    # AnalyticalFormFields
+    f⁰_analytic = Mantis.Forms.AnalyticalFormField(0, analytical_form_func, geom, "f")
+    f¹_analytic = Mantis.Forms.AnalyticalFormField(1, analytical_1_form_func, geom, "f")
+    f²_analytic = Mantis.Forms.AnalyticalFormField(2, analytical_form_func, geom, "f")
     
+    total_integrated_analytical_field = 0.0
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
         # Note that we cannot do mixed inner products
 
@@ -122,16 +136,24 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
 
         # Test if the inner product of the hodges of the forms equals that of the forms
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)...)), atol=1e-12)
-        println(elem_id)
-        println((g./det_g)[:,1,1])
-        println((g./det_g)[:,1,2])
-        println((g./det_g)[:,2,1])
-        println((g./det_g)[:,2,2])
-        println(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule))
-        println(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule))
-        @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
+        # println(elem_id)
+        # println((g./det_g)[:,1,1])
+        # println((g./det_g)[:,1,2])
+        # println((g./det_g)[:,2,1])
+        # println((g./det_g)[:,2,2])
+        # println(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule))
+        # println(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule))
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
         @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)...)), atol=1e-12)
+
+
+        # AnalyticalFormField tests
+        # 0-form
+        #println(Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule))
+        #total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
     end
+    println(total_integrated_analytical_field)
 end
 
 # # 3d
