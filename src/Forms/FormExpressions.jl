@@ -114,9 +114,19 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx:
     form_eval = form.expression(x) # size: num_points x image_dim
 
     num_eval_points = size(x,1)
-    form_pullback = zeros(num_eval_points, manifold_dim)
-    for i = 1:num_eval_points
-        form_pullback[i,:] = form_eval[i,:] * J[i,:,:]
+    image_dim = length(form_eval)
+    form_pullback = Vector{Vector{Float64}}(undef, manifold_dim)
+    for j = 1:manifold_dim
+        form_pullback[j] = zeros(num_eval_points)
+    end
+    a = zeros(num_eval_points, manifold_dim)
+    for j = 1:image_dim
+        for i = 1:num_eval_points
+            a[i,:] .+= form_eval[j][i] .* J[i,j,:]
+        end
+    end
+    for j= 1:image_dim
+        form_pullback[j] = a[:,j]
     end
     
     form_indices = ones(Int, n_form_components)
