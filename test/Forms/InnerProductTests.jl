@@ -98,7 +98,8 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     f¹_analytic = Mantis.Forms.AnalyticalFormField(1, analytical_1_form_func, geom, "f")
     f²_analytic = Mantis.Forms.AnalyticalFormField(2, analytical_form_func, geom, "f")
     
-    total_integrated_analytical_field = 0.0
+    total_integrated_analytical_field_0 = 0.0
+    total_integrated_analytical_field_n = 0.0
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
         # Note that we cannot do mixed inner products
 
@@ -142,10 +143,11 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
 
         # AnalyticalFormField tests
         # 0-form
-        #total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
-        total_integrated_analytical_field += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_0 += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_n += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
     end
-    @test isapprox(total_integrated_analytical_field, 1558.5454565440389, atol=1e-12)
+    @test isapprox(total_integrated_analytical_field_0, 1558.5454565440389, atol=1e-12)
+    @test isapprox(total_integrated_analytical_field_n, 1558.5454565440389, atol=1e-12)
 end
 
 # # 3d
