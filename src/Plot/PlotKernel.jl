@@ -260,9 +260,9 @@ function _plot(form::Forms.AbstractFormExpression{1, form_rank, G}, offset::Unio
                 # Compute data to plot 
                 if is_field
                     if form_rank == 0
-                        point_data[:,vertex_idx + bnd_idx] .= Forms.evaluate(form, element_idx, ([ξ],))[1]
+                        point_data[:,vertex_idx + bnd_idx] .= vcat(Forms.evaluate(form, element_idx, ([ξ],))[1]...)
                     elseif form_rank == 1
-                        point_data[:,vertex_idx + bnd_idx] .= Forms.evaluate(Forms.hodge(form), element_idx, ([ξ],))[1]
+                        point_data[:,vertex_idx + bnd_idx] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ([ξ],))[1]...)
                     end
                 end
                 if !isnothing(offset)
@@ -277,9 +277,9 @@ function _plot(form::Forms.AbstractFormExpression{1, form_rank, G}, offset::Unio
                 # Compute data to plot 
                 if is_field
                     if form_rank == 0
-                        point_data[:,vertex_idx + interior_vertex_idx + 1] .= Forms.evaluate(form, element_idx, ([ξ],))[1]
+                        point_data[:,vertex_idx + interior_vertex_idx + 1] .= vcat(Forms.evaluate(form, element_idx, ([ξ],))[1]...)
                     elseif form_rank == 1
-                        point_data[:,vertex_idx + interior_vertex_idx + 1] .= Forms.evaluate(Forms.hodge(form), element_idx, ([ξ],))[1]
+                        point_data[:,vertex_idx + interior_vertex_idx + 1] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ([ξ],))[1]...)
                     end
                 end
                 if !isnothing(offset)
@@ -298,7 +298,7 @@ function _plot(form::Forms.AbstractFormExpression{1, form_rank, G}, offset::Unio
 
     WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
         vtk.version == "2.2"
-        if !isnothing(field)
+        if is_field
             vtk["point_data", WriteVTK.VTKPointData()] = point_data
         end
     end
@@ -362,7 +362,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            #point_data[:,vertex_idx + corner_idx[count+1]] .= vec(reduce(+, Forms.evaluate_sharp(form, element_idx, ξ)[1])) Not implemented in this branch yet.
+                            point_data[:,vertex_idx + corner_idx[count+1]] .= vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1]))
                         else form_rank == 2
                             point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
