@@ -23,7 +23,7 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
     # Pre-allocate
     nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
 
-    nvals_A = nnz_elem[1] * get_num_elements(weak_form_inputs)
+    nvals_A = 4 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 4 times due to the forms being per component. This needs to be updated.
     A_column_idxs = Vector{Int}(undef, nvals_A)
     A_row_idxs = Vector{Int}(undef, nvals_A)
     A_vals = Vector{Float64}(undef, nvals_A)
@@ -61,6 +61,8 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
 
 
     # Set Dirichlet conditions if needed.
+    # WARNING: This may not work as intended if the boundary indices are 
+    # duplicated in the given row and column vectors!
     if ~isempty(self.dirichlet_bcs)
         # Set the bc value for the rhs.
         for (bc_idx, bc_value) in pairs(self.dirichlet_bcs)
@@ -100,14 +102,12 @@ end
 
 
 
-struct AssemblerError{n} <: AbstractAssemblers 
-    quad_nodes::NTuple{n, Vector{Float64}}
-    quad_weights::Vector{Float64}
+struct AssemblerError{manifold_dim} <: AbstractAssemblers 
+    quad_rule::Quadrature.QuadratureRule{manifold_dim}
 end
 
-struct AssemblerErrorPerElement{n} <: AbstractAssemblers 
-    quad_nodes::NTuple{n, Vector{Float64}}
-    quad_weights::Vector{Float64}
+struct AssemblerErrorPerElement{manifold_dim} <: AbstractAssemblers 
+    quad_rule::Quadrature.QuadratureRule{manifold_dim}
 end
 
 @doc raw"""
@@ -122,17 +122,19 @@ function (self::AssemblerError)(space, dofs, geom, exact_sol, norm="L2")
     result = 0.0
 
     # Loop over all active elements
+    qn = Quadrature.get_quadrature_nodes(self.quad_rule)
+    qw = Quadrature.get_quadrature_weights(self.quad_rule)
     for elem_id in 1:Geometry.get_num_elements(geom)
         field = Fields.FEMField(space, dofs)
-        element_sol = dropdims(Fields.evaluate(field, elem_id, self.quad_nodes), dims=2)
+        element_sol = dropdims(Fields.evaluate(field, elem_id, qn), dims=2)
 
-        _, jac_det = Geometry.metric(geom, elem_id, self.quad_nodes)
+        _, jac_det = Geometry.metric(geom, elem_id, qn)
 
-        phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
+        phys_nodes = Geometry.evaluate(geom, elem_id, qn)
         element_exact = exact_sol.(Tuple(phys_nodes[:,i] for i in 1:1:Geometry.get_domain_dim(geom))...)
 
-        @inbounds for point_idx in eachindex(jac_det, self.quad_weights, element_sol, element_exact)
-            result += jac_det[point_idx] * self.quad_weights[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
+        @inbounds for point_idx in eachindex(jac_det, qw, element_sol, element_exact)
+            result += jac_det[point_idx] * qw[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
         end
 
     end
@@ -156,18 +158,20 @@ function (self::AssemblerErrorPerElement)(space, dofs, geom, exact_sol, norm="L2
     errors = Vector{Float64}(undef, num_els)
 
     # Loop over all active elements
+    qn = Quadrature.get_quadrature_nodes(self.quad_rule)
+    qw = Quadrature.get_quadrature_weights(self.quad_rule)
     for elem_id in 1:num_els
         field = Fields.FEMField(space, dofs)
-        element_sol = dropdims(Fields.evaluate(field, elem_id, self.quad_nodes), dims=2)
+        element_sol = dropdims(Fields.evaluate(field, elem_id, qn), dims=2)
 
-        _, jac_det = Geometry.metric(geom, elem_id, self.quad_nodes)
+        _, jac_det = Geometry.metric(geom, elem_id, qn)
 
-        phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
+        phys_nodes = Geometry.evaluate(geom, elem_id, qn)
         element_exact = exact_sol.(Tuple(phys_nodes[:,i] for i in 1:1:Geometry.get_domain_dim(geom))...)
 
         result = 0.0
-        @inbounds for point_idx in eachindex(jac_det, self.quad_weights, element_sol, element_exact)
-            result += jac_det[point_idx] * self.quad_weights[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
+        @inbounds for point_idx in eachindex(jac_det, qw, element_sol, element_exact)
+            result += jac_det[point_idx] * qw[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
         end
 
         errors[elem_id] = result

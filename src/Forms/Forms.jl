@@ -33,6 +33,18 @@ abstract type AbstractFormSpace{manifold_dim, form_rank, G} <: AbstractFormField
 
 # General getters involving forms. These are general enough to work on all subtypes.
 @doc raw"""
+    get_form_rank(form::FE) where {FE <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Returns the form rank for the given `form` (expression).
+
+# Arguments
+- `form::AbstractFormExpression`: The form of which to get the rank.
+"""
+function get_form_rank(form::FE) where {FE <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return form_rank
+end
+
+@doc raw"""
     get_geometry(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Returns the geometry associated with the `form_space`.
