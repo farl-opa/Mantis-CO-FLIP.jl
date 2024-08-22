@@ -153,8 +153,17 @@ function extract_gtbspline_to_nurbs(nurbs::NTuple{m,F}, regularity::Vector{Int})
         r = regularity[i]
         
         # Smoothness constraint matrix
-        KL = SparseArrays.findnz(_evaluate_all_at_point(nurbs[i], bspl_nels[i], 1.0, r))
-        KR = SparseArrays.findnz(_evaluate_all_at_point(nurbs[i+1], 1, 0.0, r))
+        KL = _evaluate_all_at_point(nurbs[i], bspl_nels[i], 1.0, r)
+        KR = _evaluate_all_at_point(nurbs[i+1], 1, 0.0, r)
+        # element sizes where constraints are evaluated
+        h_i = get_element_size(nurbs[i].knot_vector, bspl_nels[i])
+        h_ip1 = get_element_size(nurbs[i+1].knot_vector, 1)
+        # scale the constraints by the element sizes and findnz values
+        scaling_i = [h_i^(-j) for j = 0:r]
+        scaling_ip1 = [h_ip1^(-j) for j = 0:r]
+        KL = SparseArrays.findnz(SparseArrays.sparse(KL * LinearAlgebra.diagm(scaling_i)))
+        KR = SparseArrays.findnz(SparseArrays.sparse(KR * LinearAlgebra.diagm(scaling_ip1)))
+        # join the constraints together
         rows = [KL[1]; KR[1] .+ (bspl_dims[i+1] - bspl_dims[i])]
         cols = [KL[2]; KR[2]]
         vals = [-KL[3]; KR[3]]

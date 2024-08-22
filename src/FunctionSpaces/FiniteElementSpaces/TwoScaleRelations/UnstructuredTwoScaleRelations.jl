@@ -26,10 +26,10 @@ function build_two_scale_operator(coarse_us_space::UnstructuredSpace{n,m}, fine_
     fine_extraction_mat = assemble_global_extraction_matrix(fine_us_space)
 
     # Next, concatenate the two_scale_operator subdivision matrices in a block diagonal format
-    discontinuous_subdivision_mat = SparseArrays.blockdiag([discontinuous_two_scale_ops[i].global_subdiv_matrix for i = 1:m]...)
+    discontinuous_subdivision_mat = SparseArrays.blockdiag([discontinuous_two_scale_ops[i][1].global_subdiv_matrix for i = 1:m]...)
 
     # Finally, compute the two-scale matrix by solving a least-squares problem
-    global_subdiv_mat = (coarse_extraction_mat * discontinuous_subdivision_mat) \ fine_extraction_mat
+    global_subdiv_matrix = SparseArrays.sparse(qr(fine_extraction_mat' * fine_extraction_mat) \ Array(fine_extraction_mat' * discontinuous_subdivision_mat * coarse_extraction_mat))
 
     ###
     ### PART 2: Build the coarse-fine element relationships
@@ -39,7 +39,8 @@ function build_two_scale_operator(coarse_us_space::UnstructuredSpace{n,m}, fine_
     for i ∈ 1:m
         for j ∈ 1:get_num_elements(coarse_us_space.function_spaces[i])
             global_coarse_el_id = get_global_element_id(coarse_us_space, i, j)
-            coarse_to_fine_elements[global_coarse_el_id] = get_global_element_id.(fine_us_space, i, discontinuous_two_scale_ops[i].coarse_to_fine_elements[j])
+            local_coarse_to_fine_elements = discontinuous_two_scale_ops[i][1].coarse_to_fine_elements[j]
+            coarse_to_fine_elements[global_coarse_el_id] = [get_global_element_id(fine_us_space, i, local_coarse_to_fine_elements[k]) for k ∈ eachindex(local_coarse_to_fine_elements)]
         end
     end
 
@@ -48,12 +49,12 @@ function build_two_scale_operator(coarse_us_space::UnstructuredSpace{n,m}, fine_
     for i ∈ 1:m
         for j ∈ 1:get_num_elements(fine_us_space.function_spaces[i])
             global_fine_el_id = get_global_element_id(fine_us_space, i, j)
-            fine_to_coarse_elements[global_fine_el_id] = get_global_element_id(coarse_us_space, i, discontinuous_two_scale_ops[i].fine_to_coarse_elements[j])
+            fine_to_coarse_elements[global_fine_el_id] = get_global_element_id(coarse_us_space, i, discontinuous_two_scale_ops[i][1].fine_to_coarse_elements[j])
         end
     end
 
     ###
     ### PART 3: Build the two-scale operator and return
     ###
-    return TwoScaleOperator(coarse_us_space, fine_us_space, global_subdiv_matrix, coarse_to_fine_elements, fine_to_coarse_elements)
+    return TwoScaleOperator(coarse_us_space, fine_us_space, global_subdiv_matrix, coarse_to_fine_elements, fine_to_coarse_elements), fine_us_space
 end

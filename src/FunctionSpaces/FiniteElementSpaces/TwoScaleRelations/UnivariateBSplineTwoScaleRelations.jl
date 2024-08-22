@@ -464,6 +464,10 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::I
     return build_two_scale_operator(coarse_bspline, nsubdivisions, 1)
 end
 
+function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::NTuple{1,Int})
+    return build_two_scale_operator(coarse_bspline, nsubdivisions[1])
+end
+
 """
     build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}) where {n}
 
