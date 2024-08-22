@@ -351,7 +351,7 @@ end
 
 # Priority 3: Triple products
 
-# Musical Isomorphisms for conversion between 1-forms and vector fields (♯ and ♭)
+# Useful proxy vector fields associated to forms
 
 @doc raw"""
     evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, G}, 
@@ -381,7 +381,7 @@ function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1,
 
     sharp_eval = Vector{Matrix{Float64}}(undef, num_form_components)
 
-    # ♯: dξⁱ ↦ gⁱʲ∂ⱼ
+    # ♯: dξⁱ ↦ ♯(dξⁱ) = gⁱʲ∂ⱼ
     for component ∈ 1:num_form_components
         sharp_eval[component] = @views hcat([form_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components]...)
     end
@@ -389,6 +389,129 @@ function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1,
     sharp_indices = repeat([vcat(form_indices...)], num_form_components)
 
     return sharp_eval, sharp_indices
+end
+
+@doc raw"""
+    evaluate_pushforward(vfield::Vector{Matrix{Float64}}, 
+                         jacobian::Array{Float64,3})
+
+Evaluate the pushforward of the vector field at the discrete points where it has been evaluated. The pushforward is the action of the Jacobian of the field on the field itself.
+
+# Arguments
+- `vfield::Vector{Matrix{Float64}}`: The pointwise evaluated vector field to evaluate the pushforward for.
+- `jacobian::Array{Float64,3}`: The Jacobian of the vector field evaluated at the discrete points.
+
+# Returns
+- `::Vector{Matrix{Float64}}`: The evaluated pushforward of the vector field at the discrete points.
+"""
+function evaluate_pushforward(vfield::Vector{Matrix{Float64}}, jacobian::Array{Float64,3})
+    image_dim = size(jacobian,2)
+    
+    # Gᵢ: v ↦ Gᵢ(v) = Jᵢⱼvʲ
+    evaluated_pushforward = Vector{Matrix{Float64}}(undef, image_dim)
+    for component ∈ 1:image_dim
+        evaluated_pushforward[component] = @views reduce(+,[vfield[i] .* jacobian[:, component, i] for i in 1:manifold_dim])
+    end
+
+    return evaluated_pushforward
+end
+
+@doc raw"""
+    evaluate_sharp_pushforward(form_expression::AbstractFormExpression{manifold_dim, 1, G}, 
+                                element_id::Int, 
+                                xi::NTuple{manifold_dim, Vector{Float64}}) 
+                                where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the pushforward of the sharp of a differential 1-form over a specified element of a manifold, converting the form into a vector field. Note that the output vector-field is defined in physical coordinates.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, 1, G}`: An expression representing the 1-form on the manifold.
+- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the 1-form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the pushed-forward vector, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `sharp_indices::Vector{Vector{Int}}`: Each component of the vector, stores the indices of the evaluated basis functions.
+"""
+function evaluate_sharp_pushforward(form_expression::AbstractFormExpression{manifold_dim, 1, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    sharp_eval, sharp_indices = evaluate_sharp(form_expression, element_id, xi)
+    
+    # dξⁱ ↦ G∘♯ (dξⁱ)
+    jacobian = Geometry.jacobian(form_expression.geometry, element_id, xi)
+    evaluated_pushforward = evaluate_pushforward(sharp_eval, jacobian)
+    
+    return evaluated_pushforward, sharp_indices
+end
+
+@doc raw"""
+    evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, 
+                                        element_id::Int, 
+                                        xi::NTuple{manifold_dim, Vector{Float64}}) 
+                                        where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the rotated proxy vector-field associated to a differential (n-1)-form over a specified element of an n-dimensional manifold, converting the form into a vector field. Note that both the form and the vector-field are defined in reference, curvilinear coordinates.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, form_rank, G}`: An expression representing the form on the manifold.
+- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `hodge_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the indices of the evaluated basis functions. Uses the indices of the hodge evaluation because they are the same.
+
+# Throws an error if the manifold dimension is less than 2 or the form rank is not one less than the manifold dimension.
+"""
+function evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    manifold_dim >= 2 && form_rank == manifold_dim-1 || throw(ArgumentError("Manifold dimension should be 2 or higher and form rank should be 1 less than its value. Dimension $manifold_dim and form rank $form_rank were given."))
+
+    # Examples...
+    # 2D: dξⁱ ↦ ♯∘★ (dξⁱ)
+    # 3D: dξⁱ∧dξʲ ↦ ♯∘★ (dξⁱ∧dξʲ)
+    # ... and so on.
+    hodge_form = hodge(form_expression)
+    return evaluate_sharp(hodge_form, element_id, xi)
+
+    # OLD IMPLEMENTATION BELOW:
+    # hodge_eval, hodge_indices = evaluate(hodge(form_expression), element_id, xi)
+    # sharp_eval = Vector{Matrix{Float64}}(undef, num_form_components)
+
+    # for component ∈ 1:num_form_components
+    #     sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components])
+    # end
+
+    # return sharp_eval, hodge_indices
+end
+
+@doc raw"""
+    evaluate_rotated_proxy_vector_fiel_pushforward(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, 
+                                        element_id::Int, 
+                                        xi::NTuple{manifold_dim, Vector{Float64}}) 
+                                        where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the pushforward of the rotated proxy vector-field associated to a differential (n-1)-form over a specified element of an n-dimensional manifold, converting the form into a vector field. Note that both the vector-field is defined in physical coordinates.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, form_rank, G}`: An expression representing the form on the manifold.
+- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `hodge_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the indices of the evaluated basis functions. Uses the indices of the hodge evaluation because they are the same.
+
+# Throws an error if the manifold dimension is less than 2 or the form rank is not one less than the manifold dimension.
+"""
+function evaluate_rotated_proxy_vector_field_pushforward(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    manifold_dim >= 2 && form_rank == manifold_dim-1 || throw(ArgumentError("Manifold dimension should be 2 or higher and form rank should be 1 less than its value. Dimension $manifold_dim and form rank $form_rank were given."))
+
+    # Examples...
+    # 2D: dξⁱ ↦ G∘♯∘★(dξⁱ)
+    # 3D: dξⁱ∧dξʲ ↦ G∘♯∘★(dξⁱ∧dξʲ)
+    # ... and so on.
+    hodge_form = hodge(form_expression)
+    return evaluate_sharp_pushforward(hodge_form, element_id, xi)
+
 end
 
 # @doc raw"""
@@ -427,48 +550,6 @@ end
 
 #     return flat_eval, flat_indices
 # end
-
-# Proxy vector-fields for (manifold_dim-1)-forms
-
-@doc raw"""
-    evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, 
-                                        element_id::Int, 
-                                        xi::NTuple{manifold_dim, Vector{Float64}}) 
-                                        where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-
-Compute the rotated proxy vector-field associated to a differential (n-1)-form over a specified element of an n-dimensional manifold, converting the form into a vector field. Note that both the form and the vector-field are defined in reference, curvilinear coordinates.
-
-# Arguments
-- `form_expression::AbstractFormExpression{manifold_dim, form_rank, G}`: An expression representing the form on the manifold.
-- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
-
-# Returns
-- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
-- `hodge_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the indices of the evaluated basis functions. Uses the indices of the hodge evaluation because they are the same.
-
-# Throws an error if the manifold dimension is less than 2 or the form rank is not one less than the manifold dimension.
-"""
-function evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    manifold_dim >= 2 && form_rank == manifold_dim-1 || throw(ArgumentError("Manifold dimension should be 2 or higher and form rank should be 1 less than its value. Dimension $manifold_dim and form rank $form_rank were given."))
-
-    # Examples...
-    # 2D: dξⁱ ↦ ♯★(dξⁱ)
-    # 3D: dξⁱ∧dξʲ ↦ ♯★(dξⁱ∧dξʲ)
-    # ... and so on.
-    hodge_form = hodge(form_expression)
-    return evaluate_sharp(hodge_form, element_id, xi)
-
-    # OLD IMPLEMENTATION BELOW:
-    # hodge_eval, hodge_indices = evaluate(hodge(form_expression), element_id, xi)
-    # sharp_eval = Vector{Matrix{Float64}}(undef, num_form_components)
-    
-    # for component ∈ 1:num_form_components
-    #     sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components])
-    # end
-
-    # return sharp_eval, hodge_indices
-end
 
 # @doc raw"""
 #     evaluate_flat(form_expression::AbstractFormExpression{manifold_dim, 2, G}, 
