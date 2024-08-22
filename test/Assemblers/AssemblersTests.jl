@@ -58,12 +58,6 @@ function fe_run(weak_form_inputs, weak_form, bc_dirichlet, case, test, verbose)
     end
     sol = A \ b
 
-    # if n > 1 && isempty(bc_dirichlet)
-    #     sol_rsh = reshape(sol[1:end-1], :, 1)
-    # else
-    sol_rsh = reshape(sol, :, 1)
-    #end
-
     return sol
 end
 
@@ -81,21 +75,13 @@ function write_form_sol_to_file(form_sols, var_names, geom, p, k, case, n, verbo
 
         output_file = joinpath(output_data_folder, output_filename)
         #output_file_error = joinpath(output_data_folder, output_filename_error)
-        # if occursin("mixed", case)
-        #     field = Mantis.Fields.FEMField(weak_form_inputs.space_trial_phi_2.fem_space[1], reshape(sol_rsh[Mantis.Forms.get_num_basis(weak_form_inputs.space_trial_u_1)+1:end], (:,1)))
-        # else
-        #     field = Mantis.Fields.FEMField(weak_form_inputs.space_trial.fem_space[1], sol_rsh)
-        # end
 
-        #field = Mantis.Fields.FEMField(trial_space, sol_rsh)
         if n == 1
             out_deg = maximum([1, p])
         else
             out_deg = maximum([1, maximum(p)])
         end
         Mantis.Plot.plot(form_sol; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
-        #Mantis.Plot.plot(geom, field; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
-        #Mantis.Plot.plot(geom, field, exact_sol; vtk_filename = output_file_error, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
     end
 end
 
@@ -158,11 +144,7 @@ m_1d = 5
 # polynomial degree and inter-element continuity.
 p_1d = 3
 k_1d = 2
-# Domain. The length of the domain is chosen so that the normal 
-# derivatives of the exact solution are zero at the boundary. This is 
-# the only Neumann b.c. that we can specify at the moment. These are 
-# specified as constants to make sure that the forcing function can use 
-# them while remaining type stable.
+# Domain.
 const Lleft_1d = 0.0  # exact solutions are for xl = 0.0
 const Lright_1d = 2.0  # exact solution for xr > 0.0
 
@@ -175,8 +157,6 @@ trial_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1
 test_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1d-1)
 
 # Set Dirichlet boundary conditions.
-# bc_sine_1d = Dict{Int, Float64}(i == 1 ? i => 0.0 : i => 1.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
-# bc_const_1d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_1d))
 const bc_left_sine_1d = 0.0
 const bc_right_sine_1d = 1.0
 bc_sine_1d = Dict{Int, Float64}(1 => bc_left_sine_1d, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => bc_right_sine_1d)
@@ -197,15 +177,13 @@ zero_form_space_test_1d = Mantis.Forms.FormSpace(0, geom_1d, (test_space_1d,), "
 one_form_space_trial_1d = Mantis.Forms.FormSpace(1, geom_1d, (trial_space_1d_pm1,), "φ")
 one_form_space_test_1d = Mantis.Forms.FormSpace(1, geom_1d, (test_space_1d_pm1,), "ϕ")
 
-top_form_space_trial_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (trial_space_1d,), "φ")
-top_form_space_test_1d = Mantis.Forms.FormSpace(n_1d, geom_1d, (test_space_1d,), "ϕ")
-
 # Forcing forms
 # Constant forcing
 f⁰_const = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")
 f⁰_const.coefficients .= 1.0
 f¹_const = Mantis.Forms.FormField(one_form_space_trial_1d, "f")
 f¹_const.coefficients .= 1.0
+
 # Sine forcing
 function forcing_sine_1d(x::Matrix{Float64})
     return [@. -pi^2 * sinpi.(x[:,1])]
@@ -257,13 +235,11 @@ m_y = 10
 # polynomial degree and inter-element continuity.
 p_2d = (4, 4)
 k_2d = (3, 3)
-# Domain. The length of the domain is chosen so that the normal 
-# derivatives of the exact solution are zero at the boundary. This is 
-# the only Neumann b.c. that we can specify at the moment.
-const Lleft = 0.0#0.25
-const Lright = 1.0#0.75
-const Lbottom = 0.0#0.25
-const Ltop = 1.0#0.75
+# Domain.
+const Lleft = 0.0
+const Lright = 1.0
+const Lbottom = 0.0
+const Ltop = 1.0
 
 
 # Create function spaces (b-splines here).
