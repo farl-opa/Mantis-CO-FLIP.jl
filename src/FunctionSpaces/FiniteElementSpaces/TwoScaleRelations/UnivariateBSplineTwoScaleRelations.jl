@@ -229,14 +229,13 @@ are preserved in the final multiplicity vector, and newly inserted ones are give
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 - `fine_multiplicity::Int`: Multiplicity of each new knot.
 # Returns 
-- `::TwoScaleOperator`: Two-scale operator for a change of B-spline basis.
+- `::BSplineSpace`: Refined B-spline space.
 """
 function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
     fine_knot_vector = subdivide_knot_vector(coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity)
     p = coarse_bspline.knot_vector.polynomial_degree
-    fine_bspline = BSplineSpace(fine_knot_vector.patch_1d, p, p .- fine_knot_vector.multiplicity)
 
-    return build_two_scale_operator(coarse_bspline, fine_bspline, nsubdivisions)
+    return BSplineSpace(fine_knot_vector.patch_1d, p, p .- fine_knot_vector.multiplicity)
 end
 
 """
@@ -249,7 +248,7 @@ are preserved in the `fine_multiplicity`, and newly inserted ones are given mult
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 # Returns 
-- `::TwoScaleOperator`: Two-scale operator for a change of B-spline basis.
+- `::BSplineSpace`: Refined B-spline space.
 """
 function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int)
     return subdivide_bspline(coarse_bspline, nsubdivisions, 1)
