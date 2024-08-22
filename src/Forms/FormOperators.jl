@@ -441,7 +441,10 @@ function evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpres
 
     sharp_eval = Vector{Matrix{Float64}}(undef, num_form_components)
 
-    # ♯: dξⁱ∧dξʲ ↦ ♯★(dξⁱ∧dξʲ)
+    # Examples...
+    # 2D: dξⁱ ↦ ♯★(dξⁱ)
+    # 3D: dξⁱ∧dξʲ ↦ ♯★(dξⁱ∧dξʲ)
+    # ... and so on.
     
     for component ∈ 1:num_form_components
         sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components])
