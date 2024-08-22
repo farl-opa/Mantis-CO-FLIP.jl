@@ -452,24 +452,22 @@ Compute the rotated proxy vector-field associated to a differential (n-1)-form o
 function evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     manifold_dim >= 2 && form_rank == manifold_dim-1 || throw(ArgumentError("Manifold dimension should be 2 or higher and form rank should be 1 less than its value. Dimension $manifold_dim and form rank $form_rank were given."))
 
-    inv_g, _, _ = Geometry.inv_metric(form_expression.geometry, element_id, xi)
-
-    num_form_components = manifold_dim # = binomial(manifold_dim, manifold_dim-1)
-
-    hodge_eval, hodge_indices = evaluate(hodge(form_expression), element_id, xi)
-
-    sharp_eval = Vector{Matrix{Float64}}(undef, num_form_components)
-
     # Examples...
     # 2D: dξⁱ ↦ ♯★(dξⁱ)
     # 3D: dξⁱ∧dξʲ ↦ ♯★(dξⁱ∧dξʲ)
     # ... and so on.
-    
-    for component ∈ 1:num_form_components
-        sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components])
-    end
+    hodge_form = hodge(form_expression)
+    return evaluate_sharp(hodge_form, element_id, xi)
 
-    return sharp_eval, hodge_indices
+    # OLD IMPLEMENTATION BELOW:
+    # hodge_eval, hodge_indices = evaluate(hodge(form_expression), element_id, xi)
+    # sharp_eval = Vector{Matrix{Float64}}(undef, num_form_components)
+    
+    # for component ∈ 1:num_form_components
+    #     sharp_eval[component] = @views reduce(+,[hodge_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components])
+    # end
+
+    # return sharp_eval, hodge_indices
 end
 
 # @doc raw"""
