@@ -121,7 +121,7 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 # Choose whether to write the output to a file, run the tests, and/or 
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
-write_to_output_file = false  # false
+write_to_output_file = true  # false
 run_tests = true              # true
 verbose = false               # false
 
@@ -314,31 +314,25 @@ one_form_space_trial_2d_crazy = Mantis.Forms.FormSpace(1, geom_crazy, (trial_spa
 one_form_space_test_2d_crazy = Mantis.Forms.FormSpace(1, geom_crazy, (test_space_2d_1_form_x, test_space_2d_1_form_y), "q")
 
 # Create the forcing forms
-f⁰_cart = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "f")
-f⁰_crazy = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "f")
-
-f²_cart = Mantis.Forms.FormField(two_form_space_trial_2d_cart, "f")
-f²_crazy = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "f")
-
-
 function forcing_function_const_2d(x::Matrix{Float64})
     return [ones(size(x, 1))]
 end
+
+f⁰_cart_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_cartesian, "f")
+f²_cart_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_2d, geom_cartesian, "f")
+
+f⁰_crazy_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_crazy, "f")
+f²_crazy_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_2d, geom_crazy, "f")
+
 
 function forcing_function_sine_2d(x::Matrix{Float64})
     return [@. -8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
 
-f⁰_cart_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_cartesian, "f")
-f⁰_crazy_const_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_const_2d, geom_crazy, "f")
-
 f⁰_cart_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_cartesian, "f")
-f⁰_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_crazy, "f")
-
-f²_cart_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_2d, geom_cartesian, "f")
-f²_crazy_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_2d, geom_crazy, "f")
-
 f²_cart_sine_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_sine_2d, geom_cartesian, "f")
+
+f⁰_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_crazy, "f")
 f²_crazy_sine_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_sine_2d, geom_crazy, "f")
 
 
@@ -446,8 +440,8 @@ cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "cos1d-Dirichlet-mixed", "cons
 for case in cases
 
     if case == "const1d-Dirichlet"
-        weak_form_inputs_const1dD = Mantis.Assemblers.WeakFormInputs(f⁰_const, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
-        sol = fe_run(weak_form_inputs_const1dD, Mantis.Assemblers.poisson_non_mixed, bc_const_1d, case, run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_const, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_const_1d, case, run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
             α⁰.coefficients .= sol
@@ -456,8 +450,8 @@ for case in cases
         end
     
     elseif case == "sine1d-Dirichlet"
-        weak_form_inputs_sine1dD = Mantis.Assemblers.WeakFormInputs(f⁰_sine_1d, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
-        sol = fe_run(weak_form_inputs_sine1dD, Mantis.Assemblers.poisson_non_mixed, bc_sine_1d, case, run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_1d, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_sine_1d, case, run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
             α⁰.coefficients .= sol
@@ -466,8 +460,8 @@ for case in cases
         end
     
     elseif case == "cos1d-Dirichlet-mixed"
-        weak_form_inputs_const1dDm = Mantis.Assemblers.WeakFormInputsMixed(f¹_cos_1d, zero_form_space_trial_1d, one_form_space_trial_1d, zero_form_space_test_1d, one_form_space_test_1d, q_rule_1d)
-        sol = fe_run(weak_form_inputs_const1dDm, Mantis.Assemblers.poisson_mixed, bc_const_1d_empty, case, run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(f¹_cos_1d, zero_form_space_trial_1d, one_form_space_trial_1d, zero_form_space_test_1d, one_form_space_test_1d, q_rule_1d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_mixed, bc_const_1d_empty, case, run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
             ξ¹ = Mantis.Forms.FormField(one_form_space_trial_1d, "ξ")
@@ -478,8 +472,8 @@ for case in cases
         end
     
     elseif case == "const2d-Dirichlet"
-        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_cart_const_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
-        sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case, run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_cart_const_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case, run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "α")
             α⁰.coefficients .= sol
@@ -488,8 +482,8 @@ for case in cases
         end
         
     elseif case == "const2d-Dirichlet-crazy"
-        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_const_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
-        sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case*"_crazy_c$crazy_c", run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_const_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case*"_crazy_c$crazy_c", run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "α")
             α⁰.coefficients .= sol
@@ -498,8 +492,8 @@ for case in cases
         end
         
     elseif case == "sine2d-Dirichlet"
-        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_cart_sine_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
-        sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case, run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_cart_sine_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case, run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "α")
             α⁰.coefficients .= sol
@@ -508,8 +502,8 @@ for case in cases
         end
         
     elseif case == "sine2d-Dirichlet-crazy"
-        weak_form_inputs_const2dD = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_sine_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
-        sol = fe_run(weak_form_inputs_const2dD, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case*"_crazy_c$crazy_c", run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_sine_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case*"_crazy_c$crazy_c", run_tests, verbose)
         if write_to_output_file
             α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "α")
             α⁰.coefficients .= sol
@@ -518,20 +512,20 @@ for case in cases
         end
         
     elseif case == "sine2d-Dirichlet-mixed"
-        weak_form_inputs_const2dDm = Mantis.Assemblers.WeakFormInputsMixed(f²_cart_sine_2d, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
-        sol = fe_run(weak_form_inputs_const2dDm, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, case, run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(f²_cart_sine_2d, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, case, run_tests, verbose)
         if write_to_output_file
             ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_cart, "ξ")
             β² = Mantis.Forms.FormField(two_form_space_trial_2d_cart, "β")
             ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)]
             β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)+1:end]
 
-            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form"], geom_cartesian, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
+            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
         end
     
     elseif case == "sine2d-Dirichlet-mixed-crazy"
-        weak_form_inputs_const2dDmc = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy_sine_2d, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
-        sol = fe_run(weak_form_inputs_const2dDmc, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, case*"_crazy_c$crazy_c", run_tests, verbose)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy_sine_2d, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, case*"_crazy_c$crazy_c", run_tests, verbose)
         if write_to_output_file
             ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_crazy, "ξ")
             β² = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "β")
