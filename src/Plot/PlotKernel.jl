@@ -397,7 +397,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + count] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            #point_data[:,vertex_idx + count] .= vec(reduce(+, Forms.evaluate_sharp(form, element_idx, ξ)[1])) Not implemented in this branch yet.
+                            point_data[:,vertex_idx + count] .= vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1]))
                         else form_rank == 2
                             point_data[:,vertex_idx + count] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
@@ -423,7 +423,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            #point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vec(reduce(+, Forms.evaluate_sharp(form, element_idx, ξ)[1])) Not implemented in this branch yet.
+                            point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1]))
                         else form_rank == 2
                             point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
