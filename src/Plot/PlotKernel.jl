@@ -330,7 +330,11 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
     else
         field_dim = binomial(2, form_rank)
     end
-    point_data = zeros(field_dim, n_vertices)
+    if form_rank == 1
+        point_data = zeros(field_dim+1, n_vertices)
+    else
+        point_data = zeros(field_dim, n_vertices)
+    end
     
     vertex_idx = 1
     vertex_offset = 0
@@ -362,7 +366,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            point_data[:,vertex_idx + corner_idx[count+1]] .= vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1]))
+                            point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
                         else form_rank == 2
                             point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
@@ -397,7 +401,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + count] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            point_data[:,vertex_idx + count] .= vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1]))
+                            point_data[:,vertex_idx + count] .= vcat(vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
                         else form_rank == 2
                             point_data[:,vertex_idx + count] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
@@ -423,7 +427,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1]))
+                            point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
                         else form_rank == 2
                             point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
