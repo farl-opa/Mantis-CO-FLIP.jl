@@ -424,6 +424,25 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}
     return form_eval
 end
 
+function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormField, F2 <: AbstractFormField}
+    #print("Evaluating: " * form.label * "\n")
+    if form.op == "∧"
+        throw("∧ not imlemented yet: (form.children[1].label, form.children[2].label)")
+        return 1.0
+
+    elseif form.op == "-"
+        form_1_eval = evaluate(form.children[1], element_idx, xi)
+        form_2_eval = evaluate(form.children[2], element_idx, xi)
+        return form_1_eval[1] - form_2_eval[1], form_1_eval[2]
+
+    elseif form.op == "+"
+        form_1_eval = evaluate(form.children[1], element_idx, xi)
+        form_2_eval = evaluate(form.children[2], element_idx, xi)
+        return form_1_eval[1] + form_2_eval[1], form_1_eval[2]
+
+    end
+end
+
 @doc raw"""
     wedge(form_1::F_1, form_2::F_2) {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1, G1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2, G2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2, G1 <: Geometry.AbstractGeometry{manifold_dim_1}, G2 <: Geometry.AbstractGeometry{manifold_dim_2}}
 

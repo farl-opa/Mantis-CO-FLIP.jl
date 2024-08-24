@@ -259,3 +259,28 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom_crazy)
     global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
 end
 @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
+
+# Test "error" computation -------------
+zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, (TP_Space,), "ν")
+α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+α⁰.coefficients .= 1.0
+
+function zero_form_function(x::Matrix{Float64})
+    return [x[:, 2]]
+end
+
+# Generate an analytical form field
+β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, tensor_prod_geo, "β")
+
+# Define error
+e = Mantis.Forms.FormExpression((α⁰, β⁰), 0, "-")
+
+# compute the L^2 norm of the differences
+using SparseArrays
+error_L2 = 0.0
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+for elem_id in 1:1:Mantis.Geometry.get_num_elements(tensor_prod_geo)
+    global error_L2 += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(e, e, elem_id, q_rule)...))[1,1]
+end
+error_L2 = sqrt(error_L2)
+@test(isapprox(error_L2^2, 1/3, atol=1e-10))
