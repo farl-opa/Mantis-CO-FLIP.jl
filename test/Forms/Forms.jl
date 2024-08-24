@@ -273,7 +273,7 @@ end
 β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, tensor_prod_geo, "β")
 
 # Define error
-e = Mantis.Forms.FormExpression((α⁰, β⁰), 0, "-")
+e = α⁰ - β⁰
 
 # compute the L^2 norm of the differences
 using SparseArrays

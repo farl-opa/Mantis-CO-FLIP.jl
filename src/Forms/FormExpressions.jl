@@ -459,6 +459,38 @@ function wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{ma
     return FormExpression((form_1, form_2), form_rank_1 + form_rank_2, "∧")
 end
 
+"""
+    Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Subtract two form fields.
+
+# Arguments
+- `form_1::F_1`: First form field
+- `form_2::F_2`: Second form field
+
+# Returns
+- `FormExpression`: A new FormExpression representing the subtraction of the two form fields.
+"""
+function Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return FormExpression((form_1, form_2), form_rank, "-")
+end
+
+"""
+    Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Add two form fields.
+
+# Arguments
+- `form_1::F_1`: First form field
+- `form_2::F_2`: Second form field
+
+# Returns
+- `FormExpression`: A new FormExpression representing the addition of the two form fields.
+"""
+function Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return FormExpression((form_1, form_2), form_rank, "+")
+end
+
 @doc raw"""
     hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
