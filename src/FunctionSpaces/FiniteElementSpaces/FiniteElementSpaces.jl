@@ -3,17 +3,19 @@ include("HelperFunctions.jl")
 include("AbstractFiniteElementSpace.jl")
 # Extraction operator: functionaly for extraction operator
 include("ExtractionOperator.jl")
-# rational version of finite element spaces
-include("RationalFiniteElementSpaces.jl")
-# canonical finite element space wrapper
-include("CanonicalFiniteElementSpaces.jl")
-# univariate function spaces
-include("UnivariateSplineSpaces.jl")
-include("UnivariateSplineExtractions.jl")
-# composite function spaces
-include("UnstructuredSpaces.jl")
-include("TensorProductSpaces.jl")
-# two scale relations
+# Two scale relations
 include("TwoScaleRelations/TwoScaleRelations.jl")
-# hierarchical function spaces
+
+# Univariate space implementations
+include("UnivariateSplineSpaces.jl")
+
+# General finite element space categories that can be composed to build more complex spaces:
+# 1. rational version of finite element spaces
+include("RationalFiniteElementSpaces.jl")
+# 2. multi-patch function spaces
+include("UnstructuredSpaces.jl")
+# 3. tensor-product spaces
+include("TensorProductSpaces.jl")
+# 4. hierarchical function spaces
 include("HierarchicalFiniteElementSpaces.jl")
+

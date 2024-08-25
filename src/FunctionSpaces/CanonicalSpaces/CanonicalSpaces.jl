@@ -35,3 +35,7 @@ include("ECTSpaces.jl")
 function (elem_loc_basis::C where {C <: AbstractCanonicalSpace})(xi::Vector{Float64}, args...)
     return evaluate(elem_loc_basis, xi, args...)
 end
+
+function get_degree(elem_loc_basis::AbstractCanonicalSpace)
+    return elem_loc_basis.p
+end
