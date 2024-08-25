@@ -18,7 +18,7 @@ struct BSplineSpace{F} <: AbstractFiniteElementSpace{1}
 
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::F, regularity::Vector{Int}, n_dofs_left::Int, n_dofs_right::Int) where {F <: AbstractCanonicalSpace}
         # polynomial degree
-        polynomial_degree = get_degree(polynomials)
+        polynomial_degree = get_polynomial_degree(polynomials)
 
         # Check for errors in the construction 
         if polynomial_degree <0
@@ -296,4 +296,40 @@ The partition of degrees of freedom.
 """
 function get_dof_partition(bspline::BSplineSpace)
     return bspline.dof_partition
+end
+
+"""
+    assemble_global_extraction_matrix(bsplines::BSplineSpace)
+
+Loops over all elements and assembles the global extraction matrix for the B-spline space. The extraction matrix is a sparse matrix that maps the local basis functions to the global basis functions.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-spline space.
+
+# Returns
+- `::Array{Float64,2}`: Global extraction matrix.
+"""
+function assemble_global_extraction_matrix(bspline::BSplineSpace)
+    # Number of global basis functions
+    num_global_basis = get_num_basis(bspline)
+    # Number of elements
+    nel = get_num_elements(bspline)
+    # Number of local basis functions
+    num_local_basis = repeat([get_polynomial_degree(bspline.polynomials) + 1], nel, 1)
+    num_local_basis_offset = cumsum([0; num_local_basis])
+    # Initialize the global extraction matrix
+    global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)
+
+    # Loop over all elements
+    for el_id ∈ 1:nel
+        # get extraction on this element
+        extraction_coefficients, global_basis_indices = get_extraction(bspline, el_id)
+        # get local basis indices
+        local_basis_indices = num_local_basis_offset[el_id]+ 1:num_local_basis_offset[el_id + 1]
+
+        # Assemble the global extraction matrix
+        global_extraction_matrix[local_basis_indices, global_basis_indices] = extraction_coefficients
+    end
+
+    return SparseArrays.sparse(global_extraction_matrix)
 end

@@ -64,9 +64,10 @@ end
 # Generate the Geometry
 deg = 2
 Wt = pi/2
-b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt))
-B = ntuple( i -> b, 4)
-GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, -1])
+b = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+GB = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
 # control points for geometry
 geom_coeffs =   [0.0 -1.0 0.0
 1.0  -1.0 0.25

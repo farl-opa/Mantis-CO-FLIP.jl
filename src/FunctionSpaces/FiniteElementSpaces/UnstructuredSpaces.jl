@@ -236,9 +236,10 @@ Loops over all elements and assembles the global extraction matrix for the unstr
 """
 function assemble_global_extraction_matrix(us_space::UnstructuredSpace{n,m}) where {n,m}
     # Initialize the global extraction matrix
-    num_basis = get_num_basis(us_space)
-    num_basis_consituents = get_num_basis.(us_space.function_spaces)
-    global_extraction_matrix = zeros(Float64, sum(num_basis_consituents), num_basis)
+    num_global_basis = get_num_basis(us_space)
+    num_local_basis = get_num_basis.(us_space.function_spaces)
+    local_basis_offset = cumsum([0; num_local_basis...])
+    global_extraction_matrix = zeros(Float64, local_basis_offset[end], num_global_basis)
 
     # Loop over all elements
     for element_id = 1:get_num_elements(us_space)
@@ -248,11 +249,11 @@ function assemble_global_extraction_matrix(us_space::UnstructuredSpace{n,m}) whe
         # Get the local space ID and local element ID
         space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
 
-        # Get the local basis indices
+        # Get the (offsetted) local basis indices
         _, local_basis_indices = get_extraction(us_space.function_spaces[space_id], space_element_id)
 
         # Assemble the global extraction matrix
-        global_extraction_matrix[local_basis_indices, global_basis_indices] = extraction_coefficients
+        global_extraction_matrix[local_basis_indices .+ local_basis_offset[space_id], global_basis_indices] = extraction_coefficients
     end
 
     return SparseArrays.sparse(global_extraction_matrix)

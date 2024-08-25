@@ -235,7 +235,7 @@ function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fin
     fine_knot_vector = subdivide_knot_vector(coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity)
     p = coarse_bspline.knot_vector.polynomial_degree
 
-    return BSplineSpace(fine_knot_vector.patch_1d, p, p .- fine_knot_vector.multiplicity)
+    return BSplineSpace(fine_knot_vector.patch_1d, coarse_bspline.polynomials, p .- fine_knot_vector.multiplicity)
 end
 
 """
@@ -327,7 +327,7 @@ function single_knot_insertion_oslo(coarse_knot_vector::KnotVector, fine_knot_ve
 end
 
 """
-    build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
+    build_two_scale_matrix(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion 
 of multiple knots, recursively using `single_knot_insertion_oslo()`.
@@ -339,10 +339,9 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knots.
 # Returns 
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
-and finer B-spline space.
+- `global_extraction_matrix`: Global subdivision matrix
 """
-function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
+function build_two_scale_matrix(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
     m = get_knot_vector_length(fine_knot_vector)
     nel = size(fine_knot_vector.patch_1d)
     p = coarse_knot_vector.polynomial_degree
@@ -394,7 +393,7 @@ function build_two_scale_operator(coarse_knot_vector::KnotVector, fine_knot_vect
 end
 
 """
-    build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace)
+    build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace, nsubdivisions::Int)
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion 
 of multiple knots, recursively using `single_knot_insertion_oslo()`.
@@ -405,12 +404,21 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 # Arguments
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `fine_bspline::BSplineSpace`: Fine B-spline, with extra knots.
+- `nsubdivisions::Int`: Number of times each element is subdivided.
+
 # Returns 
 - `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
 and finer B-spline space.
 """
-function build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace, nsubdivisions::Int)
-    gm = build_two_scale_operator(coarse_bspline.knot_vector, fine_bspline.knot_vector)
+function build_two_scale_operator(coarse_bspline::BSplineSpace{F}, fine_bspline::BSplineSpace{F}, nsubdivisions::Int) where {F <: AbstractCanonicalSpace}
+    if F <: Bernstein
+        gm = build_two_scale_matrix(coarse_bspline.knot_vector, fine_bspline.knot_vector)
+
+    else
+        throw(ArgumentError("Right now only polynomial B-splines are supported for two-scale matrix computation."))
+        gm = build_two_scale_matrix()
+
+    end
     
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
     fine_to_coarse_elements = get_fine_to_coarse(fine_bspline, nsubdivisions)

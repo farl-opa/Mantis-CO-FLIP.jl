@@ -204,8 +204,8 @@ function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) whe
         r = p - mult
         
         # Construct smoothness constraint matrix contributions from the left and right of the breakpoint
-        KL = _evaluate_all_at_point(canonical_space, 1, 1.0, r)
-        KR = _evaluate_all_at_point(canonical_space, 1, 0.0, r)
+        KL = _evaluate_all_at_point(canonical_space, 1.0, r)
+        KR = _evaluate_all_at_point(canonical_space, 0.0, r)
         # element sizes where constraints are evaluated
         h_L = get_element_size(knot_vector, el)
         h_R = get_element_size(knot_vector, el+1)
@@ -248,7 +248,7 @@ function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) whe
     end
     
     # Create and return the ExtractionOperator
-    return ExtractionOperator(extraction_coefficients, basis_indices, m, size(H,1))
+    return ExtractionOperator(extraction_coefficients, basis_indices, nel, size(H,1))
 end
 
 """
@@ -286,8 +286,8 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
         KL = _evaluate_all_at_point(spline_spaces[i], bspl_nels[i], 1.0, r)
         KR = _evaluate_all_at_point(spline_spaces[i+1], 1, 0.0, r)
         # element sizes where constraints are evaluated
-        h_L = get_element_size(spline_spaces[i].knot_vector, bspl_nels[i])
-        h_R = get_element_size(spline_spaces[i+1].knot_vector, 1)
+        h_L = get_element_size(spline_spaces[i], bspl_nels[i])
+        h_R = get_element_size(spline_spaces[i+1], 1)
         # scale the constraints by the element sizes and findnz values
         scaling_L = [h_L^(-j) for j = 0:r]
         scaling_R = [h_R^(-j) for j = 0:r]
@@ -313,8 +313,19 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
         r = regularity[m]
         if size(H, 1) >= 2*(r+1)
             Hper = circshift(H, r+1)
-            KL = SparseArrays.findnz(_evaluate_all_at_point(spline_spaces[m], bspl_nels[m], 1.0, r))
-            KR = SparseArrays.findnz(_evaluate_all_at_point(spline_spaces[1], 1, 0.0, r))
+            
+            # smoothness constraints
+            KL = _evaluate_all_at_point(spline_spaces[m], bspl_nels[m], 1.0, r)
+            KR = _evaluate_all_at_point(spline_spaces[1], 1, 0.0, r)
+            # element sizes where constraints are evaluated
+            h_L = get_element_size(spline_spaces[m], bspl_nels[m])
+            h_R = get_element_size(spline_spaces[1], 1)
+            # scale the constraints by the element sizes and findnz values
+            scaling_L = [h_L^(-j) for j = 0:r]
+            scaling_R = [h_R^(-j) for j = 0:r]
+            KL = SparseArrays.findnz(SparseArrays.sparse(KL * LinearAlgebra.diagm(scaling_L)))
+            KR = SparseArrays.findnz(SparseArrays.sparse(KR * LinearAlgebra.diagm(scaling_R)))
+
             rows = [KL[1]; KR[1] .+ (spl_dims[m+1] - spl_dims[m])]
             cols = [KL[2]; KR[2]]
             vals = [-KL[3]; KR[3]]
@@ -340,12 +351,11 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
     for i = 1:m
         for j = 1:bspl_nels[i]
             _, cols_ij = get_extraction(spline_spaces[i], j)
-            cols_ij .+= spl_dims[i]
-            eij = SparseArrays.findnz(H[:, cols_ij])
+            eij = SparseArrays.findnz(H[:, cols_ij .+ spl_dims[i]])
             # Unique indices for non-zero rows and columns
             basis_indices[count+1] = unique(eij[1])
             # Matrix of coefficients
-            extraction_coefficients[count+1] = Array(H[basis_indices[count+1], cols_ij])'
+            extraction_coefficients[count+1] = Array(H[basis_indices[count+1], cols_ij .+ spl_dims[i]])'
             count += 1
         end
     end
