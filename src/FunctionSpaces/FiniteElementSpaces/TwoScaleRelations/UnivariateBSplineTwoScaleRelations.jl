@@ -415,9 +415,7 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace{F}, fine_bspline:
         gm = build_two_scale_matrix(coarse_bspline.knot_vector, fine_bspline.knot_vector)
 
     else
-        throw(ArgumentError("Right now only polynomial B-splines are supported for two-scale matrix computation."))
-        gm = build_two_scale_matrix()
-
+        gm = build_two_scale_matrix(coarse_bspline.polynomials, nsubdivisions)
     end
     
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)

@@ -1,3 +1,5 @@
+import SparseArrays, LinearAlgebra
+
 abstract type AbstractECTSpaces <: AbstractCanonicalSpace end
 
 @doc raw"""
@@ -195,4 +197,56 @@ function gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
     C[1, :] = [M0[:, 1] M1[:, 1:p]]' \ [1.0; zeros(p)] 
 
     return C
+end
+
+"""
+    build_two_scale_matrix(ect_space::AbstractECTSpaces, num_sub_elements::Int)
+
+Uniformly subdivides the ECT space into `num_sub_elements` sub-elements. It is assumed that `num_sub_elements` is a power of 2, else the method throws an argument error. It returns a global subdivision matrix that maps the global basis functions of the ECT space to the global basis functions of the subspaces.
+
+# Arguments
+- `ect_space::AbstractECTSpaces`: A ect space.
+- `num_sub_elements::Int`: The number of subspaces to divide the EC T space into.
+
+# Returns
+- `::SparseMatrixCSC{Float64}`: A global subdivision matrix that maps the global basis functions of the ECT space to the global basis functions of the subspaces.
+"""
+function build_two_scale_matrix(ect_space::AbstractECTSpaces, num_sub_elements::Int)
+    num_ref = log2(num_sub_elements)
+    if num_sub_elements < 2 || !isapprox(num_ref-round(num_ref), 0.0, atol=1e-12)
+        throw(ArgumentError("Number of subdivisions should be a power of 2 and greater than 1"))
+    end
+    p = get_polynomial_degree(ect_space)
+    num_ref = Int(num_ref)
+    
+    # first, build the subdivision matrix for num_sub_elements = 2
+    bisection_matrix = zeros(Float64, 2 * (p+1), p+1)
+    # evaluate all ECT basis functions at left and right endpoints
+    eval_L = _evaluate_all_at_point(ect_space, 0.0, p-1)
+    # fill the subdivision matrix by solving endpoint interpolation problems
+    for i = 1:p
+        if i == 1
+            bisection_matrix[1, i] = 1.0
+        else
+            for j = 1:i-1
+                bisection_matrix[i,j] = (eval_L[j, i]/2^(i-1) - sum(bisection_matrix[1:i-1, j] .* eval_L[1:i-1, i]))/eval_L[i, i]
+            end
+            bisection_matrix[i,i] = 1.0 - sum(bisection_matrix[i, 1:i-1])
+        end
+    end
+    # evaluate at midpoint for the central degree of freedom
+    eval_M = _evaluate_all_at_point(ect_space, 0.5, 0)
+    bisection_matrix[p+1, 1:p+1] = eval_M
+    # fill the rest of the matrix in symmetrically
+    bisection_matrix[p+2:end, :] = bisection_matrix[p+1:-1:1, p+1:-1:1]
+    # convert to a sparse matrix
+    bisection_matrix = SparseArrays.sparse(bisection_matrix)
+
+    # now, build the subdivision matrix for num_sub_elements > 2
+    subdivision_matrix = SparseArrays.sparse(Matrix(LinearAlgebra.I, p+1, p+1))
+    for i = 1:num_ref
+        subdivision_matrix = SparseArrays.blockdiag([bisection_matrix for i = 1:2^(i-1)]...) * subdivision_matrix
+    end
+    
+    return subdivision_matrix
 end
