@@ -166,7 +166,7 @@ function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64},
     
 end
 
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)::Array{Float64}
+function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)::Matrix{Float64}
     return evaluate(polynomials, [ξ], nderivatives)
 end
 

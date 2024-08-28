@@ -12,14 +12,14 @@ Concrete type for Generalized Trignometric section space spanned by `<1, x, ...,
 - `w::Float64`: Weight parameter for the space.
 - `t::Bool`: flag to indicate if critical length is exceeded.
 - `m::Int`: number of terms from the infinite sum used to build the basis.
-- `C::Array{Float64}`: representation matrix for the local basis.
+- `C::Matrix{Float64}`: representation matrix for the local basis.
 """
 struct GeneralizedTrigonometric <: AbstractECTSpaces
     p::Int
     w::Float64
     t::Bool
     m::Int
-    C::Array{Float64}
+    C::Matrix{Float64}
     endpoint_tol::Float64
     function GeneralizedTrigonometric(p::Int)
         w = 1.0
@@ -151,7 +151,7 @@ Build representation matrix for Generalized Trignometric section space of degree
 - `m::Int`: number of terms from the infinite sum used to build the basis.
 
 # Returns:
-- `C::Array{Float64}`: representation matrix for the local basis.
+- `C::Matrix{Float64}`: representation matrix for the local basis.
 """
 
 import LinearAlgebra, ToeplitzMatrices

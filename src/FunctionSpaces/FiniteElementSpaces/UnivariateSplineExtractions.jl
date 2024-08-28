@@ -240,7 +240,7 @@ function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) whe
     end
     # Convert global extraction matrix to element local extractions
     # (here, the matrix is transposed so that [canonical_space] * [extraction] = [B-splines])
-    extraction_coefficients = Vector{Array{Float64}}(undef, nel)
+    extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
     for el ∈ 1:nel
         cols_el = canonical_dims[el]+1:canonical_dims[el+1]
         # Matrix of coefficients
@@ -345,7 +345,7 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
 
     # Convert global extraction matrix to element local extractions
     # (here, the matrix is transposed so that [spline_spaces] * [extraction] = [GTB-splines])
-    extraction_coefficients = Vector{Array{Float64}}(undef, nel)
+    extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
     basis_indices = Vector{Vector{Int}}(undef, nel)
     count = 0
     for i = 1:m
@@ -460,7 +460,7 @@ end
 
 #     # Convert global extraction matrix to element local extractions
 #     # (here, the matrix is transposed so that [canonical_spaces] * [extraction] = [GTB-splines])
-#     extraction_coefficients = Vector{Array{Float64}}(undef, m)
+#     extraction_coefficients = Vector{Matrix{Float64}}(undef, m)
 #     basis_indices = Vector{Vector{Int}}(undef, m)
 #     for i = 1:m
 #         cols_i = collect(1:get_num_basis(canonical_spaces[i]))

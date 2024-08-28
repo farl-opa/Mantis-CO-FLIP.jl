@@ -112,7 +112,7 @@ Get extraction coefficients and global basis indices for the specified global el
 - `element_id::Int`: The global element ID.
 
 # Returns
-- `extraction_coefficients::Array{Float64}`: Extraction coefficients.
+- `extraction_coefficients::Matrix{Float64}`: Extraction coefficients.
 - `basis_indices::Vector{Int}`: Indices of global basis functions.
 """
 function get_extraction(us_space::UnstructuredSpace, element_id::Int)
@@ -177,7 +177,7 @@ Evaluate the local basis functions for a given element in the unstructured space
 - `nderivatives::Int`: Number of derivatives to evaluate.
 
 # Returns
-- `::Array{Float64}`: Array of evaluated local basis (size: num_eval_points × num_funcs × (nderivatives+1)).
+- `::Matrix{Float64}`: Array of evaluated local basis (size: num_eval_points × num_funcs × (nderivatives+1)).
 - `::Vector{Int}`: Vector of local basis indices (size: num_funcs).
 """
 function get_local_basis(us_space::UnstructuredSpace{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,m}

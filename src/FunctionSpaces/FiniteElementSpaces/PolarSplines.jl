@@ -56,7 +56,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     space_dim = get_num_basis(tp_space) - pole_offset
 
     # allocate space for extraction coefficients and basis indices
-    extraction_coefficients = Vector{Array{Float64}}(undef,num_elements)
+    extraction_coefficients = Vector{Matrix{Float64}}(undef,num_elements)
     basis_indices = Vector{Vector{Int}}(undef,num_elements)
     for e ∈ 1:num_elements
         # get tp_extraction basis indices
@@ -73,7 +73,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
             # indices of all active functions
             basis_indices[e] = cat([1,2,3],tp_basis_inds[i_unmodified] .- pole_offset,dims=1)
             # extraction coefficients will be stored here
-            el_extraction = Array{Float64}(undef,n_tp_basis,length(i_unmodified)+3)
+            el_extraction = Matrix{Float64}(undef,n_tp_basis,length(i_unmodified)+3)
             # extraction coefficients for modified basis functions
             for j ∈ 1:3
                 el_extraction[i_modified,j] .= ex_coeff_pole[tp_basis_inds[i_modified],j]

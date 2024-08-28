@@ -488,7 +488,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_bspline::NTuple{n, BSplineSpace}`: Coarse B-spline.
 - `nsubdivisions::NTuple{n, Int}`: Number of times each element is subdivided.
 # Returns 
-- `::NTuple{n, Vector{Array{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
+- `::NTuple{n, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
 """
 function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}) where {n}
     return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], nsubdivisions[d]), n)
@@ -507,7 +507,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 # Arguments
 - `coarse_bspline::NTuple{n, BSplineSpace}`: Coarse B-spline.
 # Returns 
-- `::NTuple{n, Vector{Array{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
+- `::NTuple{n, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
 """
 function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}) where {n}
     return build_two_scale_operator(coarse_bspline, ntuple(d -> 2, n))
@@ -527,7 +527,7 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `coarse_bspline::NTuple{n, BSplineSpace}`: Coarse B-splines.
 - `fine_bspline::NTuple{n, BSplineSpace}`: Fine B-splines, with extra knots.
 # Returns 
-- `::NTuple{n, Vector{Array{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
+- `::NTuple{n, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
 """
 function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, fine_bspline::NTuple{n, BSplineSpace}) where {n}
     return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]), n)

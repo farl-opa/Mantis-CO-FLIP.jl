@@ -14,7 +14,7 @@ include("ECTSpaces.jl")
 # # Has to be below the include statements to ensure that all evaluate 
 # # methods are visible to it!
 # @doc raw"""
-#     (elem_loc_basis::AbstractCanonicalSpace)(xi::Vector{Float64}, args...)::Array{Float64}
+#     (elem_loc_basis::AbstractCanonicalSpace)(xi::Vector{Float64}, args...)::Matrix{Float64}
 
 # Call the `evaluate`-method for the given `elem_loc_basis`.
 
