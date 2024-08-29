@@ -1,0 +1,122 @@
+import Mantis
+
+using Test
+
+using LinearAlgebra
+using SparseArrays
+
+
+# Domain
+const Lleft = 0.0
+const Lright = 1.0
+const Lbottom = 0.0
+const Ltop = 1.0
+
+# Setup the form spaces
+# First the FEM spaces
+breakpoints1 = [Lleft, 0.5, Lright]
+patch1 = Mantis.Mesh.Patch1D(breakpoints1)
+breakpoints2 = [Lbottom, 0.5, 0.6, Ltop]
+patch2 = Mantis.Mesh.Patch1D(breakpoints2)
+
+# first B-spline patch
+deg1 = 2
+deg2 = 2
+B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, deg1-1, -1])
+# second B-spline patch
+B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-1, -1])
+# tensor-product B-spline patch
+TP_Space = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
+TP_Space3d = Mantis.FunctionSpaces.TensorProductSpace(TP_Space, B1)
+
+# Then the geometry 
+# Line 1
+line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
+
+# Line 2
+line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
+
+# Tensor product geometry 
+tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
+geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
+
+# Crazy mesh
+const crazy_c = 0.2
+function mapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+end
+function dmapping(x::Vector{Float64})
+    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+end
+
+dimension = (2, 2)
+crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
+geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, crazy_mapping)
+
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+
+# Test on multiple geometries. Type-wise and content/metric wise.
+for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
+    println("Geom type: ",typeof(geom))
+    # Create form spaces
+    zero_form_space = Mantis.Forms.FormSpace(0, geom, (TP_Space,), "ν")
+    one_form_space = Mantis.Forms.FormSpace(1, geom, (TP_Space, TP_Space), "η")
+    top_form_space = Mantis.Forms.FormSpace(2, geom, (TP_Space,), "σ")
+
+    # Generate the form expressions
+    α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+    α⁰.coefficients .= 1.0
+    ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
+    ζ¹.coefficients .= 1.0
+    constdx = Mantis.Forms.FormField(one_form_space, "ζ")
+    constdx.coefficients[begin:20] .= 1.0
+    constdy = Mantis.Forms.FormField(one_form_space, "ζ")
+    constdy.coefficients[21:end] .= 1.0
+    dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+    γ² = Mantis.Forms.FormField(top_form_space, "γ")
+    γ².coefficients .= 1.0
+    dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+
+    ★α⁰ = Mantis.Forms.hodge(α⁰)
+    ★ζ¹ = Mantis.Forms.hodge(ζ¹)
+    ★γ² = Mantis.Forms.hodge(γ²)
+    
+    for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+        # Note that we cannot do mixed inner products
+
+        # Tests to see if the integrated metric terms are correctly recovered.
+        g, det_g = Mantis.Geometry.metric(geom, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        
+        # 0-forms
+        # Hodge of a unity 0-form is the volume form and has only 1 component.
+        @test all(isapprox(Mantis.Forms.evaluate(★α⁰, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1], det_g, atol=1e-12))
+        #@test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(★α⁰), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1], α⁰, atol=1e-12))
+
+        # 1-forms
+        @test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][2][:,1], (g./det_g)[:,2,2], atol=1e-12))
+        @test all(isapprox(Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1][:,2], -(g./det_g)[:,1,1], atol=1e-12))
+        
+        hodge_1_eval = Mantis.Forms.evaluate(★ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_1_eval[1][1], hcat((g./det_g)[:,1,2], -(g./det_g)[:,1,1]), atol=1e-12))
+        @test all(isapprox(hodge_1_eval[1][2], hcat((g./det_g)[:,2,2], -(g./det_g)[:,2,1]), atol=1e-12))
+
+        # n-forms
+        # Hodge of a unity n-form is a form and has only 1 component.
+        @test all(isapprox(Mantis.Forms.evaluate(★γ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1], 1.0./det_g, atol=1e-12))
+    end
+end
+
+
+# ★α⁰ = Mantis.Forms.hodge(α⁰)
+# ★θ¹ = Mantis.Forms.hodge(θ¹)
+# ★ζ² = Mantis.Forms.hodge(ζ²)
+# ★γ³ = Mantis.Forms.hodge(γ³)
+
+# ★α⁰_eval = Mantis.Forms.evaluate(★α⁰, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+# ★θ¹_eval = Mantis.Forms.evaluate(★θ¹, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+# ★ζ²_eval = Mantis.Forms.evaluate(★ζ², 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
+# ★γ³_eval = Mantis.Forms.evaluate(★γ³, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))

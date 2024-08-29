@@ -400,11 +400,12 @@ Evaluate the pushforward of the vector field at the discrete points where it has
 # Arguments
 - `vfield::Vector{Matrix{Float64}}`: The pointwise evaluated vector field to evaluate the pushforward for.
 - `jacobian::Array{Float64,3}`: The Jacobian of the vector field evaluated at the discrete points.
+- `manifold_dim::Int`: The dimension of the embedding manifold.
 
 # Returns
 - `::Vector{Matrix{Float64}}`: The evaluated pushforward of the vector field at the discrete points.
 """
-function evaluate_pushforward(vfield::Vector{Matrix{Float64}}, jacobian::Array{Float64,3})
+function evaluate_pushforward(vfield::Vector{Matrix{Float64}}, jacobian::Array{Float64,3}, manifold_dim::Int)
     image_dim = size(jacobian,2)
     
     # Gᵢ: v ↦ Gᵢ(v) = Jᵢⱼvʲ
@@ -438,7 +439,7 @@ function evaluate_sharp_pushforward(form_expression::AbstractFormExpression{mani
     
     # dξⁱ ↦ G∘♯ (dξⁱ)
     jacobian = Geometry.jacobian(form_expression.geometry, element_id, xi)
-    evaluated_pushforward = evaluate_pushforward(sharp_eval, jacobian)
+    evaluated_pushforward = evaluate_pushforward(sharp_eval, jacobian, manifold_dim)
     
     return evaluated_pushforward, sharp_indices
 end

@@ -96,7 +96,7 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
     # that happen to be zero by computation. 
     #spa.dropzeros!(A)
 
-    return A, b[1:n_dofs_test]
+    return A, b
 
 end
 
