@@ -53,7 +53,7 @@ renderView1.Update()
 warpByScalar1 = WarpByScalar(registrationName='WarpByScalar1', Input=extractSurface1)
 
 # Properties modified on warpByScalar1
-warpByScalar1.ScaleFactor = 0.05
+warpByScalar1.ScaleFactor = 0.2
 
 # show data in view
 warpByScalar1Display = Show(warpByScalar1, renderView1, 'GeometryRepresentation')
