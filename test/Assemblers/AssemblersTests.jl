@@ -458,6 +458,10 @@ for case in cases
         # Create solution(s) as forms.
         α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
         α⁰.coefficients .= sol
+        if run_tests
+            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"), 0.0, atol=1e-14)
+            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "Linf"), 0.0, atol=1e-14)
+        end
         if verbose
             print("Total L2 error 0-form: ")
             println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"))
