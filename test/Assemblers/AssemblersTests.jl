@@ -341,10 +341,16 @@ function exact_sol_sine_2d(x::Matrix{Float64})
     return [@. sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
 
+function exact_sol_sine_2d_grad(x::Matrix{Float64})
+    return [@. 2.0 * pi * cospi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]),  2.0 * pi * sinpi(2.0 * x[:,1]) * cospi(2.0 * x[:,2])]
+end
+
 sol⁰_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geom_cartesian, "sol")
+sol¹_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(1, exact_sol_sine_2d_grad, geom_cartesian, "sol")
 sol²_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_sine_2d, geom_cartesian, "sol")
 
 sol⁰_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geom_crazy, "sol")
+sol¹_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(1, exact_sol_sine_2d_grad, geom_crazy, "sol")
 sol²_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_sine_2d, geom_crazy, "sol")
 
 
@@ -520,7 +526,7 @@ for case in cases
             ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)]
             β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)+1:end]
 
-            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
+            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol, sol¹_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
         end
     
     elseif case == "sine2d-Dirichlet-mixed-crazy"
@@ -532,7 +538,7 @@ for case in cases
             ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)]
             β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)+1:end]
 
-            write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
+            write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol, sol¹_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
         end
     else
         if verbose
