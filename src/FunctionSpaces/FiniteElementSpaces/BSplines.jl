@@ -64,12 +64,24 @@ struct BSplineSpace{F} <: AbstractFiniteElementSpace{1}
         new{F}(knot_vector, extraction_op, polynomials, dof_partition)
     end
 
+    # constructor with default dof_partitioning
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::F, regularity::Vector{Int}) where {F <: AbstractCanonicalSpace}
         BSplineSpace(patch_1d, polynomials, regularity, 1, 1)
     end
 
+    # constructor with default polynomials
     function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
         BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity, 1, 1)
+    end
+
+    # constructor with default internal regularity and dof_partitioning
+    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::F, regularity::Int) where {F <: AbstractCanonicalSpace}
+        BSplineSpace(patch_1d, polynomials, [-1; repeat([regularity],size(patch_1d)-1); -1], 1, 1)
+    end
+
+    # constructor with default internal regularity, polynomials, and dof_partitioning
+    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Int)
+        BSplineSpace(patch_1d, Bernstein(polynomial_degree), [-1; repeat([regularity],size(patch_1d)-1); -1], 1, 1)
     end
 
 end
