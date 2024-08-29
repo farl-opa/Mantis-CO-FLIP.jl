@@ -1,15 +1,4 @@
 
-import .. Geometry
-import .. FunctionSpaces
-import .. Forms
-import .. Quadrature
-
-import ... Main  # For testing only, to be able to use Main.@code_warntype (but not when precompiling!)
-
-
-
-
-
 @doc raw"""
     struct WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest, G} <: AbstractInputs
 
