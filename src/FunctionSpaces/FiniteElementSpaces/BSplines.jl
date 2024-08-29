@@ -150,16 +150,13 @@ Returns the degree of B-splines.
 
 # Arguments
 - `bspline::BSplineSpace`: A univariate B-Spline function space.
+- `elem_id::Int`: An optional dummy argument for uniformity with other spaces (dummy because the degree is the same for all elements for B-splines).
 
 # Returns
 - `polynomial_degree`: Polynomial degree.
 """
-function get_polynomial_degree(bspline::BSplineSpace)
-    return bspline.knot_vector.polynomial_degree
-end
-
-function get_polynomial_degree(bspline::BSplineSpace, ::Int)
-    return bspline.knot_vector.polynomial_degree
+function get_polynomial_degree(bspline::BSplineSpace, elem_id::Int = 0)
+    return get_polynomial_degree(bspline)
 end
 
 """
