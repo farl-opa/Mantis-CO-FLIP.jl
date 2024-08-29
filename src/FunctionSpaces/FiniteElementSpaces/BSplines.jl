@@ -156,7 +156,7 @@ Returns the degree of B-splines.
 - `polynomial_degree`: Polynomial degree.
 """
 function get_polynomial_degree(bspline::BSplineSpace, elem_id::Int = 0)
-    return get_polynomial_degree(bspline)
+    return get_polynomial_degree(bspline.polynomials)
 end
 
 """
