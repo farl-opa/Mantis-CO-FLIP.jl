@@ -342,7 +342,7 @@ function exact_sol_sine_2d(x::Matrix{Float64})
 end
 
 function exact_sol_sine_2d_grad(x::Matrix{Float64})
-    return [@. 2.0 * pi * cospi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]),  2.0 * pi * sinpi(2.0 * x[:,1]) * cospi(2.0 * x[:,2])]
+    return [2.0.*pi.*cospi.(2.0 .* x[:,1]).*sinpi.(2.0 .* x[:,2]) 2.0.*pi.*sinpi.(2.0 .* x[:,1]).*cospi.(2.0 .* x[:,2])]
 end
 
 sol⁰_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geom_cartesian, "sol")
