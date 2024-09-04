@@ -121,9 +121,9 @@ output_data_folder = joinpath(data_folder, "output", "Poisson") # Create this fo
 # Choose whether to write the output to a file, run the tests, and/or 
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
-write_to_output_file = false  # false
-run_tests = true              # true
-verbose = false               # false
+write_to_output_file = true  # false
+run_tests = false              # true
+verbose = true               # false
 
 
 
@@ -332,7 +332,7 @@ f²_crazy_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_
 
 
 function forcing_function_sine_2d(x::Matrix{Float64})
-    return [@. -8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
 
 f⁰_cart_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_cartesian, "f")
@@ -348,7 +348,7 @@ function exact_sol_sine_2d(x::Matrix{Float64})
 end
 
 function exact_sol_sine_2d_grad(x::Matrix{Float64})
-    return [2.0.*pi.*cospi.(2.0 .* x[:,1]).*sinpi.(2.0 .* x[:,2]), 2.0.*pi.*sinpi.(2.0 .* x[:,1]).*cospi.(2.0 .* x[:,2])]
+    return [-2.0.*pi.*sinpi.(2.0 .* x[:,1]).*cospi.(2.0 .* x[:,2]), 2.0.*pi.*cospi.(2.0 .* x[:,1]).*sinpi.(2.0 .* x[:,2])]
 end
 
 sol⁰_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geom_cartesian, "sol")
@@ -448,6 +448,7 @@ sol²_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_si
 if verbose
     println()
 end
+
 cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "cos1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "sine2d-Dirichlet-mixed", "sine2d-Dirichlet-mixed-crazy"]
 for case in cases
 
@@ -536,7 +537,7 @@ for case in cases
             println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_cart_sine_2d_exact_sol, q_rule_2d, "L2"))
         end
         if write_to_output_file
-           write_form_sol_to_file([α⁰, sol⁰_cart_sine_2d_exact_sol], ["zero_form", "exact_zero_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
+           write_form_sol_to_file([α⁰, sol⁰_cart_sine_2d_exact_sol, α⁰ - sol⁰_cart_sine_2d_exact_sol], ["zero_form", "exact_zero_form", "error_zero_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
         end
         
     elseif case == "sine2d-Dirichlet-crazy"
@@ -551,7 +552,7 @@ for case in cases
             println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_crazy_sine_2d_exact_sol, q_rule_2d, "L2"))
         end
         if write_to_output_file
-           write_form_sol_to_file([α⁰, sol⁰_crazy_sine_2d_exact_sol], ["zero_form", "exact_zero_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
+           write_form_sol_to_file([α⁰, sol⁰_crazy_sine_2d_exact_sol, α⁰ - sol⁰_crazy_sine_2d_exact_sol], ["zero_form", "exact_zero_form", "error_zero_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
         end
         
     elseif case == "sine2d-Dirichlet-mixed"
@@ -570,7 +571,7 @@ for case in cases
             println(Mantis.Assemblers.compute_error_total(β², sol²_cart_sine_2d_exact_sol, q_rule_2d, "L2"))
         end
         if write_to_output_file
-            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol, sol¹_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
+            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol, sol¹_cart_sine_2d_exact_sol, β² - sol²_cart_sine_2d_exact_sol, ξ¹ - sol¹_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form", "error_two_form", "error_one_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
         end
     
     elseif case == "sine2d-Dirichlet-mixed-crazy"
@@ -589,7 +590,7 @@ for case in cases
             println(Mantis.Assemblers.compute_error_total(β², sol²_crazy_sine_2d_exact_sol, q_rule_2d, "L2"))
         end
         if write_to_output_file
-            write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol, sol¹_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
+            write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol, sol¹_crazy_sine_2d_exact_sol, β² - sol²_crazy_sine_2d_exact_sol, ξ¹ - sol¹_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form", "error_two_form", "error_one_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
         end
     else
         if verbose

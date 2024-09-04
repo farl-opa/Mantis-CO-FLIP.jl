@@ -214,16 +214,31 @@ function _plot(form::Forms.AbstractFormExpression{1, form_rank, G}, offset::Unio
     # create a structured grid, each cell of this refined grid is plotted.
     # These cells can be on a straight line, but they can also lie on a complex manifold of dimension 1 embedded in R^3
 
+    # Enforce that degree is at least 1, which is the minimum required by paraview 
+    degree = max(degree, 1)
+
     geometry = Forms.get_geometry(form)
 
-    is_field = typeof(form) <: Forms.AbstractFormField{1, form_rank, G} # checks whether the form is a form field (which can be evaluated with coefficients)
-    
+    n_total_elements = prod(geometry.n_elements)
+
+    # Check if form expression is made up of fields of contains basis functions (form space)
+    # We do this by evaluating all elements and checking if the indices are all the same (form field base expression)
+    _, form_indices = Forms.evaluate(form, 1, ([0.0],))  # evaluate at the [0.0, 0.0] point of the first element
+    form_index_ref = form_indices[1][1]  # use one index as reference 
+
+    is_field = true  # then check if all indices are the same
+    for element_idx in 1:n_total_elements
+        _, form_indices = Forms.evaluate(form, element_idx, ([0.0],))  # evaluate at the [0.0, 0.0] point of the first element
+        for form_component_indices in form_indices
+            is_field = is_field & all(y -> y == form_index_ref, form_component_indices)
+        end
+    end
+
     range_dim = Geometry.get_image_dim(geometry)
     # print("Geometry dimensions: ", domain_dim, " x ", range_dim, "\n")
     
     # Compute the total number of points
     n_vertices = prod(geometry.n_elements) * n_subcells * (degree+1)  # there are n_subcells cells per element, and (p+1) vertices per cell
-    n_total_elements = prod(geometry.n_elements)
     n_total_cells = n_total_elements * n_subcells  # each computational element is subdivided into n_subcells
     
     vertices = Array{Float64, 2}(undef, range_dim, n_vertices)
@@ -310,17 +325,33 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
     # create a structured grid, each cell of this refined grid is plotted.
     # These cells can be on a plane, but then can also lie on a complex manifold of dimension 2 embedded in R^3
 
+    # Enforce that degree is at least 1, which is the minimum required by paraview 
+    degree = max(degree, 1)
+
     geometry = Forms.get_geometry(form)
 
-    is_field = typeof(form) <: Forms.AbstractFormField{2, form_rank, G} # checks whether the form is a form field (which can be evaluated with coefficients)
-    
+    n_total_elements = prod(geometry.n_elements)
+
+    # Check if form expression is made up of fields of contains basis functions (form space)
+    # We do this by evaluating all elements and checking if the indices are all the same (form field base expression)
+    _, form_indices = Forms.evaluate(form, 1, ([0.0], [0.0]))  # evaluate at the [0.0, 0.0] point of the first element
+    form_index_ref = form_indices[1][1]  # use one index as reference 
+
+    is_field = true  # then check if all indices are the same
+    for element_idx in 1:n_total_elements
+        _, form_indices = Forms.evaluate(form, element_idx, ([0.0], [0.0]))  # evaluate at the [0.0, 0.0] point of the first element
+        for form_component_indices in form_indices
+            is_field = is_field & all(y -> y == form_index_ref, form_component_indices)
+        end
+    end
+
     range_dim = Geometry.get_image_dim(geometry)
 
     # print("Geometry dimensions: ", domain_dim, " x ", range_dim, "\n")
     
     # Compute the total number of points
     n_vertices = prod(geometry.n_elements) * (n_subcells^2) * ((degree+1)^2)  # there are n_subcells^2 cells per element, and (p+1)^2 vertices per cell
-    n_total_elements = prod(geometry.n_elements)
+    
     n_total_cells = n_total_elements * (n_subcells^2)  # each computational element is subdivided into n_subcells^2
     
     vertices = Array{Float64, 2}(undef, range_dim, n_vertices)
@@ -366,7 +397,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
+                            point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(vec(reduce.(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
                         else form_rank == 2
                             point_data[:,vertex_idx + corner_idx[count+1]] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
@@ -401,7 +432,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + count] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            point_data[:,vertex_idx + count] .= vcat(vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
+                            point_data[:,vertex_idx + count] .= vcat(vec(reduce.(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
                         else form_rank == 2
                             point_data[:,vertex_idx + count] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
@@ -427,7 +458,7 @@ function _plot(form::Forms.AbstractFormExpression{2, form_rank, G}, offset::Unio
                         if form_rank == 0
                             point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(Forms.evaluate(form, element_idx, ξ)[1]...)
                         elseif form_rank == 1
-                            point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(vec(reduce(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
+                            point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(vec(reduce.(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1])), [0.0])
                         else form_rank == 2
                             point_data[:,vertex_idx + vertex_offset + interior_vertex_idx] .= vcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)
                         end
