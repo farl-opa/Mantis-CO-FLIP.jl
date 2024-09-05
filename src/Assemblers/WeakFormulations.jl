@@ -1,15 +1,4 @@
 
-import .. Geometry
-import .. FunctionSpaces
-import .. Forms
-import .. Quadrature
-
-import ... Main  # For testing only, to be able to use Main.@code_warntype (but not when precompiling!)
-
-
-
-
-
 @doc raw"""
     struct WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest, G} <: AbstractInputs
 
@@ -88,10 +77,12 @@ function poisson_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Tt
     dtest = Forms.exterior_derivative(inputs.space_test)
 
     A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(dtest, dtrial, element_id, inputs.quad_rule)
+    A_elem .*= -1.0  # this is needed here because integration by parts adds a -1 on this term
 
     # The linear form is the inner product between the trial form and 
     # the forcing function which is a form of an appropriate rank.
     b_row_idx, b_col_idx, b_elem = Forms.evaluate_inner_product(inputs.space_test, inputs.forcing, element_id, inputs.quad_rule)
+    b_elem .*= -1.0
     
     # The output should be the contribution to the left-hand-side matrix 
     # A and right-hand-side vector b. The outputs are tuples of 
@@ -212,8 +203,10 @@ formulation is:
 
 For given ``f^n \in L^2 \Lambda^n (\Omega)``, find ``u^{n-1} \in H(div, \Omega) \Lambda^{n-1} (\Omega)`` and ``\phi^n \in L^2 \Lambda^n (\Omega)`` such that 
 ```math
-\langle \varepsilon^{n-1}, u^{n-1} \rangle - \langle d \varepsilon^{n-1}, \phi^n \rangle = 0 \quad \forall \ \varepsilon^{n-1} \in H(div, \Omega) \Lambda^{n-1} (\Omega)
+\begin{gather}
+\langle \varepsilon^{n-1}, u^{n-1} \rangle - \langle d \varepsilon^{n-1}, \phi^n \rangle = 0 \quad \forall \ \varepsilon^{n-1} \in H(div, \Omega) \Lambda^{n-1} (\Omega) \\
 \langle \varepsilon^n, d u^{n-1} \rangle = -\langle \varepsilon^n f^n \rangle \quad \forall \ \varepsilon^n \in L^2 \Lambda^n (\Omega)
+\end{gather}
 ```
 
 # Arguments
@@ -224,31 +217,32 @@ function poisson_mixed(inputs::WeakFormInputsMixed{manifold_dim, Frhs, Ttrial1, 
     # Left hand side.
     # <ε¹, u¹>
     A_row_idx_11, A_col_idx_11, A_elem_11 = Forms.evaluate_inner_product(inputs.space_test_eps_1, inputs.space_trial_u_1, element_id, inputs.quad_rule)
-
+    
     # <dε¹, ϕ²>
     A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(Forms.exterior_derivative(inputs.space_test_eps_1), inputs.space_trial_phi_2, element_id, inputs.quad_rule)
-
+    
     # <ε², du¹>
     A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(inputs.space_test_eps_2, Forms.exterior_derivative(inputs.space_trial_u_1), element_id, inputs.quad_rule)
 
     # The remain term, A22, is zero, so not computed.
 
     # Add offsets.
-    A_row_idx_21 .+= Forms.get_num_basis(inputs.space_trial_u_1)
+    A_row_idx_21 .+= Forms.get_num_basis(inputs.space_test_eps_1)
 
     A_col_idx_12 .+= Forms.get_num_basis(inputs.space_trial_u_1)
 
     # Put all variables together.
     A_row_idx = vcat(A_row_idx_11, A_row_idx_12, A_row_idx_21)
     A_col_idx = vcat(A_col_idx_11, A_col_idx_12, A_col_idx_21)
-    A_elem = vcat(A_elem_11, -A_elem_12, A_elem_21)
+    A_elem = vcat(A_elem_11, A_elem_12, A_elem_21)
 
 
     # Right hand side. Only the second part is non-zero.
     # <ε², f²>
-    b_row_idx, b_col_idx, b_elem = Forms.evaluate_inner_product(inputs.space_test_eps_2, inputs.forcing, element_id, inputs.quad_rule)
+    b_row_idx, _, b_elem = Forms.evaluate_inner_product(inputs.space_test_eps_2, inputs.forcing, element_id, inputs.quad_rule)
+    b_elem .*= -1.0
     
-    b_row_idx .+= Forms.get_num_basis(inputs.space_trial_u_1)
+    b_row_idx .+= Forms.get_num_basis(inputs.space_test_eps_1)
 
     
     # The output should be the contribution to the left-hand-side matrix 
