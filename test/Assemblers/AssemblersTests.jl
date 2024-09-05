@@ -180,20 +180,19 @@ one_form_space_test_1d = Mantis.Forms.FormSpace(1, geom_1d, (test_space_1d_pm1,)
 # Forcing forms
 # Constant forcing
 function forcing_const_1d(x::Matrix{Float64})
-    return [-ones(size(x,1))]
+    return [ones(size(x,1))]
 end
 f⁰_const_1d = Mantis.Forms.AnalyticalFormField(0, forcing_const_1d, geom_1d, "f")
 
 # Sine forcing
 function forcing_sine_1d(x::Matrix{Float64})
-    return [@. -pi^2 * sinpi.(x[:,1])]
+    return [@. pi^2 * sinpi.(x[:,1])]
 end
-f¹_sine_1d = Mantis.Forms.AnalyticalFormField(1, forcing_sine_1d, geom_1d, "f")
 f⁰_sine_1d = Mantis.Forms.AnalyticalFormField(0, forcing_sine_1d, geom_1d, "f")
 
 # Cosine forcing for the mixed formulation.
 function forcing_cos_1d(x::Matrix{Float64})
-    return [@. -pi^2 * cospi.(x[:,1]-0.5)]
+    return [@. pi^2 * cospi.(x[:,1]-0.5)]
 end
 f¹_cos_1d = Mantis.Forms.AnalyticalFormField(1, forcing_cos_1d, geom_1d, "f")
 
@@ -210,11 +209,10 @@ function exact_sol_sine_1d(x::Matrix{Float64})
     return [@. sinpi(x[:,1]) + ((bc_right_sine_1d - bc_left_sine_1d - sinpi(Lright_1d)) / Lright_1d)*x[:,1] + bc_left_sine_1d]
 end
 sol⁰_sine_1d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_1d, geom_1d, "sol")
-sol¹_sine_1d_exact_sol = Mantis.Forms.AnalyticalFormField(1, exact_sol_sine_1d, geom_1d, "sol")
 
 # Cosine forcing
 function exact_sol_cos_1d_zero_form(x::Matrix{Float64})
-    return [@. pi * sinpi((x[:,1] - 0.5)) + cospi((Lright_1d - 0.5)) / Lright_1d]
+    return [@. -pi * sinpi((x[:,1] - 0.5)) - cospi((Lright_1d - 0.5)) / Lright_1d]
 end
 function exact_sol_cos_1d_one_form(x::Matrix{Float64})
     return [@. cospi((x[:,1] - 0.5)) - x[:,1] * cospi((Lright_1d - 0.5)) / Lright_1d]
