@@ -164,9 +164,9 @@ if verbose_step
     println("Maximum error: $max_error. \n")
 end
 
-        global hb_errors = Vector{Float64}(undef, nsteps+1)
-        global hb_dofs = Vector{Int}(undef, nsteps+1)
-        #hb_nnz = Vector{Int}(undef, nsteps+1)
+    global hb_errors = Vector{Float64}(undef, nsteps+1)
+    global hb_dofs = Vector{Int}(undef, nsteps+1)
+    #hb_nnz = Vector{Int}(undef, nsteps+1)
 
 thb_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
 thb_errors[1] = max_error
@@ -200,6 +200,7 @@ thb_nnz[1] = SparseArrays.nnz(A)
                 println("Step $step") 
                 println("Maximum error: $(max_error).") 
                 println("Number of marked_elements: $(length(dorfler_marking)).")
+            end
 
         println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
         println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
@@ -266,6 +267,7 @@ hb_nnz[1] = SparseArrays.nnz(A)
                 println("Step $step") 
                 println("Maximum error: $(max_error).") 
                 println("Number of marked_elements: $(length(dorfler_marking)).")
+            end
 
         println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
         println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
