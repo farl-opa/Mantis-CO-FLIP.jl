@@ -9,6 +9,7 @@ import WriteVTK
 
 import .. Geometry
 import .. Fields
+import .. Forms
 
 include("./PlotKernel.jl")
 
@@ -46,6 +47,14 @@ end
 
 function plot(geometry::Geometry.AbstractGeometry{n}, field::Fields.AbstractField{n,k}, offset::Function; kwargs...) where {n, k}
   _plot(geometry, field, offset; kwargs...)
+end
+
+function plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}; kwargs...) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+  _plot(form; kwargs...)
+end
+
+function plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, offset::Function; kwargs...) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+  _plot(form, offset; kwargs...)
 end
 
 
