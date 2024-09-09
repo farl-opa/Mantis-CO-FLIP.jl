@@ -25,16 +25,16 @@ for deg1 in 0:5
         # tensor-product B-spline patch
         TP = Mantis.FunctionSpaces.TensorProductSpace(B1,B2)
         # evaluation points
-        x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
-        x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
+        qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+        x_all = Mantis.Quadrature.get_quadrature_nodes(qrule)
         for el in 1:1:Mantis.FunctionSpaces.get_num_elements(TP)
             # check B-spline evaluation
-            TP_eval, _ = Mantis.FunctionSpaces.evaluate(TP, el, (x1,x2), 0)
+            TP_eval, _ = Mantis.FunctionSpaces.evaluate(TP, el, x_all, 0)
             # Positivity of the polynomials
-            @test minimum(TP_eval[0,0]) >= 0.0
+            @test minimum(TP_eval[1][1]) >= 0.0
 
             # Partition of unity
-            @test all(isapprox.(sum(TP_eval[0,0], dims=2), 1.0))
+            @test all(isapprox.(sum(TP_eval[1][1], dims=2), 1.0))
         end
     end
 end
@@ -70,8 +70,8 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(TP)
     # check B-spline evaluation
     TP_eval, _ = Mantis.FunctionSpaces.evaluate(TP, el, (x1,x2))
     # Positivity of the polynomials
-    @test minimum(TP_eval[0,0]) >= 0.0
+    @test minimum(TP_eval[1][1]) >= 0.0
 
     # Partition of unity
-    @test all(isapprox.(sum(TP_eval[0,0], dims=2), 1.0))
+    @test all(isapprox.(sum(TP_eval[1][1], dims=2), 1.0))
 end

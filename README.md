@@ -94,8 +94,9 @@ To create the docs, follow these steps:
 
 The Mantis source code is organized as follows:
 
-| Directory         | Contents                                         |
-| -                 | -                                                |
-| `docs/`           | source for the user and developer manuals        |
-| `src/`            | source for the all Mantis code                   |
-| `test/`           | test suites                                      |
+| Directory          | Contents                                                |
+| -                  | -                                                       |
+| `docs/`            | Source for the user and developer manuals               |
+| `src/`             | Source for the all Mantis code                          |
+| `test/`            | Test suites                                             |
+| `test/data/output` | Empty directories for storing output files during tests. This is needed to prevent crashes over write access. |

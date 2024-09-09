@@ -156,22 +156,22 @@ for case ∈ cases
 
         err_per_element, max_error, A = fe_run(source_function, hspace, hspace, hspace_geo, q_nodes, q_weights, source_function, p, k, source, case, bc, false, test, verbose)
 
-        if verbose_step
-            println("Step 0:")
-            println("Polynomial degrees: $p with regularities: $k.")
-            println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-            println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)).")
-            println("Maximum error: $max_error. \n")
-        end
+if verbose_step
+    println("Step 0:")
+    println("Polynomial degrees: $p with regularities: $k.")
+    println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
+    println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)).")
+    println("Maximum error: $max_error. \n")
+end
 
         global hb_errors = Vector{Float64}(undef, nsteps+1)
         global hb_dofs = Vector{Int}(undef, nsteps+1)
         #hb_nnz = Vector{Int}(undef, nsteps+1)
 
-        hb_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
-        hb_errors[1] = max_error
-        #SparseArrays.dropzeros!(A)
-        #hb_nnz[1] = SparseArrays.nnz(A)
+thb_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
+thb_errors[1] = max_error
+SparseArrays.dropzeros!(A)
+thb_nnz[1] = SparseArrays.nnz(A)
 
         for step ∈ 1:nsteps
             # Solve current hierarchical space solution
@@ -201,20 +201,17 @@ for case ∈ cases
                 println("Maximum error: $(max_error).") 
                 println("Number of marked_elements: $(length(dorfler_marking)).")
 
-                println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-                println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)). \n")
-            end
-            hb_errors[step+1] = max_error
-            hb_dofs[step+1] = Mantis.FunctionSpaces.get_dim(hspace)
-            #SparseArrays.dropzeros!(A)
-            #hb_nnz[step+1] = SparseArrays.nnz(A)
-        end
-        plt = plot!(hb_dofs, hb_errors, label="HB")
+        println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
     end
-    if case == "THB"
-        patches = map(n -> Mantis.Mesh.Patch1D(collect(range(-1, 1, n+1))), nels)
-        bsplines = [Mantis.FunctionSpaces.BSplineSpace(patches[i], p[i], [-1; fill(k[i], nels[i]-1); -1]) for i ∈ 1:2]
-        tensor_bspline = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
+    thb_errors[step+1] = max_error
+    thb_dofs[step+1] = Mantis.FunctionSpaces.get_num_basis(hspace)
+    SparseArrays.dropzeros!(A)
+    thb_nnz[step+1] = SparseArrays.nnz(A)
+end
+
+output_to_file = false
+# HB Refinement
 
         spaces = [tensor_bspline]
         operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
@@ -237,10 +234,10 @@ for case ∈ cases
         global thb_dofs = Vector{Int}(undef, nsteps+1)
         #thb_nnz = Vector{Int}(undef, nsteps+1)
 
-        thb_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
-        thb_errors[1] = max_error
-        #SparseArrays.dropzeros!(A)
-        #thb_nnz[1] = SparseArrays.nnz(A)
+hb_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
+hb_errors[1] = max_error
+SparseArrays.dropzeros!(A)
+hb_nnz[1] = SparseArrays.nnz(A)
 
         for step ∈ 1:nsteps
             # Solve current hierarchical space solution
@@ -270,40 +267,36 @@ for case ∈ cases
                 println("Maximum error: $(max_error).") 
                 println("Number of marked_elements: $(length(dorfler_marking)).")
 
-                println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-                println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)). \n")
-            end
-            thb_errors[step+1] = max_error
-            thb_dofs[step+1] = Mantis.FunctionSpaces.get_dim(hspace)
-            #SparseArrays.dropzeros!(A)
-            #thb_nnz[step+1] = SparseArrays.nnz(A)
-        end
-        plt = plot!(thb_dofs, thb_errors, label="THB")
+        println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
     end
-    if case == "THB-L-chain"
-        patches = map(n -> Mantis.Mesh.Patch1D(collect(range(-1, 1, n+1))), nels)
-        bsplines = [Mantis.FunctionSpaces.BSplineSpace(patches[i], p[i], [-1; fill(k[i], nels[i]-1); -1]) for i ∈ 1:2]
-        tensor_bspline = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
-    
-        spaces = [tensor_bspline]
-        operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
-        hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]], true)
-        hspace_geo = Mantis.Geometry.compute_geometry(hspace)
-        bc = Dict{Int, Float64}()
-        q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule(p .+ 2, Mantis.Quadrature.gauss_legendre)
+    hb_errors[step+1] = max_error
+    hb_dofs[step+1] = Mantis.FunctionSpaces.get_num_basis(hspace)
+    SparseArrays.dropzeros!(A)
+    hb_nnz[step+1] = SparseArrays.nnz(A)
+end
 
-        err_per_element, max_error, A = fe_run(source_function, hspace, hspace, hspace_geo, q_nodes, q_weights, source_function, p, k, source, case, bc, false, test, verbose)
+output_to_file = false
+# THB L-chain
+
+spaces = [tensor_bspline]
+operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
+hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]])
+hspace_geo = get_hb_geometry(hspace)
+
+err_per_element, max_error, A = fe_run(source_function, hspace, hspace, hspace_geo, q_nodes, q_weights, source_function, p, k, case, bc, output_to_file, test, verbose)
 
         global lchain_errors = Vector{Float64}(undef, nsteps+1)
         global lchain_dofs = Vector{Int}(undef, nsteps+1)
         #lchain_nnz = Vector{Int}(undef, nsteps+1)
 
-        lchain_dofs[1] = Mantis.FunctionSpaces.get_dim(hspace)
-        lchain_errors[1] = max_error
-        #SparseArrays.dropzeros!(A)
-        #lchain_nnz[1] = SparseArrays.nnz(A)
-        for step ∈ 1:nsteps
-            # Solve current hierarchical space solution
+lchain_dofs[1] = Mantis.FunctionSpaces.get_num_basis(hspace)
+lchain_errors[1] = max_error
+SparseArrays.dropzeros!(A)
+lchain_nnz[1] = SparseArrays.nnz(A)
+
+for step ∈ 1:nsteps-1
+    # Solve current hierarchical space solution
 
             L = Mantis.FunctionSpaces.get_num_levels(hspace)
             new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hspace.spaces[L], nsubdiv)
@@ -325,19 +318,59 @@ for case ∈ cases
                 err_per_element, max_error, A = fe_run(source_function, hspace, hspace, hspace_geo, q_nodes, q_weights, source_function, p, k, source, case, bc, output_to_file, test, verbose)
             end
 
-            if verbose_step
-                println("Step $step") 
-                println("Maximum error: $(max_error).") 
-                println("Number of marked_elements: $(length(dorfler_marking)).")
-                println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-                println("DoF: $(Mantis.FunctionSpaces.get_dim(hspace)). \n")
-            end
-            lchain_errors[step+1] = max_error
-            lchain_dofs[step+1] = Mantis.FunctionSpaces.get_dim(hspace)
-            #SparseArrays.dropzeros!(A)
-            #lchain_nnz[step+1] = SparseArrays.nnz(A)
-        end
-        plt = plot!(lchain_dofs, lchain_errors, label="THB L-chain")
+    if verbose_step
+        println("Step $step") 
+        println("Maximum error: $(max_error).") 
+        println("Number of marked_elements: $(length(dorfler_marking)).")
+
+        println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
     end
-    display(plt)
+    lchain_errors[step+1] = max_error
+    lchain_dofs[step+1] = Mantis.FunctionSpaces.get_num_basis(hspace)
+    SparseArrays.dropzeros!(A)
+    lchain_nnz[step+1] = SparseArrays.nnz(A)
 end
+
+
+output_to_file = false
+# h-Refinement
+
+nsubdivs = 2
+
+h_errors = Vector{Float64}(undef, nsubdivs+1)
+h_dofs = Vector{Int}(undef, nsubdivs+1)
+for subdiv_factor ∈ 0:nsubdivs
+    nels = nels .* 2^subdiv_factor
+    
+    patches = map(n -> Mantis.Mesh.Patch1D(collect(range(-1, 1, n+1))), nels)
+    bsplines = [Mantis.FunctionSpaces.BSplineSpace(patches[i], p[i], [-1; fill(k[i], nels[i]-1); -1]) for i ∈ 1:2]
+    
+    trial_space = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
+    test_space = Mantis.FunctionSpaces.TensorProductSpace(bsplines...)
+    bc = Dict{Int, Float64}()
+    
+    geom_cartesian = Mantis.Geometry.CartesianGeometry(Tuple(patches[i].breakpoints for i ∈ 1:2))
+    
+    # Setup the quadrature rule.
+    q_nodes, q_weights = Mantis.Quadrature.tensor_product_rule(p .+ 2, Mantis.Quadrature.gauss_legendre)
+    h_errors[subdiv_factor+1] = fe_run(source_function, trial_space, test_space, geom_cartesian, q_nodes, q_weights, source_function, p, k, case, bc, output_to_file, test, verbose)[2]
+    h_dofs[subdiv_factor+1] = Mantis.FunctionSpaces.get_num_basis(trial_space)
+end
+
+println("HB number of non-zero entries")
+println(hb_nnz)
+println("THB number of non-zero entries")
+println(thb_nnz)
+println("THB L-chain number of non-zero entries")
+println(lchain_nnz)
+println("number of non-zero entries ratio (THB/HB)")
+println( map( x -> round(x, digits=2), thb_nnz ./ hb_nnz))
+#println("number of non-zero entries ratio (lchain/HB)")
+#println( map( x -> round(x, digits=2), lchain_nnz ./ hb_nnz))
+
+plt = plot(reference_dofs, reference_errors, label="reference", xlabel="DoF", ylabel="Error", yscale=:log10, xscale=:log10)
+plot!(hb_dofs, hb_errors, label="HB")
+plot!(thb_dofs, thb_errors, label="THB")
+plot!(lchain_dofs, lchain_errors, label="THB L-chain")
+plot!(h_dofs, h_errors, label="h")

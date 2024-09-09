@@ -10,9 +10,9 @@ struct TensorProductTwoScaleOperator{n, F1, F2, O1, O2} <: AbstractTwoScaleOpera
         coarse_space = TensorProductSpace(twoscale_operator_1.coarse_space, twoscale_operator_2.coarse_space)
         fine_space = TensorProductSpace(twoscale_operator_1.fine_space, twoscale_operator_2.fine_space)
 
-       get_n(coarse_space) == get_n(fine_space) ? nothing : throw(ArgumentError("Tensor product dimensions do not match."))
+       get_manifold_dim(coarse_space) == get_manifold_dim(fine_space) ? nothing : throw(ArgumentError("Tensor product dimensions do not match."))
 
-        n = get_n(coarse_space)
+        n = get_manifold_dim(coarse_space)
         
         gm = get_global_subdiv_matrix(twoscale_operator_2.global_subdiv_matrix, twoscale_operator_1.global_subdiv_matrix)
 
@@ -116,7 +116,7 @@ function _get_coarser_elements_per_space(twoscale_operator::TensorProductTwoScal
 end
 
 function get_finer_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, O1, O2}, basis_id::Int) where{n, F1<:TensorProductSpace{n, T1, T2} where{T1, T2},  F2<:TensorProductSpace{n, T3, T4} where{T3, T4}, O1<:AbstractTwoScaleOperator, O2<:AbstractTwoScaleOperator }
-    max_ind_f = _get_dim_per_space(twoscale_operator.fine_space)
+    max_ind_f = _get_num_basis_per_space(twoscale_operator.fine_space)
 
     finer_ordered_indices = _get_finer_basis_id_per_space(twoscale_operator, basis_id)
 
@@ -132,14 +132,14 @@ function get_finer_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, 
 end
 
 function _get_finer_basis_id_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, O1, O2}, basis_id::Int) where{n, F1<:TensorProductSpace{n, T1, T2} where{T1, T2},  F2<:TensorProductSpace{n, T3, T4} where{T3, T4}, O1<:AbstractTwoScaleOperator, O2<:AbstractTwoScaleOperator }
-    max_ind_c = _get_dim_per_space(twoscale_operator.coarse_space)
+    max_ind_c = _get_num_basis_per_space(twoscale_operator.coarse_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_c)
 
     return (get_finer_basis_id(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_finer_basis_id(twoscale_operator.twoscale_operator_2, ordered_index[2]))
 end
 
 function get_coarser_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, O1, O2}, basis_id::Int) where{n, F1<:TensorProductSpace{n, T1, T2} where{T1, T2},  F2<:TensorProductSpace{n, T3, T4} where{T3, T4}, O1<:AbstractTwoScaleOperator, O2<:AbstractTwoScaleOperator }
-    max_ind_c = _get_dim_per_space(twoscale_operator.coarse_space)
+    max_ind_c = _get_num_basis_per_space(twoscale_operator.coarse_space)
     
     coarser_ordered_indices = _get_coarser_basis_id_per_space(twoscale_operator, basis_id)
 
@@ -155,7 +155,7 @@ function get_coarser_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n
 end
 
 function _get_coarser_basis_id_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, O1, O2}, basis_id::Int) where{n, F1<:TensorProductSpace{n, T1, T2} where{T1, T2},  F2<:TensorProductSpace{n, T3, T4} where{T3, T4}, O1<:AbstractTwoScaleOperator, O2<:AbstractTwoScaleOperator }
-    max_ind_f = _get_dim_per_space(twoscale_operator.fine_space)
+    max_ind_f = _get_num_basis_per_space(twoscale_operator.fine_space)
 
     ordered_index = linear_to_ordered_index(basis_id, max_ind_f)
 

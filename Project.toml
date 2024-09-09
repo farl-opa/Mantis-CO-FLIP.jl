@@ -19,6 +19,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 ReadVTK = "dc215faf-f008-4882-a9f7-a79a826fadc3"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+Subscripts = "2b7f82d5-8785-4f63-971e-f18ddbeb808e"
 ToeplitzMatrices = "c751599d-da0a-543b-9d20-d0a503d91d24"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 

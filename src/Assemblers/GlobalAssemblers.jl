@@ -1,7 +1,4 @@
 
-import .. Fields
-import .. Geometry
-
 struct Assembler <: AbstractAssemblers
     dirichlet_bcs::Dict{Int, Float64}
 end
@@ -23,7 +20,7 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
     # Pre-allocate
     nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
 
-    nvals_A = nnz_elem[1] * get_num_elements(weak_form_inputs)
+    nvals_A = 4 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 4 times due to the forms being per component. This needs to be updated.
     A_column_idxs = Vector{Int}(undef, nvals_A)
     A_row_idxs = Vector{Int}(undef, nvals_A)
     A_vals = Vector{Float64}(undef, nvals_A)
@@ -61,6 +58,8 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
 
 
     # Set Dirichlet conditions if needed.
+    # WARNING: This may not work as intended if the boundary indices are 
+    # duplicated in the given row and column vectors!
     if ~isempty(self.dirichlet_bcs)
         # Set the bc value for the rhs.
         for (bc_idx, bc_value) in pairs(self.dirichlet_bcs)
@@ -94,97 +93,53 @@ function (self::Assembler)(weak_form::F, weak_form_inputs::W) where {F <: Functi
     # that happen to be zero by computation. 
     #spa.dropzeros!(A)
 
-    return A, b[1:n_dofs_test]
+    return A, b
 
 end
 
 
 
-struct AssemblerError{n} <: AbstractAssemblers 
-    quad_nodes::NTuple{n, Vector{Float64}}
-    quad_weights::Vector{Float64}
-end
 
-struct AssemblerErrorPerElement{n} <: AbstractAssemblers 
-    quad_nodes::NTuple{n, Vector{Float64}}
-    quad_weights::Vector{Float64}
-end
+function _compute_square_error_per_element(computed_sol::TF1, exact_sol::TF2, quad_rule::Q, norm="L2") where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, Q <: Quadrature.QuadratureRule{manifold_dim}}
+    num_elements = Geometry.get_num_elements(Forms.get_geometry(computed_sol))
+    result = Vector{Float64}(undef, num_elements)
 
-@doc raw"""
-    (self::AssemblerError)(bilinear_form::AbstractBilinearForms)
-
-Assemble a continuous Galerkin problem with given bilinear form.
-
-# Arguments
-- `bilinear_form::AbstractBilinearForms`: bilinear form.
-"""
-function (self::AssemblerError)(space, dofs, geom, exact_sol, norm="L2")
-    result = 0.0
-
-    # Loop over all active elements
-    for elem_id in 1:Geometry.get_num_elements(geom)
-        field = Fields.FEMField(space, dofs)
-        element_sol = dropdims(Fields.evaluate(field, elem_id, self.quad_nodes), dims=2)
-
-        _, jac_det = Geometry.metric(geom, elem_id, self.quad_nodes)
-
-        phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
-        element_exact = exact_sol.(Tuple(phys_nodes[:,i] for i in 1:1:Geometry.get_domain_dim(geom))...)
-
-        @inbounds for point_idx in eachindex(jac_det, self.quad_weights, element_sol, element_exact)
-            result += jac_det[point_idx] * self.quad_weights[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
-        end
-
-    end
-
-    return sqrt(result)
-
-end
-
-@doc raw"""
-    (self::AssemblerErrorPerElement)(bilinear_form::AbstractBilinearForms)
-
-Assemble a continuous Galerkin problem with given bilinear form.
-
-# Arguments
-- `bilinear_form::AbstractBilinearForms`: bilinear form.
-"""
-function (self::AssemblerErrorPerElement)(space, dofs, geom, exact_sol, norm="L2", measure_normalized=false)
-    result = 0.0
-    num_els = Geometry.get_num_elements(geom)
-
-    errors = Vector{Float64}(undef, num_els)
-    if measure_normalized
-        element_measures = Vector{Float64}(undef, num_els)
-    end
-
-    # Loop over all active elements
-    for elem_id in 1:num_els
-        field = Fields.FEMField(space, dofs)
-        element_sol = dropdims(Fields.evaluate(field, elem_id, self.quad_nodes), dims=2)
-
-        _, jac_det = Geometry.metric(geom, elem_id, self.quad_nodes)
-
-        phys_nodes = Geometry.evaluate(geom, elem_id, self.quad_nodes)
-        element_exact = exact_sol.(Tuple(phys_nodes[:,i] for i in 1:1:Geometry.get_domain_dim(geom))...)
-
-        result = 0.0
-        @inbounds for point_idx in eachindex(jac_det, self.quad_weights, element_sol, element_exact)
-            result += jac_det[point_idx] * self.quad_weights[point_idx] * (element_sol[point_idx] - element_exact[point_idx])^2
-        end
-
-        errors[elem_id] = result
-        if measure_normalized
-            element_measures[elem_id] = Geometry.get_element_measure(geom, elem_id)
+    for elem_id in 1:1:num_elements
+        difference = computed_sol - exact_sol
+        if norm == "L2"
+            result[elem_id] = sum(Forms.evaluate_inner_product(difference, difference, elem_id, quad_rule)[3])
+        elseif norm == "Linf"
+            println("WARNING: The Linf evaluation only uses the quadrature nodes as evaluation points!")
+            result[elem_id] = maximum(Forms.evaluate(difference, elem_id, Quadrature.get_quadrature_nodes(quad_rule))[1][1])
+        elseif norm == "H1"
+            Error("Computing the H1 norm still needs to be updated.")
+            d_difference = Forms.exterior_derivative(difference)
+            result[elem_id] = sum(Forms.evaluate_inner_product(d_difference, d_difference, elem_id, quad_rule)[3])
         end
     end
 
-    max_error = maximum(errors)
+    return result
+end
 
-    if !measure_normalized
-        return errors, max_error
+
+function compute_error_per_element(computed_sol::TF1, exact_sol::TF2, quad_rule::Q, norm="L2") where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, Q <: Quadrature.QuadratureRule{manifold_dim}}
+    partial_result = _compute_square_error_per_element(computed_sol, exact_sol, quad_rule, norm)
+    if norm == "Linf"
+        return partial_result
+    elseif norm == "L2" || norm == "H1"
+        return sqrt.(partial_result)
     else
-        max_measure = maximum(element_measures)
-        return errors .* (1 .- (element_measures ./ max_measure)), max_error
+        throw(ArgumentError("Unknown norm '$norm'. Only 'L2', 'Linf', and 'H1' are accepted inputs."))
+    end
+end
+
+function compute_error_total(computed_sol::TF1, exact_sol::TF2, quad_rule::Q, norm="L2") where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, Q <: Quadrature.QuadratureRule{manifold_dim}}
+    partial_result = _compute_square_error_per_element(computed_sol, exact_sol, quad_rule, norm)
+    if norm == "Linf"
+        return maximum(partial_result)
+    elseif norm == "L2" || norm == "H1"
+        return sqrt(sum(partial_result))
+    else
+        throw(ArgumentError("Unknown norm '$norm'. Only 'L2', 'Linf', and 'H1' are accepted inputs."))
     end
 end

@@ -41,9 +41,8 @@ ae, ab = Mantis.FunctionSpaces.get_active_objects(spaces, [CTS], refined_domains
 ###
 hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
 
-x1, _ = Mantis.Quadrature.gauss_legendre(deg1+1)
-x2, _ = Mantis.Quadrature.gauss_legendre(deg2+1)
-xi = (x1, x2)
+qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
+xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
 # Tests for coefficients and evaluation
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
@@ -55,7 +54,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # check Hierarchical B-spline evaluation
     h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[0,0]) >= 0.0
+    @test minimum(h_eval[1][1]) >= 0.0
 end
 
 # Test if projection in space is exact
@@ -73,7 +72,7 @@ end
 xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
 nx = size(xs)[1]
 
-A = zeros(nx, Mantis.FunctionSpaces.get_dim(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
 
 for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
@@ -92,7 +91,7 @@ for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
 
     local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
 
-    A[idx, eval[2]] = eval[1][0,0]
+    A[idx, eval[2]] = eval[1][1][1]
 end
 
 coeffs = A \ xs

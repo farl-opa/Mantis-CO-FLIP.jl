@@ -8,7 +8,7 @@ module Geometry
 using .. FunctionSpaces
 
 abstract type AbstractGeometry{n} end
-abstract type AbstractAnalGeometry{n} <: AbstractGeometry{n} end
+abstract type AbstractAnalyticalGeometry{n} <: AbstractGeometry{n} end
 abstract type AbstractFEMGeometry{n} <: AbstractGeometry{n} end
 
 @doc raw"""
