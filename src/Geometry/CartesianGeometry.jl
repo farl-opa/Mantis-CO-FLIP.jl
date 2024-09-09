@@ -100,3 +100,61 @@ function _get_element_measure(geometry::CartesianGeometry{n}, element_id::Int) w
 
     return element_measure
 end
+# Methods for ease of geometry creation
+
+@doc raw"""
+    create_cartesian_geometry(starting_point::NTuple{n, Float64}, box_size::NTuple{n, Float64}, num_elements::NTuple{n, Int}) where {n}
+
+Create a Cartesian geometry based on the provided starting point, box size, and number of elements. The geometry is created in `n`-dimensional space, where `n` is determined by the length of the input tuples.
+
+# Arguments
+- `starting_point::NTuple{n, Float64}`: The coordinates of the starting point of the geometry.
+- `box_size::NTuple{n, Float64}`: The size of the bounding box in each dimension.
+- `num_elements::NTuple{n, Int}`: The number of elements in each dimension.
+
+# Returns
+- `::CartesianGeometry{n}`: The generated Cartesian geometry structure.
+
+# Examples
+```julia
+# Create a 3D Cartesian geometry
+start_3d = (0.0, 0.0, 0.0)
+size_3d = (10.0, 5.0, 2.0)
+elements_3d = (100, 50, 20)
+geometry_3d = create_cartesian_geometry(start_3d, size_3d, elements_3d)
+```
+"""
+function create_cartesian_geometry(starting_point::NTuple{n, Float64}, box_size::NTuple{n, Float64}, num_elements::NTuple{n, Int}) where {n}
+
+    all(box_size .> 0.0) ? nothing : throw(ArgumentError("The argumente 'box_size' must be greater than 0."))
+
+    breakpoints = Tuple(collect(LinRange(starting_point[i], starting_point[i]+box_size[i], num_elements[i]+1)) for i ∈ 1:n)
+
+    return CartesianGeometry(breakpoints)
+end
+
+@doc raw"""
+    create_cartesian_geometry(starting_point::Float64, box_size::Float64, num_elements::Int)
+
+Create a 1D Cartesian geometry based on the provided starting point, box size, and number of elements. It creates a linear distribution of points from the starting point, spaced evenly across the specified box size.
+
+# Arguments
+- `starting_point::Float64`: The coordinate of the starting point of the geometry.
+- `box_size::Float64`: The size of the bounding box along the single dimension.
+- `num_elements::Int`: The number of elements along the dimension.
+
+# Returns
+- `::CartesianGeometry{1}`: The generated 1D Cartesian geometry structure.
+
+# Examples
+```julia
+# Create a 1D Cartesian geometry
+start_1d = 0.0
+size_1d = 10.0
+elements_1d = 100
+geometry_1d = create_cartesian_geometry(start_1d, size_1d, elements_1d)
+```
+"""
+function create_cartesian_geometry(starting_point::Float64, box_size::Float64, num_elements::Int)
+    return create_cartesian_geometry((starting_point,), (box_size,), (num_elements,))
+end
