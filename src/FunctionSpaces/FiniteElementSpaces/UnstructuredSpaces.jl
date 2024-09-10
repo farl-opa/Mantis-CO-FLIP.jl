@@ -103,6 +103,21 @@ function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
 end
 
 """
+    get_dof_partition(us_space::UnstructuredSpace)
+
+Get the degree of freedom partitioning for the unstructured space.
+
+# Arguments
+- `us_space::UnstructuredSpace`: The unstructured space.
+
+# Returns
+- `::Vector{Vector{Vector{Int}}}`: The degree of freedom partitioning.
+"""
+function get_dof_partition(us_space::UnstructuredSpace)
+    return us_space.dof_partition
+end
+
+"""
     get_extraction(us_space::UnstructuredSpace, element_id::Int)
 
 Get extraction coefficients and global basis indices for the specified global element ID.

@@ -13,6 +13,36 @@ data_folder = joinpath(Mantis_folder, "test", "data")
 input_data_folder = joinpath(data_folder, "reference", "Plot")
 output_data_folder = joinpath(data_folder, "output", "Plot")
 
+# Test Plotting of 3D Geometry (torus) -------------------------------------------
+deg = 2
+Wt = pi/2
+bθ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
+GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
+Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1, -1])
+geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GBθ),Mantis.FunctionSpaces.get_num_basis(Br),1.0)
+PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]), return_global_extraction=true)
+geom_coeffs_θr = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
+S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(PSplines[1], GBθ)
+# control points for geometry cross-section
+geom_coeffs_θr0 = [geom_coeffs_θr.+[4 0] zeros(size(geom_coeffs_θr,1))]
+# rotate the cross-section points around the y-axis to create control points for torus
+geom_coeffs_θrϕ = Vector{Matrix{Float64}}(undef,Mantis.FunctionSpaces.get_num_basis(GBθ))
+geom_coeffs_θrϕ[1] = geom_coeffs_θr0
+for i ∈ 1:Mantis.FunctionSpaces.get_num_basis(GBθ)-1
+    ϕ = i*2*π/Mantis.FunctionSpaces.get_num_basis(GBθ)
+    R = [cos(ϕ) 0 sin(ϕ); 0 1 0; -sin(ϕ) 0 cos(ϕ)]
+    geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
+end
+geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
+geom = Mantis.Geometry.FEMGeometry(S_θrϕ, geom_coeffs_θrϕ)
+# Generate the plot
+output_filename = "fem_geometry_torus_test.vtu"
+output_file = joinpath(output_data_folder, output_filename)
+Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+
 # Test Plotting of 3D Geometry (toroidal annulus) -------------------------------------------
 deg = 2
 Wt = pi/2

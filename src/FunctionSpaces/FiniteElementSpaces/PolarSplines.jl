@@ -91,6 +91,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
                     dof_partition[1][i] = []
                 else
                     # TODO!!
+                    dof_partition[1][i] = []
                 end
             end
         end
