@@ -179,36 +179,40 @@ one_form_space_test_1d = Mantis.Forms.FormSpace(1, geom_1d, (test_space_1d_pm1,)
 
 # Forcing forms
 # Constant forcing
-f⁰_const = Mantis.Forms.FormField(zero_form_space_trial_1d, "f")
-f⁰_const.coefficients .= 1.0
-f¹_const = Mantis.Forms.FormField(one_form_space_trial_1d, "f")
-f¹_const.coefficients .= 1.0
+function forcing_const_1d(x::Matrix{Float64})
+    return [ones(size(x,1))]
+end
+f⁰_const_1d = Mantis.Forms.AnalyticalFormField(0, forcing_const_1d, geom_1d, "f")
 
 # Sine forcing
 function forcing_sine_1d(x::Matrix{Float64})
-    return [@. -pi^2 * sinpi.(x[:,1])]
+    return [@. pi^2 * sinpi.(x[:,1])]
 end
-f¹_sine_1d = Mantis.Forms.AnalyticalFormField(1, forcing_sine_1d, geom_1d, "f")
 f⁰_sine_1d = Mantis.Forms.AnalyticalFormField(0, forcing_sine_1d, geom_1d, "f")
 
 # Cosine forcing for the mixed formulation.
 function forcing_cos_1d(x::Matrix{Float64})
-    return [@. -pi^2 * cospi.(x[:,1]-0.5)]
+    return [@. pi^2 * cospi.(x[:,1]-0.5)]
 end
 f¹_cos_1d = Mantis.Forms.AnalyticalFormField(1, forcing_cos_1d, geom_1d, "f")
 
 
 # Exact solutions as forms.
+# Constant forcing
+function exact_sol_const_1d(x::Matrix{Float64})
+    return [@. -0.5 * x[:,1]^2 + 0.5*Lright_1d*x[:,1]]
+end
+sol⁰_const_1d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_const_1d, geom_1d, "sol")
+
 # Sine forcing
 function exact_sol_sine_1d(x::Matrix{Float64})
     return [@. sinpi(x[:,1]) + ((bc_right_sine_1d - bc_left_sine_1d - sinpi(Lright_1d)) / Lright_1d)*x[:,1] + bc_left_sine_1d]
 end
 sol⁰_sine_1d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_1d, geom_1d, "sol")
-sol¹_sine_1d_exact_sol = Mantis.Forms.AnalyticalFormField(1, exact_sol_sine_1d, geom_1d, "sol")
 
 # Cosine forcing
 function exact_sol_cos_1d_zero_form(x::Matrix{Float64})
-    return [@. pi * sinpi((x[:,1] - 0.5)) + cospi((Lright_1d - 0.5)) / Lright_1d]
+    return [@. -pi * sinpi((x[:,1] - 0.5)) - cospi((Lright_1d - 0.5)) / Lright_1d]
 end
 function exact_sol_cos_1d_one_form(x::Matrix{Float64})
     return [@. cospi((x[:,1] - 0.5)) - x[:,1] * cospi((Lright_1d - 0.5)) / Lright_1d]
@@ -326,7 +330,7 @@ f²_crazy_const_2d = Mantis.Forms.AnalyticalFormField(2, forcing_function_const_
 
 
 function forcing_function_sine_2d(x::Matrix{Float64})
-    return [@. -8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
 
 f⁰_cart_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geom_cartesian, "f")
@@ -341,10 +345,16 @@ function exact_sol_sine_2d(x::Matrix{Float64})
     return [@. sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
 
+function exact_sol_sine_2d_grad(x::Matrix{Float64})
+    return [-2.0.*pi.*sinpi.(2.0 .* x[:,1]).*cospi.(2.0 .* x[:,2]), 2.0.*pi.*cospi.(2.0 .* x[:,1]).*sinpi.(2.0 .* x[:,2])]
+end
+
 sol⁰_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geom_cartesian, "sol")
+sol¹_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(1, exact_sol_sine_2d_grad, geom_cartesian, "sol")
 sol²_cart_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_sine_2d, geom_cartesian, "sol")
 
 sol⁰_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geom_crazy, "sol")
+sol¹_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(1, exact_sol_sine_2d_grad, geom_crazy, "sol")
 sol²_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_sine_2d, geom_crazy, "sol")
 
 
@@ -436,38 +446,60 @@ sol²_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_si
 if verbose
     println()
 end
+
 cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "cos1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "sine2d-Dirichlet-mixed", "sine2d-Dirichlet-mixed-crazy"]
 for case in cases
 
     if case == "const1d-Dirichlet"
-        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_const, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_const_1d, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_const_1d, case, run_tests, verbose)
-        if write_to_output_file
-            α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
-            α⁰.coefficients .= sol
 
-            write_form_sol_to_file([α⁰], ["zero_form"], geom_1d, p_1d, k_1d, case, n_1d, verbose)
+        # Create solution(s) as forms.
+        α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
+        α⁰.coefficients .= sol
+        if run_tests
+            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"), 0.0, atol=1e-14)
+            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "Linf"), 0.0, atol=1e-14)
+        end
+        if verbose
+            print("Total L2 error 0-form: ")
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"))
+        end
+        if write_to_output_file
+            write_form_sol_to_file([α⁰, sol⁰_const_1d_exact_sol], ["zero_form", "exact_zero_form"], geom_1d, p_1d, k_1d, case, n_1d, verbose)
         end
     
     elseif case == "sine1d-Dirichlet"
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_1d, zero_form_space_trial_1d, zero_form_space_test_1d, q_rule_1d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_sine_1d, case, run_tests, verbose)
-        if write_to_output_file
-            α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
-            α⁰.coefficients .= sol
 
+        # Create solution(s) as forms.
+        α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
+        α⁰.coefficients .= sol
+        if verbose
+            print("Total L2 error 0-form: ")
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_sine_1d_exact_sol, q_rule_1d, "L2"))
+        end
+        if write_to_output_file
             write_form_sol_to_file([α⁰, sol⁰_sine_1d_exact_sol], ["zero_form", "exact_zero_form"], geom_1d, p_1d, k_1d, case, n_1d, verbose)
         end
     
     elseif case == "cos1d-Dirichlet-mixed"
         weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(f¹_cos_1d, zero_form_space_trial_1d, one_form_space_trial_1d, zero_form_space_test_1d, one_form_space_test_1d, q_rule_1d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_mixed, bc_const_1d_empty, case, run_tests, verbose)
-        if write_to_output_file
-            α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
-            ξ¹ = Mantis.Forms.FormField(one_form_space_trial_1d, "ξ")
-            α⁰.coefficients .= sol[1:Mantis.Forms.get_num_basis(zero_form_space_trial_1d)]
-            ξ¹.coefficients .= sol[Mantis.Forms.get_num_basis(zero_form_space_trial_1d)+1:end]
 
+        # Create solution(s) as forms.
+        α⁰ = Mantis.Forms.FormField(zero_form_space_trial_1d, "α")
+        ξ¹ = Mantis.Forms.FormField(one_form_space_trial_1d, "ξ")
+        α⁰.coefficients .= sol[1:Mantis.Forms.get_num_basis(zero_form_space_trial_1d)]
+        ξ¹.coefficients .= sol[Mantis.Forms.get_num_basis(zero_form_space_trial_1d)+1:end]
+        if verbose
+            print("Total L2 error 0-form: ")
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_cos_1d_exact_sol, q_rule_1d, "L2"))
+            print("Total L2 error 1-form: ")
+            println(Mantis.Assemblers.compute_error_total(ξ¹, sol¹_cos_1d_exact_sol, q_rule_1d, "L2"))
+        end
+        if write_to_output_file
             write_form_sol_to_file([α⁰, ξ¹, sol⁰_cos_1d_exact_sol, sol¹_cos_1d_exact_sol], ["zero_form", "one_form", "exact_zero_form", "exact_one_form"], geom_1d, p_1d, k_1d, case, n_1d, verbose)
         end
     
@@ -494,45 +526,69 @@ for case in cases
     elseif case == "sine2d-Dirichlet"
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_cart_sine_2d, zero_form_space_trial_2d_cart, zero_form_space_test_2d_cart, q_rule_2d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case, run_tests, verbose)
-        if write_to_output_file
-            α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "α")
-            α⁰.coefficients .= sol
 
-            write_form_sol_to_file([α⁰, sol⁰_cart_sine_2d_exact_sol], ["zero_form", "exact_zero_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
+        # Create solution(s) as forms.
+        α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_cart, "α")
+        α⁰.coefficients .= sol
+        if verbose
+            print("Total L2 error 0-form: ")
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_cart_sine_2d_exact_sol, q_rule_2d, "L2"))
+        end
+        if write_to_output_file
+           write_form_sol_to_file([α⁰, sol⁰_cart_sine_2d_exact_sol, α⁰ - sol⁰_cart_sine_2d_exact_sol], ["zero_form", "exact_zero_form", "error_zero_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
         end
         
     elseif case == "sine2d-Dirichlet-crazy"
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_crazy_sine_2d, zero_form_space_trial_2d_crazy, zero_form_space_test_2d_crazy, q_rule_2d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_2d, case*"_crazy_c$crazy_c", run_tests, verbose)
+        
+        # Create solution(s) as forms.
+        α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "α")
+        α⁰.coefficients .= sol
+        if verbose
+            print("Total L2 error 0-form: ")
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_crazy_sine_2d_exact_sol, q_rule_2d, "L2"))
+        end
         if write_to_output_file
-            α⁰ = Mantis.Forms.FormField(zero_form_space_trial_2d_crazy, "α")
-            α⁰.coefficients .= sol
-
-            write_form_sol_to_file([α⁰, sol⁰_crazy_sine_2d_exact_sol], ["zero_form", "exact_zero_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
+           write_form_sol_to_file([α⁰, sol⁰_crazy_sine_2d_exact_sol, α⁰ - sol⁰_crazy_sine_2d_exact_sol], ["zero_form", "exact_zero_form", "error_zero_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
         end
         
     elseif case == "sine2d-Dirichlet-mixed"
         weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(f²_cart_sine_2d, one_form_space_trial_2d_cart, two_form_space_trial_2d_cart, one_form_space_test_2d_cart, two_form_space_test_2d_cart, q_rule_2d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, case, run_tests, verbose)
-        if write_to_output_file
-            ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_cart, "ξ")
-            β² = Mantis.Forms.FormField(two_form_space_trial_2d_cart, "β")
-            ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)]
-            β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)+1:end]
 
-            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
+        # Create solution(s) as forms.
+        ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_cart, "ξ")
+        β² = Mantis.Forms.FormField(two_form_space_trial_2d_cart, "β")
+        ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)]
+        β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_trial_2d_cart)+1:end]
+        if verbose
+            print("Total L2 error 1-form: ")
+            println(Mantis.Assemblers.compute_error_total(ξ¹, sol¹_cart_sine_2d_exact_sol, q_rule_2d, "L2"))
+            print("Total L2 error 2-form: ")
+            println(Mantis.Assemblers.compute_error_total(β², sol²_cart_sine_2d_exact_sol, q_rule_2d, "L2"))
+        end
+        if write_to_output_file
+            write_form_sol_to_file([β², ξ¹, sol²_cart_sine_2d_exact_sol, sol¹_cart_sine_2d_exact_sol, β² - sol²_cart_sine_2d_exact_sol, ξ¹ - sol¹_cart_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form", "error_two_form", "error_one_form"], geom_cartesian, p_2d, k_2d, case, n_2d, verbose)
         end
     
     elseif case == "sine2d-Dirichlet-mixed-crazy"
         weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(f²_crazy_sine_2d, one_form_space_trial_2d_crazy, two_form_space_trial_2d_crazy, one_form_space_test_2d_crazy, two_form_space_test_2d_crazy, q_rule_2d)
         sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_mixed, bc_dirichlet_2d_empty, case*"_crazy_c$crazy_c", run_tests, verbose)
+        
+        # Create solution(s) as forms.
+        ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_crazy, "ξ")
+        β² = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "β")
+        ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)]
+        β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)+1:end]
+        if verbose
+            print("Total L2 error 1-form: ")
+            println(Mantis.Assemblers.compute_error_total(ξ¹, sol¹_crazy_sine_2d_exact_sol, q_rule_2d, "L2"))
+            print("Total L2 error 2-form: ")
+            println(Mantis.Assemblers.compute_error_total(β², sol²_crazy_sine_2d_exact_sol, q_rule_2d, "L2"))
+        end
         if write_to_output_file
-            ξ¹ = Mantis.Forms.FormField(one_form_space_trial_2d_crazy, "ξ")
-            β² = Mantis.Forms.FormField(two_form_space_trial_2d_crazy, "β")
-            ξ¹.coefficients .= sol[1:Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)]
-            β².coefficients .= sol[Mantis.Forms.get_num_basis(one_form_space_test_2d_crazy)+1:end]
-
-            write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
+            write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol, sol¹_crazy_sine_2d_exact_sol, β² - sol²_crazy_sine_2d_exact_sol, ξ¹ - sol¹_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form", "error_two_form", "error_one_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
         end
     else
         if verbose

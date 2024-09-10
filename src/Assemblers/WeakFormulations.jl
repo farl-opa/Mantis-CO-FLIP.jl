@@ -1,15 +1,4 @@
 
-import .. Geometry
-import .. FunctionSpaces
-import .. Forms
-import .. Quadrature
-
-import ... Main  # For testing only, to be able to use Main.@code_warntype (but not when precompiling!)
-
-
-
-
-
 @doc raw"""
     struct WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest, G} <: AbstractInputs
 
@@ -88,6 +77,7 @@ function poisson_non_mixed(inputs::WeakFormInputs{manifold_dim, Frhs, Ttrial, Tt
     dtest = Forms.exterior_derivative(inputs.space_test)
 
     A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(dtest, dtrial, element_id, inputs.quad_rule)
+    A_elem .*= -1.0  # this is needed here because integration by parts adds a -1 on this term
 
     # The linear form is the inner product between the trial form and 
     # the forcing function which is a form of an appropriate rank.
@@ -227,10 +217,10 @@ function poisson_mixed(inputs::WeakFormInputsMixed{manifold_dim, Frhs, Ttrial1, 
     # Left hand side.
     # <ε¹, u¹>
     A_row_idx_11, A_col_idx_11, A_elem_11 = Forms.evaluate_inner_product(inputs.space_test_eps_1, inputs.space_trial_u_1, element_id, inputs.quad_rule)
-
+    
     # <dε¹, ϕ²>
     A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(Forms.exterior_derivative(inputs.space_test_eps_1), inputs.space_trial_phi_2, element_id, inputs.quad_rule)
-
+    
     # <ε², du¹>
     A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(inputs.space_test_eps_2, Forms.exterior_derivative(inputs.space_trial_u_1), element_id, inputs.quad_rule)
 
@@ -244,7 +234,7 @@ function poisson_mixed(inputs::WeakFormInputsMixed{manifold_dim, Frhs, Ttrial1, 
     # Put all variables together.
     A_row_idx = vcat(A_row_idx_11, A_row_idx_12, A_row_idx_21)
     A_col_idx = vcat(A_col_idx_11, A_col_idx_12, A_col_idx_21)
-    A_elem = vcat(A_elem_11, -A_elem_12, A_elem_21)
+    A_elem = vcat(A_elem_11, A_elem_12, A_elem_21)
 
 
     # Right hand side. Only the second part is non-zero.

@@ -3,40 +3,31 @@ import Mantis
 using Test
 
 # Setup the form spaces
-# First the FEM spaces
-breakpoints1 = [0.0, 0.5, 1.0]
-patch1 = Mantis.Mesh.Patch1D(breakpoints1)
-breakpoints2 = [0.0, 0.3, 0.5, 1.0]
-patch2 = Mantis.Mesh.Patch1D(breakpoints2)
+# First the 2D information
+starting_point_2d = (0.0, 0.0)
+box_size_2d = (1.0, 1.0)
+num_elements_2d = (2, 3)
+degree_2d = (2, 2)
+regularity_2d = degree_2d .- 1
 
-# first B-spline patch
-deg1 = 2
-deg2 = 2
-B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, deg1-1, -1])
-# second B-spline patch
-B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-1, -1])
-# tensor-product B-spline patch
-TP_Space = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
-TP_Space3d = Mantis.FunctionSpaces.TensorProductSpace(TP_Space, B1)
+geo_2d_cart = Mantis.Geometry.create_cartesian_geometry(starting_point_2d, box_size_2d, num_elements_2d)
+TP_Space = Mantis.FunctionSpaces.create_bspline_space(starting_point_2d, box_size_2d, num_elements_2d, degree_2d, regularity_2d)
 
-# Then the geometry 
-# Line 1
-line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
+# Then the 3D information
+starting_point_3d = (0.0, 0.0, 0.0)
+box_size_3d = (1.0, 1.0, 1.0)
+num_elements_3d = (2, 3, 2)
+degree_3d = (2, 2, 3)
+regularity_3d = degree_3d .- 1
 
-# Line 2
-line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
-
-# Tensor product geometry 
-tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
-
-# This seems to be a bug:
-#println(Mantis.Geometry.jacobian(tensor_prod_geo, 1, ([0.0, 0.0], [0.0, 0.0])))
+geo_3d_cart = Mantis.Geometry.create_cartesian_geometry(starting_point_3d, box_size_3d, num_elements_3d)
+TP_Space3d = Mantis.FunctionSpaces.create_bspline_space(starting_point_3d, box_size_3d, num_elements_3d, degree_3d, regularity_3d)
 
 # Then the form space 
-zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, (TP_Space,), "ν")
+zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
 d_zero_form_space = Mantis.Forms.exterior_derivative(zero_form_space)
-one_form_space = Mantis.Forms.FormSpace(1, tensor_prod_geo, (TP_Space, TP_Space), "η")
-top_form_space = Mantis.Forms.FormSpace(2, tensor_prod_geo, (TP_Space,), "σ")
+one_form_space = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
+top_form_space = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
 
 # Generate the form expressions
 α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
@@ -99,14 +90,13 @@ dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
 # ★β²_eval = Mantis.Forms.evaluate(★β², 1, ([0.0, 1.0], [0.0, 1.0]))
 
 
-# println()
-geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
-# geo_2d_cart2 = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints1))
-# zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
-# zero_form_space_cart2 = Mantis.Forms.FormSpace(0, geo_2d_cart2, (TP_Space,), "ν")
-# d_zero_form_space_cart = Mantis.Forms.exterior_derivative(zero_form_space)
-# one_form_space_cart = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
-# top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
+println()
+geo_2d_cart2 = Mantis.Geometry.create_cartesian_geometry(starting_point_2d, box_size_2d, num_elements_2d .+ 1) # Used to test if different geometries break, as they should.
+zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
+zero_form_space_cart2 = Mantis.Forms.FormSpace(0, geo_2d_cart2, (TP_Space,), "ν")
+d_zero_form_space_cart = Mantis.Forms.exterior_derivative(zero_form_space)
+one_form_space_cart = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
+top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
 
 # # Generate the form expressions
 # α⁰ = Mantis.Forms.FormField(zero_form_space_cart, "α")
@@ -120,10 +110,10 @@ geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
 # γ².coefficients .= 1.0
 # dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
-# q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
-# #display(Mantis.Forms.evaluate_inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
-# println("Starting inner product computations")
-# # Note that we cannot do mixed inner products
+q_rule = Mantis.Quadrature.tensor_product_rule(degree_2d.+1, Mantis.Quadrature.gauss_legendre)
+#display(Mantis.Forms.evaluate_inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
+println("Starting inner product computations")
+# Note that we cannot do mixed inner products
 
 # for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
 #     ordered_idx = Tuple(geo_2d_cart.cartesian_idxs[elem_id])
@@ -227,7 +217,7 @@ end
 
 using SparseArrays
 
-q_rule_high = Mantis.Quadrature.tensor_product_rule((deg1+10, deg2+10), Mantis.Quadrature.gauss_legendre)
+q_rule_high = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 10, Mantis.Quadrature.gauss_legendre)
 alpha1_l2_norm_square = 0.0
 for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
     global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
@@ -261,7 +251,7 @@ end
 @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
 
 # Test "error" computation -------------
-zero_form_space = Mantis.Forms.FormSpace(0, tensor_prod_geo, (TP_Space,), "ν")
+zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
 α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
 α⁰.coefficients .= 1.0
 
@@ -270,7 +260,7 @@ function zero_form_function(x::Matrix{Float64})
 end
 
 # Generate an analytical form field
-β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, tensor_prod_geo, "β")
+β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, geo_2d_cart, "β")
 
 # Define error
 e = α⁰ - β⁰
@@ -278,8 +268,8 @@ e = α⁰ - β⁰
 # compute the L^2 norm of the differences
 using SparseArrays
 error_L2 = 0.0
-q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
-for elem_id in 1:1:Mantis.Geometry.get_num_elements(tensor_prod_geo)
+q_rule = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 1, Mantis.Quadrature.gauss_legendre)
+for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
     global error_L2 += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(e, e, elem_id, q_rule)...))[1,1]
 end
 error_L2 = sqrt(error_L2)

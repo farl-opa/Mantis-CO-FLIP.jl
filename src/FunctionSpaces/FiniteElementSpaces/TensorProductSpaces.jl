@@ -345,3 +345,18 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
 
     return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
 end
+
+# Methods for ease of function space creation
+
+function create_bspline_space(starting_point::NTuple{n, Float64}, box_size::NTuple{n, Float64}, num_elements::NTuple{n, Int}, degree::NTuple{n, Int}, regularity::NTuple{n, Int}) where {n}
+    
+    dim_wise_spaces = [create_bspline_space(starting_point[i], box_size[i], num_elements[i], degree[i], regularity[i]) for i ∈ 1:n]
+
+    tensor_space = TensorProductSpace(dim_wise_spaces[1], dim_wise_spaces[2]) # Initialize tensor product construction
+
+    for i ∈ 2:n-1
+        tensor_space = TensorProductSpace(tensor_space, dim_wise_spaces[i+1])
+    end
+
+    return tensor_space
+end
