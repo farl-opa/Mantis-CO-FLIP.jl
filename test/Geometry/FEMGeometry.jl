@@ -21,13 +21,13 @@ breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
 patch = Mantis.Mesh.Patch1D(breakpoints)
 B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
 GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [1])
-b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-PSplines = Mantis.FunctionSpaces.PolarSplineSpace(GB, b1)
-geom_coeffs, _, _ = Mantis.FunctionSpaces.build_base_polar_control_points(Mantis.FunctionSpaces.get_num_basis(GB),Mantis.FunctionSpaces.get_num_basis(b1),1.0)
-geom = Mantis.Geometry.FEMGeometry(PSplines, geom_coeffs)
-
-field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_num_basis(PSplines), Mantis.FunctionSpaces.get_num_basis(PSplines))
-polar_surface_field = Mantis.Fields.FEMField(PSplines, field_coeffs)
+b2 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1, -1])
+geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GB),Mantis.FunctionSpaces.get_num_basis(b2),1.0)
+PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GB, b2, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]), return_global_extraction=true)
+geom_coeffs = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
+geom = Mantis.Geometry.FEMGeometry(PSplines[1], geom_coeffs)
+field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_num_basis(PSplines[1]), Mantis.FunctionSpaces.get_num_basis(PSplines[1]))
+polar_surface_field = Mantis.Fields.FEMField(PSplines[1], field_coeffs)
 
 # Generate the plot
 output_filename = "fem_geometry_polar_test.vtu"
