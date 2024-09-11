@@ -41,6 +41,12 @@ struct BSplineSpace{F} <: AbstractFiniteElementSpace{1}
             end
         end
 
+        if F <: AbstractLagrangePolynomials
+            if maximum(regularity) > 0
+                throw(ArgumentError("Smoothness for a piecewise-Lagrange space must be at most C^0."))
+            end
+        end
+
         # Create the knot vector
         knot_vector = create_knot_vector(patch_1d, polynomial_degree, regularity, "regularity")
 

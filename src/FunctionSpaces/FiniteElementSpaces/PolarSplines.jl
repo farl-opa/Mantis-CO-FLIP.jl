@@ -16,11 +16,17 @@ Create a polar spline space from the given poloidal and radial finite element sp
 - `polar_splines::UnstructuredSpace...`: The polar spline space(s).
 
 """
-function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1}, degenerate_control_points::NTuple{2,Matrix{Float64}}; singularity_type::Int=1, form_rank::Int=0, dspace_p::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing, dspace_r::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing, return_global_extraction::Bool=false)
+function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1}, degenerate_control_points::NTuple{2,Matrix{Float64}}; singularity_type::Int=1, form_rank::Int=0, dspace_p::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing, dspace_r::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing)
 
     # number of dofs for the poloidal and radial spaces
     n_p = get_num_basis(space_p)
     n_r = get_num_basis(space_r)
+
+    if form_rank > 0
+        if isnothing(dspace_p) || isnothing(dspace_r)
+            throw(ArgumentError("Derivative spaces are required for form_rank > 0 but haven't been provided."))
+        end
+    end
 
     # first, build_forms extraction operator
     E = build_forms_polar_extraction_operators(singularity_type, degenerate_control_points, n_p, n_r, form_rank=form_rank)
@@ -100,11 +106,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         polar_splines[component_idx] = UnstructuredSpace((tp_space[component_idx],), extraction_op, dof_partition, us_config, Dict("regularity" => 1))
     end
 
-    if return_global_extraction
-        return polar_splines, E
-    else
-        return polar_splines
-    end
+    return polar_splines, E
 end
 
 # """
