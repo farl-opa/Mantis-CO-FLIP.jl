@@ -122,6 +122,10 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
     else
         point_data = zeros(field_dim, n_vertices)
     end
+
+    vertex_offset = 0
+    dξ = 1.0/n_subcells
+    subcell_cartesian_idx = CartesianIndices(Tuple(n_subcells*ones(Int,manifold_dim)))
     
     # nodes within a reference subcell of degree p
     if manifold_dim == 1

@@ -28,8 +28,9 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         end
     end
 
-    # first, build_forms extraction operator
-    E = build_forms_polar_extraction_operators(singularity_type, degenerate_control_points, n_p, n_r, form_rank=form_rank)
+    # first, build extraction operator
+    E, control_triangle = build_polar_extraction_operators(singularity_type, degenerate_control_points, n_p, n_r, form_rank=form_rank)
+    E = E[form_rank+1]
     # tensor-product space which will form the foundation of the polar spline space
     if form_rank == 0
         tp_space = TensorProductSpace(space_p, space_r)
@@ -39,10 +40,9 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         tp_space = (TensorProductSpace(dspace_p, space_r), TensorProductSpace(space_p, dspace_r))
     end
 
-    # convert everything to tuples if form_rank is not 1 for uniformity
+    # convert to tuple if form_rank is not 1 for uniformity
     if form_rank != 1
         tp_space = (tp_space,)
-        E = (E,)
     end
 
     # allocate space for polar spline space(s)
@@ -103,46 +103,11 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         end
 
         # build and store polar spline space
-        polar_splines[component_idx] = UnstructuredSpace((tp_space[component_idx],), extraction_op, dof_partition, us_config, Dict("regularity" => 1))
+        polar_splines[component_idx] = UnstructuredSpace((tp_space[component_idx],), extraction_op, dof_partition, us_config, Dict("regularity" => 1, "control_triangle" => control_triangle))
     end
 
-    return polar_splines, E
+    return Tuple(polar_splines), E
 end
-
-# """
-#     build_forms_base_polar_control_points(n_p::Int, n_r::Int, R::Float64)
-
-# Generate the base polar control points for a given number of poloidal and radial divisions.
-
-# # Arguments
-# - n_p::Int: Number of poloidal divisions.
-# - n_r::Int: Number of radial divisions.
-# - R::Float64: Radius of the polar space.
-
-# # Returns
-# - polar_control_points::Matrix{Float64}: The generated polar control points.
-# - radii::Vector{Float64}: The radii values.
-# - theta::Vector{Float64}: The theta values.
-# """
-# function build_forms_base_polar_control_points(n_p::Int, n_r::Int, R::Float64)
-#     radii = LinRange(0.0, R, n_r)
-#     theta = 2*pi .+ (1 .- 2 .* (1:n_p)) .* pi / n_p
-#     polar_control_points = zeros(Float64, n_p*(n_r-2)+3, 2)
-#     # the control points that are identical to the tensor-product control points
-#     for idx ∈ Iterators.product(1:n_p, 3:n_r)
-#         pidx = ordered_to_linear_index(idx, (n_p, n_r))
-#         pidx = pidx - (2*n_p - 3)
-#         polar_control_points[pidx,1] = radii[idx[2]]*cos(theta[idx[1]])
-#         polar_control_points[pidx,2] = radii[idx[2]]*sin(theta[idx[1]])
-#     end
-#     # the control points for the control triangle
-#     rho_2 = radii[2]
-#     polar_control_points[1,:] .= [2*rho_2, 0]
-#     polar_control_points[2,:] .= [-rho_2, sqrt(3)*rho_2]
-#     polar_control_points[3,:] .= [-rho_2, -sqrt(3)*rho_2]
-
-#     return polar_control_points, radii, theta
-# end
 
 """
     build_standard_degenerate_control_points(n_p::Int, n_r::Int, R::Float64)
@@ -175,9 +140,9 @@ end
 import LinearAlgebra, SparseArrays
 
 """
-    build_forms_polar_extraction_operators(polar_config::Int, degenerate_control_points::NTuple{2,Matrix{Float64}}, num_basis_p::Int, num_basis_r::Int)
+    build_polar_extraction_operators(polar_config::Int, degenerate_control_points::NTuple{2,Matrix{Float64}}, num_basis_p::Int, num_basis_r::Int)
 
-build_forms the extraction operators for the polar spline space. The extraction operators are used to extract the polar spline basis functions from the tensor product space.
+build the extraction operators for the polar spline space. The extraction operators are used to extract the polar spline basis functions from the tensor product space.
 
 # Arguments
 - `polar_config::Int`: The type of polar singularity.
@@ -189,7 +154,7 @@ build_forms the extraction operators for the polar spline space. The extraction 
 - `E1::Tuple{SparseMatrixCSC{Float64,Int},SparseMatrixCSC{Float64,Int}}`: The one form extraction operators.
 - `E2::SparseMatrixCSC{Float64,Int}`: The two form extraction operator.
 """
-function build_forms_polar_extraction_operators(polar_config::Int, degenerate_control_points::NTuple{2,Matrix{Float64}}, num_basis_p::Int, num_basis_r::Int; form_rank::Int=nothing)
+function build_polar_extraction_operators(polar_config::Int, degenerate_control_points::NTuple{2,Matrix{Float64}}, num_basis_p::Int, num_basis_r::Int; form_rank::Union{Nothing,Int}=nothing)
 
     @assert (polar_config == 1) || (polar_config == 2) # type of polar singularity
     @assert all(size.(degenerate_control_points, 1) .== num_basis_p) # two rows of control points
@@ -197,7 +162,7 @@ function build_forms_polar_extraction_operators(polar_config::Int, degenerate_co
 
     ## Basic quantities
     # build control triangle that contains all degenerate control points
-    trix, triy = build_forms_control_triangle_(degenerate_control_points)
+    trix, triy = build_control_triangle_(degenerate_control_points)
     # compute barycentric coordinates of the degenerate control points w.r.t. the control triangle
     baryc = barycentric_coordinates_(degenerate_control_points, trix, triy)
     
@@ -355,18 +320,10 @@ function build_forms_polar_extraction_operators(polar_config::Int, degenerate_co
         E2 = nothing
     end
     
-    if all(build_forms)
-        return E0, (E1_h, E1_v), E2
-    elseif build_forms[1]
-        return E0
-    elseif build_forms[2]
-        return E1_h, E1_v
-    elseif build_forms[3]
-        return E2
-    end
+    return ((E0,), (E1_h, E1_v), (E2,)), (trix, triy)
 end
 
-function build_forms_control_triangle_(points::NTuple{2,Matrix{Float64}})
+function build_control_triangle_(points::NTuple{2,Matrix{Float64}})
     rad = sqrt.(sum((points[2] .- points[1]).^2, dims=2))
     tau = 2 * maximum(rad)
     trix = [tau, -tau / 2, -tau / 2]

@@ -200,6 +200,21 @@ function gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
 end
 
 """
+    get_derivative_space(ect_space::GeneralizedTrigonometric)
+
+Get the space of one degree lower than the input space.
+
+# Arguments
+- `ect_space::GeneralizedTrigonometric`: A ect space.
+
+# Returns
+- `::GeneralizedTrigonometric`: A ect space of one degree lower than the input space.
+"""
+function get_derivative_space(ect_space::GeneralizedTrigonometric)
+    return GeneralizedTrigonometric(ect_space.p-1, ect_space.w, ect_space.t, ect_space.m)
+end
+
+"""
     build_two_scale_matrix(ect_space::AbstractECTSpaces, num_sub_elements::Int)
 
 Uniformly subdivides the ECT space into `num_sub_elements` sub-elements. It is assumed that `num_sub_elements` is a power of 2, else the method throws an argument error. It returns a global subdivision matrix that maps the global basis functions of the ECT space to the global basis functions of the subspaces.
