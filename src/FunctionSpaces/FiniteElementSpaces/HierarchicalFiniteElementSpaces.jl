@@ -219,6 +219,10 @@ function get_num_levels(hierarchical_space::HierarchicalFiniteElementSpace{n, S,
     return get_num_levels(hierarchical_space.active_elements)
 end
 
+function get_dof_partition(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    return hierarchical_space.dof_partition
+end
+
 """
     get_active_level(active_info::HierarchicalActiveInfo, index::Int)
 
@@ -829,23 +833,6 @@ function _get_element_measure(hspace::HierarchicalFiniteElementSpace{n, S, T}, e
     element_level_id = get_active_id(hspace.active_elements, element_id)
 
     return _get_element_measure(hspace.spaces[element_level], element_level_id)
-end
-
-# Boundary methods
-
-function get_boundary_dof_indices(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-
-    L = get_num_levels(hspace)
-
-    boundary_dof_indices = Vector{Int}(undef, 0)
-    for level ∈ 1:L
-        level_boundary_dof_indices = get_boundary_dof_indices(hspace.spaces[level])
-        active_hspace_indices, active_level_indices = get_level_active(hspace.active_basis, level)
-
-        append!(boundary_dof_indices, active_hspace_indices[findall(id -> id ∈ level_boundary_dof_indices, active_level_indices)])
-    end
-
-    return boundary_dof_indices
 end
 
 # Geometry methods
