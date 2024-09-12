@@ -1,4 +1,4 @@
-"""
+@doc raw"""
     BSplineSpace{F} <: AbstractFiniteElementSpace{1}
 
 Structure containing information about a univariate B-Spline function space defined on `patch_1d::Mesh.Patch1D`,
@@ -108,6 +108,10 @@ function get_extraction(bspline::BSplineSpace, element_id::Int)
     return get_extraction(bspline.extraction_op, element_id)
 end
 
+function get_basis_indices(bspline::BSplineSpace, element_id::Int)
+    return get_extraction(bspline.extraction_op, element_id)
+end
+
 """
     get_polynomials(bspline::BSplineSpace)
 
@@ -161,6 +165,8 @@ function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::NTuple{1, V
     return get_local_basis(bspline, element_id, xi[1], nderivatives)
 end
 
+
+
 """
     get_polynomial_degree(bspline::BSplineSpace)
 
@@ -192,6 +198,7 @@ function get_num_basis(bspline::BSplineSpace)
     @assert get_num_basis(bspline.extraction_op) == size(bspline.knot_vector.patch_1d) * (bspline.knot_vector.polynomial_degree + 1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree + 1)) "B-spline dimension incorrect."
     return get_num_basis(bspline.extraction_op)
 end
+
 
 """
     get_patch(bspline::BSplineSpace)

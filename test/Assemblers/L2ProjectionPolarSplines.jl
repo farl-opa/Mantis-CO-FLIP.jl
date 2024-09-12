@@ -119,10 +119,15 @@ function run_polar_spline_L2_projection_test(deg, form_rank)
         # inputs for the mixed weak form
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(fₑ, X, X, ∫)
         
+        # Dirichlet boundary conditions
+        dirichlet_bcs = Dict{Int, Float64}()
+
         # assemble all matrices
         weak_form = Mantis.Assemblers.l2_weak_form
-        global_assembler = Mantis.Assemblers.Assembler(Dict{Int, Float64}())
-        A, b = global_assembler(weak_form, weak_form_inputs)
+        A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, dirichlet_bcs)
+        
+        # global_assembler = Mantis.Assemblers.Assembler(Dict{Int, Float64}())
+        # A, b = global_assembler(weak_form, weak_form_inputs)
 
         # solve for coefficients of solution
         sol = A \ b
