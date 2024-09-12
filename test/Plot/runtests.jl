@@ -23,7 +23,7 @@ Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
 GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
 Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1, -1])
 geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GBθ),Mantis.FunctionSpaces.get_num_basis(Br),1.0)
-PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]), return_global_extraction=true)
+PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]))
 geom_coeffs_θr = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
 S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(PSplines[1], GBθ)
 # control points for geometry cross-section
