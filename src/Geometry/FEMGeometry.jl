@@ -56,9 +56,9 @@ end
 
 # compute FEMGeometry for different FESpaces
 @doc raw"""
-    compute_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+    get_parametric_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
 
-Returns the geometry associated with `fem_space` by computing the geometry coefficients of the space.
+Returns the parametric geometry associated with `fem_space` by computing the geometry coefficients of the space.
 
 # Arguments
 - 'fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}': Finite element space for which to compute the geometry.
@@ -66,8 +66,8 @@ Returns the geometry associated with `fem_space` by computing the geometry coeff
 # Returns
 - '::FEMGeometry{n, F}': structure of the finite element geometry.
 """
-function compute_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
-    geometry_coefficients = FunctionSpaces._compute_geometry_coeffs(fem_space)
+function get_parametric_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+    geometry_coefficients = FunctionSpaces._get_parametric_geometry_coeffs(fem_space)
 
     return FEMGeometry(fem_space, geometry_coefficients)
 end

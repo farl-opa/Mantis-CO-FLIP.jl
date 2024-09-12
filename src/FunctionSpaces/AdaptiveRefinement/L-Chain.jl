@@ -356,16 +356,17 @@ function get_marked_element_padding(hspace::HierarchicalFiniteElementSpace{n, S,
     num_levels = get_num_levels(hspace)
     get_basis_indices_from_extraction(space, element) = get_extraction(space, element)[2]
 
-    element_padding = Vector{Vector{Int}}(undef, num_levels)
-    
+    element_padding = [Int[] for _ ∈ 1:num_levels]
+    level_padding = Int[]
 
     for level ∈ 1:num_levels
         if marked_elements_per_level[level] == Int[]
-            element_padding[level]= Int[]
             continue
         end
         basis_in_marked_elements = reduce(union, get_basis_indices_from_extraction.(Ref(hspace.spaces[level]), marked_elements_per_level[level]))
-        element_padding[level] = reduce(union, get_support.(Ref(hspace.spaces[level]), basis_in_marked_elements))
+        
+        level_padding = union(get_support.(Ref(hspace.spaces[level]), basis_in_marked_elements)...)
+        append!(element_padding[level], level_padding)
     end
 
     return element_padding
@@ -399,7 +400,7 @@ function get_marked_domains(hspace::HierarchicalFiniteElementSpace{n, S, T}, mar
                 if element_padding[level] == Int[]
                     marked_domains[level+1] = get_level_domain(hspace, level+1)
                 else
-                    marked_domains[level+1] = union(get_level_domain(hspace, level+1), get_finer_elements(new_two_scale_operator, element_padding[level]))
+                    marked_domains[level+1] = union(get_level_domain(hspace, level+1), get_finer_elements(hspace.two_scale_operators[level], element_padding[level]))
                 end
             elseif element_padding[level] != Int[]
                 push!(marked_domains, get_finer_elements(new_two_scale_operator, element_padding[level]))
@@ -422,6 +423,6 @@ function get_marked_domains(hspace::HierarchicalFiniteElementSpace{n, S, T}, mar
             end
         end
     end
-
+    
     return marked_domains
 end

@@ -34,5 +34,5 @@ function get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter:
     
     max_error = maximum(element_errors)
     
-    return findall(el -> el > (1.0-dorfler_parameter)*max_error, element_errors)
+    return findall(error -> error > (1.0-dorfler_parameter)*max_error, element_errors)
 end
