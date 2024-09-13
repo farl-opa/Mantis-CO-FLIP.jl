@@ -77,7 +77,7 @@ function forcing_function_gianelli2012_2d(x::Matrix{Float64})
 end
 
 # Boundary conditions 
-local bc_dirichlet_2d_empty = Dict{Int, Float64}()
+bc_dirichlet_2d_empty = Dict{Int, Float64}()
 
 # Refinement conditions 
 n_subdivs_2d = (2, 2)
