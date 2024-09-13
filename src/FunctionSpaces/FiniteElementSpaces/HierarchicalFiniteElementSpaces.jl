@@ -1,17 +1,83 @@
 @doc raw"""
     struct HierarchicalActiveInfo
 
-# Description
-`ids` is a collection of linear ids of active objects, whether elements or functions.
-`levels` contains information about the level of each active object by encoding the 
-indexes of the last active objects, of the `ids` vector, from each level. 
-For example, if `levels = [0, n1, n2, ...]`, then:
-- `ids[1:n1]` will contain all active objects from level 1
-- `ids[n1+1:n2]` will contain all active objects from level 2, and so forth.
+Contains information about active objects in a hierarchical construction. The indexing in the hierarchical space is such that
+the index of an object in level l-1 is always less than that of an object in level l.
+
+# Fields
+- `level_ids::Vector{Vector{Int}}`: Per level collection of active objects. 
+    'level_ids[l][i]' gives the id in level 'l' of the object indicated by 'i', 
+    not the hierarchical id of the overall set of objects.
+- `level_cum_num_ids::Vector{Int}`: Total number of active objects up to a certain level, i.e. 'level_cum_num_ids[l]=sum(length.(level_ids[1:l-1]))'. 
+    First entry is always 0 for ease of use.
+
+# Note
 """
 struct HierarchicalActiveInfo
-    ids::Vector{Int}
-    levels::Vector{Int} 
+    level_ids::Vector{Vector{Int}}
+    level_cum_num_ids::Vector{Int}
+
+    function HierarchicalActiveInfo(level_ids::Vector{Vector{Int}})
+        level_cum_num_ids = [0; cumsum(length.(level_ids))]
+        
+        return new(level_ids, level_cum_num_ids)
+    end
+end
+
+# Basis getters for HierarchicalActiveInfo
+
+function get_level_ids(active_info::HierarchicalActiveInfo)
+    return active_info.level_ids
+end
+
+function get_level_ids(active_info::HierarchicalActiveInfo, level::Int)
+    return get_level_ids(active_info)[level]
+end
+
+function get_level_cum_num_ids(active_info::HierarchicalActiveInfo)
+    return active_info.level_cum_num_ids
+end
+
+function get_level_cum_num_ids(active_info::HierarchicalActiveInfo, level::Int)
+    return get_level_cum_num_ids(active_info)[level+1]
+end
+
+function get_level_num_ids(active_info::HierarchicalActiveInfo, level::Int)
+    level == 0 ? (return 0) : nothing
+
+    level_cum_num_ids = get_level_cum_num_ids(active_info)
+
+    return level_cum_num_ids[level+1] - level_cum_num_ids[level]  
+end
+
+function get_num_levels(active_info::HierarchicalActiveInfo)
+    return length(get_level_ids(active_info))
+end
+
+function get_num_objects(active_info::HierarchicalActiveInfo)
+    return active_info.level_cum_num_ids[end]
+end
+
+function get_level(active_info::HierarchicalActiveInfo, hierarchical_id::Int)
+    return findlast(x -> x < hierarchical_id, get_level_cum_num_ids(active_info))
+end
+
+# Other basic functionality 
+
+function convert_to_level_id(active_info::HierarchicalActiveInfo, hierarchical_id::Int)
+    object_level = get_level(active_info, hierarchical_id)
+
+    return get_level_ids(active_info, object_level)[hierarchical_id - get_level_cum_num_ids(active_info, object_level-1)]
+end
+
+function convert_to_hierarchical_id(active_info::HierarchicalActiveInfo, level::Int, level_id::Int)
+    level_id_count = findfirst(x -> x == level_id, get_level_ids(active_info, level))
+
+    return  level_id_count + get_level_cum_num_ids(active_info, level-1)
+end
+
+function get_level_and_level_id(active_info::HierarchicalActiveInfo, hierarchical_id::Int)
+    return get_level(active_info, hierarchical_id), convert_to_level_id(active_info, hierarchical_id)
 end
 
 @doc raw"""
@@ -20,14 +86,11 @@ end
 A hierarchical space that is built from nested hierarchies of `n`-variate function spaces and domains. 
 
 # Fields
-- `spaces::Vector{AbstractFiniteElementSpace{n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}} `: collection of `n`-variate 
-    function spaces.
-- `two_scale_operators::Vector{AbstractTwoScaleOperator}`: collection of two-scale operators. 
-    relating each consequtive pair of function spaces.
+- `spaces::Vector{AbstractFiniteElementSpace{n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}} `: collection of `n`-variate function spaces.
+- `two_scale_operators::Vector{AbstractTwoScaleOperator}`: collection of two-scale operators relating each consecutive pair of finite element spaces.
 - `active_elements::HierarchicalActiveInfo`: information about the active elements in each level.
 - `active_basis::HierarchicalActiveInfo`: information about the active basis in each level.
-- `multilevel_elements::SparseArrays.SparseVector{Int, Int}`: elements where basis from multiple levels
-    have non-empty support.
+- `multilevel_elements::SparseArrays.SparseVector{Int, Int}`: elements where basis from multiple levels have non-empty support.
 - `multilevel_extraction_coeffs::Vector{Matrix{Float64}}`: extraction coefficients of active basis in `multilevel_elements`.
 - `multilevel_basis_indices::Vector{Vector{Int}}`: indices of active basis in `multilevel_elements`.
 """
@@ -43,41 +106,48 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
     dof_partition::Vector{Vector{Int}}
 
     # Constructor that builds the space
-    function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, marked_domains::HierarchicalActiveInfo, truncated::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-        L = length(spaces)
+    function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, nested_domains::HierarchicalActiveInfo, truncated::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+
+        function _compute_dof_partition(spaces, active_basis)
+
+            level_partition = get_dof_partition.(spaces)
+            n_partitions = length(level_partition[1])
+            dof_partition = [Int[] for _ ∈ 1:n_partitions]
+
+            for level ∈ 1:num_levels
+                level_active_basis = [get_level_active(active_basis, level)[2]]
+                
+                for i ∈ 1:n_partitions
+                    active_dof_partition_checks = level_partition[level][i] .∈ level_active_basis
+                    dof_ids = get_active_indices(active_basis, level_partition[level][i][active_dof_partition_checks], level)
+
+                    append!(dof_partition[i], dof_ids)
+                end
+            end
+
+            return dof_partition
+        end
+
+        num_levels = length(spaces)
 
         # Checks for incompatible arguments
-        if L<1
-            throw(ArgumentError("At least 1 level is required. 0 were given."))
-        elseif length(two_scale_operators) != L-1
+        if num_levels<1
+            throw(ArgumentError("At least 1 level is required, but 0 were given."))
+        elseif length(two_scale_operators) != num_levels-1
             msg1 = "Number of two-scale operators should be 1 less than the number of hierarchical spaces. "
-            msg2 = " $L refinement levels and $(length(two_scale_operators)) two-scale operators were received."
+            msg2 = "$num_levels refinement levels and $(length(two_scale_operators)) two-scale operators were received."
             throw(ArgumentError(msg1*msg2))
-        elseif get_num_levels(marked_domains) != L
-            msg1 = "Number of domains should be the same as the number of levels. "
-            msg2 = " $L refinement levels and $(get_num_levels(marked_domains)) domains were received."
+        elseif get_num_levels(nested_domains) != num_levels
+            msg1 = "Number of nested domains should be the same as the number of levels. "
+            msg2 = "$num_levels refinement levels and $(get_num_levels(nested_domains)) domains were received."
             throw(ArgumentError(msg1*msg2))
         end
 
         # Computes necessary hierarchical information
-        active_elements, active_basis = get_active_objects(spaces, two_scale_operators, marked_domains)
+        active_elements, active_basis = get_active_objects(spaces, two_scale_operators, nested_domains)
         multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(spaces, two_scale_operators, active_elements, active_basis, truncated)
 
-        # Computes dof partition
-        spaces_partition = get_dof_partition.(spaces)
-        n_partitions = length(spaces_partition[1])
-        dof_partition = [Int[] for _ ∈ 1:n_partitions]
-
-        for level ∈ 1:L
-            level_active_basis = [get_level_active(active_basis, level)[2]]
-            
-            for i ∈ 1:n_partitions
-                active_dof_partition_checks = spaces_partition[level][i] .∈ level_active_basis
-                dof_ids = get_active_indices(active_basis, spaces_partition[level][i][active_dof_partition_checks], level)
-
-                append!(dof_partition[i], dof_ids)
-            end
-        end
+        dof_partition = _compute_dof_partition(spaces, active_basis)
 
         # Creates the structure
         return new{n, S, T}(spaces, two_scale_operators, active_elements, active_basis,
@@ -86,10 +156,10 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
     end
 
     # Helper constructor for domains given in a per-level vector.
-    function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, marked_domains_per_level::Vector{Vector{Int}}, truncated::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-        marked_domains = convert_elements_per_level_to_active_info(marked_domains_per_level)
+    function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, nested_domains_per_level::Vector{Vector{Int}}, truncated::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+        nested_domains = convert_elements_per_level_to_active_info(marked_domains_per_level)
         
-        return HierarchicalFiniteElementSpace(spaces, two_scale_operators, marked_domains, truncated)
+        return HierarchicalFiniteElementSpace(spaces, two_scale_operators, nested_domains, truncated)
     end
 end
 
