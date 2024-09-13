@@ -3,10 +3,10 @@
 
 Supertype for all scalar finite element spaces.
 """
-abstract type AbstractFiniteElementSpace{n} <: AbstractFunctionSpace end
+abstract type AbstractFiniteElementSpace{manifold_dim} <: AbstractFunctionSpace end
 
 # Getters for the function spaces
-get_manifold_dim(f::AbstractFiniteElementSpace{n}) where {n} = n
+get_manifold_dim(_::AbstractFiniteElementSpace{manifold_dim}) where {manifold_dim} = manifold_dim
 
 @doc raw"""
     evaluate(space::S, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {S<:AbstractFiniteElementSpace}

@@ -109,7 +109,7 @@ function get_extraction(bspline::BSplineSpace, element_id::Int)
 end
 
 function get_basis_indices(bspline::BSplineSpace, element_id::Int)
-    return get_extraction(bspline.extraction_op, element_id)
+    return get_extraction(bspline.extraction_op, element_id)[2]
 end
 
 """
