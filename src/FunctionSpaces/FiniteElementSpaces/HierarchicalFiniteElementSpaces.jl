@@ -62,7 +62,7 @@ function get_level(active_info::HierarchicalActiveInfo, hierarchical_id::Int)
     return findlast(x -> x < hierarchical_id, get_level_cum_num_ids(active_info))
 end
 
-# Other basic functionality 
+# Other basic functionality u
 
 function convert_to_level_id(active_info::HierarchicalActiveInfo, hierarchical_id::Int)
     object_level = get_level(active_info, hierarchical_id)
@@ -133,13 +133,13 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
         # Checks for incompatible arguments
         if num_levels<1
             throw(ArgumentError("At least 1 level is required, but 0 were given."))
-        elseif length(two_scale_operators) != num_levels-1
-            msg1 = "Number of two-scale operators should be 1 less than the number of hierarchical spaces. "
-            msg2 = "$num_levels refinement levels and $(length(two_scale_operators)) two-scale operators were received."
+        elseif length(two_scale_operators) != num_levels
+            msg1 = "Number of two-scale operators should be the same as the number of levels. "
+            msg2 = "$num_levels refinement levels and $(length(two_scale_operators)) two-scale operators were given."
             throw(ArgumentError(msg1*msg2))
         elseif get_num_levels(nested_domains) != num_levels
             msg1 = "Number of nested domains should be the same as the number of levels. "
-            msg2 = "$num_levels refinement levels and $(get_num_levels(nested_domains)) domains were received."
+            msg2 = "$num_levels refinement levels and $(get_num_levels(nested_domains)) domains were given."
             throw(ArgumentError(msg1*msg2))
         end
 
@@ -157,7 +157,8 @@ struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
 
     # Helper constructor for domains given in a per-level vector.
     function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, nested_domains_per_level::Vector{Vector{Int}}, truncated::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-        nested_domains = convert_elements_per_level_to_active_info(marked_domains_per_level)
+
+        nested_domains = HierarchicalActiveInfo(nested_domains_per_level)
         
         return HierarchicalFiniteElementSpace(spaces, two_scale_operators, nested_domains, truncated)
     end
