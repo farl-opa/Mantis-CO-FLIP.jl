@@ -54,7 +54,7 @@ function get_num_levels(active_info::HierarchicalActiveInfo)
     return length(get_level_ids(active_info))
 end
 
-function get_num_objects(active_info::HierarchicalActiveInfo)
+function get_num_active(active_info::HierarchicalActiveInfo)
     return active_info.level_cum_num_ids[end]
 end
 
