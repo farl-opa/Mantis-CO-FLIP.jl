@@ -473,7 +473,7 @@ function get_active_objects(spaces::Vector{S}, two_scale_operators::Vector{T}, m
         for Ni ∈ active_basis_per_level[level] # Loop over active basis on current level
             # Gets the support of Ni on current level and the next one
             support = get_support(spaces[level], Ni)
-            finer_support = get_finer_elements(two_scale_operators[level], support)
+            finer_support = get_element_children(two_scale_operators[level], support)
             check_in_next_domain = finer_support .∈ next_level_domain # checks if the support is contained in the next level domain
 
             # Updates elements and basis to add and remove based on check_in_next_domain
@@ -526,7 +526,7 @@ function get_inactive_active_children(active_elements::HierarchicalActiveInfo, e
         all_active_check = true
         inactive_children = Int[]
         for curr_element_id ∈ current_element_ids 
-            children = get_finer_elements(two_scale_operators[current_level], curr_element_id)
+            children = get_element_children(two_scale_operators[current_level], curr_element_id)
             children_check = children .∈ [get_level_active(active_elements, current_level+1)[2]]
             for child_id ∈ children[children_check]
                 push!(active_children, (current_level+1, child_id))

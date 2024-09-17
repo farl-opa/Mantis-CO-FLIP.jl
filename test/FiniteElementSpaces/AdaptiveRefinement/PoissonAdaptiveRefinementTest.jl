@@ -174,8 +174,8 @@ function test()
     for step ∈ 1:n_steps
         # Solve current hierarchical space solution
 
-        L = Mantis.FunctionSpaces.get_num_levels(hier_space)
-        new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hier_space.spaces[L], (nsub1, nsub2))
+        L = Mantis.FunctionSpaces.get_num_levels(hspace)
+        new_operator, new_space = Mantis.FunctionSpaces.build_two_scale_operator(hspace.spaces[L], (nsub1, nsub2))
         dorfler_marking = Mantis.FunctionSpaces.get_dorfler_marking(err_per_element, dorfler_parameter)
         marked_domains = Mantis.FunctionSpaces.get_marked_domains(hier_space, dorfler_marking, new_operator, false)
 

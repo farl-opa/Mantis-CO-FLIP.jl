@@ -7,12 +7,11 @@ using LinearAlgebra
 function fe_run(weak_form_inputs, weak_form, bc_dirichlet, case, test, verbose)
 
     # Setup the global assembler.
-    global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
 
     if verbose
         println("Assembling ...")
     end
-    A, b = global_assembler(weak_form, weak_form_inputs)
+    A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, bc_dirichlet)
 
     # Solve & add bcs.
     if verbose
@@ -112,7 +111,7 @@ for scheme ∈ refinemenent_schemes
             f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geo_cart_2d, "f")
             f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geo_cart_2d, "u")
 
-            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in tp_space_2d.dof_partition[j])
+            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in tp_space_2d.dof_partition[1][j])
             weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
             coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
@@ -160,7 +159,7 @@ for scheme ∈ refinemenent_schemes
         f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, HB_geo, "f")
         f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, HB_geo, "u")
 
-        bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in HB_space.dof_partition[j])
+        bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in HB_space.dof_partition[1][j])
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
         coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
@@ -201,7 +200,7 @@ for scheme ∈ refinemenent_schemes
             f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, HB_geo, "f")
             f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, HB_geo, "u")
 
-            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in HB_space.dof_partition[j])
+            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in HB_space.dof_partition[1][j])
             weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
             coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
@@ -250,7 +249,7 @@ for scheme ∈ refinemenent_schemes
         f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, THB_geo, "f")
         f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, THB_geo, "u")
 
-        bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[j])
+        bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[1][j])
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
         coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
@@ -291,7 +290,7 @@ for scheme ∈ refinemenent_schemes
             f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, THB_geo, "f")
             f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, THB_geo, "u")
 
-            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[j])
+            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[1][j])
             weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
             coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
@@ -340,7 +339,7 @@ for scheme ∈ refinemenent_schemes
         f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, THB_geo, "f")
         f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, THB_geo, "u")
 
-        bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[j])
+        bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[1][j])
         weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
         coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
@@ -381,7 +380,7 @@ for scheme ∈ refinemenent_schemes
             f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, THB_geo, "f")
             f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, THB_geo, "u")
 
-            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[j])
+            bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in THB_space.dof_partition[1][j])
             weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
             coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 

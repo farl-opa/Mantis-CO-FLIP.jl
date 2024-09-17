@@ -309,3 +309,4 @@ end
 
 include("UnivariateBSplineTwoScaleRelations.jl")
 include("TensorProductTwoScaleRelations.jl")
+include("UnstructuredTwoScaleRelations.jl")

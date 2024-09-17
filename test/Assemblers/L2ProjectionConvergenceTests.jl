@@ -7,12 +7,11 @@ using LinearAlgebra
 function fe_run(weak_form_inputs, weak_form, bc_dirichlet, case, test, verbose)
 
     # Setup the global assembler.
-    global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
 
     if verbose
         println("Assembling ...")
     end
-    A, b = global_assembler(weak_form, weak_form_inputs)
+    A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, bc_dirichlet)
 
     # Solve & add bcs.
     if verbose
