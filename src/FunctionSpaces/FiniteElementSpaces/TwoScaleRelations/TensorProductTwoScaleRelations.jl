@@ -32,10 +32,10 @@ function get_local_subdiv_matrix(twoscale_operator::TensorProductTwoScaleOperato
     return local_subdiv_matrix
 end
 
-function get_finer_elements(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+function get_element_children(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_f = _get_num_elements_per_space(twoscale_operator.fine_space)
 
-    finer_ordered_indices = _get_finer_elements_per_space(twoscale_operator, el_id)
+    finer_ordered_indices = _get_element_children_per_space(twoscale_operator, el_id)
 
     finer_elements = Vector{Int}(undef, prod(length.(finer_ordered_indices)))
 
@@ -48,40 +48,40 @@ function get_finer_elements(twoscale_operator::TensorProductTwoScaleOperator{n, 
     return finer_elements
 end
 
-function _get_finer_elements_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+function _get_element_children_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_c = _get_num_elements_per_space(twoscale_operator.coarse_space)
     ordered_index = linear_to_ordered_index(el_id, max_ind_c)
 
-    return (get_finer_elements(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_finer_elements(twoscale_operator.twoscale_operator_2, ordered_index[2]))
+    return (get_element_children(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_element_children(twoscale_operator.twoscale_operator_2, ordered_index[2]))
 end
 
-function get_finer_elements(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_ids::Vector{Int}) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
-    return reduce(vcat, get_finer_elements.(Ref(twoscale_operator), el_ids))
+function get_element_children(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_ids::Vector{Int}) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+    return reduce(vcat, get_element_children.(Ref(twoscale_operator), el_ids))
 end
 
 
-function get_coarser_element(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+function get_element_parent(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_c = _get_num_elements_per_space(twoscale_operator.coarse_space)
 
-    coarser_ordered_indices = _get_coarser_elements_per_space(twoscale_operator, el_id)
+    coarser_ordered_indices = _get_element_parents_per_space(twoscale_operator, el_id)
 
     return ordered_to_linear_index(coarser_ordered_indices, max_ind_c)
 end
 
 
 
-function _get_coarser_elements_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+function _get_element_parents_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, el_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_f = _get_num_elements_per_space(twoscale_operator.fine_space)
     ordered_index = linear_to_ordered_index(el_id, max_ind_f)
 
-    return (get_coarser_element(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_coarser_element(twoscale_operator.twoscale_operator_2, ordered_index[2]))
+    return (get_element_parent(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_element_parent(twoscale_operator.twoscale_operator_2, ordered_index[2]))
 end
 
 
-function get_finer_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, basis_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+function get_basis_children(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, basis_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_f = _get_num_basis_per_space(twoscale_operator.fine_space)
 
-    finer_ordered_indices = _get_finer_basis_id_per_space(twoscale_operator, basis_id)
+    finer_ordered_indices = _get_basis_children_per_space(twoscale_operator, basis_id)
 
     finer_basis_ids = Vector{Int}(undef, prod(length.(finer_ordered_indices)))
 
@@ -94,11 +94,11 @@ function get_finer_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, 
     return finer_basis_ids
 end
 
-function _get_finer_basis_id_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, basis_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
+function _get_basis_children_per_space(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, basis_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}
     max_ind_c = _get_num_basis_per_space(twoscale_operator.coarse_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_c)
 
-    return (get_finer_basis_id(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_finer_basis_id(twoscale_operator.twoscale_operator_2, ordered_index[2]))
+    return (get_basis_children(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_basis_children(twoscale_operator.twoscale_operator_2, ordered_index[2]))
 end
 
 function get_coarser_basis_id(twoscale_operator::TensorProductTwoScaleOperator{n, F1, F2, T1, T2}, basis_id::Int) where {n, F1<:AbstractFiniteElementSpace{n1} where {n1}, F2<:AbstractFiniteElementSpace{n2} where {n2}, T1<: AbstractTwoScaleOperator, T2<: AbstractTwoScaleOperator}

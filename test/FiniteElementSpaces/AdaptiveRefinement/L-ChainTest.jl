@@ -45,8 +45,8 @@ function plot_grid(ne1, ne2, marked_elements, marked_bsplines, refinement_domain
     #savefig("many-marked.pdf")
 end
 
-function plot_geometry(hspace)
-    degrees = Mantis.FunctionSpaces.get_polynomial_degree_per_dim(hspace.spaces[1])
+function plot_geometry(hier_space)
+    degrees = Mantis.FunctionSpaces.get_polynomial_degree_per_dim(hier_space.spaces[1])
     nxi_per_dim = maximum(degrees) + 1
     nxi = nxi_per_dim^2
     xi_per_dim = collect(range(0,1, nxi_per_dim))
@@ -58,27 +58,27 @@ function plot_geometry(hspace)
         xi[idx,:] = [x[1] x[2]]
     end
 
-    xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
+    xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hier_space)*nxi,2)
     nx = size(xs)[1]
 
-    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
+    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hier_space))
 
-    for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
-        level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
-        element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
+    for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
+        level = Mantis.FunctionSpaces.get_active_level(hier_space.active_elements, el)
+        element_id = Mantis.FunctionSpaces.get_active_id(hier_space.active_elements, el)
 
-        max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hspace.spaces[level])
+        max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hier_space.spaces[level])
         ordered_index = Mantis.FunctionSpaces.linear_to_ordered_index(element_id, max_ind_els)
 
-        borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
-        borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
+        borders_x = Mantis.Mesh.get_element(hier_space.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
+        borders_y = Mantis.Mesh.get_element(hier_space.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
 
         x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
 
         idx = (el-1)*nxi+1:el*nxi
         xs[idx,:] = x
 
-        local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
+        local eval = Mantis.FunctionSpaces.evaluate(hier_space, el, xi_eval, 0)
 
         A[idx, eval[2]] = eval[1][1][1]
     end
@@ -88,7 +88,7 @@ function plot_geometry(hspace)
     println(size(coeffs))
     display(coeffs)
 
-    hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
+    hierarchical_geo = Mantis.Geometry.FEMGeometry(hier_space, coeffs)
 
     # Generate the Plot
     Mantis_folder =  dirname(dirname(pathof(Mantis)))
@@ -100,8 +100,8 @@ function plot_geometry(hspace)
     Mantis.Plot.plot(hierarchical_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 end
 
-function plot_field(hspace)
-    degrees = Mantis.FunctionSpaces.get_polynomial_degree_per_dim(hspace.spaces[1])
+function plot_field(hier_space)
+    degrees = Mantis.FunctionSpaces.get_polynomial_degree_per_dim(hier_space.spaces[1])
     nxi_per_dim = maximum(degrees) + 1
     nxi = nxi_per_dim^2
     xi_per_dim = collect(range(0,1, nxi_per_dim))
@@ -113,36 +113,36 @@ function plot_field(hspace)
         xi[idx,:] = [x[1] x[2]]
     end
 
-    xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi,2)
+    xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hier_space)*nxi,2)
     nx = size(xs)[1]
 
-    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
+    A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hier_space))
 
-    for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
-        level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
-        element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
+    for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
+        level = Mantis.FunctionSpaces.get_active_level(hier_space.active_elements, el)
+        element_id = Mantis.FunctionSpaces.get_active_id(hier_space.active_elements, el)
 
-        max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hspace.spaces[level])
+        max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hier_space.spaces[level])
         ordered_index = Mantis.FunctionSpaces.linear_to_ordered_index(element_id, max_ind_els)
 
-        borders_x = Mantis.Mesh.get_element(hspace.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
-        borders_y = Mantis.Mesh.get_element(hspace.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
+        borders_x = Mantis.Mesh.get_element(hier_space.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
+        borders_y = Mantis.Mesh.get_element(hier_space.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
 
         x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
 
         idx = (el-1)*nxi+1:el*nxi
         xs[idx,:] = x
 
-        local eval = Mantis.FunctionSpaces.evaluate(hspace, el, xi_eval, 0)
+        local eval = Mantis.FunctionSpaces.evaluate(hier_space, el, xi_eval, 0)
 
         A[idx, eval[2]] = eval[1][1][1]
     end
 
     coeffs = A \ xs
 
-    hierarchical_geo = Mantis.Geometry.FEMGeometry(hspace, coeffs)
-    field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_num_basis(hspace), Mantis.FunctionSpaces.get_num_basis(hspace))
-    field = Mantis.Fields.FEMField(hspace, field_coeffs)
+    hierarchical_geo = Mantis.Geometry.FEMGeometry(hier_space, coeffs)
+    field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_num_basis(hier_space), Mantis.FunctionSpaces.get_num_basis(hier_space))
+    field = Mantis.Fields.FEMField(hier_space, field_coeffs)
 
     # Generate the Plot
     Mantis_folder =  dirname(dirname(pathof(Mantis)))
@@ -177,25 +177,25 @@ n_els_per_step = 4
 new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(TB, (nsub1, nsub2))
 spaces = [TB, new_space]
 operators = [new_operator]
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[], Int[]])
+hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[], Int[]])
 Random.seed!(28) 
 
 for step ∈ 1:n_steps
-    L = Mantis.FunctionSpaces.get_num_levels(hspace)
+    L = Mantis.FunctionSpaces.get_num_levels(hier_space)
 
     new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(spaces[L], (nsub1, nsub2))
 
     marked_elements_per_level = [Int[] for _ ∈ 1:L-2]
-    push!(marked_elements_per_level, rand(Mantis.FunctionSpaces.get_level_active(hspace.active_elements, L-1)[2], n_els_per_step))
+    push!(marked_elements_per_level, rand(Mantis.FunctionSpaces.get_level_active(hier_space.active_elements, L-1)[2], n_els_per_step))
     push!(marked_elements_per_level, Int[])
 
-    refinement_domains = Mantis.FunctionSpaces.get_refinement_domain(hspace, Int[], new_operator)
+    refinement_domains = Mantis.FunctionSpaces.get_refinement_domain(hier_space, Int[], new_operator)
 
     if length(refinement_domains) > L
         push!(operators, new_operator)
         push!(spaces, new_space)
     end
-    hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, refinement_domains, false)
+    hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, refinement_domains, false)
 end
 
-plot_geometry(hspace)
+plot_geometry(hier_space)

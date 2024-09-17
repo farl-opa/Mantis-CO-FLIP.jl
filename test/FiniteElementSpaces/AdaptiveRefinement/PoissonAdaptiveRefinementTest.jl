@@ -4,19 +4,19 @@ using Test
 using Random
 using LinearAlgebra
 
-function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
-    L = Mantis.FunctionSpaces.get_num_levels(hspace)
+function get_thb_geometry(hier_space::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
+    L = Mantis.FunctionSpaces.get_num_levels(hier_space)
     
-    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hspace), 2))
+    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hier_space), 2))
 
     id_sum = 1
     for level ∈ 1:1:L
-        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hspace.spaces[level])
-        x_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
-        y_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
+        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hier_space.spaces[level])
+        x_greville_points = Mantis.FunctionSpaces.get_greville_points(hier_space.spaces[level].function_space_1.knot_vector)
+        y_greville_points = Mantis.FunctionSpaces.get_greville_points(hier_space.spaces[level].function_space_2.knot_vector)
         grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
         
-        _, level_active_basis = Mantis.FunctionSpaces.get_level_active(hspace.active_basis, level)
+        _, level_active_basis = Mantis.FunctionSpaces.get_level_active(hier_space.active_basis, level)
 
         for (y_count, y_id) ∈ enumerate(y_greville_points)
             for (x_count, x_id) ∈ enumerate(x_greville_points)
@@ -28,7 +28,7 @@ function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElemen
         end
     end
 
-    return Mantis.Geometry.FEMGeometry(hspace, coefficients)
+    return Mantis.Geometry.FEMGeometry(hier_space, coefficients)
 end
 
 function fe_run(source_function, trial_space, test_space, geom, q_nodes, 
@@ -156,10 +156,10 @@ function test()
     dorfler_parameter = 0.3
     spaces = [TB]
     operators = Mantis.FunctionSpaces.AbstractTwoScaleOperator[]
-    hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]])
-    hspace_geo = get_thb_geometry(hspace)
-    bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(hspace))
-    err_per_element = fe_run(forcing_sine, hspace, hspace, hspace_geo, 
+    hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, [Int[]])
+    hier_space_geo = get_thb_geometry(hier_space)
+    bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(hier_space))
+    err_per_element = fe_run(forcing_sine, hier_space, hier_space, hier_space_geo, 
     q_nodes, q_weights, exact_sol_sine, (deg1, deg2), 
     (reg1, reg2), case, bc_dirichlet_2d, output_to_file, test, verbose)
     
@@ -167,27 +167,27 @@ function test()
         println("Initial data:")
         println("Maximum error: $(sqrt(maximum(err_per_element))).") 
         println("Polynomial degrees: $((deg1, deg2)) with regularities: $((reg1, reg2)).")
-        println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
+        println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hier_space)).")
+        println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hier_space)). \n")
     end
 
     for step ∈ 1:n_steps
         # Solve current hierarchical space solution
 
-        L = Mantis.FunctionSpaces.get_num_levels(hspace)
-        new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hspace.spaces[L], (nsub1, nsub2))
+        L = Mantis.FunctionSpaces.get_num_levels(hier_space)
+        new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(hier_space.spaces[L], (nsub1, nsub2))
         dorfler_marking = Mantis.FunctionSpaces.get_dorfler_marking(err_per_element, dorfler_parameter)
-        marked_domains = Mantis.FunctionSpaces.get_marked_domains(hspace, dorfler_marking, new_operator, false)
+        marked_domains = Mantis.FunctionSpaces.get_marked_domains(hier_space, dorfler_marking, new_operator, false)
 
         if length(marked_domains) > L
             push!(spaces, new_space)
             push!(operators, new_operator)
         end
         
-        hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_domains, true)
-        hspace_geo = get_thb_geometry(hspace)
-        bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(hspace))
-        err_per_element = fe_run(forcing_sine, hspace, hspace, hspace_geo, 
+        hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_domains, true)
+        hier_space_geo = get_thb_geometry(hier_space)
+        bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(hier_space))
+        err_per_element = fe_run(forcing_sine, hier_space, hier_space, hier_space_geo, 
         q_nodes, q_weights, exact_sol_sine, (deg1, deg2), 
         (reg1, reg2), case, bc_dirichlet_2d, output_to_file, test, verbose)
 
@@ -196,8 +196,8 @@ function test()
             println("Maximum error: $(sqrt(maximum(err_per_element))).") 
             println("Number of marked_elements: $(length(dorfler_marking)).")
 
-            println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hspace)).")
-            println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hspace)). \n")
+            println("Number of elements: $(Mantis.FunctionSpaces.get_num_elements(hier_space)).")
+            println("DoF: $(Mantis.FunctionSpaces.get_num_basis(hier_space)). \n")
         end
     end
 end
