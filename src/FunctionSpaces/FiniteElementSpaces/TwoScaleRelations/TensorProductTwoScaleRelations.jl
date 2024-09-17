@@ -125,7 +125,7 @@ function _get_coarser_basis_id_per_space(twoscale_operator::TensorProductTwoScal
     return (get_coarser_basis_id(twoscale_operator.twoscale_operator_1, ordered_index[1]), get_coarser_basis_id(twoscale_operator.twoscale_operator_2, ordered_index[2]))
 end
 
-function subdivide_bspline(tp_space::TensorProductSpace{n, F1, F2}, nsubdivs::Tuple{Int, Int}) where {n, F1 <: BSplineSpace, F2 <: BSplineSpace}
+function get_sub_operator_and_space(tp_space::TensorProductSpace{n, F1, F2}, nsubdivs::Tuple{Int, Int}) where {n, F1 <: BSplineSpace, F2 <: BSplineSpace}
     space_1_ts, space_1_fine = subdivide_bspline(tp_space.function_space_1, nsubdivs[1])
     space_2_ts, space_2_fine = subdivide_bspline(tp_space.function_space_2, nsubdivs[2])
 

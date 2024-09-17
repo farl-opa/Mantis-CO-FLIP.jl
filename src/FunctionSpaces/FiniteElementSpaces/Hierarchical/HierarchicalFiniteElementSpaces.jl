@@ -12,7 +12,7 @@ A hierarchical space that is built from nested hierarchies of `n`-variate functi
 - `multilevel_extraction_coeffs::Vector{Matrix{Float64}}`: extraction coefficients of active basis in `multilevel_elements`.
 - `multilevel_basis_indices::Vector{Vector{Int}}`: indices of active basis in `multilevel_elements`.
 """
-struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
+mutable struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementSpace{n}
     spaces::Vector{S}   
     two_scale_operators::Vector{T}
     active_elements::HierarchicalActiveInfo
@@ -124,6 +124,10 @@ function get_space(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::I
     return hier_space.spaces[level]
 end
 
+function get_twoscale_operator(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    return hier_space.two_scale_operators[level]
+end
+
 function get_level_element_ids(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_level_ids(hier_space.active_elements, level)
 end
@@ -209,13 +213,13 @@ in the next level domain, regardless of whether their parent basis are active or
 - `active_basis::HierarchicalActiveInfo`: active basis on each level.
 """
 function get_active_objects(spaces::Vector{S}, two_scale_operators::Vector{T}, domains::HierarchicalActiveInfo) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    L = get_num_levels(domains)
+    num_levels = get_num_levels(domains)
 
     # Initialize active basis and elements on first level
     active_elements_per_level = [collect(1:get_num_elements(spaces[1]))]
     active_basis_per_level = [collect(1:get_num_basis(spaces[1]))]
 
-    for level in 1:L-1 # Loop over levels
+    for level in 1:num_levels-1 # Loop over levels
         next_level_domain = [get_level_ids(domains, level+1)]
 
         elements_to_remove = Int[]
@@ -226,14 +230,14 @@ function get_active_objects(spaces::Vector{S}, two_scale_operators::Vector{T}, d
         for Ni ∈ active_basis_per_level[level] # Loop over active basis on current level
             # Gets the support of Ni on current level and the next one
             support = get_support(spaces[level], Ni)
-            finer_support = get_element_children(two_scale_operators[level], support)
-            check_in_next_domain = finer_support .∈ next_level_domain # checks if the support is contained in the next level domain
+            element_children = get_element_children(two_scale_operators[level], support)
+            check_in_next_domain = element_children .∈ next_level_domain # checks if the support is contained in the next level domain
 
             # Updates elements and basis to add and remove based on check_in_next_domain
             if all(check_in_next_domain)
                 append!(elements_to_remove, support)
                 append!(basis_to_remove, Ni)
-                append!(elements_to_add, finer_support)
+                append!(elements_to_add, element_children)
                 append!(basis_to_add, get_basis_children(two_scale_operators[level], Ni))
             end
         end
@@ -454,7 +458,6 @@ end
 function get_extraction(hier_space::HierarchicalFiniteElementSpace{n, S, T}, hier_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     if hier_space.multilevel_elements[hier_id] == 0
         element_level, element_level_id = convert_to_element_level_and_level_id(hier_space, hier_id)
-
         coeffs, basis_level_ids = get_extraction(get_space(hier_space, element_level), element_level_id)
 
         # Convert level space basis indices to hierarchical space basis indices
@@ -470,12 +473,105 @@ end
 
 # Methods for updating the hierarchical space
 
-function update_hier_space(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domains::HierarchicalActiveInfo) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    return nothing
+function update_hier_space(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domains::HierarchicalActiveInfo, num_sub::NTuple{n, Int}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    function _extend_levels!(hier_space, domains, num_sub)
+        if get_num_levels(domains)>get_num_levels(hier_space)
+            num_domain_levels = get_num_levels(domains)
+            num_hier_levels = get_num_levels(hier_space)
+    
+            active_element_ids = copy(hier_space.active_elements.level_ids)
+            active_basis_ids = copy(hier_space.active_basis.level_ids)
+    
+            for level ∈ num_hier_levels:num_domain_levels-1
+                new_operator, new_space = get_sub_operator_and_space(get_space(hier_space, level), num_sub)
+                
+                push!(hier_space.operators, new_operator)
+                push!(hier_space.spaces, new_space)
+
+                push!(active_element_ids, Int[])
+                push!(active_basis_ids, Int[])
+            end
+        end
+
+        return hier_space
+    end
+
+    function _update_active_objects!(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domains::HierarchicalActiveInfo) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+
+        function _update_elements!(hier_space, level, elements_to_remove, elements_to_add)
+            # remove elements
+            hier_space.active_elements.level_ids[level] = setdiff(hier_space.active_elements.level_ids[level], elements_to_remove)
+            # add elements
+            hier_space.active_elements.level_ids[level+1] = union(hier_space.active_elements.level_ids[level+1], elements_to_add)
+            
+            return hier_space
+        end
+    
+        function _update_basis!(hier_space, level, basis_to_remove, basis_to_add)
+            # remove basis
+            hier_space.active_basis.level_ids[level] = setdiff(hier_space.active_basis.level_ids[level], basis_to_remove)
+            # add basis
+            hier_space.active_basis.level_ids[level+1] = union(hier_space.active_basis.level_ids[level+1], basis_to_add)
+    
+            return hier_space
+        end
+    
+        num_levels = get_num_levels(domains)
+    
+        # Initialize active basis and elements on first level
+    
+        for level in 1:num_levels-1 # Loop over levels
+            next_level_domain = [union(get_level_element_ids(hier_space, level+1), get_level_ids(domains, level+1))]
+    
+            elements_to_remove = Int[]
+            elements_to_add = Int[]
+            basis_to_remove = Int[]
+            basis_to_add = Int[]
+    
+            for Ni ∈ get_level_basis_ids(hier_space, level) # Loop over active basis on current level
+                # Gets the support of Ni on current level and the next one
+                support = get_support(get_space(hier_space, level), Ni)
+                element_children = get_element_children(get_twoscale_operator(hier_space, level), support)
+                check_in_next_domain = element_children .∈ next_level_domain # checks if the support is contained in the next level domain
+    
+                # Updates elements and basis to add and remove based on check_in_next_domain
+                if all(check_in_next_domain)
+                    append!(elements_to_remove, support)
+                    append!(basis_to_remove, Ni)
+                    append!(elements_to_add, element_children)
+                    append!(basis_to_add, get_basis_children(get_twoscale_operator(hier_space, level), Ni))
+                end
+            end
+            
+            # Remove inactive elements and basis on current level
+            _update_elements!(hier_space, level, elements_to_remove, elements_to_add)
+            _update_basis!(hier_space, level, basis_to_remove, basis_to_add)
+        end
+    
+        map(x -> sort!(x), hier_space.active_elements.level_ids)
+        map(x -> sort!(x), hier_space.active_basis.level_ids)
+
+        hier_space.active_elements = HierarchicalActiveInfo(hier_space.active_elements.level_ids)
+        hier_space.active_basis = HierarchicalActiveInfo(hier_space.active_basis.level_ids)
+    
+        return hier_space
+    end
+
+    _extend_levels!(hier_space, domains, num_sub) # extends number of levels if needed
+    _update_active_objects!(hier_space, domains) # updates active elements and basis
+
+    # THIS NEEDS CHANGING
+    multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(hier_space.spaces, hier_space.two_scale_operators, hier_space.active_elements, hier_space.active_basis, hier_space.truncated)
+
+    hier_space.multilevel_elements = multilevel_elements
+    hier_space.multilevel_extraction_coeffs = multilevel_extraction_coeffs
+    hier_space.multilevel_basis_indices = multilevel_basis_indices
+
+    return hier_space
 end
 
-function update_hier_space(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domains::Vector{Vector{Int}}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    return update_hier_space(hier_space, HierarchicalActiveInfo(domains))
+function update_hier_space(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domains::Vector{Vector{Int}}, num_sub::NTuple{n, Int}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    return update_hier_space(hier_space, HierarchicalActiveInfo(domains), num_sub)
 end
 
 # Useful for refinement 

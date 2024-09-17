@@ -19,13 +19,13 @@ CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1);
 CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
 
 
-TTS, FTP = Mantis.FunctionSpaces.subdivide_bspline(CTP, nsubs)
+TTS, FTP = Mantis.FunctionSpaces.get_sub_operator_and_space(CTP, nsubs)
 
 spaces = [CTP, FTP]
 operators = [TTS]
 
 for level ∈ 3:nlevels
-    new_operator, new_space = Mantis.FunctionSpaces.subdivide_bspline(spaces[level-1], nsubs)
+    new_operator, new_space = Mantis.FunctionSpaces.get_sub_operator_and_space(spaces[level-1], nsubs)
     push!(spaces, new_space)
     push!(operators, new_operator)
 end
@@ -33,6 +33,7 @@ end
 marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_element_children(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_element_children(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
+#=
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
 xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
@@ -51,6 +52,8 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
 end
 
 # Geometry visualization
+
+=#
 
 function get_thb_geometry(hier_space::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
     L = Mantis.FunctionSpaces.get_num_levels(hier_space)
@@ -79,9 +82,15 @@ function get_thb_geometry(hier_space::Mantis.FunctionSpaces.HierarchicalFiniteEl
     return Mantis.Geometry.FEMGeometry(hier_space, coefficients)
 end
 
+new_elements = vcat(Mantis.FunctionSpaces.get_element_children.(Ref(hier_space.two_scale_operators[1]), [10,15,20])...)
+domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([Int[], new_elements])
+println(Mantis.FunctionSpaces.get_num_elements(hier_space))
+hier_space = Mantis.FunctionSpaces.update_hier_space(hier_space, domains, (2,2))
+println(Mantis.FunctionSpaces.get_num_elements(hier_space))
+println(hier_space.active_basis)
 
 # Generate the Plot
-#=
+
 
 Mantis_folder =  dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
@@ -91,4 +100,3 @@ output_filename = "thb-partition-of-unity-test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
 hier_space_geo = get_thb_geometry(hier_space)
 Mantis.Plot.plot(hier_space_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
-=#
