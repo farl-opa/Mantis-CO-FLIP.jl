@@ -70,12 +70,14 @@ end
 
 # Test C1-smooth TrigonometricSplineSpace ----------------------------------------------------
 deg = 2
-npatch = 4
-Wt = 2.0*pi/npatch
-b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt))
-B_C1_smooth_trig = ntuple( i -> b, npatch)
-GB = Mantis.FunctionSpaces.GTBSplineSpace(B_C1_smooth_trig, ones(Int,npatch))
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
+Wt = pi/2
+b = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
+GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), ones(Int, 1))
+nel = Mantis.FunctionSpaces.get_num_elements(GB)
+for el in 1:1:nel
     # check extraction coefficients
     ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(GB, el)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
@@ -84,9 +86,9 @@ end
 
 # interpolate a cosine and a sine
 x = [0.5]
-LHS = zeros(npatch,npatch)
-RHS_C = zeros(npatch)
-RHS_S = zeros(npatch)
+LHS = zeros(nel, nel)
+RHS_C = zeros(nel)
+RHS_S = zeros(nel)
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(GB)
     GB_eval, inds = Mantis.FunctionSpaces.evaluate(GB, el, (x,), 0)
     LHS[el,inds] = GB_eval[1][1]

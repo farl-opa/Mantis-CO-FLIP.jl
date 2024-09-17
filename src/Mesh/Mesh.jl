@@ -132,6 +132,10 @@ function get_breakpoints(patch::Patch{n}) where {n}
     return NTuple{n, Vector{Float64}}(get_breakpoints(patch.patches_per_dim[d]) for d in 1:1:n)
 end
 
+function get_element_size(patch::Patch1D, element_id::Int)
+    return patch.breakpoints[element_id+1]-patch.breakpoints[element_id]
+end
+
 """
     get_breakpoints(patch::Patch{n}, d::Int) where {n}
 

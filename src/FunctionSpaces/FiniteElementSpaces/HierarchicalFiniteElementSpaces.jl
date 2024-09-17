@@ -184,6 +184,7 @@ function get_num_basis(hierarchical_space::HierarchicalFiniteElementSpace{n, S, 
     return get_num_active(hierarchical_space.active_basis)
 end
 
+# get_extraction(hierarchical_space, element)[2]
 
 function get_max_local_dim(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     return get_max_local_dim(hierarchical_space.spaces[1])*2 # This needs to be checked

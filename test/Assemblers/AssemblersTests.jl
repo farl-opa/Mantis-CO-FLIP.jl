@@ -27,13 +27,10 @@ function fe_run(weak_form_inputs, weak_form, bc_dirichlet, case, test, verbose)
         println("Running case "*case*" ...")
     end
 
-    # Setup the global assembler.
-    global_assembler = Mantis.Assemblers.Assembler(bc_dirichlet)
-
     if verbose
         println("Assembling ...")
     end
-    A, b = global_assembler(weak_form, weak_form_inputs)
+    A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, bc_dirichlet)
 
     # if n > 1 && isempty(bc_dirichlet)
     #     # Add the average = 0 condition for Neumann b.c. (derivatives are 
@@ -84,25 +81,6 @@ function write_form_sol_to_file(form_sols, var_names, geom, p, k, case, n, verbo
         Mantis.Plot.plot(form_sol; vtk_filename = output_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
     end
 end
-
-# # Compute error
-# if verbose
-#     println("Computing L^2 error w.r.t. exact solution ...")
-# end
-# err_assembler = Mantis.Assemblers.AssemblerError(q_rule)
-# err = err_assembler(trial_space, sol_rsh, geom, exact_sol)
-# if verbose
-#     println("The L^2 error is: ",err)
-# end
-
-# if test
-#     if case == "const1d"
-#         if verbose
-#             println("Error tests ...")
-#         end
-#         @test err < 1e12
-#     end
-# end
 
 
 
@@ -269,7 +247,7 @@ trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_s
 test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
 
 # Set Dirichlet boundary conditions to zero.
-bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in trial_space_2d.dof_partition[j])
+bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in trial_space_2d.dof_partition[1][j])
 bc_dirichlet_2d_empty = Dict{Int, Float64}()
 
 # Create the geometries.
@@ -360,94 +338,114 @@ sol²_crazy_sine_2d_exact_sol = Mantis.Forms.AnalyticalFormField(2, exact_sol_si
 
 
 
-# ########################################################################
-# ## Test cases for the 3D Poisson problem.                             ##
-# ########################################################################
+########################################################################
+## Test cases for the 3D Poisson problem.                             ##
+########################################################################
 
-# if verbose
-#     println("Creating 3D Geometry and spaces ...")
-# end
+if verbose
+    println("Creating 3D Geometry and spaces ...")
+end
 
-# # Dimension
-# n_3d = 3
-# # Number of elements.
-# m_3d_x = 5
-# m_3d_y = 5
-# m_3d_z = 5
-# # polynomial degree and inter-element continuity.
-# p_3d = (3, 4, 1)
-# k_3d = (2, 2, 0)
-# # Domain. The length of the domain is chosen so that the normal 
-# # derivatives of the exact solution are zero at the boundary. This is 
-# # the only Neumann b.c. that we can specify at the moment.
-# const Lx1 = 0.0
-# const Lx2 = 1.0
-# const Ly1 = 0.0
-# const Ly2 = 1.0
-# const Lz1 = 0.0
-# const Lz2 = 1.0
+# Dimension
+n_3d = 3
+# Number of elements.
+m_3d_x = 5
+m_3d_y = 5
+m_3d_z = 5
+# polynomial degree and inter-element continuity.
+p_3d = (3, 4, 1)
+k_3d = (2, 2, 0)
+# Domain. The length of the domain is chosen so that the normal 
+# derivatives of the exact solution are zero at the boundary. This is 
+# the only Neumann b.c. that we can specify at the moment.
+const Lx1 = 0.0
+const Lx2 = 1.0
+const Ly1 = 0.0
+const Ly2 = 1.0
+const Lz1 = 0.0
+const Lz2 = 1.0
 
+# Tensor product b-spline case on a Cartesian geometry.
+# Create Patch.
+brk_3d_x = collect(LinRange(Lx1, Lx2, m_3d_x+1))
+brk_3d_y = collect(LinRange(Ly1, Ly2, m_3d_y+1))
+brk_3d_z = collect(LinRange(Lz1, Lz2, m_3d_z+1))
+patch_3d_x = Mantis.Mesh.Patch1D(brk_3d_x)
+patch_3d_y = Mantis.Mesh.Patch1D(brk_3d_y)
+patch_3d_z = Mantis.Mesh.Patch1D(brk_3d_z)
+# Continuity vector for OPEN knot vector.
+kvec_3d_x = fill(k_3d[1], (m_3d_x+1,))
+kvec_3d_x[1] = -1
+kvec_3d_x[end] = -1
+kvec_3d_y = fill(k_3d[2], (m_3d_y+1,))
+kvec_3d_y[1] = -1
+kvec_3d_y[end] = -1
+kvec_3d_z = fill(k_3d[3], (m_3d_z+1,))
+kvec_3d_z[1] = -1
+kvec_3d_z[end] = -1
+# Create function spaces (b-splines here).
+trial_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
+test_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
+trial_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
+test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
+trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
 
-# function forcing_sine_3d(x::Float64, y::Float64, z::Float64)
-#     return 12.0 * pi^2 * sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
-# end
+trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
+test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
 
-# function exact_sol_sine_3d(x::Float64, y::Float64, z::Float64)
-#     return sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
-# end
+trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
+test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
 
+# Set Dirichlet boundary conditions to zero.
+bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] for i in trial_space_3d.dof_partition[1][j])
 
+# Create the geometry.
+geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
 
-# # Tensor product b-spline case on a Cartesian geometry.
-# # Create Patch.
-# brk_3d_x = collect(LinRange(Lx1, Lx2, m_3d_x+1))
-# brk_3d_y = collect(LinRange(Ly1, Ly2, m_3d_y+1))
-# brk_3d_z = collect(LinRange(Lz1, Lz2, m_3d_z+1))
-# patch_3d_x = Mantis.Mesh.Patch1D(brk_3d_x)
-# patch_3d_y = Mantis.Mesh.Patch1D(brk_3d_y)
-# patch_3d_z = Mantis.Mesh.Patch1D(brk_3d_z)
-# # Continuity vector for OPEN knot vector.
-# kvec_3d_x = fill(k_3d[1], (m_3d_x+1,))
-# kvec_3d_x[1] = -1
-# kvec_3d_x[end] = -1
-# kvec_3d_y = fill(k_3d[2], (m_3d_y+1,))
-# kvec_3d_y[1] = -1
-# kvec_3d_y[end] = -1
-# kvec_3d_z = fill(k_3d[3], (m_3d_z+1,))
-# kvec_3d_z[1] = -1
-# kvec_3d_z[end] = -1
-# # Create function spaces (b-splines here).
-# trial_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
-# test_space_3d_x = Mantis.FunctionSpaces.BSplineSpace(patch_3d_x, p_3d[1], kvec_3d_x)
-# trial_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
-# test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3d_y)
-# trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
-# test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
+# Setup the quadrature rule.
+q_rule_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mantis.Quadrature.gauss_legendre)
 
-# trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
-# test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
-
-# trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
-# test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
-
-# # Set Dirichlet boundary conditions to zero.
-# bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for i in Mantis.FunctionSpaces.get_boundary_dof_indices(trial_space_3d))
-
-# # Create the geometry.
-# geom_3d_cartesian = Mantis.Geometry.CartesianGeometry((brk_3d_x, brk_3d_y, brk_3d_z))
-
-# # Setup the quadrature rule.
-# q_nodes_3d, q_weights_3d = Mantis.Quadrature.tensor_product_rule(p_3d .+ 1, Mantis.Quadrature.gauss_legendre)
+# Create form spaces (both test and trial)
+# Cartesian mesh
+zero_form_space_trial_3d_cart = Mantis.Forms.FormSpace(0, geom_3d_cartesian, (trial_space_3d,), "φ")
+zero_form_space_test_3d_cart = Mantis.Forms.FormSpace(0, geom_3d_cartesian, (test_space_3d,), "ϕ")
 
 
+function exact_sol_sine_3d(x::Float64, y::Float64, z::Float64)
+    return sinpi(2.0 * x) * sinpi(2.0 * y) * sinpi(2.0 * z)
+end
+
+# Create the forcing form.
+function forcing_function_sine_3d(x::Matrix{Float64})
+    return [@. 12.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]) * sinpi(2.0 * x[:,3])]
+end
+f⁰_cart_sine_3d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_3d, geom_3d_cartesian, "f")
+
+# Create the exact_solutions as appropriate form.
+function exact_sol_sine_3d(x::Matrix{Float64})
+    return [@. sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]) * sinpi(2.0 * x[:,3])]
+end
+sol⁰_cart_sine_3d_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_3d, geom_3d_cartesian, "sol")
 
 
-# Running all testcases.
+
+
+
+
+
+
+
+
+
+########################################################################
+## Running all testcases.                                             ##
+########################################################################
 if verbose
     println()
 end
 
-cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "cos1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "sine2d-Dirichlet-mixed", "sine2d-Dirichlet-mixed-crazy"]
+cases = ["const1d-Dirichlet", "sine1d-Dirichlet", "cos1d-Dirichlet-mixed", "const2d-Dirichlet", "const2d-Dirichlet-crazy", "sine2d-Dirichlet", "sine2d-Dirichlet-crazy", "sine2d-Dirichlet-mixed", "sine2d-Dirichlet-mixed-crazy", "sine3d-Dirichlet"]
 for case in cases
 
     if case == "const1d-Dirichlet"
@@ -590,6 +588,22 @@ for case in cases
         if write_to_output_file
             write_form_sol_to_file([β², ξ¹, sol²_crazy_sine_2d_exact_sol, sol¹_crazy_sine_2d_exact_sol, β² - sol²_crazy_sine_2d_exact_sol, ξ¹ - sol¹_crazy_sine_2d_exact_sol], ["two_form", "one_form", "exact_two_form", "exact_one_form", "error_two_form", "error_one_form"], geom_crazy, p_2d, k_2d, case*"_crazy_c$crazy_c", n_2d, verbose)
         end
+
+    elseif case == "sine3d-Dirichlet"
+        weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_cart_sine_3d, zero_form_space_trial_3d_cart, zero_form_space_test_3d_cart, q_rule_3d)
+        sol = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet_3d, case, run_tests, verbose)
+
+        # Create solution(s) as forms.
+        α⁰ = Mantis.Forms.FormField(zero_form_space_trial_3d_cart, "α")
+        α⁰.coefficients .= sol
+        if verbose
+            print("Total L2 error 0-form: ")
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_cart_sine_3d_exact_sol, q_rule_3d, "L2"))
+        end
+        if write_to_output_file
+           write_form_sol_to_file([α⁰, sol⁰_cart_sine_3d_exact_sol, α⁰ - sol⁰_cart_sine_3d_exact_sol], ["zero_form", "exact_zero_form", "error_zero_form"], geom_3d_cartesian, p_3d, k_3d, case, n_3d, verbose)
+        end
+
     else
         if verbose
             println("Warning: case '"*case*"' unknown. Skipping.") 
