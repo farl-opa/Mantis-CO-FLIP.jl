@@ -4,8 +4,14 @@ breakpoints = [0.0, 1.0]
 patch = Mantis.Mesh.Patch1D(breakpoints);
 B1 = Mantis.FunctionSpaces.BSplineSpace(patch, 2, [-1, -1])
 B2 = Mantis.FunctionSpaces.BSplineSpace(patch, 3, [-1, -1])
-D = Mantis.FunctionSpaces.DirectSumSpace((B1,B2))
-D_eval, D_ind = Mantis.FunctionSpaces.evaluate(D, 1, ([0.0, 0.5, 1.0],), 0)
+TP = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
+
+D = Mantis.FunctionSpaces.DirectSumSpace((B1, B2))
+D_eval, D_ind = Mantis.FunctionSpaces.evaluate(D, 1, ([0.0, 0.5, 1.0],), 1)
+
+# D = Mantis.FunctionSpaces.DirectSumSpace((TP, TP))
+# D_eval, D_ind = Mantis.FunctionSpaces.evaluate(D, 1, ([0.0, 1.0], [0.5, 1.0]), 1)
+
 display(D_eval[1])
 display(D_eval[2])
 

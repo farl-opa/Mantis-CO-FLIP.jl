@@ -28,19 +28,27 @@ Evaluate the basis functions of the direct sum space at the points `xi` in the e
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
 function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
+    # Check if only up to first derivatives is requested
+    if nderivatives > 1
+        throw("nderivatives = $nderivatives > 1 not allowed!")
+    end
+
+    # Number of evaluation matrices per derivative degree 
+    # 1: evaluation of function 
+    # 2: evaluation of first derivatives => manifold_dim evaluations, one per coordinate
+    n_evaluation_matrices_per_derivative = manifold_dim * ones(Int, nderivatives + 1)
+    n_evaluation_matrices_per_derivative[1] = 1
+
     # number of dofs for each space
     num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
     dof_offset_component = zeros(Int, num_components)
     dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])  # we skip the first one because the offset is 0
-
-    # Allocate memory for the evaluation of all basis for all components
-    local_multivalued_basis = Vector{Matrix{Float64}}(undef, num_components)
     
-    # first loop over the components to get the basis indices
+    # Get the indices of the basis
+    # first get the indices for each of the component spaces
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-    num_component_basis = length.(component_basis_indices)
-
-    # generate the indices for all the bases
+    num_basis_per_component = length.(component_basis_indices)
+    num_multivaluedbasis = sum(num_basis_per_component)
     # since each component of the direct sum has its own index, we need to offset it  
     # the bases that are nonzero for the first component have an offset of 0 
     # the bases that are nonzero for the second component have an offset equal to the
@@ -48,16 +56,33 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
     multivalued_basis_indices_per_component = map(.+, component_basis_indices, dof_offset_component)  # offset the indices
     multivalued_basis_indices = vcat(multivalued_basis_indices_per_component...)  # just place the indices in a single vector
     
+    # Allocate memory for the evaluation of all basis and their derivatives for all components
+    #   local_multivalued_basis[i][j][k][l, m]
+    # contains the (j-1)th-order derivative, derivative with respect to the k-th coordinate, 
+    # of the i-th multivalued basis of component i evaluated at the lth-point
+    # In this case the maximum order of derivative is first order. For higher order derivatives 
+    # we should follow a flattenned numbering using the indices of the derivatives.
+    n_evaluation_points = prod(size.(xi, 1))
+    num_derivatives = num_components  # each component will have as many derivatives as the number of components
+    local_multivalued_basis = [[[zeros(Float64, n_evaluation_points, num_multivaluedbasis) for _ = 1:n_evaluation_matrices] for n_evaluation_matrices = n_evaluation_matrices_per_derivative] for _ = 1:num_components]
+
+    # generate the indices for all the bases
+    
     # next, loop over the spaces of each component and evaluate them
     count = 0
     for component_idx in 1:num_components
         # Evaluate the basis for the component
-        local_component_basis, _ = FunctionSpaces.evaluate(space.component_spaces[component_idx], element_idx, xi)
-                   
-        # store the evaluations in the right place
-        local_multivalued_basis[component_idx] = zeros(Float64, size(local_component_basis[1][1],1), sum(num_component_basis))  # first initialize the evaluation of the component to zeros
-        local_multivalued_basis[component_idx][:, count .+ (1:num_component_basis[component_idx])] .= local_component_basis[1][1]  # then store the values in the right places
-        count += num_component_basis[component_idx]
+        local_component_basis, _ = FunctionSpaces.evaluate(space.component_spaces[component_idx], element_idx, xi, nderivatives)
+        
+        # Store the evaluation and the derivatives in the correct places
+        for derivative_order_idx in 1:(nderivatives + 1)
+            for derivative_idx in 1:n_evaluation_matrices_per_derivative[derivative_order_idx]
+                # store the evaluations in the right place
+                local_multivalued_basis[component_idx][derivative_order_idx][derivative_idx][:, count .+ (1:num_basis_per_component[component_idx])] .= local_component_basis[derivative_order_idx][derivative_idx]  # then store the values in the right places
+            end
+        end
+
+        count += num_basis_per_component[component_idx]
     end
 
     return local_multivalued_basis, multivalued_basis_indices
