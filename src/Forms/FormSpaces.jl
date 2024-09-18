@@ -86,29 +86,11 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     #   2-forms:(dξ₁dξ₂) (2D)
     #   2-forms:(dξ₂dξ₃, dξ₃dξ₁, dξ₁dξ₂) (3D)
     #   3-forms: single component
-    # each component has a numbering starting at 1, we stack the numbering 
-    # so the dξ₂ basis numbering starts from the end of the dξ₁ numbering, and so on.
-    n_dofs_component = FunctionSpaces.get_num_basis.(form_space.fem_space)
-    dof_offset_component = zeros(Int, n_form_components)
-    dof_offset_component[2:end] .= cumsum(n_dofs_component[1:(n_form_components-1)])  # we skip the first one because the offset is 0
-
-    # Allocate memory for the evaluation of all basis for all components
-    local_form_basis = Vector{Array{Float64, 2}}(undef, n_form_components)
-    form_basis_indices = Vector{Vector{Int}}(undef, n_form_components)
-
-    # Loop over the spaces of the each component and evaluate them 
-    # Note that the indices of the basis for each component are updated
-    # by the offset defined above.
-    for form_component_idx in 1:n_form_components
-        # Evaluate the basis for the component
-        local_basis, form_basis_indices[form_component_idx] = FunctionSpaces.evaluate(form_space.fem_space[form_component_idx], element_idx, xi)
-
-        local_form_basis[form_component_idx] = local_basis[1][1]
-
-        # Update the basis indices by adding the offset, since they are now 
-        # a component among several, so the indexing needs to include all components
-        form_basis_indices[form_component_idx] .+= dof_offset_component[form_component_idx]
-    end
+    # We use the numbering of the function space.
+    n_active_basis = FunctionSpaces.get_num_basis.(form_space.fem_space)
+    
+    # Evaluate the form spaces
+    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi)
 
     return local_form_basis, form_basis_indices
 end
