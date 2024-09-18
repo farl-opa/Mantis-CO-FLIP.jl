@@ -560,7 +560,6 @@ function update_hier_space(hier_space::HierarchicalFiniteElementSpace{n, S, T}, 
     _extend_levels!(hier_space, domains, num_sub) # extends number of levels if needed
     _update_active_objects!(hier_space, domains) # updates active elements and basis
 
-    # THIS NEEDS CHANGING
     multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(hier_space.spaces, hier_space.two_scale_operators, hier_space.active_elements, hier_space.active_basis, hier_space.truncated)
 
     hier_space.multilevel_elements = multilevel_elements

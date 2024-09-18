@@ -33,7 +33,6 @@ end
 marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_element_children(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_element_children(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
-#=
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
 xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
@@ -44,7 +43,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
 
     # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, el, xi, 0)
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, el, xi)
     # Positivity of the basis
     @test minimum(h_eval[1][1]) >= 0.0
     # Partition of unity
@@ -53,44 +52,11 @@ end
 
 # Geometry visualization
 
-=#
-
-function get_thb_geometry(hier_space::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
-    L = Mantis.FunctionSpaces.get_num_levels(hier_space)
-    
-    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hier_space), 2))
-
-    id_sum = 1
-    for level ∈ 1:1:L
-        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hier_space.spaces[level])
-        x_greville_points = Mantis.FunctionSpaces.get_greville_points(hier_space.spaces[level].function_space_1.knot_vector)
-        y_greville_points = Mantis.FunctionSpaces.get_greville_points(hier_space.spaces[level].function_space_2.knot_vector)
-        grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
-        
-        level_active_basis = Mantis.FunctionSpaces.get_level_basis_ids(hier_space, level)
-
-        for (y_count, y_id) ∈ enumerate(y_greville_points)
-            for (x_count, x_id) ∈ enumerate(x_greville_points)
-                if Mantis.FunctionSpaces.ordered_to_linear_index((x_count, y_count), max_ind_basis) ∈ level_active_basis
-                    coefficients[id_sum, :] .= [x_id, y_id]
-                    id_sum += 1
-                end
-            end
-        end
-    end
-
-    return Mantis.Geometry.FEMGeometry(hier_space, coefficients)
-end
-
-new_elements = vcat(Mantis.FunctionSpaces.get_element_children.(Ref(hier_space.two_scale_operators[1]), [10,15,20])...)
-domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([Int[], new_elements])
-println(Mantis.FunctionSpaces.get_num_elements(hier_space))
-hier_space = Mantis.FunctionSpaces.update_hier_space(hier_space, domains, (2,2))
-println(Mantis.FunctionSpaces.get_num_elements(hier_space))
-println(hier_space.active_basis)
 
 # Generate the Plot
 
+#=
+hier_space_geo = Mantis.Geometry.get_parametric_geometry(hier_space)
 
 Mantis_folder =  dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
@@ -98,5 +64,5 @@ output_data_folder = joinpath(data_folder, "output", "Geometry")
 
 output_filename = "thb-partition-of-unity-test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
-hier_space_geo = get_thb_geometry(hier_space)
 Mantis.Plot.plot(hier_space_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+=#

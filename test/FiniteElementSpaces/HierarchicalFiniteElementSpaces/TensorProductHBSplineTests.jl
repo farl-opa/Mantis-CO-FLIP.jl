@@ -52,44 +52,5 @@ for element_id in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
     # check Hierarchical B-spline evaluation
     h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, element_id, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[1][1]) >= 0.0
+    @test minimum(h_eval[1][1][1]) >= 0.0
 end
-
-# Test if projection in space is exact
-nxi_per_dim = 3
-nxi = nxi_per_dim^2
-xi_per_dim = collect(range(0,1, nxi_per_dim))
-xi = Matrix{Float64}(undef, nxi,2)
-
-xi_eval = (xi_per_dim, xi_per_dim)
-
-for (idx,x) ∈ enumerate(Iterators.product(xi_per_dim, xi_per_dim))
-    xi[idx,:] = [x[1] x[2]]
-end
-
-xs = Matrix{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hier_space)*nxi,2)
-nx = size(xs)[1]
-
-A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hier_space))
-
-for element_id ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
-    level, element_level_id = Mantis.FunctionSpaces.convert_to_element_level_and_level_id(hier_space, element_id)
-
-    max_ind_els = Mantis.FunctionSpaces._get_num_elements_per_space(hier_space.spaces[level])
-    ordered_index = Mantis.FunctionSpaces.linear_to_ordered_index(element_id, max_ind_els)
-
-    borders_x = Mantis.Mesh.get_element(hier_space.spaces[level].function_space_1.knot_vector.patch_1d, ordered_index[1])
-    borders_y = Mantis.Mesh.get_element(hier_space.spaces[level].function_space_2.knot_vector.patch_1d, ordered_index[2])
-
-    x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
-
-    idx = (element_id-1)*nxi+1:element_id*nxi
-    xs[idx,:] = x
-
-    local eval = Mantis.FunctionSpaces.evaluate(hier_space, element_id, xi_eval, 0)
-
-    A[idx, eval[2]] = eval[1][1][1]
-end
-
-coeffs = A \ xs
-all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))
