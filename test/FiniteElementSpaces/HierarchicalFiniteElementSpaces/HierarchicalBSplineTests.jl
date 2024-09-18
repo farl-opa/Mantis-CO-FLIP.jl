@@ -85,3 +85,5 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # Positivity of the basis
     @test minimum(h_eval[1][1]) >= 0.0
 end
+
+Mantis.Geometry.compute_parametric_geometry(hspace)

@@ -190,6 +190,9 @@ function get_max_local_dim(hierarchical_space::HierarchicalFiniteElementSpace{n,
     return get_max_local_dim(hierarchical_space.spaces[1])*2 # This needs to be checked
 end
 
+function get_polynomial_degree(hierarchical_space::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    return get_polynomial_degree(hierarchical_space.spaces[1])
+end
 
 """
     get_num_levels(active_info::HierarchicalActiveInfo)
@@ -836,87 +839,42 @@ function _get_element_size(hspace::HierarchicalFiniteElementSpace{n, S, T}, elem
     return _get_element_size(hspace.spaces[element_level], element_level_id)
 end
 
-# Geometry methods
+function get_element_vertices(hspace::HierarchicalFiniteElementSpace{n, S, T}, element_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    element_level = get_active_level(hspace.active_elements, element_id)
+    element_level_id = get_active_id(hspace.active_elements, element_id)
 
-function _get_thb_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    L = get_num_levels(hspace)
+    return get_element_vertices(hspace.spaces[element_level], element_level_id)
+end
+
+# Parametric geometry methods
+
+function _compute_thb_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{manifold_dim, S, T}) where {manifold_dim, S<:AbstractFiniteElementSpace{manifold_dim}, T<:AbstractTwoScaleOperator}
+    num_levels = get_num_levels(hspace)
     
-    coefficients = Matrix{Float64}(undef, (get_num_basis(hspace), 2))
+    coeffs = Matrix{Float64}(undef, get_num_basis(hspace), manifold_dim)
 
-    id_sum = 1
-    for level ∈ 1:1:L
-        max_ind_basis = _get_num_basis_per_space(hspace.spaces[level])
-        x_greville_points = get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
-        y_greville_points = get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
-        grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
+    id_count = 1
+    for level ∈ 1:num_levels
+        greville_points = get_greville_points(get_space(hspace, level))
         
         _, level_active_basis = get_level_active(hspace.active_basis, level)
 
-        for (y_count, y_id) ∈ enumerate(y_greville_points)
-            for (x_count, x_id) ∈ enumerate(x_greville_points)
-                if ordered_to_linear_index((x_count, y_count), max_ind_basis) ∈ level_active_basis
-                    coefficients[id_sum, :] .= [x_id, y_id]
-                    id_sum += 1
-                end
+        for (point_id, point) ∈ enumerate(Iterators.product(greville_points...))
+            if point_id ∈ level_active_basis
+                coeffs[id_count, :] .= point
+                id_count += 1
             end
         end
     end
 
-    return coefficients
-end
-
-function _get_hb_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    degrees = get_polynomial_degree_per_dim(hspace.spaces[1])
-    nxi_per_dim = maximum(degrees) + 1
-    nxi = nxi_per_dim^2
-    xi_per_dim = collect(range(0,1, nxi_per_dim))
-    xi = Matrix{Float64}(undef, nxi,2)
-
-    xi_eval = (xi_per_dim, xi_per_dim)
-
-    for (idx,x) ∈ enumerate(Iterators.product(xi_per_dim, xi_per_dim))
-        xi[idx,:] = [x[1] x[2]]
-    end
-
-    xs = Matrix{Float64}(undef, get_num_elements(hspace)*nxi,2)
-    nx = size(xs)[1]
-
-    A = zeros(nx, get_num_basis(hspace))
-
-    for el ∈ 1:1:get_num_elements(hspace)
-        level = get_active_level(hspace.active_elements, el)
-        element_id = get_active_id(hspace.active_elements, el)
-
-        max_ind_els = _get_num_elements_per_space(hspace.spaces[level])
-        ordered_index = linear_to_ordered_index(element_id, max_ind_els)
-
-        borders_x = [hspace.spaces[level].function_space_1.knot_vector.patch_1d.breakpoints[ordered_index[1]], 
-                     hspace.spaces[level].function_space_1.knot_vector.patch_1d.breakpoints[ordered_index[1]+1]
-        ]
-        borders_y = [hspace.spaces[level].function_space_2.knot_vector.patch_1d.breakpoints[ordered_index[2]], 
-                     hspace.spaces[level].function_space_2.knot_vector.patch_1d.breakpoints[ordered_index[2]+1]
-        ]
-
-        x = [(borders_x[1] .+ xi[:,1] .* (borders_x[2] - borders_x[1])) (borders_y[1] .+ xi[:,2] .* (borders_y[2] - borders_y[1]))]
-
-        idx = (el-1)*nxi+1:el*nxi
-        xs[idx,:] = x
-
-        local eval = evaluate(hspace, el, xi_eval, 0)
-
-        A[idx, eval[2]] = eval[1][1][1]
-    end
-
-    coeffs = A \ xs
-
     return coeffs
 end
 
-function _get_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function _compute_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     if hspace.truncated
-        return _get_thb_parametric_geometry_coeffs(hspace)
-    else
-        return _get_hb_parametric_geometry_coeffs(hspace)
+        return _compute_thb_parametric_geometry_coeffs(hspace)
     end
+
+    return invoke(_compute_parametric_geometry_coeffs, Tuple{AbstractFiniteElementSpace{n}}, hspace)
 end
 

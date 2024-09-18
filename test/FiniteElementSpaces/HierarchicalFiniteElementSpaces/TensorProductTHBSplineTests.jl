@@ -54,34 +54,7 @@ end
 
 # Geometry visualization
 
-function get_thb_geometry(hspace::Mantis.FunctionSpaces.HierarchicalFiniteElementSpace{n, S, T}) where {n, S<:Mantis.FunctionSpaces.AbstractFiniteElementSpace{n}, T<:Mantis.FunctionSpaces.AbstractTwoScaleOperator}
-    L = Mantis.FunctionSpaces.get_num_levels(hspace)
-    
-    coefficients = Matrix{Float64}(undef, (Mantis.FunctionSpaces.get_num_basis(hspace), 2))
-
-    id_sum = 1
-    for level ∈ 1:1:L
-        max_ind_basis = Mantis.FunctionSpaces._get_num_basis_per_space(hspace.spaces[level])
-        x_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_1.knot_vector)
-        y_greville_points = Mantis.FunctionSpaces.get_greville_points(hspace.spaces[level].function_space_2.knot_vector)
-        grevile_mesh(x_id,y_id) = x_greville_points[x_id]*y_greville_points[y_id]
-        
-        _, level_active_basis = Mantis.FunctionSpaces.get_level_active(hspace.active_basis, level)
-
-        for (y_count, y_id) ∈ enumerate(y_greville_points)
-            for (x_count, x_id) ∈ enumerate(x_greville_points)
-                if Mantis.FunctionSpaces.ordered_to_linear_index((x_count, y_count), max_ind_basis) ∈ level_active_basis
-                    coefficients[id_sum, :] .= [x_id, y_id]
-                    id_sum += 1
-                end
-            end
-        end
-    end
-
-    return Mantis.Geometry.FEMGeometry(hspace, coefficients)
-end
-
-hspace_geo = get_thb_geometry(hspace)
+hspace_geo = Mantis.Geometry.compute_parametric_geometry(hspace)
 
 # Generate the Plot
 Mantis_folder =  dirname(dirname(pathof(Mantis)))
