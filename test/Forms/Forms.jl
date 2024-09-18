@@ -23,10 +23,13 @@ regularity_3d = degree_3d .- 1
 geo_3d_cart = Mantis.Geometry.create_cartesian_geometry(starting_point_3d, box_size_3d, num_elements_3d)
 TP_Space3d = Mantis.FunctionSpaces.create_bspline_space(starting_point_3d, box_size_3d, num_elements_3d, degree_3d, regularity_3d)
 
+dsTP_0_form = Mantis.FunctionSpaces.DirectSumSpace((TP_Space,))  # direct sum space
+dsTP_1_form = Mantis.FunctionSpaces.DirectSumSpace((TP_Space, TP_Space))  # direct sum space
+
 # Then the form space 
-zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
+zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, dsTP_0_form, "ν")
 d_zero_form_space = Mantis.Forms.exterior_derivative(zero_form_space)
-one_form_space = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
+one_form_space = Mantis.Forms.FormSpace(1, geo_2d_cart, dsTP_1_form, "η")
 top_form_space = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
 
 # Generate the form expressions

@@ -36,45 +36,14 @@ struct FormSpace{manifold_dim, form_rank, G, F} <: AbstractFormSpace{manifold_di
             contain only one component.
     - `label::String`: Label for the form space.
     """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F}, label::String) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F <: FunctionSpaces.AbstractFunctionSpace}
-        @assert form_rank in Set([0, manifold_dim])
-        new{manifold_dim, form_rank, G, Tuple{F}}(geometry, fem_space, label)
-    end
+    function FormSpace(form_rank::Int, geometry::G, fem_space::F, label::String) where {manifold_dim, num_components, G <: Geometry.AbstractGeometry{manifold_dim}, F <: FunctionSpaces.AbstractMultiValuedFiniteElementSpace{manifold_dim, num_components}}
+        if (form_rank ∈ Set([0, manifold_dim])) && (num_components > 1)
+            throw("Mantis.Forms.FormSpace: form_rank = $form_rank with manifold_dim = $manifold_dim requires only one component multivalued FEM space (got num_compoents = $num_components).")
+        elseif (form_rank ∉ Set([0, manifold_dim])) && (num_components != manifold_dim)
+            throw("Mantis.Forms.FormSpace: form_rank = $form_rank with manifold_dim = $manifold_dim requires a multivalued FEM space with num_components = $manifold_dim (got num_components = $num_components).")
+        end
 
-    @doc raw"""
-        FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
-
-    Constructor for 1-forms in 2D.
-
-    # Arguments
-    - `form_rank::Int`: Rank of the differential form (must be 1)
-    - `geometry::G`: The geometry of the space
-    - `fem_space::Tuple{F_dξ, F_dη}`: A tuple containing two finite element spaces for dξ and dη components
-    - `label::String`: Label for the form space.
-    """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη}, label::String) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace}
-        @assert form_rank == 1
-        form_components = binomial(manifold_dim, form_rank)
-        @assert form_components == length(fem_space)
-        new{manifold_dim, form_rank, G, Tuple{F_dξ, F_dη}}(geometry, fem_space, label)
-    end
-
-    @doc raw"""
-        FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ}) where {domain_dim, codomain_dim, G <: Geometry.AbstractGeometry{domain_dim, codomain_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace, F_dζ <: FunctionSpaces.AbstractFunctionSpace}
-
-    Constructor for 1-forms and 2-forms in 3D.
-
-    # Arguments
-    - `form_rank::Int`: Rank of the differential form (must be 1 or 2)
-    - `geometry::G`: The geometry of the manifold
-    - `fem_space::Tuple{F_dξ, F_dη, F_dζ}`: A tuple containing three finite element spaces for dξ, dη, and dζ components
-    - `label::String`: Label for the form space.
-    """
-    function FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ}, label::String) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, F_dξ <: FunctionSpaces.AbstractFunctionSpace, F_dη <: FunctionSpaces.AbstractFunctionSpace, F_dζ <: FunctionSpaces.AbstractFunctionSpace}
-        @assert form_rank in Set([1, 2])
-        form_components = binomial(manifold_dim, form_rank)
-        @assert form_components == length(fem_space)
-        new{manifold_dim, form_rank, G, Tuple{F_dξ, F_dη, F_dζ}}(geometry, fem_space, label)
+        new{manifold_dim, form_rank, G, F}(geometry, fem_space, label)
     end
 end
 
