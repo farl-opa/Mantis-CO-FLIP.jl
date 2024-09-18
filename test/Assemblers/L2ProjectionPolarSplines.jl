@@ -3,7 +3,7 @@ import SparseArrays
 using Test
 
 function my_sol(x::Matrix{Float64})
-    ω = 1.0
+    ω = 0.25
     y = prod(sin.(ω * x), dims=2)
     return [vec(y)]
 end
@@ -27,7 +27,7 @@ function visualize_geometry(geo::Mantis.Geometry.AbstractGeometry, filename::Str
     return nothing
 end
 
-function visualize_solution(form_sols, var_names, filename, geom, n_subcells::Int = 1, degree::Int = 4)
+function visualize_solution(form_sols, var_names, filename, n_subcells::Int = 1, degree::Int = 4)
 
     Mantis_folder =  dirname(dirname(pathof(Mantis)))
     data_folder = joinpath(Mantis_folder, "examples", "data")
@@ -40,6 +40,31 @@ function visualize_solution(form_sols, var_names, filename, geom, n_subcells::In
         Mantis.Plot.plot(form_sol; vtk_filename = output_file, n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
     end
 
+    return nothing
+end
+
+function visualize_tensor_product_controlnet(control_points::Array{Float64}, manifold_dim::Int, range_dim::Int, periodic::Vector{Bool}, filename::String)
+    # create bilinear geometry
+    B = [Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D(collect(LinRange(0.0, 1.0, size(control_points,i)+periodic[i]))), 1, 0) for i in 1:manifold_dim]
+    if periodic[1]
+        TP = Mantis.FunctionSpaces.GTBSplineSpace((B[1],), [0])
+    else
+        TP = B[1]
+    end
+    for i in 2:manifold_dim
+        if periodic[i]
+            TP = Mantis.FunctionSpaces.TensorProductSpace(TP, Mantis.FunctionSpaces.GTBSplineSpace((B[i],), [0]))
+        else
+            TP = Mantis.FunctionSpaces.TensorProductSpace(TP, B[i])
+        end
+    end
+
+    # create geometry
+    geo = Mantis.Geometry.FEMGeometry(TP, reshape(control_points, :, range_dim))
+    
+    # export to vtk
+    visualize_geometry(geo, filename, 1, 1)
+    
     return nothing
 end
 
@@ -169,7 +194,7 @@ end
 #                 println("       Error in u: ", errors[r+1])
 #                 println("...done!")
 #                 # println("Visualizing the solution...")
-#                 # visualize_solution((uₕ, uₑ-uₕ), ("uh", "error"), "k_form_L2_projection_polar_$r", ○, 1, 4)
+#                 # visualize_solution((uₕ, uₑ-uₕ), ("uh", "error"), "k_form_L2_projection_polar_$r", 1, 4)
 #                 println("--------------------------------------------")
 #             end
 #         end
@@ -281,13 +306,13 @@ function build_toroidal_spline_space_and_geometry(deg, nel_r, nel_θ, nel_ϕ, R_
 end
 
 for deg in 2:2
-    for form_rank in 3:3
+    for form_rank in [0, 3]
         nel_r = 2
         nel_θ = 5
         nel_ϕ = 5
         R_θr = 1.0
         R_ϕ = 2.0
-        n_ref = 3
+        n_ref = 0
         verbose=true
         
         # form rank
@@ -332,17 +357,20 @@ for deg in 2:2
                 println("       Error in u: ", errors[r+1])
                 println("...done!")
             end
-            println("Visualizing the solution...")
-            visualize_solution((uₕ,), ("u_h",), "$form_rank _form_L2_projection_toroidal_$r", T, 1, deg)
-            println("--------------------------------------------")
+            if n_dofs < 2e5
+                println("Visualizing the solution...")
+                n_subcells = 20
+                visualize_solution((uₕ,), ("u_h",), "$form_rank _form_L2_projection_toroidal_$r _$n_subcells _$deg", n_subcells, deg)
+                visualize_tensor_product_controlnet(geom_coeffs_toroidal, 3, 3, [true, false, false], "L2_projection_toroidal_$r _controlnet")
+                println("--------------------------------------------")
+            end
         end
 
         error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
-        display(error_rates[end])
-        # if form_rank == 0
-        #     @test isapprox(error_rates[end], deg+1, atol=1e-1)
-        # elseif form_rank == 2
-        #     @test isapprox(error_rates[end], deg, atol=1e-1)
-        # end
+        if form_rank == 0
+            @test isapprox(error_rates[end], deg+1, atol=1e-1)
+        elseif form_rank == 2
+            @test isapprox(error_rates[end], deg, atol=1e-1)
+        end
     end
 end
