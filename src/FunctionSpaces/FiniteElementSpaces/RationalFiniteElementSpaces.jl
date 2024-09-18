@@ -36,6 +36,22 @@ function get_num_basis(rat_space::RationalFiniteElementSpace{n,F}) where {n, F <
 end
 
 """
+    get_num_basis(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int) where {n, F <: AbstractFiniteElementSpace{n}}
+
+Get the number of basis functions of the finite element space `rat_space` for the element with index `element_id`.
+
+# Arguments
+- `rat_space::RationalFiniteElementSpace{n,F}`: Finite element space
+- `element_id::Int`: Index of the element
+
+# Returns
+- `::Int`: Number of basis functions
+"""
+function get_num_basis(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int) where {n, F <: AbstractFiniteElementSpace{n}}
+    return get_num_basis(rat_space.function_space, element_id)
+end
+
+"""
     get_basis_indices(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int) where {n, F <: AbstractFiniteElementSpace{n}}
 
 Returns the basis indices supported on the given element for the rational finite element space.
