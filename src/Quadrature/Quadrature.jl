@@ -11,6 +11,7 @@ module Quadrature
 
 
 import FastGaussQuadrature
+import FFTW
 
 
 
@@ -78,6 +79,7 @@ end
 
 
 
+# Gauss quadrature rules in 1D.
 @doc raw"""
     gauss_lobatto(p::Integer)
 
@@ -132,6 +134,123 @@ end
 
 
 
+# Clenshaw-Curtis quadrature rules in 1D.
+"""
+    clenshaw_curtis(p::Integer)
+    
+Find the roots and weights for Clenshaw-Curtis quadrature on the 
+interval [0, 1]. The roots include the endpoints -1 and 1 and 
+Clenshaw-Curtis quadrature is exact for polynomials up to degree 
+`p`. However, in practise, this quadrature formula achieves results
+that can be comparable to Gauss quadrature (in some cases), see [Trefethen2008](@cite).
+
+# Arguments
+- `p::Int`: Degree of the quadrature rule.
+
+# Returns
+- `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
+
+# Notes
+See [Waldvogel2006](@cite) for the algorithm.
+"""
+function clenshaw_curtis(p::Integer)
+    if p <= 1
+        throw(ArgumentError("Invalid degree: $p. The degree must be greater than 1."))
+    end
+    
+    N = collect(1:2:p-1)
+    l = length(N)
+    m = p - l
+
+    v0 = vcat(2.0./N./(N.-2), 1/N[end], zeros(m))
+    v2 = -v0[1:end-1] .- v0[end:-1:2]
+
+    g0 = -ones(p)
+    g0[l+1] = g0[l+1] + p
+    g0[m+1] = g0[m+1] + p
+    g = g0 ./ (p^2 - 1 + p%2)
+
+    w = real(FFTW.ifft(v2.+g))
+    w = vcat(w, w[1])
+
+    rts = cospi.(collect(Float64, range(0, p)) ./ p)
+    ξ = rts[end:-1:begin]
+
+    # Map roots and weights to the interval [0, 1].
+    @. ξ = (ξ + 1.0)/2.0
+    @. w = 0.5 * w
+
+    return QuadratureRule{1}((ξ,), w)
+end
+
+
+# Quadrature rules on equally spaced nodes.
+@doc raw"""
+    newton_cotes(num_points::Integer, type::String="closed")
+
+Computes the nodes `ξ` and weights `w` of a Newton-Cotes quadrature rule.
+
+# Arguments
+- `num_points::Int`: Number of points in the quadrature rule.
+- `type::String`: Type of the Newton-Cotes rule. Valid types are "closed" and "open".
+
+# Returns
+- `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
+"""
+function newton_cotes(num_points::Integer, type::String="closed")
+    # Compute the equally spaced nodes on the interval [-1, 1].
+    if type == "closed"
+        if num_points <= 1
+            throw(ArgumentError("Invalid number of points: $num_points. A closed Newton-Cotes rule requires at least 2 points."))
+        else
+            ξ = [-1.0 + i * 2.0 / (num_points-1) for i = 0:num_points-1]
+        end
+    elseif type == "open"
+        if num_points <= 0
+            throw(ArgumentError("Invalid number of points: $num_points. An open Newton-Cotes rule requires at least 1 point."))
+        else
+            ξ = [-1.0 + i * 2.0 / (num_points+1) for i = 1:num_points]
+        end
+    else
+        throw(ArgumentError("Invalid Newton-Cotes type: $type. Valid types are 'closed' and 'open'."))
+    end
+
+    # Compute the weights by integrating the Lagrange basis functions.
+    # We need n Lagrange basis functions when given n points.
+    ql, wl = FastGaussQuadrature.gausslegendre(num_points)
+
+    lagrange_at_ql = zeros(Float64, num_points, length(ql))
+    for i in 1:num_points
+        for j in eachindex(ql)
+            l_poly_i = 1.0
+            for k in 1:num_points
+                if k != i
+                    l_poly_i *= (ql[j] - ξ[k]) / (ξ[i] - ξ[k])
+                end
+            end
+            lagrange_at_ql[i,j] = l_poly_i
+        end
+    end
+
+    w = zeros(Float64, num_points)
+    for i in 1:num_points
+        for j in eachindex(ql, wl)
+            w[i] += wl[j] * lagrange_at_ql[i,j]
+        end
+        
+    end
+
+    # Map roots and weights to the interval [0, 1].
+    @. ξ = (ξ + 1.0)/2.0
+    @. w = 0.5 * w
+
+    return QuadratureRule{1}((ξ,), w)
+    
+end
+
+
+
+# Multi-dimensional quadrature rules.
 @doc raw"""
     tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}
 
