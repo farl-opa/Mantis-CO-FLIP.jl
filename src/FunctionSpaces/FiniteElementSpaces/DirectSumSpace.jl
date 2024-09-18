@@ -104,3 +104,17 @@ Get the number of basis functions of the direct sum space.
 - `num_basis::Int`: Number of basis functions
 """
 get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces))
+
+"""
+    get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+
+Get the number of active basis functions of the direct sum space in element `element_idx`.
+
+# Arguments
+- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
+- `element_idx::Int`: The element where to get the number of active basis.
+
+# Returns
+- `num_basis::Int`: Number of active basis functions in element `element_idx`
+"""
+get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces, element_idx))
