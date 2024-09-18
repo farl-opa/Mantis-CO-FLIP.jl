@@ -105,7 +105,6 @@ Get the number of basis functions of the direct sum space.
 """
 get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces))
 
-
 """
     get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
 
