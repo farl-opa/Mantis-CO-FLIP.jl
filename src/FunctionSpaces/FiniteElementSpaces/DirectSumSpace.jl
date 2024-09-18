@@ -67,8 +67,6 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
     n_evaluation_points = prod(size.(xi, 1))
     num_derivatives = num_components  # each component will have as many derivatives as the number of components
     local_multivalued_basis = [[[zeros(Float64, n_evaluation_points, num_multivaluedbasis) for _ = 1:n_evaluation_matrices] for n_evaluation_matrices = n_evaluation_matrices_per_derivative] for _ = 1:num_components]
-
-    # generate the indices for all the bases
     
     # next, loop over the spaces of each component and evaluate them
     count = 0
@@ -89,3 +87,16 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
 
     return local_multivalued_basis, multivalued_basis_indices
 end
+
+"""
+    get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+
+Get the number of basis functions of the direct sum space.
+
+# Arguments
+- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
+
+# Returns
+- `num_basis::Int`: Number of basis functions
+"""
+get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces))
