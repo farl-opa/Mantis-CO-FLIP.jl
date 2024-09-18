@@ -29,3 +29,4 @@ Manifest.toml
 # Ignore all VTK files; any new VTK file has to be forcefully added to the repo
 *.vtk
 *.vtu
+*.DS_Store
