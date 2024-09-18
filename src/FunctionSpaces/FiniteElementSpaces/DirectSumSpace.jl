@@ -28,9 +28,9 @@ Evaluate the basis functions of the direct sum space at the points `xi` in the e
 # Returns
 - `local_multivalued_basis::Vector{Vector{Vector{Array{Float64, 2}}}}`: Matrices containing the evaluations of the basis functions and its derivatives of the direct sum space.
     `local_multivalued_basis[i][j][k][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate, 
-    # of the m-th multivalued basis of component i evaluated at the lth-point
-    # In this case the maximum order of derivative is first order. For higher order derivatives 
-    # we should follow a flattenned numbering using the indices of the derivatives.
+    of the m-th multivalued basis of component i evaluated at the lth-point.
+    In this case the maximum order of derivative is first order. For higher order derivatives 
+    we should follow a flattenned numbering using the indices of the derivatives.
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
 function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
