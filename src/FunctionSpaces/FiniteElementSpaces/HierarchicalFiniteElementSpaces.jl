@@ -829,11 +829,11 @@ function get_level_domain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level
     end
 end
 
-function _get_element_measure(hspace::HierarchicalFiniteElementSpace{n, S, T}, element_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function _get_element_size(hspace::HierarchicalFiniteElementSpace{n, S, T}, element_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     element_level = get_active_level(hspace.active_elements, element_id)
     element_level_id = get_active_id(hspace.active_elements, element_id)
 
-    return _get_element_measure(hspace.spaces[element_level], element_level_id)
+    return _get_element_size(hspace.spaces[element_level], element_level_id)
 end
 
 # Geometry methods
