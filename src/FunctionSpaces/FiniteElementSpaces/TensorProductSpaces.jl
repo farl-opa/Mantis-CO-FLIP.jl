@@ -69,10 +69,21 @@ struct TensorProductSpace{n, F1, F2} <: AbstractFiniteElementSpace{n}
     end
 end
 
+"""
+    get_basis_indices(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1, F2}
 
+Get the basis indices for an element in the tensor-product space.
+
+# Arguments
+- `tp_space::TensorProductSpace{n, F1, F2}`: The tensor-product space
+- `el_id::Int`: ID of the element
+
+# Returns
+- `::Vector{Int}`: Basis indices for the element
+"""
 function get_basis_indices(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1, F2}
     max_ind_basis = _get_num_basis_per_space(tp_space)
-    indices_per_dim = _get_basis_indices_per_dim(tp_space, el_id)
+    indices_per_dim = _get_basis_indices_per_space(tp_space, el_id)
     
     # Compute basis indices
     basis_indices = Vector{Int}(undef, prod(length.(indices_per_dim)))
@@ -85,7 +96,19 @@ function get_basis_indices(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) 
     return basis_indices
 end
 
-function _get_basis_indices_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1, F2}
+"""
+    _get_basis_indices_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1, F2}
+
+Helper function to get the basis indices for each constituent space.
+
+# Arguments
+- `tp_space::TensorProductSpace{n, F1, F2}`: The tensor-product space
+- `el_id::Int`: ID of the element
+
+# Returns
+- `::Tuple{Vector{Int},Vector{Int}}`: Basis indices for each constituent space
+"""
+function _get_basis_indices_per_space(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int) where {n, F1, F2}
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(el_id, max_ind_el)
 
