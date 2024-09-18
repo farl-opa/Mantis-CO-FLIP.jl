@@ -33,7 +33,7 @@ U1 = Mantis.FunctionSpaces.UnstructuredSpace((B1,), extraction_operator_1, Dict(
 extraction_operator_2 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(4))], [[4, 5, 6, 7]], 1, 4)
 U2 = Mantis.FunctionSpaces.UnstructuredSpace((B2,), extraction_operator_2, Dict())
 
-S = Mantis.FunctionSpaces.SumSpace((U1, U2))
+S = Mantis.FunctionSpaces.SumSpace((U1, U2), 7)
 S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)
 
 display(S_eval[1][1][1])
@@ -48,7 +48,7 @@ U1 = Mantis.FunctionSpaces.UnstructuredSpace((B1,), extraction_operator_1, Dict(
 extraction_operator_2 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(4))], [[1, 4, 5, 6]], 1, 4)
 U2 = Mantis.FunctionSpaces.UnstructuredSpace((B2,), extraction_operator_2, Dict())
 
-S = Mantis.FunctionSpaces.SumSpace((U1, U2))
+S = Mantis.FunctionSpaces.SumSpace((U1, U2), 6)
 S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)
 
 display(S_eval[1][1][1])
