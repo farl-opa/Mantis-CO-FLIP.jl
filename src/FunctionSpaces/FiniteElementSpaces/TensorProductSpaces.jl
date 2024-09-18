@@ -161,6 +161,22 @@ function get_num_basis(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2
 end
 
 """
+    get_num_basis(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+
+Get the number of active basis on `element_idx` of the tensor-product function space.
+
+# Arguments
+- `tp_space::TensorProductSpace{n, F1, F2}`: The tensor-product space
+- `element_idx::Int`: The element where to get the number of active basis function.
+
+# Returns
+- `::Int`: The number of active basis functions of the space on element `element_idx`
+"""
+function get_num_basis(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+    return prod(_get_num_basis_per_space(tp_space, element_idx))
+end
+
+"""
     _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
 
 Helper function to get the dimension of each constituent space.
@@ -173,6 +189,23 @@ Helper function to get the dimension of each constituent space.
 """
 function _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
     return (get_num_basis(tp_space.function_space_1), get_num_basis(tp_space.function_space_2))
+end
+
+
+"""
+    _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+
+Helper function to get the number of active basis of each constituent space on element_idx.
+
+# Arguments
+- `tp_space::TensorProductSpace{n, F1, F2}`: The tensor-product space
+- `element_idx::Int`: Element where to get the number of active basis.
+
+# Returns
+- `::Tuple{Int,Int}`: Number of active basis of each constituent space on element `element_idx`.
+"""
+function _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+    return (get_num_basis(tp_space.function_space_1, element_idx), get_num_basis(tp_space.function_space_2, element_idx))
 end
 
 """
