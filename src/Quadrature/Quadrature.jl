@@ -135,7 +135,7 @@ end
 
 
 # Clenshaw-Curtis quadrature rules in 1D.
-"""
+@doc raw"""
     clenshaw_curtis(p::Integer)
     
 Find the roots and weights for Clenshaw-Curtis quadrature on the 
