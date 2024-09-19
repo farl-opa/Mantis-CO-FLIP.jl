@@ -48,6 +48,22 @@ function get_basis_indices(extraction_op::ExtractionOperator, element_id::Int)
     return extraction_op.basis_indices[element_id]
 end
 
+"""
+    get_num_basis(extraction_op::ExtractionOperator, element_id::Int)
+
+Returns the number of basis functions for a specific element.
+
+# Arguments
+- `extraction_op::ExtractionOperator`: The `ExtractionOperator` object.
+- `element_id::Int`: The index of the element.
+
+# Returns
+The number of basis functions for the specified element.
+"""
+function get_num_basis(extraction_op::ExtractionOperator, element_id::Int)
+    return length(get_basis_indices(extraction_op, element_id))
+end
+
 @doc raw"""
     get_extraction(extraction_op::ExtractionOperator, element_id::Int)
 
