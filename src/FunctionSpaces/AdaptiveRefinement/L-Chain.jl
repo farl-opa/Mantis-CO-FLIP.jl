@@ -354,7 +354,6 @@ Returns all the elements in the support of basis functions supported on `marked_
 """
 function get_marked_element_padding(hspace::HierarchicalFiniteElementSpace{n, S, T}, marked_elements_per_level::Vector{Vector{Int}}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     num_levels = get_num_levels(hspace)
-    get_basis_indices_from_extraction(space, element) = get_extraction(space, element)[2]
 
     element_padding = [Int[] for _ ∈ 1:num_levels]
     level_padding = Int[]
@@ -363,10 +362,10 @@ function get_marked_element_padding(hspace::HierarchicalFiniteElementSpace{n, S,
         if marked_elements_per_level[level] == Int[]
             continue
         end
-        basis_in_marked_elements = reduce(union, get_basis_indices_from_extraction.(Ref(hspace.spaces[level]), marked_elements_per_level[level]))
-        
-        level_padding = union(get_support.(Ref(hspace.spaces[level]), basis_in_marked_elements)...)
-        append!(element_padding[level], level_padding)
+
+        basis_in_marked_elements = reduce(union, get_basis_indices.(Ref(hspace.spaces[level]), marked_elements_per_level[level]))
+        element_padding[level] = reduce(union, get_support.(Ref(hspace.spaces[level]), basis_in_marked_elements))
+
     end
 
     return element_padding

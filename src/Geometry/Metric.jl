@@ -29,7 +29,7 @@ function metric(geometry::AbstractGeometry{n}, element_id::Int, xi::NTuple{n,Vec
     end
 
     # Compute the squareroot of the determinant of the metric
-    sqrt_g = sqrt.(LinearAlgebra.det.(eachslice(g; dims=1)))
+    sqrt_g = sqrt.(abs.(LinearAlgebra.det.(eachslice(g; dims=1))))
 
     return g, sqrt_g
 end
