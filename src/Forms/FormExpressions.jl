@@ -72,43 +72,29 @@ Evaluate a FormField at given points.
         `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
 """
 function evaluate(form::AnalyticalFormField{manifold_dim, 0, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
-    #print("Evaluating $(form.label) \n")
-    n_form_components = 1
-    
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
     
     form_eval = form.expression(x)
     
-    form_indices = ones(Int, n_form_components)
-
-    return form_eval, form_indices
+    return form_eval, [1]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
-    #print("Evaluating $(form.label) \n")
-    
     if Geometry.get_image_dim(form.geometry) != manifold_dim
         throw("Image manifold must have the same dimension as the domain manifold.")
     end
     
-    n_form_components = 1
-
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
     J = Geometry.jacobian(form.geometry, element_idx, ξ)  # Jₖⱼ = ∂Φᵏ\∂ξⱼ
     form_eval = form.expression(x)
 
     form_eval[1][:] .*= LinearAlgebra.det.(eachslice(J; dims=1))
     
-    form_indices = ones(Int, n_form_components)
-
-    return form_eval, form_indices
+    return form_eval, [1]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
-    #print("Evaluating $(form.label) \n")
     
-    n_form_components = manifold_dim
-
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
     J = Geometry.jacobian(form.geometry, element_idx, ξ)  # Jₖⱼ = ∂Φᵏ\∂ξⱼ
     form_eval = form.expression(x) # size: num_points x image_dim
@@ -129,9 +115,7 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx:
         form_pullback[j] = a[:,j]
     end
     
-    form_indices = ones(Int, n_form_components)
-
-    return form_pullback, form_indices
+    return form_pullback, [1]
 end
 
 """

@@ -268,8 +268,8 @@ a = 2
 ξ¹.coefficients .= 1.0
 β².coefficients .= 1.0
 
-dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
+# dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+# dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
 # ★α⁰ = Mantis.Forms.hodge(α⁰)
 # ★ξ¹ = Mantis.Forms.hodge(ξ¹)
 # ★β² = Mantis.Forms.hodge(β²)

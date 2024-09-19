@@ -66,19 +66,14 @@ Evaluate the basis functions of a differential form space at given points `xi`.
         Typically each basis is associated only to one component, e.g., ``\mathrm{d}\xi_{1}``. To avoid populating 
         the evaluation with zeros on the other components, we only return, per component, the basis that have nonzero values 
         on that component.
-- `form_basis_indices`: Vector of vectors containing the global indices of the basis forms.
-        `form_basis_indices[i][k]` is the global index of the returned basis `k` of this element
-        from component `i`.
+- `form_basis_indices`: Vector containing the global indices of the basis forms.
 
 # Sizes
 - `local_form_basis`: Vector of length `n_form_components`, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions)
-- `form_basis_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length n_basis_functions
+- `form_basis_indices`: Vector{Int} of length n_basis_functions
 """
 function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G} where {G <: Geometry.AbstractGeometry{manifold_dim}}} where {form_rank}
-    n_form_components = binomial(manifold_dim, form_rank)
-    
-    # Compute the offset in the numbering of the degrees of freedom 
-    # of the form space. The form space is made up of components 
+    # The form space is made up of components 
     # e.g, 
     #   0-forms: single component
     #   1-forms:(dξ₁, dξ₂) (2D)
