@@ -251,9 +251,9 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G
     # Form space 2: β² = β²₁dξ₂∧dξ₃ + β²₂dξ₃∧dξ₁ + β²₃dξ₁∧dξ₂
     # ⟨α², β²⟩ = ∫α²ᵢβ²ⱼ(gⁱ¹ʲ¹gⁱ²ʲ²-gⁱ¹ʲ²gⁱ²ʲ¹)√det(g)dξ¹∧dξ²∧dξ³
     
-    prod_form_rows = Vector{Int}(undef, n_total_indices)
-    prod_form_cols = Vector{Int}(undef, n_total_indices)
-    prod_form_eval = Vector{Float64}(undef, n_total_indices)
+    prod_form_rows = zeros(Int, n_prod_indices)
+    prod_form_cols = zeros(Int, n_prod_indices)
+    prod_form_eval = zeros(Float64, n_prod_indices)
 
     for i ∈1:3
         for j ∈1:3
@@ -317,7 +317,7 @@ function inner_product_1_form_component!(prod_form_rows::Vector{Int}, prod_form_
     return prod_form_rows, prod_form_cols, prod_form_eval
 end
 
-function inner_product_2_form_component!(prod_form_rows::Vector{Int}, prod_form_cols::Vector{Int}, prod_form_eval::Vector{Float64}, quad_rule, inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, n_indices_1, n_indices_2, component_idx::Int, form_idxs::NTuple{2, Int}, indices_offset)
+function inner_product_2_form_component!(prod_form_rows::Vector{Int}, prod_form_cols::Vector{Int}, prod_form_eval::Vector{Float64}, quad_rule, inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, n_indices_1, n_indices_2, form_idxs::NTuple{2, Int})
 
     inv_indices_1 = (mod(form_idxs[1], 3) + 1, mod(form_idxs[1]+1, 3) + 1)
     inv_indices_2 = (mod(form_idxs[2], 3) + 1, mod(form_idxs[2]+1, 3) + 1)
