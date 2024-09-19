@@ -67,18 +67,18 @@ zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate(zero_form_spac
 # hodge_zero_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
-d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
-hodge_one_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+# d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+# hodge_one_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 top_form_space_eval, top_form_space_idx = Mantis.Forms.evaluate(top_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
-hodge_top_form_space_eval, hodge_top_form_space_idx = Mantis.Forms.evaluate_hodge_star(top_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+# hodge_top_form_space_eval, hodge_top_form_space_idx = Mantis.Forms.evaluate_hodge_star(top_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 α⁰.coefficients .= 1.0
 ξ¹.coefficients .= 1.0
 β².coefficients .= 1.0
 
-dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
+# dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+# dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
 # ★α⁰ = Mantis.Forms.hodge(α⁰)
 # ★ξ¹ = Mantis.Forms.hodge(ξ¹)
 # ★β² = Mantis.Forms.hodge(β²)

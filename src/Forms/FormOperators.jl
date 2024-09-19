@@ -81,8 +81,8 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{manifol
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
     
     # get dimension of each form expression
-    n_indices_1 = length(form1_indices[1])
-    n_indices_2 = length(form2_indices[1])
+    n_indices_1 = length(form1_indices)
+    n_indices_2 = length(form2_indices)
 
     # Form 1: αⁿ = αⁿ₁dξ¹∧…∧dξⁿ
     # Form 2: βⁿ = βⁿ₁dξ¹∧…∧dξⁿ
