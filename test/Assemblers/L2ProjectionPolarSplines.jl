@@ -74,9 +74,8 @@ function L2_projection(X, ∫, fₑ)
     
     # assemble all matrices
     weak_form = Mantis.Assemblers.l2_weak_form
-    global_assembler = Mantis.Assemblers.Assembler(Dict{Int, Float64}())
-    A, b = global_assembler(weak_form, weak_form_inputs)
-
+    A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, Dict{Int, Float64}())
+    
     # solve for coefficients of solution
     sol = A \ b
 
@@ -357,13 +356,13 @@ for deg in 2:2
                 println("       Error in u: ", errors[r+1])
                 println("...done!")
             end
-            if n_dofs < 2e5
-                println("Visualizing the solution...")
-                n_subcells = 20
-                visualize_solution((uₕ,), ("u_h",), "$form_rank _form_L2_projection_toroidal_$r _$n_subcells _$deg", n_subcells, deg)
-                visualize_tensor_product_controlnet(geom_coeffs_toroidal, 3, 3, [true, false, false], "L2_projection_toroidal_$r _controlnet")
-                println("--------------------------------------------")
-            end
+            # if n_dofs < 2e5
+            #     println("Visualizing the solution...")
+            #     n_subcells = 20
+            #     visualize_solution((uₕ,), ("u_h",), "$form_rank _form_L2_projection_toroidal_$r _$n_subcells _$deg", n_subcells, deg)
+            #     visualize_tensor_product_controlnet(geom_coeffs_toroidal, 3, 3, [true, false, false], "L2_projection_toroidal_$r _controlnet")
+            #     println("--------------------------------------------")
+            # end
         end
 
         error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
