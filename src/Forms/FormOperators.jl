@@ -24,11 +24,13 @@ Compute the inner product of two differential 0-forms over a specified element o
 function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 0, G}, form_expression2::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
     _, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
+    # evaluate both the form expressions
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
     
-    n_indices_1 = length(form1_indices[1])
-    n_indices_2 = length(form2_indices[1])
+    # get number of basis functions for each form
+    n_indices_1 = length(form1_indices)
+    n_indices_2 = length(form2_indices)
 
     # Form 1: α⁰ = α⁰₁
     # Form 2: β⁰ = β⁰₁
@@ -285,10 +287,10 @@ function inner_product_0_form_component!(prod_form_rows::Vector{Int}, prod_form_
         for i ∈ 1:n_indices_1
             linear_idx = i + (j-1) * n_indices_1
 
-            prod_form_rows[linear_idx] = form1_indices[1][i]
-            prod_form_cols[linear_idx] = form2_indices[1][j]
+            prod_form_rows[linear_idx] = form1_indices[i]
+            prod_form_cols[linear_idx] = form2_indices[j]
 
-            prod_form_eval[linear_idx] = @views (quad_rule.weights .* form1_eval[1][:,i])' * (form2_eval[1][:,j] .* sqrt_g)    
+            prod_form_eval[linear_idx] = @views (quad_rule.weights .* form1_eval[1][:,i])' * (form2_eval[1][:,j] .* sqrt_g)
         end
     end
 
