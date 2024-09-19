@@ -235,21 +235,17 @@ Compute the inner product of two differential 2-forms over a specified element o
 function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G}, form_expression2::AbstractFormExpression{3, 2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
+    # assumes that the output is of the following form:
+    # form_eval::Vector{Matrix{Float64}} of length 3, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
+    # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
     
-    n_indices_1 = map(basis_indices -> length(basis_indices), form1_indices)
-    n_indices_2 = map(basis_indices -> length(basis_indices), form2_indices)
+    # get dimension of each form expression
+    n_indices_1 = length(form1_indices)
+    n_indices_2 = length(form2_indices)
 
-    n_prod_indices = Vector{Int}(undef, 9)
-    for i ∈ 1:3, j ∈ 1:3
-        linear_idx = i + (j-1)*3
-        n_prod_indices[linear_idx] = n_indices_1[i]*n_indices_2[j]
-    end
-    indices_offset = cumsum(n_prod_indices)
-    indices_offset[2:end] .= indices_offset[1:end-1]
-    indices_offset[1] = 0
-    n_total_indices = sum(n_prod_indices)
+    n_prod_indices = n_indices_1*n_indices_2
 
     # Form space 1: α² = α²₁dξ₂∧dξ₃ + α²₂dξ₃∧dξ₁ + α²₃dξ₁∧dξ₂
     # Form space 2: β² = β²₁dξ₂∧dξ₃ + β²₂dξ₃∧dξ₁ + β²₃dξ₁∧dξ₂
@@ -264,7 +260,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G
             prod_form_rows, prod_form_cols, prod_form_eval = inner_product_2_form_component!(
                 prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
                 inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
-                n_indices_1, n_indices_2, j + (i-1)*3, (i,j), indices_offset
+                n_indices_1, n_indices_2, (i,j)
             ) # Evaluates α¹ᵢβ¹ⱼ(gⁱ¹ʲ¹gⁱ²ʲ²-gⁱ¹ʲ²gⁱ²ʲ¹)√det(g)
         end
     end
@@ -328,14 +324,14 @@ function inner_product_2_form_component!(prod_form_rows::Vector{Int}, prod_form_
 
     inv_g_factor = inv_g[:,inv_indices_1[1],inv_indices_2[1]].*inv_g[:,inv_indices_1[2],inv_indices_2[2]] .- inv_g[:,inv_indices_1[1],inv_indices_2[2]].*inv_g[:,inv_indices_1[2],inv_indices_2[1]]
 
-    for j ∈ 1:n_indices_2[form_idxs[2]]
-        for i ∈ 1:n_indices_1[form_idxs[1]]
-            linear_idx = i + (j-1) * n_indices_1[form_idxs[1]]
+    for j ∈ 1:n_indices_2
+        for i ∈ 1:n_indices_1
+            linear_idx = i + (j-1) * n_indices_1
 
-            prod_form_rows[indices_offset[component_idx]+linear_idx] = form1_indices[form_idxs[1]][i]
-            prod_form_cols[indices_offset[component_idx]+linear_idx] = form2_indices[form_idxs[2]][j]
+            prod_form_rows[linear_idx] = form1_indices[i]
+            prod_form_cols[linear_idx] = form2_indices[j]
 
-            prod_form_eval[indices_offset[component_idx]+linear_idx] = @views (quad_rule.weights .* form1_eval[form_idxs[1]][:,i])' * (form2_eval[form_idxs[2]][:,j] .* inv_g_factor .* sqrt_g)    
+            prod_form_eval[linear_idx] += @views (quad_rule.weights .* form1_eval[form_idxs[1]][:,i])' * (form2_eval[form_idxs[2]][:,j] .* inv_g_factor .* sqrt_g)
         end
     end
 
