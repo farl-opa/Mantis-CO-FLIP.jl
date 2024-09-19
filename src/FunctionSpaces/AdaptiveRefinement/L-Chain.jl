@@ -240,7 +240,7 @@ function check_problematic_pair(hier_space::HierarchicalFiniteElementSpace{n, S,
 end
 
 @doc raw"""
-    build_L_chain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    build_Lchain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Returns the basis indices of basis functions in the L-chain between the basis in `basis_pair`.
 
@@ -253,69 +253,73 @@ Returns the basis indices of basis functions in the L-chain between the basis in
 
 # Returns
 
-- `L_chain::Vector{Int}`: the indices of basis functions in the L-chain, excluding the endpoints.
+- `Lchain::Vector{Int}`: the indices of basis functions in the L-chain, excluding the endpoints.
 - `corner_basis::Int`: the index of the basis function in the corner of the L-chain.
 """
-function build_L_chain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    L_chain = Int[]
+function build_Lchain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    Lchain = Int[]
     max_id_basis = _get_num_basis_per_space(get_space(hier_space, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k ∈ 1:2]
 
     # Lower right L-chain
     if chain_type=="LR"
         for first_index ∈ proper_range(basis_per_dim[1][1],basis_per_dim[2][1])
-            append!(L_chain, ordered_to_linear_index( (first_index, basis_per_dim[1][2]), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (first_index, basis_per_dim[1][2]), max_id_basis))
         end
         for second_index ∈ proper_range(basis_per_dim[1][2], basis_per_dim[2][2])[2:end]
-            append!(L_chain, ordered_to_linear_index( (basis_per_dim[2][1], second_index), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (basis_per_dim[2][1], second_index), max_id_basis))
         end
         corner_basis = ordered_to_linear_index( (basis_per_dim[2][1], basis_per_dim[1][2]), max_id_basis)
     # Upper left L-chain
     elseif chain_type=="UL" 
         for second_index ∈ proper_range(basis_per_dim[1][2], basis_per_dim[2][2])
-            append!(L_chain, ordered_to_linear_index( (basis_per_dim[1][1], second_index), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (basis_per_dim[1][1], second_index), max_id_basis))
         end
         for first_index ∈ proper_range(basis_per_dim[1][1], basis_per_dim[2][1])
-            append!(L_chain, ordered_to_linear_index( (first_index, basis_per_dim[2][2]), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (first_index, basis_per_dim[2][2]), max_id_basis))
         end
         corner_basis = ordered_to_linear_index( (basis_per_dim[1][1], basis_per_dim[2][2]), max_id_basis)
     else
         throw(ArgumentError("Invalid chain type. Supported types are \"LR\" or \"UL\" and \"$chain_type\" was given."))
     end
 
-    return L_chain[2:end-1], corner_basis
+    return Lchain[2:end-1], corner_basis
 end
 
-@doc raw"""
-    get_level_marked_basis(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, marked_elements_per_level::Vector{Vector{Int}}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
 
-Returns the  basis functions in `level` that will contribute to the marked domains. These are given by the basis functions with non-empty support on `marked_element_ids` togheter with the ones introduced by L-chains.
+function _compute_Lchain_basis(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, marked_elements_per_level::Vector{Vector{Int}}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
 
-# Arguments
+    num_levels = get_num_levels(hier_space)
 
-- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
-- `level::Int`: current level.
-- `marked_element_ids::Vector{Int}`: marked elements from error analysis.
-- `new_two_scale_operator::AbstractTwoScaleOperator`: operator to be used when a new level needs to be created or checked.
-
-# Returns
-
-- `new_inactive_basis::Vector{Int}`: basis used to contrsuct the marked domains for refinement.
-"""
-function get_level_marked_basis(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, marked_elements_per_level::Vector{Vector{Int}}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
-    if marked_elements_per_level[level] == Int[]
-        return Int[]
-    end 
-
-    checked_pairs = Vector{Int}[]
     new_basis_to_check, new_inactive_basis = initiate_basis_to_check(get_space(hier_space, level), marked_elements_per_level[level])
-    previous_inactive_basis = get_basis_contained_in_next_level(hier_space, level)
+    if level < num_levels
+        previous_inactive_basis = get_basis_contained_in_next_level_domain(hier_space, level)
+    else
+        function _get_basis_contained_in_new_domain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domain::Vector{Int}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+            basis_contained_in_new_domain = Int[]
+        
+            for basis_id ∈ get_level_basis_ids(hier_space, get_num_levels(hier_space))
+                basis_support = get_support(get_space(hier_space,get_num_levels(hier_space)), basis_id)
+                basis_support_children = get_element_children(new_operator, basis_support)
+        
+                if all(basis_support_children .∈ [domain])
+                    append!(basis_contained_in_new_domain, basis_id)
+                end
+            end
+        
+            return basis_contained_in_new_domain
+        end
+        previous_inactive_basis = _get_basis_contained_in_new_domain(hier_space, marked_elements_per_level[level+1], new_operator)
+    end
     
     basis_to_check = union(previous_inactive_basis, new_basis_to_check)
     inactive_basis = union(previous_inactive_basis, new_inactive_basis)
     
     combinations_to_check = Combinatorics.combinations(basis_to_check, 2)
     
+    checked_pairs = Vector{Int}[]
+    Lchain_basis_ids = Int[]
+
     check_count = 1
     while check_count > 0 # Add L-chains until there are no more problematic intersections
         check_count = 0
@@ -324,9 +328,10 @@ function get_level_marked_basis(hier_space::HierarchicalFiniteElementSpace{n, S,
             problematic_pair = check_problematic_pair(hier_space, level, basis_pair, inactive_basis, new_operator)
             
             if problematic_pair
-                L_chain, corner_basis = build_L_chain(hier_space, level, basis_pair) # Choose chain type here default is "LR" 
+                Lchain, corner_basis = build_Lchain(hier_space, level, basis_pair) # Choose chain type. here default is "LR" 
                 append!(basis_to_check, corner_basis)
-                append!(inactive_basis, L_chain)
+                append!(inactive_basis, Lchain)
+                append!(Lchain_basis_ids, Lchain)
                 check_count += 1
             end
         end
@@ -334,74 +339,27 @@ function get_level_marked_basis(hier_space::HierarchicalFiniteElementSpace{n, S,
         append!(checked_pairs, combinations_to_check)
         combinations_to_check = setdiff(Combinatorics.combinations(basis_to_check, 2), checked_pairs)
     end
-    
-    return inactive_basis
+
+    return Lchain_basis_ids
 end
 
-@doc raw"""
-    get_marked_domains(hier_space::HierarchicalFiniteElementSpace{n, S, T}, marked_element_ids::Vector{Int}, new_two_scale_operator::T, L_chain::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-
-Returns a set of domains for a hierarchical space construction based on a set of `marked_element_ids` from error analysis. When `L_chain` is false the marked domains are given by `get_marked_element_padding`. If `L_chain` is true L-chains will be added when needed aside from the element padding.
-
-# Arguments
-- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
-- `marked_element_ids::Vector{Int}`: marked elements from error analysis.
-- `new_two_scale_operator::AbstractTwoScaleOperator`: operator to be used when a new level needs to be created or checked.
-- `L_chain::Bool`: flag for whether L-chains are added or not.
-# Returns
-
-- `marked_domains::Vector{Vector{Int}}`: domains for hierarchical space construction.
-"""
-function get_marked_domains(hier_space::HierarchicalFiniteElementSpace{n, S, T}, marked_element_ids::Vector{Int}, new_two_scale_operator::T, L_chain::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    function _convert_to_per_level_ids(hier_space, num_levels, marked_element_ids)
-
-        marked_elements_per_level = [Int[] for _ ∈ 1:num_levels]
-
-        for hier_id ∈ marked_element_ids
-            element_level, element_level_id = convert_to_element_level_and_level_id(hier_space, hier_id)
-
-            append!(marked_elements_per_level[element_level], element_level_id)
-        end
-
-        return marked_elements_per_level
-    end
+function add_Lchains!(marked_elements_per_level::Vector{Vector{Int}}, hier_space::HierarchicalFiniteElementSpace{n, S, T}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
     num_levels = get_num_levels(hier_space)
-    marked_elements_per_level = _convert_to_per_level_ids(hier_space, num_levels, marked_element_ids)
-    
-    marked_domains = Vector{Vector{Int}}(undef, num_levels)
-    marked_domains[1] = Int[]
-    if !L_chain
-        element_padding = get_marked_element_padding(hier_space, marked_elements_per_level)
 
-        for level ∈ 1:1:num_levels
-            if level<num_levels
-                if element_padding[level] == Int[]
-                    marked_domains[level+1] = get_level_domain(hier_space, level+1)
-                else
-                    marked_domains[level+1] = union(get_level_domain(hier_space, level+1), get_element_children(hier_space.two_scale_operators[level], element_padding[level]))
-                end
-            elseif element_padding[level] != Int[]
-                push!(marked_domains, get_element_children(new_two_scale_operator, element_padding[level]))
-            end
+    for level ∈ 1:num_levels
+        Lchain_basis_ids = _compute_Lchain_basis(hier_space, level, marked_elements_per_level, new_operator)
+        if Lchain_basis_ids == Int[]
+            continue
         end
-    else
-        for level ∈ 1:1:num_levels
-            level_marked_basis = get_level_marked_basis(hier_space, level, marked_elements_per_level, new_two_scale_operator)
-
-            if level<num_levels
-                if level_marked_basis == Int[]
-                    marked_domains[level+1] = get_level_domain(hier_space, level+1)
-                else
-                    basis_supports = reduce(union, get_support.(Ref(hier_space.spaces[level]), level_marked_basis))
-                    marked_domains[level+1] = union(get_level_domain(hier_space, level+1), get_element_children(new_two_scale_operator, basis_supports))
-                end
-            elseif level_marked_basis != Int[]
-                basis_supports = reduce(union, get_support.(Ref(hier_space.spaces[level]), level_marked_basis))
-                push!(marked_domains, get_element_children(new_two_scale_operator, basis_supports))
-            end
+        Lchain_support_ids = union(get_support.(Ref(hier_space.spaces[level]), Lchain_basis_ids)...)
+        if level==num_levels
+            union!(marked_elements_per_level[level+1], get_element_children(new_operator, Lchain_support_ids))
+        else
+            union!(marked_elements_per_level[level+1], get_element_children(get_twoscale_operator(hier_space, level), Lchain_support_ids))
         end
     end
-    
-    return marked_domains
+
+
+    return marked_elements_per_level
 end

@@ -12,7 +12,7 @@ abstract type AbstractAnalyticalGeometry{n} <: AbstractGeometry{n} end
 abstract type AbstractFEMGeometry{n} <: AbstractGeometry{n} end
 
 @doc raw"""
-    get_element_measure(geometry::G, element_id::Int) where {G<:AbstractGeometry{n} where {n}}
+    get_element_size(geometry::G, element_id::Int) where {G<:AbstractGeometry{n} where {n}}
 
 Computes the measure of the element given by 'element_id' in 'geometry'.
 
@@ -23,8 +23,8 @@ Computes the measure of the element given by 'element_id' in 'geometry'.
 # Returns
 - '::Float64': The measure of the element.
 """
-function get_element_measure(geometry::G, element_id::Int) where {G<:AbstractGeometry{n} where {n}}
-    return _get_element_measure(geometry, element_id)
+function get_element_size(geometry::G, element_id::Int) where {G<:AbstractGeometry{n} where {n}}
+    return _get_element_size(geometry, element_id)
 end
 
 include("./CartesianGeometry.jl")
