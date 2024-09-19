@@ -94,7 +94,6 @@ function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, e
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
-    #print("Evaluating $(form.label) \n")
     
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
     J = Geometry.jacobian(form.geometry, element_idx, ξ)  # Jₖⱼ = ∂Φᵏ\∂ξⱼ

@@ -140,9 +140,9 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G
     # Form 2: β¹ = β¹₁dξ¹ +  β¹₂dξ²
     # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²
     
-    prod_form_rows = Vector{Int}(undef, n_prod_indices)
-    prod_form_cols = Vector{Int}(undef, n_prod_indices)
-    prod_form_eval = Vector{Float64}(undef, n_prod_indices)
+    prod_form_rows = zeros(Int, n_prod_indices)
+    prod_form_cols = zeros(Int, n_prod_indices)
+    prod_form_eval = zeros(Float64, n_prod_indices)
 
     for i ∈ 1:2
         for j ∈ 1:2
@@ -195,9 +195,9 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G
     # Form 2: β¹ = β¹₁dξ¹ +  β¹₂dξ² + β¹₃dξ³
     # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²∧dξ³
     
-    prod_form_rows = Vector{Int}(undef, n_prod_indices)
-    prod_form_cols = Vector{Int}(undef, n_prod_indices)
-    prod_form_eval = Vector{Float64}(undef, n_prod_indices)
+    prod_form_rows = zeros(Int, n_prod_indices)
+    prod_form_cols = zeros(Int, n_prod_indices)
+    prod_form_eval = zeros(Float64, n_prod_indices)
 
     for i ∈1:3
         for j ∈1:3

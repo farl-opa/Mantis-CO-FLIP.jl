@@ -27,7 +27,11 @@ dB1 = Mantis.FunctionSpaces.get_derivative_space(B1)
 dB2 = Mantis.FunctionSpaces.get_derivative_space(B2)
 
 # next, tensor-product B-spline spaces
-TP_Space = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace(B1, B2),))
+TP_Space_0 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace(B1, B2),))
+dTP_Space_dx = Mantis.FunctionSpaces.TensorProductSpace(dB1, B2)
+dTP_Space_dy = Mantis.FunctionSpaces.TensorProductSpace(B1, dB2)
+TP_Space_1 = Mantis.FunctionSpaces.DirectSumSpace((dTP_Space_dx, dTP_Space_dy))
+TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace(dB1, dB2),))
 
 # then, the geometry 
 # Line 1
@@ -53,11 +57,11 @@ dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
 geom_crazy = Mantis.Geometry.MappedGeometry(geom_cart, crazy_mapping)
 
- # compute inner-products of the form spaces
+# Test the inner product of the 0-form spaces -----------------------------
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+3, deg2+3), Mantis.Quadrature.gauss_legendre)
 for geom in [geom_cart, geom_crazy]
     # build a 0-form space
-    zero_form_space = Mantis.Forms.FormSpace(0, geom, TP_Space, "ξ")
+    zero_form_space = Mantis.Forms.FormSpace(0, geom, TP_Space_0, "ξ")
     # compute inner product assuming unit coefficients for both spaces
     inner_prod_0 = 0.0
     for element_id in 1:1:Mantis.Geometry.get_num_elements(geom)
@@ -66,6 +70,97 @@ for geom in [geom_cart, geom_crazy]
     end
     @test isapprox(inner_prod_0, 1.0, atol=1e-12)
 end
+# -------------------------------------------------------------------------
+
+# Test the inner product of analytical form fields -----------------------------
+function analytical_1valued_form_func(x::Matrix{Float64})
+    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+end
+function analytical_2valued_form_func(x::Matrix{Float64})
+    return @. [8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]), 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+end
+
+# Test on multiple geometries
+q_rule = Mantis.Quadrature.tensor_product_rule((deg1+25, deg2+25), Mantis.Quadrature.gauss_legendre)
+for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
+    println("Geom type: ",typeof(geom))
+    
+    # Create form spaces
+    zero_form_space = Mantis.Forms.FormSpace(0, geom, TP_Space_0, "ν")
+    one_form_space = Mantis.Forms.FormSpace(1, geom, TP_Space_1, "η")
+    top_form_space = Mantis.Forms.FormSpace(2, geom, TP_Space_2, "σ")
+
+    # # Generate the form expressions
+    # α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+    # α⁰.coefficients .= 1.0
+    # ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
+    # ζ¹.coefficients .= 1.0
+    # constdx = Mantis.Forms.FormField(one_form_space, "ζ")
+    # constdx.coefficients[begin:20] .= 1.0
+    # constdy = Mantis.Forms.FormField(one_form_space, "ζ")
+    # constdy.coefficients[21:end] .= 1.0
+    # dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+    # γ² = Mantis.Forms.FormField(top_form_space, "γ")
+    # γ².coefficients .= 1.0
+    # dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+
+    # ★α⁰ = Mantis.Forms.hodge(α⁰)
+    # ★ζ¹ = Mantis.Forms.hodge(ζ¹)
+    # ★γ² = Mantis.Forms.hodge(γ²)
+
+    # AnalyticalFormFields
+    f⁰_analytic = Mantis.Forms.AnalyticalFormField(0, analytical_1valued_form_func, geom, "f")
+    f¹_analytic = Mantis.Forms.AnalyticalFormField(1, analytical_2valued_form_func, geom, "f")
+    f²_analytic = Mantis.Forms.AnalyticalFormField(2, analytical_1valued_form_func, geom, "f")
+    
+    total_integrated_analytical_field_0 = 0.0
+    total_integrated_analytical_field_1 = 0.0
+    total_integrated_analytical_field_n = 0.0
+    for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+        # Tests to see if the integrated metric terms are correctly recovered.
+        inv_g, g, det_g = Mantis.Geometry.inv_metric(geom, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        # 0-forms
+        integrated_metric_0 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* det_g)
+        # @test all(isapprox.(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3], integrated_metric_0, atol=1e-12))
+        @test isapprox(sum(Mantis.Forms.evaluate_inner_product(zero_form_space, zero_form_space, elem_id, q_rule)[3]), integrated_metric_0, atol=1e-12) # same as the previous, but different wat of doing it (field vs space)
+        
+        # 1-forms
+        integrated_metric_1 = zeros((2,2))
+        for node_idx in eachindex(Mantis.Quadrature.get_quadrature_weights(q_rule))
+            integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* (inv_g[node_idx,:,:].*det_g[node_idx])
+        end
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...))[1], sum(integrated_metric_1), atol=1e-12)
+        # @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3], 0.0, atol=1e-12)
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)...))[1], integrated_metric_1[1,2], atol=1e-12)
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)...))[1], integrated_metric_1[2,1], atol=1e-12)
+        
+        @test isapprox(sum(Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]), sum(integrated_metric_1), atol=1e-12)
+        # tmp1 = Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]
+        # display(reshape(tmp1, Mantis.FunctionSpaces.get_num_basis(TP_Space_1,elem_id), :))
+        
+        # 2-forms
+        integrated_metric_2 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* (1.0./det_g))
+        # @test all(isapprox.(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], integrated_metric_2, atol=1e-12))
+        # @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
+        @test isapprox(sum(Mantis.Forms.evaluate_inner_product(top_form_space, top_form_space, elem_id, q_rule)[3]), integrated_metric_2, atol=1e-12)
+
+        # # Test if the inner product of the hodges of the forms equals that of the forms
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)...)), atol=1e-12)
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
+        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)...)), atol=1e-12)
+
+
+        # AnalyticalFormField tests
+        # 0-form
+        total_integrated_analytical_field_0 += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_1 += Mantis.Forms.evaluate_inner_product(f¹_analytic, f¹_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_n += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
+    end
+    @test isapprox(total_integrated_analytical_field_0, 1558.5454565440389, atol=1e-12)
+    @test isapprox(total_integrated_analytical_field_1/2, 1558.5454565440389, atol=1e-12)
+    @test isapprox(total_integrated_analytical_field_n, 1558.5454565440389, atol=1e-12)
+end
+
 
 # # Then the geometry 
 # # Line 1
