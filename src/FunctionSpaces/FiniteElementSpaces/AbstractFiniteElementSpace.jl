@@ -3,10 +3,42 @@
 
 Supertype for all scalar finite element spaces.
 """
-abstract type AbstractFiniteElementSpace{n} <: AbstractFunctionSpace end
+abstract type AbstractFiniteElementSpace{manifold_dim} <: AbstractFunctionSpace end
 
 # Getters for the function spaces
-get_manifold_dim(f::AbstractFiniteElementSpace{n}) where {n} = n
+get_manifold_dim(_::AbstractFiniteElementSpace{manifold_dim}) where {manifold_dim} = manifold_dim
+
+"""
+    get_basis_indices(space::AbstractFiniteElementSpace, element_id::Int)
+
+Get the global indices of the basis functions of the finite element space `space` for the element with index `element_id`.
+
+# Arguments
+- `space::AbstractFiniteElementSpace`: Finite element space
+- `element_id::Int`: Index of the element
+
+# Returns
+- `::Vector{Int}`: Global indices of the basis functions
+"""
+function get_basis_indices(space::AbstractFiniteElementSpace, element_id::Int)
+    return get_basis_indices(space.extraction_op, element_id)
+end
+
+"""
+    get_num_basis(space::AbstractFiniteElementSpace, element_id::Int)
+
+Get the number of basis functions of the finite element space `space` for the element with index `element_id`.
+
+# Arguments
+- `space::AbstractFiniteElementSpace`: Finite element space
+- `element_id::Int`: Index of the element
+
+# Returns
+- `::Int`: Number of basis functions
+"""
+function get_num_basis(space::AbstractFiniteElementSpace, element_id::Int)
+    return get_num_basis(space.extraction_op, element_id)
+end
 
 @doc raw"""
     evaluate(space::S, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {S<:AbstractFiniteElementSpace}
