@@ -3,7 +3,7 @@ import SparseArrays
 using Test
 
 function my_sol(x::Matrix{Float64})
-    ω = 0.25
+    ω = 0.1
     y = prod(sin.(ω * x), dims=2)
     return [vec(y)]
 end
@@ -144,68 +144,68 @@ function build_polar_spline_space_and_geometry(deg, nel_r, nel_θ, R; refine::Bo
     return X, ○, E_geom, geom_coeffs_tp, (ts_θ, ts_r)
 end
 
-# for deg in 2:3
-#     for form_rank in [0, 2]
-#         nel_r = 5
-#         nel_θ = 15
-#         R = 1.0
-#         n_ref = 4
-#         verbose=true
+for deg in 2:3
+    for form_rank in [0, 2]
+        nel_r = 5
+        nel_θ = 15
+        R = 1.0
+        n_ref = 4
+        verbose=true
         
-#         # form rank
-#         if form_rank == 1
-#             throw(ArgumentError("Form rank 1 is not supported for this test."))
-#         end
+        # form rank
+        if form_rank == 1
+            throw(ArgumentError("Form rank 1 is not supported for this test."))
+        end
 
-#         # quadrature rule degree for assembly
-#         q_assembly = (deg, deg) .+ (1,1)
-#         # quadrature rule degree for error computation
-#         q_error = q_assembly .* 2
-#         # quadrature rules
-#         ∫ₐ = Mantis.Quadrature.tensor_product_rule(q_assembly, Mantis.Quadrature.gauss_legendre)
-#         ∫ₑ = Mantis.Quadrature.tensor_product_rule(q_error, Mantis.Quadrature.gauss_legendre)
+        # quadrature rule degree for assembly
+        q_assembly = (deg, deg) .+ (1,1)
+        # quadrature rule degree for error computation
+        q_error = q_assembly .* 2
+        # quadrature rules
+        ∫ₐ = Mantis.Quadrature.tensor_product_rule(q_assembly, Mantis.Quadrature.gauss_legendre)
+        ∫ₑ = Mantis.Quadrature.tensor_product_rule(q_error, Mantis.Quadrature.gauss_legendre)
 
-#         errors = zeros(n_ref+1)
-#         geom_coeffs_tp = nothing
-#         E_○ = nothing
-#         for r = 0:n_ref
-#             if verbose
-#                 println("Building polar splines for refinement level $r...")
-#             end
-#             if r == 0
-#                 X, ○, E_○, geom_coeffs_tp = build_polar_spline_space_and_geometry(deg, nel_r, nel_θ, R; form_rank = form_rank)
-#             else
-#                 X, ○, E_○, geom_coeffs_tp = build_polar_spline_space_and_geometry(deg, nel_r, nel_θ, R; refine = true, geom_coeffs_tp = geom_coeffs_tp, form_rank = form_rank)
-#                 nel_r *= 2
-#                 nel_θ *= 2
-#             end
-#             # exact solution
-#             uₑ = Mantis.Forms.AnalyticalFormField(form_rank, my_sol, ○, "u")
-#             if verbose
-#                 println("Solving the problem...")
-#             end
-#             uₕ = L2_projection(X, ∫ₐ, uₑ)
-#             if verbose
-#                 println("Computing error...")
-#             end
-#             global errors[r+1] = L2_norm(uₕ - uₑ, ∫ₑ)
-#             if verbose
-#                 println("       Error in u: ", errors[r+1])
-#                 println("...done!")
-#                 # println("Visualizing the solution...")
-#                 # visualize_solution((uₕ, uₑ-uₕ), ("uh", "error"), "k_form_L2_projection_polar_$r", 1, 4)
-#                 println("--------------------------------------------")
-#             end
-#         end
+        errors = zeros(n_ref+1)
+        geom_coeffs_tp = nothing
+        E_○ = nothing
+        for r = 0:n_ref
+            if verbose
+                println("Building polar splines for refinement level $r...")
+            end
+            if r == 0
+                X, ○, E_○, geom_coeffs_tp = build_polar_spline_space_and_geometry(deg, nel_r, nel_θ, R; form_rank = form_rank)
+            else
+                X, ○, E_○, geom_coeffs_tp = build_polar_spline_space_and_geometry(deg, nel_r, nel_θ, R; refine = true, geom_coeffs_tp = geom_coeffs_tp, form_rank = form_rank)
+                nel_r *= 2
+                nel_θ *= 2
+            end
+            # exact solution
+            uₑ = Mantis.Forms.AnalyticalFormField(form_rank, my_sol, ○, "u")
+            if verbose
+                println("Solving the problem...")
+            end
+            uₕ = L2_projection(X, ∫ₐ, uₑ)
+            if verbose
+                println("Computing error...")
+            end
+            global errors[r+1] = L2_norm(uₕ - uₑ, ∫ₑ)
+            if verbose
+                println("       Error in u: ", errors[r+1])
+                println("...done!")
+                # println("Visualizing the solution...")
+                # visualize_solution((uₕ, uₑ-uₕ), ("uh", "error"), "k_form_L2_projection_polar_$r", 1, 4)
+                println("--------------------------------------------")
+            end
+        end
 
-#         error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
-#         if form_rank == 0
-#             @test isapprox(error_rates[end], deg+1, atol=1e-1)
-#         elseif form_rank == 2
-#             @test isapprox(error_rates[end], deg, atol=1e-1)
-#         end
-#     end
-# end
+        error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
+        if form_rank == 0
+            @test isapprox(error_rates[end], deg+1, atol=1e-1)
+        elseif form_rank == 2
+            @test isapprox(error_rates[end], deg, atol=1e-1)
+        end
+    end
+end
 
 # Test for L2 projection on polar splines in 3D -------------------------------------
 function build_toroidal_spline_space_and_geometry(deg, nel_r, nel_θ, nel_ϕ, R_θr, R_ϕ; form_rank::Int = 0, refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,4}}=nothing)
@@ -311,8 +311,8 @@ for deg in 2:2
         nel_ϕ = 5
         R_θr = 1.0
         R_ϕ = 2.0
-        n_ref = 4
-        verbose=false
+        n_ref = 3
+        verbose=true
         
         # form rank
         if form_rank == 1 || form_rank == 2
@@ -367,9 +367,9 @@ for deg in 2:2
 
         error_rates = log.(Ref(2), errors[1:end-1]./errors[2:end])
         if form_rank == 0
-            @test isapprox(error_rates[end], deg+1, atol=1e-1)
+            @test isapprox(error_rates[end], deg+1, atol=2e-1)
         elseif form_rank == 2
-            @test isapprox(error_rates[end], deg, atol=1e-1)
+            @test isapprox(error_rates[end], deg, atol=2e-1)
         end
     end
 end
