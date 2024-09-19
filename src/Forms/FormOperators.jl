@@ -101,7 +101,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{manifol
     return prod_form_rows, prod_form_cols, prod_form_eval
 end 
 
-# (1-forms, 1-forms) 2D
+# (1-forms, 1-forms)
 @doc raw"""
     evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G}, 
                            form_expression2::AbstractFormExpression{2, 1, G}, 
@@ -122,10 +122,10 @@ Compute the inner product of two differential 1-forms over a specified element o
 - `prod_form_cols::Vector{Int}`: Indices of the second form expression. 
 - `prod_form_eval::Vector{Float64}`: Evaluation of the inner product. Hence, prod_form_eval[l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. 
 """
-function evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G}, form_expression2::AbstractFormExpression{2, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}}
+function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 1, G}, form_expression2::AbstractFormExpression{manifold_dim, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
-    # form_eval::Vector{Matrix{Float64}} of length 2, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
+    # form_eval::Vector{Matrix{Float64}} of length manifold_dim, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
@@ -136,61 +136,11 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G
 
     n_prod_indices = n_indices_1*n_indices_2
     
+    ## 2D case:
     # Form 1: α¹ = α¹₁dξ¹ +  α¹₂dξ²
     # Form 2: β¹ = β¹₁dξ¹ +  β¹₂dξ²
     # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²
-    
-    prod_form_rows = zeros(Int, n_prod_indices)
-    prod_form_cols = zeros(Int, n_prod_indices)
-    prod_form_eval = zeros(Float64, n_prod_indices)
-
-    for i ∈ 1:2
-        for j ∈ 1:2
-            prod_form_rows, prod_form_cols, prod_form_eval = inner_product_1_form_component!(
-                prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
-                inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
-                n_indices_1, n_indices_2, (i,j)) # Evaluates α¹ᵢβ¹ⱼgⁱʲ√det(g)
-        end
-    end
-
-    return prod_form_rows, prod_form_cols, prod_form_eval
-end
-
-# (1-forms, 1-forms) 3D
-@doc raw"""
-    evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G}, 
-                           form_expression2::AbstractFormExpression{3, 1, G}, 
-                           element_id::Int, 
-                           quad_rule::Quadrature.QuadratureRule{3}) 
-                           where {G<:Geometry.AbstractGeometry{3}}
-
-Compute the inner product of two differential 1-forms over a specified element of a 3-dimensional manifold.
-
-# Arguments
-- `form_expression1::AbstractFormExpression{3, 1, G}`: The first differential form expression. It represents a form on a manifold of dimension 3.
-- `form_expression2::AbstractFormExpression{3, 1, G}`: The second differential form expression. It should have the same dimension and geometry as `form_expression1`.
-- `element_id::Int`: The identifier of the element on which the inner product is to be evaluated. This is typically an index into a mesh or other discretized representation of the manifold.
-- `quad_rule::Quadrature.QuadratureRule{3}`: The quadrature rule used to approximate the integral of the inner product over the specified element. The quadrature rule should be compatible with the dimension of the manifold.
-
-# Returns
-- `prod_form_rows::Vector{Int}`: Indices of the first form expression. 
-- `prod_form_cols::Vector{Int}`: Indices of the second form expression. 
-- `prod_form_eval::Vector{Float64}`: Evaluation of the inner product. Hence, prod_form_eval[l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. 
-"""
-function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G}, form_expression2::AbstractFormExpression{3, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
-    inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
-
-    # form_eval::Vector{Matrix{Float64}} of length 3, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
-    # form_indices::Vector{Int} of length (dimension of form_expression on this element)
-    form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
-    form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
-    
-    # get dimension of each form expression
-    n_indices_1 = length(form1_indices)
-    n_indices_2 = length(form2_indices)
-
-    n_prod_indices = n_indices_1*n_indices_2
-
+    ## 3D case:
     # Form 1: α¹ = α¹₁dξ¹ +  α¹₂dξ² + α¹₃dξ³
     # Form 2: β¹ = β¹₁dξ¹ +  β¹₂dξ² + β¹₃dξ³
     # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²∧dξ³
@@ -199,8 +149,8 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G
     prod_form_cols = zeros(Int, n_prod_indices)
     prod_form_eval = zeros(Float64, n_prod_indices)
 
-    for i ∈1:3
-        for j ∈1:3
+    for i ∈ 1:manifold_dim
+        for j ∈ 1:manifold_dim
             prod_form_rows, prod_form_cols, prod_form_eval = inner_product_1_form_component!(
                 prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
                 inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
@@ -211,7 +161,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G
     return prod_form_rows, prod_form_cols, prod_form_eval
 end
 
-# (2-forms, 2-forms) 3D
+# (2-forms, 2-forms) in 3D
 @doc raw"""
     evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G}, 
                            form_expression2::AbstractFormExpression{3, 2, G}, 
