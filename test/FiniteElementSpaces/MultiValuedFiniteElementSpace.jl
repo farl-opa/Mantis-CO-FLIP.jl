@@ -41,6 +41,8 @@ display(S_eval[2][1][1])
 
 @test S_eval[1][1][1] == D_eval[1][1][1] && S_eval[2][1][1] == D_eval[2][1][1]
 
+@test Mantis.FunctionSpaces.get_basis_indices(S, 1) == [1, 2, 3, 4, 5, 6, 7]
+
 # Example of a different SumSpace that mixes the components ------------------------------------------------------------
 # create fake unstructured spaces from the two spaces
 extraction_operator_1 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(3))], [[1, 2, 3]], 1, 3)
@@ -50,6 +52,8 @@ U2 = Mantis.FunctionSpaces.UnstructuredSpace((B2,), extraction_operator_2, Dict(
 
 S = Mantis.FunctionSpaces.SumSpace((U1, U2), 6)
 S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)
+
+@test Mantis.FunctionSpaces.get_basis_indices(S, 1) == [1, 2, 3, 4, 5, 6]
 
 display(S_eval[1][1][1])
 display(S_eval[2][1][1])

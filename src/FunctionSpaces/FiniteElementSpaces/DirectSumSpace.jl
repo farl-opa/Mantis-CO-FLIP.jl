@@ -44,23 +44,12 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
     # 2: evaluation of first derivatives => manifold_dim evaluations, one per coordinate
     n_evaluation_matrices_per_derivative = manifold_dim * ones(Int, nderivatives + 1)
     n_evaluation_matrices_per_derivative[1] = 1
-
-    # number of dofs for each space
-    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
-    dof_offset_component = zeros(Int, num_components)
-    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])  # we skip the first one because the offset is 0
     
     # Get the indices of the basis
     # first get the indices for each of the component spaces
-    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+    multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)
     num_basis_per_component = length.(component_basis_indices)
-    num_multivaluedbasis = sum(num_basis_per_component)
-    # since each component of the direct sum has its own index, we need to offset it  
-    # the bases that are nonzero for the first component have an offset of 0 
-    # the bases that are nonzero for the second component have an offset equal to the
-    # number of basis of the first component, etc.
-    multivalued_basis_indices_per_component = map(.+, component_basis_indices, dof_offset_component)  # offset the indices
-    multivalued_basis_indices = vcat(multivalued_basis_indices_per_component...)  # just place the indices in a single vector
+    num_multivaluedbasis = length(multivalued_basis_indices)
     
     # Allocate memory for the evaluation of all basis and their derivatives for all components
     #   local_multivalued_basis[j][k][i][l, m]
@@ -118,3 +107,46 @@ Get the number of active basis functions of the direct sum space in element `ele
 - `num_basis::Int`: Number of active basis functions in element `element_idx`
 """
 get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces, element_idx))
+
+"""
+    get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+
+Get the global indices of the basis functions of the direct sum space in the element with index `element_idx`.
+
+# Arguments
+- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
+- `element_idx::Int`: Index of the element
+
+# Returns
+- `basis_indices::Vector{Int}`: Global indices of the basis functions
+"""
+function get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
+    dof_offset_component = zeros(Int, num_components)
+    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
+    
+    return vcat(map(.+, component_basis_indices, dof_offset_component)...)
+end
+
+"""
+    get_basis_indices_w_components(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+
+Get the global indices of the multivalued basis functions of the direct sum space as well as the component spaces for the element with index `element_idx`.
+
+# Arguments
+- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
+- `element_idx::Int`: Index of the element
+
+# Returns
+- `multivalued_basis_indices::Vector{Int}`: Global indices of the multivalued basis functions
+- `component_basis_indices::Vector{Vector{Int}}`: Global indices of the basis functions of the component spaces
+"""
+function get_basis_indices_w_components(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
+    dof_offset_component = zeros(Int, num_components)
+    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
+    
+    return vcat(map(.+, component_basis_indices, dof_offset_component)...), component_basis_indices
+end
