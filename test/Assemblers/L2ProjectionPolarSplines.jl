@@ -311,8 +311,8 @@ for deg in 2:2
         nel_ϕ = 5
         R_θr = 1.0
         R_ϕ = 2.0
-        n_ref = 0
-        verbose=true
+        n_ref = 4
+        verbose=false
         
         # form rank
         if form_rank == 1 || form_rank == 2
