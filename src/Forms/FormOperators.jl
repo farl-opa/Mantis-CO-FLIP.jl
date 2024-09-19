@@ -125,42 +125,36 @@ Compute the inner product of two differential 1-forms over a specified element o
 function evaluate_inner_product(form_expression1::AbstractFormExpression{2, 1, G}, form_expression2::AbstractFormExpression{2, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{2}) where {G<:Geometry.AbstractGeometry{2}}
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
+    # form_eval::Vector{Matrix{Float64}} of length 2, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
+    # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
     
-    n_indices_1 = map(indices -> length(indices), form1_indices)
-    n_indices_2 = map(indices -> length(indices), form2_indices)
+    # get dimension of each form expression
+    n_indices_1 = length(form1_indices)
+    n_indices_2 = length(form2_indices)
 
-    n_prod_indices = Vector{Int}(undef, 4)
-    for i ∈ 1:2, j ∈ 1:2
-        linear_idx = i + (j-1) * 2
-        n_prod_indices[linear_idx] = n_indices_1[i]*n_indices_2[j]
-    end
-    indices_offset = cumsum(n_prod_indices)
-    indices_offset[2:end] .= indices_offset[1:end-1]
-    indices_offset[1] = 0
-    n_total_indices = sum(n_prod_indices)
-
+    n_prod_indices = n_indices_1*n_indices_2
+    
     # Form 1: α¹ = α¹₁dξ¹ +  α¹₂dξ²
     # Form 2: β¹ = β¹₁dξ¹ +  β¹₂dξ²
     # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²
     
-    prod_form_rows = Vector{Int}(undef, n_total_indices)
-    prod_form_cols = Vector{Int}(undef, n_total_indices)
-    prod_form_eval = Vector{Float64}(undef, n_total_indices)
+    prod_form_rows = Vector{Int}(undef, n_prod_indices)
+    prod_form_cols = Vector{Int}(undef, n_prod_indices)
+    prod_form_eval = Vector{Float64}(undef, n_prod_indices)
 
     for i ∈ 1:2
         for j ∈ 1:2
             prod_form_rows, prod_form_cols, prod_form_eval = inner_product_1_form_component!(
                 prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
                 inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
-                n_indices_1, n_indices_2, j + (i-1)*2, (i,j), indices_offset
-            ) # Evaluates α¹ᵢβ¹ⱼgⁱʲ√det(g)
+                n_indices_1, n_indices_2, (i,j)) # Evaluates α¹ᵢβ¹ⱼgⁱʲ√det(g)
         end
     end
 
     return prod_form_rows, prod_form_cols, prod_form_eval
-end 
+end
 
 # (1-forms, 1-forms) 3D
 @doc raw"""
@@ -186,37 +180,31 @@ Compute the inner product of two differential 1-forms over a specified element o
 function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 1, G}, form_expression2::AbstractFormExpression{3, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
+    # form_eval::Vector{Matrix{Float64}} of length 3, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
+    # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
     
-    n_indices_1 = map(basis_indices -> length(basis_indices), form1_indices)
-    n_indices_2 = map(basis_indices -> length(basis_indices), form2_indices)
+    # get dimension of each form expression
+    n_indices_1 = length(form1_indices)
+    n_indices_2 = length(form2_indices)
 
-    n_prod_indices = Vector{Int}(undef, 9)
-    for i ∈ 1:3, j ∈ 1:3
-        linear_idx = i + (j-1)*3
-        n_prod_indices[linear_idx] = n_indices_1[i]*n_indices_2[j]
-    end
-    indices_offset = cumsum(n_prod_indices)
-    indices_offset[2:end] .= indices_offset[1:end-1]
-    indices_offset[1] = 0
-    n_total_indices = sum(n_prod_indices)
+    n_prod_indices = n_indices_1*n_indices_2
 
     # Form 1: α¹ = α¹₁dξ¹ +  α¹₂dξ² + α¹₃dξ³
     # Form 2: β¹ = β¹₁dξ¹ +  β¹₂dξ² + β¹₃dξ³
     # ⟨α¹, β¹⟩ = ∫α¹ᵢβ¹ⱼgⁱʲ√det(g)dξ¹∧dξ²∧dξ³
     
-    prod_form_rows = Vector{Int}(undef, n_total_indices)
-    prod_form_cols = Vector{Int}(undef, n_total_indices)
-    prod_form_eval = Vector{Float64}(undef, n_total_indices)
+    prod_form_rows = Vector{Int}(undef, n_prod_indices)
+    prod_form_cols = Vector{Int}(undef, n_prod_indices)
+    prod_form_eval = Vector{Float64}(undef, n_prod_indices)
 
     for i ∈1:3
         for j ∈1:3
             prod_form_rows, prod_form_cols, prod_form_eval = inner_product_1_form_component!(
                 prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
                 inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
-                n_indices_1, n_indices_2, j + (i-1)*3, (i,j), indices_offset
-            ) # Evaluates α¹ᵢβ¹ⱼgⁱʲ
+                n_indices_1, n_indices_2, (i,j)) # Evaluates α¹ᵢβ¹ⱼgⁱʲ√det(g)
         end
     end
 
@@ -318,15 +306,15 @@ function inner_product_n_form_component!(prod_form_rows::Vector{Int}, prod_form_
     return prod_form_rows, prod_form_cols, prod_form_eval
 end
 
-function inner_product_1_form_component!(prod_form_rows::Vector{Int}, prod_form_cols::Vector{Int}, prod_form_eval::Vector{Float64}, quad_rule, inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, n_indices_1, n_indices_2, component_idx::Int, form_idxs::NTuple{2, Int}, indices_offset)
-    for j ∈ 1:n_indices_2[form_idxs[2]]
-        for i ∈ 1:n_indices_1[form_idxs[1]]
-            linear_idx = i + (j-1) * n_indices_1[form_idxs[1]]
+function inner_product_1_form_component!(prod_form_rows::Vector{Int}, prod_form_cols::Vector{Int}, prod_form_eval::Vector{Float64}, quad_rule, inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, n_indices_1, n_indices_2, form_idxs::NTuple{2, Int})
+    for j ∈ 1:n_indices_2
+        for i ∈ 1:n_indices_1
+            linear_idx = i + (j-1) * n_indices_1
 
-            prod_form_rows[indices_offset[component_idx]+linear_idx] = form1_indices[form_idxs[1]][i]
-            prod_form_cols[indices_offset[component_idx]+linear_idx] = form2_indices[form_idxs[2]][j]
+            prod_form_rows[linear_idx] = form1_indices[i]
+            prod_form_cols[linear_idx] = form2_indices[j]
 
-            prod_form_eval[indices_offset[component_idx]+linear_idx] = @views (quad_rule.weights .* form1_eval[form_idxs[1]][:,i])' * (form2_eval[form_idxs[2]][:,j] .* inv_g[:,form_idxs[1],form_idxs[2]] .* sqrt_g)    
+            prod_form_eval[linear_idx] += @views (quad_rule.weights .* form1_eval[form_idxs[1]][:,i])' * (form2_eval[form_idxs[2]][:,j] .* inv_g[:,form_idxs[1],form_idxs[2]] .* sqrt_g)
         end
     end
 
