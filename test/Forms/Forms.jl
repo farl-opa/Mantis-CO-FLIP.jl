@@ -28,43 +28,43 @@ dsTP_1_form = Mantis.FunctionSpaces.DirectSumSpace((TP_Space, TP_Space))  # dire
 
 # Then the form space 
 zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, dsTP_0_form, "ν")
-d_zero_form_space = Mantis.Forms.exterior_derivative(zero_form_space)
+# d_zero_form_space = Mantis.Forms.exterior_derivative(zero_form_space)
 one_form_space = Mantis.Forms.FormSpace(1, geo_2d_cart, dsTP_1_form, "η")
-top_form_space = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
+top_form_space = Mantis.Forms.FormSpace(2, geo_2d_cart, dsTP_0_form, "σ")
 
-# Generate the form expressions
-α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
-ξ¹ = Mantis.Forms.FormField(one_form_space, "ξ")
-β² = Mantis.Forms.FormField(top_form_space, "β")
-θ² = Mantis.Forms.FormExpression((α⁰, β²), 2, "∧")
-ζ² = Mantis.Forms.FormExpression((α⁰, θ²), 2, "∧")
+# # Generate the form expressions
+# α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+# ξ¹ = Mantis.Forms.FormField(one_form_space, "ξ")
+# β² = Mantis.Forms.FormField(top_form_space, "β")
+# θ² = Mantis.Forms.FormExpression((α⁰, β²), 2, "∧")
+# ζ² = Mantis.Forms.FormExpression((α⁰, θ²), 2, "∧")
 
-print(θ².label)
-print("\n")
-ζ² = Mantis.Forms.FormExpression((α⁰, θ²), 2, "∧")
-print(ζ².label)
+# print(θ².label)
+# print("\n")
+# ζ² = Mantis.Forms.FormExpression((α⁰, θ²), 2, "∧")
+# print(ζ².label)
 
 
-# function (∧)(form_1::F_1, form_2::F_2) where {F_1 <: Mantis.Forms.AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: Mantis.Forms.AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
-#     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
-# end
+# # function (∧)(form_1::F_1, form_2::F_2) where {F_1 <: Mantis.Forms.AbstractFormExpression{manifold_dim_1, form_rank_1}, F_2 <: Mantis.Forms.AbstractFormExpression{manifold_dim_2, form_rank_2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2}
+# #     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
+# # end
 
-# function (⋆)(form::F) where {F <: Mantis.Forms.AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
-#     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
-# end
+# # function (⋆)(form::F) where {F <: Mantis.Forms.AbstractFormExpression{manifold_dim, form_rank}} where {manifold_dim, form_rank}
+# #     return Mantis.Forms.FormExpression(form_1, form_2, form_rank_1 + form_rank_2, "∧")
+# # end
 
-print("\nComputing the wedge operator\n")
-γ = Mantis.Forms.wedge(α⁰, β²)
-print(γ.label)
+# print("\nComputing the wedge operator\n")
+# γ = Mantis.Forms.wedge(α⁰, β²)
+# print(γ.label)
 
-γ2 = Mantis.Forms.wedge(γ, β²)
-print("\n")
-print(γ2.label)
-print("\n")
+# γ2 = Mantis.Forms.wedge(γ, β²)
+# print("\n")
+# print(γ2.label)
+# print("\n")
 
 zero_form_space_eval, zero_form_space_idx = Mantis.Forms.evaluate(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
-d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
-hodge_zero_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+# d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
+# hodge_zero_form_space_eval, hodge_zero_form_space_idx = Mantis.Forms.evaluate_hodge_star(zero_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))
 d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(one_form_space, 1, ([0.0, 1.0], [0.0, 1.0]))

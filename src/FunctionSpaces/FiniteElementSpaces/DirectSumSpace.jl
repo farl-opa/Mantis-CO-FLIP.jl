@@ -27,7 +27,7 @@ Evaluate the basis functions of the direct sum space at the points `xi` in the e
 
 # Returns
 - `local_multivalued_basis::Vector{Vector{Vector{Array{Float64, 2}}}}`: Matrices containing the evaluations of the basis functions and its derivatives of the direct sum space.
-    `local_multivalued_basis[i][j][k][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate, 
+    `local_multivalued_basis[j][k][i][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate, 
     of the m-th multivalued basis of component i evaluated at the lth-point.
     In this case the maximum order of derivative is first order. For higher order derivatives 
     we should follow a flattenned numbering using the indices of the derivatives.
@@ -63,14 +63,14 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
     multivalued_basis_indices = vcat(multivalued_basis_indices_per_component...)  # just place the indices in a single vector
     
     # Allocate memory for the evaluation of all basis and their derivatives for all components
-    #   local_multivalued_basis[j][i][k][l, m]
+    #   local_multivalued_basis[j][k][i][l, m]
     # contains the (j-1)th-order derivative, derivative with respect to the k-th coordinate, 
     # of the m-th multivalued basis of component i evaluated at the lth-point
     # In this case the maximum order of derivative is first order. For higher order derivatives 
     # we should follow a flattenned numbering using the indices of the derivatives.
     n_evaluation_points = prod(size.(xi, 1))
     num_derivatives = num_components  # each component will have as many derivatives as the number of components
-    local_multivalued_basis = [[[zeros(Float64, n_evaluation_points, num_multivaluedbasis) for _ = 1:n_evaluation_matrices] for _ = 1:num_components] for n_evaluation_matrices = n_evaluation_matrices_per_derivative]
+    local_multivalued_basis = [[[zeros(Float64, n_evaluation_points, num_multivaluedbasis) for _ = 1:num_components] for _ = 1:n_evaluation_matrices] for n_evaluation_matrices = n_evaluation_matrices_per_derivative]
     
     # next, loop over the spaces of each component and evaluate them
     count = 0
@@ -82,7 +82,7 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
         for derivative_order_idx in 1:(nderivatives + 1)
             for derivative_idx in 1:n_evaluation_matrices_per_derivative[derivative_order_idx]
                 # store the evaluations in the right place
-                local_multivalued_basis[derivative_order_idx][component_idx][derivative_idx][:, count .+ (1:num_basis_per_component[component_idx])] .= local_component_basis[derivative_order_idx][derivative_idx]  # then store the values in the right places
+                local_multivalued_basis[derivative_order_idx][derivative_idx][component_idx][:, count .+ (1:num_basis_per_component[component_idx])] .= local_component_basis[derivative_order_idx][derivative_idx]  # then store the values in the right places
             end
         end
 

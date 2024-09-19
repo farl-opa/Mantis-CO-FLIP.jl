@@ -87,12 +87,17 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     #   2-forms:(dξ₂dξ₃, dξ₃dξ₁, dξ₁dξ₂) (3D)
     #   3-forms: single component
     # We use the numbering of the function space.
-    n_active_basis = FunctionSpaces.get_num_basis.(form_space.fem_space)
     
     # Evaluate the form spaces
-    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi)
+    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 0)  # only evaluate the basis (0-th order derivative)
 
-    return local_form_basis, form_basis_indices
+    # Note that local_multivalued_basis[j][k][i][l, m] contains
+    # the (j-1)th-order derivative, derivative with respect to the k-th coordinate, 
+    # of the m-th multivalued basis of component i evaluated at the lth-point
+    # Since we want the evaluation of the basis, for all components, we return 
+    # local_form_basis[1][1] (1-1 = 0 order derivative, and first coordinate (there is
+    # only one since it is zeroth order derivative))
+    return local_form_basis[1][1], form_basis_indices
 end
 
 
