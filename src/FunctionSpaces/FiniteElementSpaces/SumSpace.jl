@@ -43,11 +43,8 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
     n_evaluation_matrices_per_derivative[1] = 1
 
     # Get the indices of the basis
-    # first get the indices for each of the component spaces
-    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-
-    # get the basis indices for the multivalued space
-    multivalued_basis_indices = union(component_basis_indices...)
+    # get the basis indices for the multivalued space and component spaces
+    multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)
     # number of multivalued basis functions
     num_multivaluedbasis = length(multivalued_basis_indices) 
     # find the local column that each component contributes to
@@ -61,7 +58,7 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
     # we should follow a flattenned numbering using the indices of the derivatives.
     n_evaluation_points = prod(size.(xi, 1))
     num_derivatives = num_components  # each component will have as many derivatives as the number of components
-    local_multivalued_basis = [[[zeros(Float64, n_evaluation_points, num_multivaluedbasis) for _ = 1:n_evaluation_matrices] for n_evaluation_matrices = n_evaluation_matrices_per_derivative] for _ = 1:num_components]
+    local_multivalued_basis = [[[zeros(Float64, n_evaluation_points, num_multivaluedbasis) for _ = 1:n_evaluation_matrices] for _ = 1:num_components] for n_evaluation_matrices = n_evaluation_matrices_per_derivative]
     
     # next, loop over the spaces of each component and evaluate them
     for component_idx in 1:num_components
@@ -72,13 +69,50 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
         for derivative_order_idx in 1:(nderivatives + 1)
             for derivative_idx in 1:n_evaluation_matrices_per_derivative[derivative_order_idx]
                 # store the evaluations in the right place
-                local_multivalued_basis[component_idx][derivative_order_idx][derivative_idx][:, column_indices_per_component[component_idx]] .= local_component_basis[derivative_order_idx][derivative_idx]  # then store the values in the right places
+                local_multivalued_basis[derivative_order_idx][component_idx][derivative_idx][:, column_indices_per_component[component_idx]] .= local_component_basis[derivative_order_idx][derivative_idx]  # then store the values in the right places
             end
         end
 
     end
 
     return local_multivalued_basis, multivalued_basis_indices
+end
+
+"""
+    get_basis_indices(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+
+Get the global indices of the basis functions of the sum space in the element with index `element_idx`.
+
+# Arguments
+- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `element_idx::Int`: Index of the element
+
+# Returns
+- `basis_indices::Vector{Int}`: Global indices of the basis functions
+"""
+function get_basis_indices(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+
+    return union(component_basis_indices...)
+end
+
+"""
+    get_basis_indices_w_components(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+
+Get the global indices of the multivalued basis functions of the sum space as well as the component spaces for the element with index `element_idx`.
+
+# Arguments
+- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `element_idx::Int`: Index of the element
+
+# Returns
+- `multivalued_basis_indices::Vector{Int}`: Global indices of the multivalued basis functions
+- `component_basis_indices::Vector{Vector{Int}}`: Global indices of the basis functions of the component spaces
+"""
+function get_basis_indices_w_components(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+
+    return union(component_basis_indices...), component_basis_indices
 end
 
 """
@@ -93,3 +127,17 @@ Get the number of basis functions of the sum space.
 - `num_basis::Int`: Number of basis functions
 """
 get_num_basis(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F} = space.space_dim
+
+"""
+    get_num_basis(space::SumSpace{manifold_dim, num_components, F}, element_id::Int) where {manifold_dim, num_components, F}
+
+Get the number of basis functions of the sum space in the element with index `element_id`.
+
+# Arguments
+- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `element_id::Int`: Index of the element
+
+# Returns
+- `num_basis::Int`: Number of basis functions
+"""
+get_num_basis(space::SumSpace{manifold_dim, num_components, F}, element_id::Int) where {manifold_dim, num_components, F} = length(get_basis_indices(space, element_id))
