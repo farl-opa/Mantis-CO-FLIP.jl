@@ -104,9 +104,9 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
     γ².coefficients .= 1.0
     dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
-    # ★α⁰ = Mantis.Forms.hodge(α⁰)
-    # ★ζ¹ = Mantis.Forms.hodge(ζ¹)
-    # ★γ² = Mantis.Forms.hodge(γ²)
+    ★α⁰ = Mantis.Forms.hodge(α⁰)
+    ★ζ¹ = Mantis.Forms.hodge(ζ¹)
+    ★γ² = Mantis.Forms.hodge(γ²)
 
     # AnalyticalFormFields
     f⁰_analytic = Mantis.Forms.AnalyticalFormField(0, analytical_1valued_form_func, geom, "f")
@@ -141,10 +141,10 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
         @test isapprox(sum(Mantis.Forms.evaluate_inner_product(top_form_space, top_form_space, elem_id, q_rule)[3]), integrated_metric_2, atol=1e-12)
 
-        # # Test if the inner product of the hodges of the forms equals that of the forms
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)...)), atol=1e-12)
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...)), atol=1e-12)
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)...)), Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)...)), atol=1e-12)
+        # Test if the inner product of the hodges of the forms equals that of the forms
+        @test isapprox(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3], atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3], atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3], atol=1e-12)
 
 
         # AnalyticalFormField tests
