@@ -1,7 +1,6 @@
 import Mantis
 
 using Test
-using Random
 
 # Tests for a tensor product HierarchicalSplineSpace
 ne1 = 5
@@ -13,8 +12,7 @@ patch2 = Mantis.Mesh.Patch1D(breakpoints2)
 deg1 = 2
 deg2 = 2
 nsubs = (2, 2) 
-nlevels = 3 # should be 2 or higher, otherwise the hierarchical space is not actually hierarchical
-Random.seed!(9)
+nlevels = 3
 
 CB1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(deg1-1, ne1-1); -1])
 CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1); -1])
@@ -32,20 +30,20 @@ for level ∈ 3:nlevels
     push!(operators, new_operator)
 end
 
-marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_finer_elements(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_finer_elements(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
+marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_element_children(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_element_children(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
+hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
 xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
 
 # Tests for coefficients and evaluation
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
     # check extraction coefficients
-    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hspace, el)
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hier_space, el)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
 
     # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, xi, 0)
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, el, xi)
     # Positivity of the basis
     @test minimum(h_eval[1][1]) >= 0.0
     # Partition of unity
@@ -54,13 +52,17 @@ end
 
 # Geometry visualization
 
-hspace_geo = Mantis.Geometry.compute_parametric_geometry(hspace)
 
 # Generate the Plot
+
+#=
+hier_space_geo = Mantis.Geometry.get_parametric_geometry(hier_space)
+
 Mantis_folder =  dirname(dirname(pathof(Mantis)))
 data_folder = joinpath(Mantis_folder, "test", "data")
 output_data_folder = joinpath(data_folder, "output", "Geometry")
 
 output_filename = "thb-partition-of-unity-test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
-Mantis.Plot.plot(hspace_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+Mantis.Plot.plot(hier_space_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+=#

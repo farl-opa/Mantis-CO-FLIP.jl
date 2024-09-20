@@ -85,7 +85,7 @@ function element_ranges_to_tuple_list(finer_ranges::Vector{Vector{Int}}, nsubdiv
 end
 
 """
-    get_finer_elements(coarse_element_id::Int, nsubdivisions::Int)
+    get_element_children(coarse_element_id::Int, nsubdivisions::Int)
 
 Returns the child elements contained inside `coarse_element_id`, according to the number of
 `nsubdivisions`.
@@ -96,12 +96,12 @@ Returns the child elements contained inside `coarse_element_id`, according to th
 # Returns
 - `::Vector{Int}`: The element ids of the child elements.
 """
-function get_finer_elements(coarse_element_id::Int, nsubdivisions::Int)
-    return [get_finer_elements((coarse_element_id,), (nsubdivisions,))[i][1] for i in 1:nsubdivisions]
+function get_element_children(coarse_element_id::Int, nsubdivisions::Int)
+    return [get_element_children((coarse_element_id,), (nsubdivisions,))[i][1] for i in 1:nsubdivisions]
 end
 
 """
-    get_finer_elements(coarse_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+    get_element_children(coarse_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
 
 Returns the child elements contained inside `coarse_element_id`, according to the number of
 `nsubdivisions`.
@@ -112,7 +112,7 @@ Returns the child elements contained inside `coarse_element_id`, according to th
 # Returns
 - `::Vector{NTuple{n, Int}}`: The element ids of the child elements.
 """
-function get_finer_elements(coarse_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+function get_element_children(coarse_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
     finer_ranges = Vector{Vector{Int}}(undef, n)
 
     for d in 1:1:n
@@ -123,7 +123,7 @@ function get_finer_elements(coarse_element_id::NTuple{n, Int}, nsubdivisions::NT
 end
 
 """
-    get_coarser_elements(fine_element_id::Int, nsubdivisions::Int)
+    get_element_parents(fine_element_id::Int, nsubdivisions::Int)
 
 Returns the parent element where `fine_element_id` is contained.
 
@@ -133,25 +133,25 @@ Returns the parent element where `fine_element_id` is contained.
 # Returns
 - `::Int`: The parent element where `fine_element_id` is contained.
 """
-function get_coarser_element(fine_element_id::Int, nsubdivisions::Int)
+function get_element_parent(fine_element_id::Int, nsubdivisions::Int)
     return floor(Int, (fine_element_id-1)/nsubdivisions + 1)
 end
 
-function get_ancestor_element(two_scale_operators, child_element_id::Int, child_level::Int, num_ancestor_levels::Int)
+function get_element_ancestor(two_scale_operators, child_element_id::Int, child_level::Int, num_ancestor_levels::Int)
     ancestor_id = child_element_id
     for level ∈ child_level:-1:child_level-num_ancestor_levels+1
-        ancestor_id = get_coarser_element(two_scale_operators[level-1], ancestor_id)
+        ancestor_id = get_element_parent(two_scale_operators[level-1], ancestor_id)
     end
 
     return ancestor_id 
 end
 
-function get_ancestor_element(two_scale_operator, child_element_ids, child_level::Int, num_ancestor_levels::Int)
-    return union(get_ancestor_element.((two_scale_operator,), child_element_ids, (child_level,), (num_ancestor_levels,))...)
+function get_element_ancestor(two_scale_operator, child_element_ids, child_level::Int, num_ancestor_levels::Int)
+    return union(get_element_ancestor.((two_scale_operator,), child_element_ids, (child_level,), (num_ancestor_levels,))...)
 end
 
 """
-    get_coarser_elements(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+    get_element_parents(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
 
 Returns the parent element where `fine_element_id` is contained.
 
@@ -161,8 +161,8 @@ Returns the parent element where `fine_element_id` is contained.
 # Returns
 - `::NTuple{n, Int}`: The parent element where `fine_element_id` is contained.
 """
-function get_coarser_element(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
-    return ntuple(d -> get_coarser_element(fine_element_id[d], nsubdivisions[d]), n)
+function get_element_parent(fine_element_id::NTuple{n, Int}, nsubdivisions::NTuple{n, Int}) where {n}
+    return ntuple(d -> get_element_parent(fine_element_id[d], nsubdivisions[d]), n)
 end
 
 # Getters for AbstractTwoScaleOperator
@@ -218,7 +218,7 @@ function get_local_subdiv_matrix(twoscale_operator::T, coarse_el_id::Int, fine_e
 end
 
 """
-    get_finer_basis_id(coarse_basis_id::Int, twoscale_operator::FunctionSpaces.TwoScaleOperator)
+    get_basis_children(coarse_basis_id::Int, twoscale_operator::FunctionSpaces.TwoScaleOperator)
 
 Returns the ids of the child B-splines of `coarse_basis_id`, in terms of the change of basis
 provided by `twoscale_operator`.
@@ -230,28 +230,28 @@ the change of basis.
 # Returns
 - `::@view Vector{Int}`: Ids of the child B-splines.
 """
-function get_finer_basis_id(twoscale_operator::TwoScaleOperator{n, S}, basis_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
+function get_basis_children(twoscale_operator::TwoScaleOperator{n, S}, basis_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
     return twoscale_operator.coarse_to_fine_functions[basis_id]
 end
 
-function get_finer_elements(twoscale_operator::TwoScaleOperator{n, S}, el_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
+function get_element_children(twoscale_operator::TwoScaleOperator{n, S}, el_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
     return twoscale_operator.coarse_to_fine_elements[el_id]    
 end
 
-function get_finer_elements(twoscale_operator::TwoScaleOperator{n, S}, el_ids) where {n, S<:AbstractFiniteElementSpace{n}}
-    return reduce(vcat, get_finer_elements.(Ref(twoscale_operator), el_ids))  
+function get_element_children(twoscale_operator::TwoScaleOperator{n, S}, el_ids) where {n, S<:AbstractFiniteElementSpace{n}}
+    return reduce(vcat, get_element_children.(Ref(twoscale_operator), el_ids))  
 end
 
-function get_coarser_element(twoscale_operator::TwoScaleOperator{n, S}, el_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
+function get_element_parent(twoscale_operator::TwoScaleOperator{n, S}, el_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
     return twoscale_operator.fine_to_coarse_elements[el_id]    
 end
 
-function get_coarser_elements(twoscale_operator::TwoScaleOperator{n, S}, el_ids) where {n, S<:AbstractFiniteElementSpace{n}}
+function get_element_parents(twoscale_operator::TwoScaleOperator{n, S}, el_ids) where {n, S<:AbstractFiniteElementSpace{n}}
     if el_ids == Int[]
         return Int[]
     end
 
-    return reduce(union, get_coarser_element.(Ref(twoscale_operator), el_ids))  
+    return reduce(union, get_element_parent.(Ref(twoscale_operator), el_ids))  
 end
 
 function get_coarser_basis_id(twoscale_operator::TwoScaleOperator{n, S}, basis_id::Int) where {n, S<:AbstractFiniteElementSpace{n}}
@@ -260,12 +260,12 @@ end
 
 # Getters for basis splines
 
-function get_coarser_element(two_scale_operators::Vector{T}, coarse_level::Int, finer_element::Int, finer_level::Int) where {T<:AbstractTwoScaleOperator}
+function get_element_parent(two_scale_operators::Vector{T}, coarse_level::Int, finer_element::Int, finer_level::Int) where {T<:AbstractTwoScaleOperator}
 
     current_coarse = finer_element
     current_fine = finer_element
     for level ∈ finer_level:-1:coarse_level+1
-        current_coarse = get_coarser_element(two_scale_operators[level-1], current_fine)
+        current_coarse = get_element_parent(two_scale_operators[level-1], current_fine)
 
         current_fine = current_coarse
     end
@@ -275,12 +275,12 @@ end
 
 function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
     if supp_intersection == []
-        breakpoint_idxs = get_finer_elements(ts, first(supp_intersection))[1]
+        breakpoint_idxs = get_element_children(ts, first(supp_intersection))[1]
     else
         element_idxs = Int[]
 
         for element ∈ supp_intersection
-            append!(element_idxs, get_finer_elements(ts, element))
+            append!(element_idxs, get_element_children(ts, element))
         end
         
         breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)

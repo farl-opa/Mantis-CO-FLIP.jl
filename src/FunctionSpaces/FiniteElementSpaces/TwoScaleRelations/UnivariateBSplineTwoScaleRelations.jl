@@ -1,7 +1,7 @@
 function get_coarse_to_fine(bspline_space::BSplineSpace, nsubdivisions::Int)
     coarse_to_fine = Vector{Vector{Int}}(undef, get_num_elements(bspline_space))
     for el in 1:get_num_elements(bspline_space)
-        coarse_to_fine[el] = get_finer_elements(el, nsubdivisions)
+        coarse_to_fine[el] = get_element_children(el, nsubdivisions)
     end
 
     return coarse_to_fine
@@ -10,7 +10,7 @@ end
 function get_fine_to_coarse(bspline_space::BSplineSpace, nsubdivisions::Int)
     fine_to_coarse = Vector{Int}(undef, get_num_elements(bspline_space))
     for el in 1:get_num_elements(bspline_space)
-        fine_to_coarse[el] = get_coarser_element(el, nsubdivisions)
+        fine_to_coarse[el] = get_element_parent(el, nsubdivisions)
     end
 
     return fine_to_coarse

@@ -25,40 +25,38 @@ for l in 1:nlevels-1
     bsplines[l+1] = bspline
 end
 
-refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([1,2,3,4,5,6,3,4,5,6,7,8,9,10,7,8,9,10,11,12,13,14,15,16],[0,6,14,24])
-hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, refined_domains); nothing
+refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([[1,2,3,4,5,6],[3,4,5,6,7,8,9,10],[7,8,9,10,11,12,13,14,15,16]])
+hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, refined_domains); nothing
 
 # test if active elements are correct   
-@test Mantis.FunctionSpaces.get_level_elements(hspace, 1)[2] == [1,6]
-@test Mantis.FunctionSpaces.get_level_elements(hspace, 2)[2] == [3,9,10]
-@test Mantis.FunctionSpaces.get_level_elements(hspace, 3)[2] == collect(7:16)
+@test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 1) == [1,6]
+@test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 2) == [3,9,10]
+@test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 3) == collect(7:16)
 
 # test if active functions are correct   
-@test Mantis.FunctionSpaces.get_level_basis(hspace, 1)[2] == [1,2,3,4,6,7,8,9]
-@test Mantis.FunctionSpaces.get_level_basis(hspace, 2)[2] == [6,9,10]
-@test Mantis.FunctionSpaces.get_level_basis(hspace, 3)[2] == collect(10:16)
+@test Mantis.FunctionSpaces.get_level_basis_ids(hier_space, 1) == [1,2,3,4,6,7,8,9]
+@test Mantis.FunctionSpaces.get_level_basis_ids(hier_space, 2) == [6,9,10]
+@test Mantis.FunctionSpaces.get_level_basis_ids(hier_space, 3) == collect(10:16)
 
 # Test if projection in space is exact
 nxi = 20
 xi = collect(range(0,1, nxi))
 
-xs = Vector{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hspace)*nxi)
+xs = Vector{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hier_space)*nxi)
 nx = length(xs)
 
-A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hspace))
+A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hier_space))
 
-for el ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
-    
-    level = Mantis.FunctionSpaces.get_active_level(hspace.active_elements, el)
-    element_id = Mantis.FunctionSpaces.get_active_id(hspace.active_elements, el)
+for element_id ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
+    level, element_level_id = Mantis.FunctionSpaces.convert_to_element_level_and_level_id(hier_space, element_id)
 
-    borders = Mantis.Mesh.get_element(hspace.spaces[level].knot_vector.patch_1d, element_id)
+    borders = Mantis.Mesh.get_element(hier_space.spaces[level].knot_vector.patch_1d, element_id)
     x = borders[1] .+ xi .* (borders[2] - borders[1])
 
-    idx = (el-1)*nxi+1:el*nxi
+    idx = (element_id-1)*nxi+1:element_id*nxi
     xs[idx] = x
 
-    local eval = Mantis.FunctionSpaces.evaluate(hspace, el, (xi,), 0)
+    local eval = Mantis.FunctionSpaces.evaluate(hier_space, element_id, (xi,), 0)
 
     A[idx, eval[2]] = eval[1][1][1]
 end
@@ -67,23 +65,21 @@ coeffs = A \ xs
 A * coeffs .- xs
 all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))
 
-@test Mantis.FunctionSpaces.get_num_levels(hspace) == nlevels
+@test Mantis.FunctionSpaces.get_num_levels(hier_space) == nlevels
 
 for l in 1:nlevels
-    @test Mantis.FunctionSpaces.get_space(hspace, l) == bsplines[l]
+    @test Mantis.FunctionSpaces.get_space(hier_space, l) == bsplines[l]
 end
 
 # Tests for coefficients and evaluation
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
+for element_id in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
 
     # check extraction coefficients
-    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hspace, el)
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hier_space, element_id)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
 
     # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hspace, el, (xi,), 0)
+    h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, element_id, (xi,), 0)
     # Positivity of the basis
     @test minimum(h_eval[1][1]) >= 0.0
 end
-
-Mantis.Geometry.compute_parametric_geometry(hspace)
