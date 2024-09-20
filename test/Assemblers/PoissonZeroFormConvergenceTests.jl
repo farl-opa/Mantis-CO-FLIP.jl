@@ -4,7 +4,7 @@ using Test
 using LinearAlgebra
 
 # This is how MANTIS can be called to solve a problem.
-function fe_run(weak_form_inputs, weak_form, bc_dirichlet, verbose)
+function fe_run(weak_form_inputs, weak_form, bc_dirichlet, case, test, verbose)
 
     # Setup the global assembler.
 
@@ -30,7 +30,7 @@ function write_form_sol_to_file(form_sols, var_names, geom, p, k, case, n, verbo
             println("Writing form '$var_name' to file ...")
         end
         
-        output_filename = "L2-Projection-p$p-k$k-case-"*case*"-var_$var_name.vtu"
+        output_filename = "Poisson-Projection-p$p-k$k-case-"*case*"-var_$var_name.vtu"
         #output_filename_error = "Poisson-Forms-$n-D-p$p-k$k-m$msave-case-"*case*"-error.vtu"
 
         output_file = joinpath(output_data_folder, output_filename)
@@ -54,8 +54,8 @@ output_data_folder = joinpath(data_folder, "output", "Convergence") # Create thi
 # print progress statements. Make sure they are set as indicated when 
 # committing and that the grid is not much larger than 10x10
 write_to_output_file = false # false
-run_tests = true             # true
-verbose = false           # false
+run_tests = true              # true
+verbose = false             # false
 
 # Setup the form spaces
 # First the 2D information for first step
@@ -68,13 +68,14 @@ regularity_2d = degree_2d .- 1
 # Quadrature rule
 q_rule_2d = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 1, Mantis.Quadrature.gauss_legendre)
 
-# Forcing functions 
+# Create the forcing function
 function forcing_function_sine_2d(x::Matrix{Float64})
-    return [@. sinpi(x[:,1]) * sinpi(x[:,2])]
+    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
 end
-
-# Boundary conditions 
-bc_dirichlet_2d_empty = Dict{Int, Float64}()
+# Create the exact_solution
+function exact_sol_sine_2d(x::Matrix{Float64})
+    return [@. sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
+end
 
 # Refinement conditions 
 n_subdivs_2d = (2, 2)
@@ -83,7 +84,6 @@ h_steps = 4 # Steps used for h-refinement
 case = "sine_2d"
 
 run_tests ? h_errors = Vector{Float64}(undef, h_steps+1) : nothing
-
 for step ∈ 0:h_steps
     verbose ? println("Step $step") : nothing
     curr_nels = num_elements_2d .* (n_subdivs_2d .^ step)
@@ -94,14 +94,16 @@ for step ∈ 0:h_steps
     zero_form_space_2d = Mantis.Forms.FormSpace(0, geo_cart_2d, (tp_space_2d,), "α⁰")
 
     f⁰_sine_2d = Mantis.Forms.AnalyticalFormField(0, forcing_function_sine_2d, geo_cart_2d, "f")
+    f⁰_exact_sol = Mantis.Forms.AnalyticalFormField(0, exact_sol_sine_2d, geo_cart_2d, "u")
 
+    bc_dirichlet = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in tp_space_2d.dof_partition[1][j])
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(f⁰_sine_2d, zero_form_space_2d, zero_form_space_2d, q_rule_2d)
-    coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.l2_weak_form, bc_dirichlet_2d_empty, verbose)
+    coeffs = fe_run(weak_form_inputs, Mantis.Assemblers.poisson_non_mixed, bc_dirichlet, case, run_tests, verbose)
 
     # Assign coefficients to a form field
     α⁰ = Mantis.Forms.FormField(zero_form_space_2d, "α⁰")
     α⁰.coefficients .= coeffs
-    l2_error = Mantis.Assemblers.compute_error_total(α⁰, f⁰_sine_2d, q_rule_2d, "L2")
+    l2_error = Mantis.Assemblers.compute_error_total(α⁰, f⁰_exact_sol, q_rule_2d, "L2")
 
     run_tests ? h_errors[step+1] = l2_error : nothing
     
@@ -110,7 +112,7 @@ for step ∈ 0:h_steps
         println(l2_error)
     end
     if write_to_output_file
-        write_form_sol_to_file([α⁰, f⁰_sine_2d, α⁰-f⁰_sine_2d], ["zero_form_step-$step", "exact_solution_step-$step", "diff_step-$step"], geo_cart_2d, degree_2d, regularity_2d, case, 2, verbose)
+        write_form_sol_to_file([α⁰, f⁰_exact_sol, α⁰-f⁰_exact_sol], ["zero_form_step-$step", "exact_solution_step-$step", "diff_step-$step"], geo_cart_2d, degree_2d, regularity_2d, case, 2, verbose)
     end
 end
 if run_tests

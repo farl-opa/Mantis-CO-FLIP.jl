@@ -49,3 +49,25 @@ function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vec
     
     return J
 end
+
+function _get_element_size(geometry::FEMGeometry{n, F}, element_id::Int) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
+    return FunctionSpaces._get_element_size(geometry.fem_space, element_id)
+end
+
+# compute FEMGeometry for different FESpaces
+@doc raw"""
+    get_parametric_geometry(fem_space::F) where {F<:FunctionSpaces.AbstractFiniteElementSpace{n} where {n}}
+
+Returns the parametric geometry associated with `fem_space` by computing the geometry coefficients of the space.
+
+# Arguments
+- 'fem_space::FunctionSpaces.AbstractFiniteElementSpace{n}': Finite element space for which to compute the geometry.
+
+# Returns
+- '::FEMGeometry{n, F}': structure of the finite element geometry.
+"""
+function compute_parametric_geometry(fem_space::F) where {manifold_dim, F<:FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}}
+    geometry_coefficients = FunctionSpaces._compute_parametric_geometry_coeffs(fem_space)
+
+    return FEMGeometry(fem_space, geometry_coefficients)
+end

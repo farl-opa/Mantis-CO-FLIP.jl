@@ -258,6 +258,22 @@ function get_element_size(bspline::BSplineSpace, element_id::Int)
 end
 
 """
+    get_element_vertices(bspline::BSplineSpace, element_id::Int)
+
+Returns the vertices of the element specified by `element_id`.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-Spline function space.
+- `element_id::Int`: The id of the element.
+
+# Returns
+- `::NTuple{1, Vector{Float64}`: The vertices of the element.
+"""
+function get_element_vertices(bspline::BSplineSpace, element_id::Int)
+    return Mesh.get_element_vertices(get_patch(bspline), element_id)
+end
+
+"""
     get_support(bspline::BSplineSpace, basis_id::Int)
 
 Returns the elements where the B-spline given by `basis_id` is supported.
@@ -297,7 +313,7 @@ function get_max_local_dim(bspline::BSplineSpace)
     return bspline.knot_vector.polynomial_degree + 1
 end
 
-function get_base_control_points(bspline::BSplineSpace)
+function get_greville_points(bspline::BSplineSpace)
     return get_greville_points(bspline.knot_vector)
 end
 
