@@ -216,19 +216,16 @@ Evaluate a FormField at given points.
         `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
 """
 function evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
-    #print("Evaluating $(form.label) \n")
     n_form_components = binomial(manifold_dim, form_rank)
     form_basis_eval, form_basis_indices = evaluate(form.form_space, element_idx, xi)
 
     form_eval = Vector{Vector{Float64}}(undef, n_form_components)
 
     for form_component_idx in 1:n_form_components
-        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices[form_component_idx]]
+        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices]
     end
 
-    form_indices = ones(Int, n_form_components)
-
-    return form_eval, form_indices
+    return form_eval, [1]
 end
 
 @doc raw"""
