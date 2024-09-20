@@ -252,7 +252,6 @@ Evaluate the exterior derivative of a FormField at given points.
         `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 """
 function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
-    #print("Evaluating exterior derivative of $(form.label) \n")
     n_form_components = binomial(manifold_dim, form_rank)
     d_form_basis_eval, form_basis_indices = evaluate_exterior_derivative(form.form_space, element_idx, xi)
     n_derivative_components = size(d_form_basis_eval, 1)
@@ -291,12 +290,10 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G
     #       3-forms: dξ₁ ∧ dξ₂ ∧ dξ₃
     # 
     for derivative_form_component_idx in 1:n_derivative_components
-        d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices[derivative_form_component_idx]]
+        d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices]
     end
 
-    d_form_indices = ones(Int, n_derivative_components)
-
-    return d_form_eval, d_form_indices
+    return d_form_eval, [1]
 end
 
 @doc raw"""
