@@ -459,12 +459,12 @@ for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
 end
 @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
 
-const Lleft = 0.0
-const Lright = 1.0
-const Lbottom = 0.0
-const Ltop = 1.0
+Lleft = 0.0
+Lright = 1.0
+Lbottom = 0.0
+Ltop = 1.0
 
-const crazy_c = 0.2
+crazy_c = 0.2
 function mapping(x::Vector{Float64})
     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0

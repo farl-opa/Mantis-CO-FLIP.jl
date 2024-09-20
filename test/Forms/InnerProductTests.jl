@@ -6,10 +6,10 @@ using LinearAlgebra
 using SparseArrays
 
 # Domain
-const Lleft = 0.0
-const Lright = 1.0
-const Lbottom = 0.0
-const Ltop = 1.0
+Lleft = 0.0
+Lright = 1.0
+Lbottom = 0.0
+Ltop = 1.0
 
 # Setup the form spaces
 # First the patches
@@ -42,7 +42,7 @@ line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 geom_cart = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
 
 # curvilinear mesh
-const crazy_c = 0.2
+crazy_c = 0.2
 function mapping(x::Vector{Float64})
     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
@@ -168,7 +168,7 @@ end
 # geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2)) # equivalent to the above tensor-product geometry
 
 # # Crazy mesh
-# const crazy_c = 0.2
+# crazy_c = 0.2
 # function mapping(x::Vector{Float64})
 #     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
 #     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0

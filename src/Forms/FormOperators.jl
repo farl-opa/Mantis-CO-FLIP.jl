@@ -650,25 +650,41 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
     ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
 # Returns
-- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
-- `hodge_indices`: Vector of vectors containing indices of the basis functions.
+- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions for each of the components.
+- `hodge_indices`: Vector of containing the indices of the basis functions.
 """
 function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+    # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
+    n_expression_components = 3
+    n_hodge_components = 3
+
+    # Compute the metric terms
     inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
 
+    # Evaluate the form expression to which we wish to apply the Hodge-⋆
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
 
-    hodge_eval = Vector{Matrix{Float64}}(undef, 3)
+    # Preallocate memory for the Hodge evaluation matrix
+    n_eval_points = prod(size.(xi, 1))  # number of points where the forms are evaluated (tensor product)
+    n_active_basis = length(form_indices)
+    hodge_eval = [zeros(n_eval_points, n_active_basis) for _ in 1:n_hodge_components]
 
+    # Compute the Hodge-⋆ following the analytical expression
     # ⋆(α₁¹dξ₁+α₂¹dξ₂+α₃¹dξ₃) = [(α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃ + (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁ + (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂]√det(gᵢⱼ). 
-    # First: (α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃
-    hodge_eval[1] = @views hcat([form_eval[i] .* inv_g[:, 1, i] for i in 1:3]...).*sqrt_g
+    
+    # First: (α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃  --> component 1
+    # Second: (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁ --> component 2
+    # Third: (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂  --> component 3
+    # Done in a double for loop
+    for k_hodge_component in 1:n_hodge_components
+        # (α₁¹gᵏ¹+α₂gᵏ²+α₃gᵏ³)  --> to be added to the component k of the Hodge 
+        for k_expression_component in 1:n_expression_components
+            hodge_eval[k_hodge_component] .+= @views form_eval[k_expression_component] .* inv_g[:, k_hodge_component, k_expression_component]
+        end
 
-    # Second: (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁
-    hodge_eval[2] = @views hcat([form_eval[i] .* inv_g[:, 2, i] for i in 1:3]...).*sqrt_g
-
-    # Third: (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂
-    hodge_eval[3] = @views hcat([form_eval[i] .* inv_g[:, 3, i] for i in 1:3]...).*sqrt_g
+        # Multiply by √det(gᵢⱼ) to get (α₁¹gᵏ¹+α₂gᵏ²+α₃gᵏ³) √det(gᵢⱼ)
+        hodge_eval[k_hodge_component] .*= sqrt_g
+    end
 
     return hodge_eval, form_indices
 end
@@ -687,27 +703,80 @@ Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
     ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
 # Returns
-- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
-- `hodge_indices`: Vector of vectors containing indices of the basis functions.
+- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions for each of the components.
+- `hodge_indices`: Vector of containing the indices of the basis functions.
 """
 function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
-    inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
-    
+    # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
+    n_expression_components = 3
+    n_hodge_components = 3
+
+    # The Hodge-⋆ of a 2-form in 3D is the inverse of the Hodge-⋆ of a 1-form in 3D 
+    # Therefore we can use the metric tensor instead of the inverse metric tensor 
+    # and use the same expression as for the Hodge-⋆ of 1-forms but now using the 
+    # metric tensor instead of the inverse of the metric tensor.
+
+    # Compute the metric terms
+    g, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
+
+    # Evaluate the form expression to which we wish to apply the Hodge-⋆
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
 
-    hodge_eval = Vector{Matrix{Float64}}(undef, 3)
+    # Preallocate memory for the Hodge evaluation matrix
+    n_eval_points = prod(size.(xi, 1))  # number of points where the forms are evaluated (tensor product)
+    n_active_basis = length(form_indices)
+    hodge_eval = [zeros(n_eval_points, n_active_basis) for _ in 1:n_hodge_components]
 
-    # ⋆(α₁²dξ₂∧dξ₃ + α₂²dξ₃∧dξ₁ + α₃²dξ₁∧dξ₂) = [(α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹ +
-    #                                            (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ² +
-    #                                            (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³ ]√det(gᵢⱼ). 
-    # First: (α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹
-    hodge_eval[1] = @views hcat(form_eval[1].*(inv_g[:,2,2].*inv_g[:,3,3]-inv_g[:,2,3].*inv_g[:,3,2]), form_eval[2].*(inv_g[:,2,3].*inv_g[:,3,1]-inv_g[:,2,1].*inv_g[:,3,3]), form_eval[3].*(inv_g[:,2,1].*inv_g[:,3,2]-inv_g[:,2,2].*inv_g[:,3,1])).*sqrt_g
+    # Compute the Hodge-⋆ following the analytical expression
+    # ⋆(α₁dξ²∧dξ³+α₂dξ³∧dξ¹+α₃dξ¹∧dξ²) = [(α₁g₁₁+α₂¹g₁₂+α₃¹g₁₃)dξ₁ + (α₁g₂₁+α₂g₂₂+α₃g₂₃)dξ₂ + (α₁g₃₁+α₂g₃₂+α₃g₃₃)dξ₃]/√det(gᵢⱼ). 
+    
+    # First: (α₁g₁₁+α₂¹g₁₂+α₃¹g₁₃)dξ₁  --> component 1
+    # Second: (α₁g₂₁+α₂g₂₂+α₃g₂₃)dξ₂   --> component 2
+    # Third: (α₁g₃₁+α₂g₃₂+α₃g₃₃)dξ₃    --> component 3
+    # Done in a double for loop
+    for k_hodge_component in 1:n_hodge_components
+        # (α₁gₖ₁+α₂gₖ₂+α₃gₖ₃)  --> to be added to the component k of the Hodge 
+        for k_expression_component in 1:n_expression_components
+            hodge_eval[k_hodge_component] .+= @views form_eval[k_expression_component] .* g[:, k_hodge_component, k_expression_component]
+        end
 
-    # Second: (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ²
-    hodge_eval[2] = @views hcat(form_eval[1].*(inv_g[:,3,2].*inv_g[:,1,3]-inv_g[:,3,3].*inv_g[:,1,2]), form_eval[2].*(inv_g[:,3,3].*inv_g[:,1,1]-inv_g[:,3,1].*inv_g[:,1,3]), form_eval[3].*(inv_g[:,3,1].*inv_g[:,1,2]-inv_g[:,3,2].*inv_g[:,1,1])).*sqrt_g
-
-    # Third: (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³
-    hodge_eval[3] = @views hcat(form_eval[1].*(inv_g[:,1,2].*inv_g[:,2,3]-inv_g[:,1,3].*inv_g[:,2,2]), form_eval[2].*(inv_g[:,1,3].*inv_g[:,2,1]-inv_g[:,1,1].*inv_g[:,2,3]), form_eval[3].*(inv_g[:,1,1].*inv_g[:,2,2]-inv_g[:,1,2].*inv_g[:,2,1])).*sqrt_g
+        # Divide by √det(gᵢⱼ) to get (α₁gₖ₁+α₂gₖ₂+α₃gₖ₃) / √det(gᵢⱼ)
+        hodge_eval[k_hodge_component] ./= sqrt_g
+    end
 
     return hodge_eval, form_indices
+    
+    # # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
+    # n_expression_components = 3
+    # n_hodge_components = 3
+
+    # # Compute the metric terms
+    # inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+
+    # # Evaluate the form expression to which we wish to apply the Hodge-⋆
+    # form_eval, form_indices = evaluate(form_expression, element_id, xi)
+
+    # # Preallocate memory for the Hodge evaluation matrix
+    # n_eval_points = prod(size.(xi, 1))  # number of points where the forms are evaluated (tensor product)
+    # n_active_basis = length(form_indices)
+    # hodge_eval = [zeros(n_eval_points, n_active_basis) for _ in 1:n_hodge_components]
+
+    # # Compute the Hodge-⋆ following the analytical expression
+    # # ⋆(α₁²dξ₂∧dξ₃ + α₂²dξ₃∧dξ₁ + α₃²dξ₁∧dξ₂) = [(α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹ +
+    # #                                            (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ² +
+    # #                                            (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³ ]√det(gᵢⱼ). 
+    # # First: (α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹
+    # hodge_eval[1] .= @views (form_eval[1] .* (inv_g[:, 2, 2] .* inv_g[:, 3, 3] - inv_g[:, 2, 3] .* inv_g[:, 3, 2]) .+
+    #                          form_eval[2] .* (inv_g[:, 2, 3] .* inv_g[:, 3, 1] - inv_g[:, 2, 1] .* inv_g[:, 3, 3]) .+
+    #                          form_eval[3] .* (inv_g[:, 2, 1] .* inv_g[:, 3, 2] - inv_g[:, 2, 2] .* inv_g[:, 3, 1])) .* sqrt_g
+    # # Second: (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ²
+    # hodge_eval[2] .= @views (form_eval[1] .* (inv_g[:, 3, 2] .* inv_g[:, 1, 3] - inv_g[:, 3, 3] .* inv_g[:, 1, 2]) .+
+    #                          form_eval[2] .* (inv_g[:, 3, 3] .* inv_g[:, 1, 1] - inv_g[:, 3, 1] .* inv_g[:, 1, 3]) .+
+    #                          form_eval[3] .* (inv_g[:, 3, 1] .* inv_g[:, 1, 2] - inv_g[:, 3, 2] .* inv_g[:, 1, 1])) .* sqrt_g
+    # # Third: (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³
+    # hodge_eval[3] .= @views (form_eval[1] .* (inv_g[:, 1, 2] .* inv_g[:, 2, 3] - inv_g[:, 1, 3] .* inv_g[:, 2, 2]) .+
+    #                          form_eval[2] .* (inv_g[:, 1, 3] .* inv_g[:, 2, 1] - inv_g[:, 1, 1] .* inv_g[:, 2, 3]) .+
+    #                          form_eval[3] .* (inv_g[:, 1, 1] .* inv_g[:, 2, 2] - inv_g[:, 1, 2] .* inv_g[:, 2, 1])) .* sqrt_g
+    
+    # return hodge_eval, form_indices
 end
