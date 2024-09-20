@@ -146,7 +146,6 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         @test isapprox(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3], atol=1e-12)
         @test isapprox(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3], atol=1e-12)
 
-
         # AnalyticalFormField tests
         # 0-form
         total_integrated_analytical_field_0 += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]

@@ -616,15 +616,22 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, G}, e
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
     
-    hodge_eval = Vector{Matrix{Float64}}(undef, 2)
-
+    n_eval_points = length(sqrt_g)
+    n_indices = length(form_indices)
+    hodge_eval = [zeros(n_eval_points, n_indices) for _ in 1:2]
+    
     # ⋆(α₁¹dξ₁+α₂¹dξ₂) = [-(α₁¹g²¹+α₂¹g²²)dξ₁ + (α₁¹g¹¹+α₂¹g¹²)dξ₂]√det(gᵢⱼ). 
-
     # First: -(α₁¹g²¹+α₂¹g²²)dξ₁
-    hodge_eval[1] = @views hcat([-form_eval[i] .* inv_g[:, 2, i] for i in 1:2]...) .* sqrt_g
+    for i in 1:2
+        hodge_eval[1] .+= @views -form_eval[i] .* inv_g[:, 2, i]
+    end
+    hodge_eval[1] .*= sqrt_g
 
     # Second: (α₁¹g¹¹+α₂¹g¹²)dξ₂
-    hodge_eval[2] = @views hcat([form_eval[i] .* inv_g[:, 1, i] for i in 1:2]...) .* sqrt_g
+    for i in 1:2
+        hodge_eval[2] .+= @views form_eval[i] .* inv_g[:, 1, i]
+    end
+    hodge_eval[2] .*= sqrt_g
 
     return hodge_eval, form_indices
 end
