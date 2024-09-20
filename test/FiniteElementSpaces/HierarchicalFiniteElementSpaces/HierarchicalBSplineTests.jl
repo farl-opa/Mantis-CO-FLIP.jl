@@ -34,9 +34,9 @@ hspace = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scal
 @test Mantis.FunctionSpaces.get_level_elements(hspace, 3)[2] == collect(7:16)
 
 # test if active functions are correct   
-@test Mantis.FunctionSpaces.get_level_functions(hspace, 1)[2] == [1,2,3,4,6,7,8,9]
-@test Mantis.FunctionSpaces.get_level_functions(hspace, 2)[2] == [6,9,10]
-@test Mantis.FunctionSpaces.get_level_functions(hspace, 3)[2] == collect(10:16)
+@test Mantis.FunctionSpaces.get_level_basis(hspace, 1)[2] == [1,2,3,4,6,7,8,9]
+@test Mantis.FunctionSpaces.get_level_basis(hspace, 2)[2] == [6,9,10]
+@test Mantis.FunctionSpaces.get_level_basis(hspace, 3)[2] == collect(10:16)
 
 # Test if projection in space is exact
 nxi = 20
@@ -85,3 +85,5 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hspace)
     # Positivity of the basis
     @test minimum(h_eval[1][1]) >= 0.0
 end
+
+Mantis.Geometry.compute_parametric_geometry(hspace)

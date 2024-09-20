@@ -237,5 +237,5 @@ function get_greville_points(knot_vector::KnotVector)
         end
         greville_points[i] = pt / p
     end
-    return greville_points
+    return (greville_points,)
 end
