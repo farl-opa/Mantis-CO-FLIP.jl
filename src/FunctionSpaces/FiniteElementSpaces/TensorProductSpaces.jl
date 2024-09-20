@@ -190,6 +190,10 @@ function get_polynomial_degree_per_dim(tp_space::TensorProductSpace{n, F1, F2}) 
     return (get_polynomial_degree(tp_space.function_space_1), get_polynomial_degree(tp_space.function_space_2))
 end
 
+function get_polynomial_degree(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}} where {n1, n2}
+    return get_polynomial_degree_per_dim(tp_space)
+end
+
 """
     get_max_local_dim(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}} where {n1, n2}
 
@@ -415,6 +419,41 @@ function _get_element_size(tp_space::TensorProductSpace{n, F1, F2}, element_id::
     space_2_measure = _get_element_size(tp_space.function_space_2, ordered_index[2])
 
     return space_1_measure * space_2_measure
+end
+
+function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, F1, F2}, element_id::Int) where {manifold_dim, n1, n2, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    space_1_vertices = get_element_vertices(tp_space.function_space_1, ordered_index[1])
+    space_2_vertices = get_element_vertices(tp_space.function_space_2, ordered_index[2])
+
+    vertices = Vector{Vector{Float64}}(undef, manifold_dim)
+
+    for dim ∈ eachindex(space_1_vertices)
+        vertices[dim] = space_1_vertices[dim]
+    end
+    for dim ∈ eachindex(space_2_vertices)
+        vertices[dim+n1] = space_2_vertices[dim]
+    end
+
+    return tuple(vertices...)
+end
+
+function get_greville_points(tp_space::TensorProductSpace{manifold_dim, F1, F2}) where {manifold_dim, n1, n2, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}}
+    space_1_points = get_greville_points(tp_space.function_space_1)
+    space_2_points = get_greville_points(tp_space.function_space_2)
+
+    greville_points = Vector{Vector{Float64}}(undef, manifold_dim)
+
+    for dim ∈ eachindex(space_1_points)
+        greville_points[dim] = space_1_points[dim]
+    end
+    for dim ∈ eachindex(space_2_points)
+        greville_points[dim+n1] = space_2_points[dim]
+    end
+
+    return tuple(greville_points...)
 end
 # Methods for ease of function space creation
 

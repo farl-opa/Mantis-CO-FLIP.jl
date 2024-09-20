@@ -33,7 +33,7 @@ coarse_elements_to_refine = [3,4,5,8,9,10,13,14,15]
 refined_elements = vcat(Mantis.FunctionSpaces.get_element_children.((CTS,), coarse_elements_to_refine)...)
 
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], [Int[], refined_elements], true)
-hier_geo = Mantis.Geometry.get_parametric_geometry(hier_space)
+hier_geo = Mantis.Geometry.compute_parametric_geometry(hier_space)
 
 field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_num_basis(hier_space), Mantis.FunctionSpaces.get_num_basis(hier_space))
 tensor_field = Mantis.Fields.FEMField(hier_space, field_coeffs)

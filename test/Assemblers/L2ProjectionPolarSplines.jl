@@ -240,7 +240,7 @@ function build_toroidal_spline_space_and_geometry(deg, nel_r, nel_θ, nel_ϕ, R_
         # the full, non-ϕ-periodic tensor-product control points
         geom_coeffs_tp_cs = reshape(geom_coeffs_tp_cs, :, 2)
         geom_coeffs_tp_cs = [geom_coeffs_tp_cs.+[R_ϕ 0] zeros(size(geom_coeffs_tp_cs,1))]
-        greville_ϕ = Mantis.FunctionSpaces.get_base_control_points(Bϕ)
+        greville_ϕ = Mantis.FunctionSpaces.get_greville_points(Bϕ)[1]
         ϕ = greville_ϕ .* 2π
         geom_coeffs_tp = Vector{Matrix{Float64}}(undef,length(ϕ))
         for i ∈ eachindex(ϕ)

@@ -137,6 +137,22 @@ function get_element_size(patch::Patch1D, element_id::Int)
 end
 
 """
+    get_element_vertices(patch::Patch1D, element_id::Int)
+
+Returns the vertices of the element specified by `element_id`.
+
+# Arguments
+- `patch::Patch1D`: The 1-dimensional patch.
+- `element_id::Int`: The id of the element.
+
+# Returns
+- `::NTuple{1, Vector{Float64}}`: The vertices of the element.
+"""
+function get_element_vertices(patch::Patch1D, element_id::Int)
+    return ([patch.breakpoints[element_id],patch.breakpoints[element_id+1]],)
+end
+
+"""
     get_breakpoints(patch::Patch{n}, d::Int) where {n}
 
 Returns the breakpoints in dimension `d`.
