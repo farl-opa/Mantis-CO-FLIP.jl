@@ -553,12 +553,12 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_di
     _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
-    n_indices = length(form_indices[1])
+    n_indices = length(form_indices)
 
     hodge_eval = Vector{Matrix{Float64}}(undef, 1)
 
     # ⋆α₁⁰ = α₁⁰√det(gᵢⱼ) dξ₁∧…∧dξₙ. 
-    hodge_eval[1] = reshape(form_eval[1] .* sqrt_g, (:, n_indices))
+    hodge_eval[1] = reshape(form_eval[1] .* sqrt_g, (:, n_indices)) # TODO: is this reshape needed?
  
     return hodge_eval, form_indices
 end
@@ -584,12 +584,12 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_di
     _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
-    n_indices = length(form_indices[1])
+    n_indices = length(form_indices)
 
     hodge_eval = Vector{Matrix{Float64}}(undef, 1)
 
     # ⋆α₁ⁿdξ₁∧…∧dξₙ = α₁ⁿ(√det(gᵢⱼ))⁻¹. 
-    hodge_eval[1] = reshape(form_eval[1] .* (sqrt_g.^(-1)), (:, n_indices))
+    hodge_eval[1] = reshape(form_eval[1] .* (sqrt_g.^(-1)), (:, n_indices)) # TODO: is this reshape needed?
  
     return hodge_eval, form_indices
 end
@@ -626,9 +626,7 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, G}, e
     # Second: (α₁¹g¹¹+α₂¹g¹²)dξ₂
     hodge_eval[2] = @views hcat([form_eval[i] .* inv_g[:, 1, i] for i in 1:2]...) .* sqrt_g
 
-    hodge_indices = repeat([vcat(form_indices...)], 2)
-
-    return hodge_eval, hodge_indices
+    return hodge_eval, form_indices
 end
 
 # 1-forms (3 dimensions)
@@ -665,9 +663,7 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, G}, e
     # Third: (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂
     hodge_eval[3] = @views hcat([form_eval[i] .* inv_g[:, 3, i] for i in 1:3]...).*sqrt_g
 
-    hodge_indices = repeat([vcat(form_indices...)], 3)
-
-    return hodge_eval, hodge_indices
+    return hodge_eval, form_indices
 end
 
 # 2-forms (3 dimensions)
@@ -706,7 +702,5 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, e
     # Third: (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³
     hodge_eval[3] = @views hcat(form_eval[1].*(inv_g[:,1,2].*inv_g[:,2,3]-inv_g[:,1,3].*inv_g[:,2,2]), form_eval[2].*(inv_g[:,1,3].*inv_g[:,2,1]-inv_g[:,1,1].*inv_g[:,2,3]), form_eval[3].*(inv_g[:,1,1].*inv_g[:,2,2]-inv_g[:,1,2].*inv_g[:,2,1])).*sqrt_g
 
-    hodge_indices = repeat([vcat(form_indices...)], 3)
-
-    return hodge_eval, hodge_indices
+    return hodge_eval, form_indices
 end
