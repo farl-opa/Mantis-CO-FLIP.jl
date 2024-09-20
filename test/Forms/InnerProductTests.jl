@@ -90,19 +90,19 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
     one_form_space = Mantis.Forms.FormSpace(1, geom, TP_Space_1, "η")
     top_form_space = Mantis.Forms.FormSpace(2, geom, TP_Space_2, "σ")
 
-    # # Generate the form expressions
-    # α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
-    # α⁰.coefficients .= 1.0
-    # ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
-    # ζ¹.coefficients .= 1.0
-    # constdx = Mantis.Forms.FormField(one_form_space, "ζ")
-    # constdx.coefficients[begin:20] .= 1.0
-    # constdy = Mantis.Forms.FormField(one_form_space, "ζ")
-    # constdy.coefficients[21:end] .= 1.0
-    # dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-    # γ² = Mantis.Forms.FormField(top_form_space, "γ")
-    # γ².coefficients .= 1.0
-    # dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+    # Generate the form expressions
+    α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+    α⁰.coefficients .= 1.0
+    ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
+    ζ¹.coefficients .= 1.0
+    constdx = Mantis.Forms.FormField(one_form_space, "ζ")
+    constdx.coefficients[1:Mantis.FunctionSpaces.get_num_basis(dTP_Space_dx)] .= 1.0
+    constdy = Mantis.Forms.FormField(one_form_space, "ζ")
+    constdy.coefficients[Mantis.FunctionSpaces.get_num_basis(dTP_Space_dx)+1:end] .= 1.0
+    dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+    γ² = Mantis.Forms.FormField(top_form_space, "γ")
+    γ².coefficients .= 1.0
+    dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
     # ★α⁰ = Mantis.Forms.hodge(α⁰)
     # ★ζ¹ = Mantis.Forms.hodge(ζ¹)
@@ -129,19 +129,16 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         for node_idx in eachindex(Mantis.Quadrature.get_quadrature_weights(q_rule))
             integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* (inv_g[node_idx,:,:].*det_g[node_idx])
         end
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)...))[1], sum(integrated_metric_1), atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3], 0.0, atol=1e-12)
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)...))[1], integrated_metric_1[1,2], atol=1e-12)
-        # @test isapprox(Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)...))[1], integrated_metric_1[2,1], atol=1e-12)
-        
+        @test isapprox(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1], sum(integrated_metric_1), atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)[3][1], integrated_metric_1[1,2], atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)[3][1], integrated_metric_1[2,1], atol=1e-12)
         @test isapprox(sum(Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]), sum(integrated_metric_1), atol=1e-12)
-        # tmp1 = Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]
-        # display(reshape(tmp1, Mantis.FunctionSpaces.get_num_basis(TP_Space_1,elem_id), :))
         
         # 2-forms
         integrated_metric_2 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* (1.0./det_g))
-        # @test all(isapprox.(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], integrated_metric_2, atol=1e-12))
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], integrated_metric_2, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
         @test isapprox(sum(Mantis.Forms.evaluate_inner_product(top_form_space, top_form_space, elem_id, q_rule)[3]), integrated_metric_2, atol=1e-12)
 
         # # Test if the inner product of the hodges of the forms equals that of the forms
