@@ -305,33 +305,9 @@ Returns the number of degrees of freedom of the FormSpace `form_space`.
 - `::Int`: The total number of degrees of freedom of the space.
 """
 function get_num_basis(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry}
-    # Get the total number of dofs for the form space by looping 
-    # over all the FEM spaces. Each FEM space is associated to a 
-    # component of the form: 0- and n-forms have one component, and 
-    # 1- and 2-forms have multiple components, depending on the 
-    # dimension of the underlying manifold in which they are defined
-    form_space_n_dofs = 0  # initialize the number of dofs to 0, to add the ones from each FEM space
-    
-    # Loop over the spaces and add their number of dofs
-    for space in form_space.fem_space
-        form_space_n_dofs += FunctionSpaces.get_num_basis(space)
-    end
-
-    return form_space_n_dofs
+    return FunctionSpaces.get_num_basis(form_space.fem_space)
 end
 
-
-
 function get_max_local_dim(form_space::FS) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry}
-    max_local_dim = 0  # initialize to 0
-    
-    # Loop over the spaces and take the maximum between the current and 
-    # the maximum so far
-    for space in form_space.fem_space
-        if FunctionSpaces.get_max_local_dim(space) > max_local_dim
-            max_local_dim = FunctionSpaces.get_max_local_dim(space)
-        end
-    end
-
-    return max_local_dim
+    return FunctionSpaces.get_max_local_dim(form_space.fem_space)
 end
