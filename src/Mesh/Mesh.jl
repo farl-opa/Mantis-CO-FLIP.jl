@@ -69,10 +69,6 @@ function get_breakpoints(patch::Patch1D)
     return patch.breakpoints
 end
 
-function get_element_size(patch::Patch1D, element_id::Int)
-    return patch.breakpoints[element_id+1]-patch.breakpoints[element_id]
-end
-
 """
     Patch{n}
 
@@ -134,6 +130,26 @@ Returns the breakpoints per dimension.
 """
 function get_breakpoints(patch::Patch{n}) where {n}
     return NTuple{n, Vector{Float64}}(get_breakpoints(patch.patches_per_dim[d]) for d in 1:1:n)
+end
+
+function get_element_size(patch::Patch1D, element_id::Int)
+    return patch.breakpoints[element_id+1]-patch.breakpoints[element_id]
+end
+
+"""
+    get_element_vertices(patch::Patch1D, element_id::Int)
+
+Returns the vertices of the element specified by `element_id`.
+
+# Arguments
+- `patch::Patch1D`: The 1-dimensional patch.
+- `element_id::Int`: The id of the element.
+
+# Returns
+- `::NTuple{1, Vector{Float64}}`: The vertices of the element.
+"""
+function get_element_vertices(patch::Patch1D, element_id::Int)
+    return ([patch.breakpoints[element_id],patch.breakpoints[element_id+1]],)
 end
 
 """
@@ -246,11 +262,6 @@ end
 
 function get_element(patch::Patch1D, element_id::Int)
     return @view get_breakpoints(patch)[element_id:element_id+1]
-end
-
-function check_contained(support::Union{UnitRange{Int}, Vector{Int}}, domain)
-    element_checks = support .∈ [domain] 
-    return all(element_checks), element_checks
 end
 
 end

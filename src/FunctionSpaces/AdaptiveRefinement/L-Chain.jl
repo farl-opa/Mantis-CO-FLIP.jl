@@ -52,28 +52,28 @@ function get_corner_basis_ids(fe_space::AbstractFiniteElementSpace{n}, basis_ids
 end
 
 @doc raw"""
-    initiate_basis_to_check(fe_space::AbstractFiniteElementSpace{n}, marked_elements::Vector{Int}) where {n}
+    initiate_basis_to_check(fe_space::AbstractFiniteElementSpace{n}, marked_element_ids::Vector{Int}) where {n}
 
 Computes which basis functions are need for L-chain checks.
 
 # Arguments
 
 - `fe_space::AbstractFiniteElementSpace{n}`: finite element space at a given level.
-- `marked_elements::Vector{Int}`: marked elements at a given level.
+- `marked_element_ids::Vector{Int}`: marked elements at a given level.
 
 # Returns
 
 - `::Vector{Int}`: basis that need to be checked.
 - `::Vector{Int}`: all new basis what will be deactivated.
 """
-function initiate_basis_to_check(fe_space::AbstractFiniteElementSpace{n}, marked_elements::Vector{Int}) where {n}
+function initiate_basis_to_check(fe_space::AbstractFiniteElementSpace{n}, marked_element_ids::Vector{Int}) where {n}
     all_basis_ids = Int[]
     curr_basis_ids = Int[]
 
     all_corner_basis_ids = Int[]
     all_interior_basis_ids = Int[]
 
-    for el ∈ marked_elements
+    for el ∈ marked_element_ids
         _, curr_basis_ids = get_extraction(fe_space, el) 
         curr_corner_basis_ids = get_corner_basis_ids(fe_space, curr_basis_ids)
         curr_interior_basis_ids = setdiff(curr_basis_ids, curr_corner_basis_ids)
@@ -87,13 +87,13 @@ function initiate_basis_to_check(fe_space::AbstractFiniteElementSpace{n}, marked
 end
 
 @doc raw"""
-    check_nl_intersection(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    check_nl_intersection(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Checks whether a pair of basis functions has an (n-1, l+1)-intersection.
 
 # Arguments
 
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
+- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
 - `level::Int`: current level.
 - `basis_pair::`: pair of basis functions from which the L-chain is contructed.
 - `new_operator<:AbstractTwoScaleOperator`: operator to be used when a new level needs to be checked.
@@ -102,10 +102,10 @@ Checks whether a pair of basis functions has an (n-1, l+1)-intersection.
 
 - `::Bool`: whether there is an (n-1, l+1)-intersection.
 """
-function check_nl_intersection(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function check_nl_intersection(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     
-    basis_supp_per_dim1 = _get_support_per_dim(hspace.spaces[level], basis_pair[1])
-    basis_supp_per_dim2 = _get_support_per_dim(hspace.spaces[level], basis_pair[2])
+    basis_supp_per_dim1 = _get_support_per_dim(hier_space.spaces[level], basis_pair[1])
+    basis_supp_per_dim2 = _get_support_per_dim(hier_space.spaces[level], basis_pair[2])
 
     for k ∈ 1:n
         if first(basis_supp_per_dim2[k]) - last(basis_supp_per_dim1[k]) > 1 || first(basis_supp_per_dim1[k]) - last(basis_supp_per_dim2[k]) > 1 
@@ -113,10 +113,10 @@ function check_nl_intersection(hspace::HierarchicalFiniteElementSpace{n, S, T}, 
         end
     end
 
-    if level == get_num_levels(hspace)
+    if level == get_num_levels(hier_space)
         operator = new_operator
     else
-        operator = hspace.two_scale_operators[level]
+        operator = hier_space.two_scale_operators[level]
     end
 
     p_fine = get_polynomial_degree_per_dim(operator.fine_space)
@@ -179,13 +179,13 @@ function _get_basis_pair_graph(max_id_basis, basis_per_dim, diff_basis_per_dim, 
 end
 
 @doc raw"""
-    check_shortest_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    check_shortest_chain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Checks whether a pair of basis functions has a shortest chain between them.
 
 # Arguments
 
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
+- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
 - `level::Int`: current level.
 - `basis_pair::`: pair of basis functions from which the L-chain is contructed.
 - `inactive_basis::`: the indices of all deactivated basis in `level`.
@@ -194,8 +194,8 @@ Checks whether a pair of basis functions has a shortest chain between them.
 
 - `::Bool`: whether there is a shortest chain.
 """
-function check_shortest_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    max_id_basis = _get_num_basis_per_space(get_space(hspace, level))
+function check_shortest_chain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    max_id_basis = _get_num_basis_per_space(get_space(hier_space, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k ∈ 1:2]
     diff_basis_per_dim = -(basis_per_dim...)
 
@@ -209,13 +209,13 @@ function check_shortest_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, l
 end
 
 @doc raw"""
-    check_problematic_pair(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    check_problematic_pair(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Checks whether a pair of basis functions is problematic. I.e., if there is an (n-1, l+1)-intersection and no shortest chain.
 
 # Arguments
 
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
+- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
 - `level::Int`: current level.
 - `basis_pair::`: pair of basis functions from which the L-chain is contructed.
 - `inactive_basis::`: the indices of all deactivated basis in `level`.
@@ -225,14 +225,14 @@ Checks whether a pair of basis functions is problematic. I.e., if there is an (n
 
 - `problematic_pair::Bool`: whether the pair is problematic.
 """
-function check_problematic_pair(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
-    nl_intersection = check_nl_intersection(hspace, level, basis_pair, new_operator)
+function check_problematic_pair(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, inactive_basis, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
+    nl_intersection = check_nl_intersection(hier_space, level, basis_pair, new_operator)
 
     if !nl_intersection
         return false
     end
 
-    shortest_chain = check_shortest_chain(hspace, level, basis_pair, inactive_basis)
+    shortest_chain = check_shortest_chain(hier_space, level, basis_pair, inactive_basis)
 
     problematic_pair = nl_intersection && !shortest_chain
 
@@ -240,93 +240,98 @@ function check_problematic_pair(hspace::HierarchicalFiniteElementSpace{n, S, T},
 end
 
 @doc raw"""
-    build_L_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    build_Lchain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
 Returns the basis indices of basis functions in the L-chain between the basis in `basis_pair`.
 
 # Arguments
 
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
+- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
 - `level::Int`: current level.
 - `basis_pair::`: pair of basis functions from which the L-chain is contructed.
 - `chain_type::String`: determines the shape of the L-chain. Either "LR" or "UL".
 
 # Returns
 
-- `L_chain::Vector{Int}`: the indices of basis functions in the L-chain, excluding the endpoints.
+- `Lchain::Vector{Int}`: the indices of basis functions in the L-chain, excluding the endpoints.
 - `corner_basis::Int`: the index of the basis function in the corner of the L-chain.
 """
-function build_L_chain(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    L_chain = Int[]
-    max_id_basis = _get_num_basis_per_space(get_space(hspace, level))
+function build_Lchain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, basis_pair, chain_type="LR") where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+    Lchain = Int[]
+    max_id_basis = _get_num_basis_per_space(get_space(hier_space, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k ∈ 1:2]
 
     # Lower right L-chain
     if chain_type=="LR"
         for first_index ∈ proper_range(basis_per_dim[1][1],basis_per_dim[2][1])
-            append!(L_chain, ordered_to_linear_index( (first_index, basis_per_dim[1][2]), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (first_index, basis_per_dim[1][2]), max_id_basis))
         end
         for second_index ∈ proper_range(basis_per_dim[1][2], basis_per_dim[2][2])[2:end]
-            append!(L_chain, ordered_to_linear_index( (basis_per_dim[2][1], second_index), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (basis_per_dim[2][1], second_index), max_id_basis))
         end
         corner_basis = ordered_to_linear_index( (basis_per_dim[2][1], basis_per_dim[1][2]), max_id_basis)
     # Upper left L-chain
     elseif chain_type=="UL" 
         for second_index ∈ proper_range(basis_per_dim[1][2], basis_per_dim[2][2])
-            append!(L_chain, ordered_to_linear_index( (basis_per_dim[1][1], second_index), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (basis_per_dim[1][1], second_index), max_id_basis))
         end
         for first_index ∈ proper_range(basis_per_dim[1][1], basis_per_dim[2][1])
-            append!(L_chain, ordered_to_linear_index( (first_index, basis_per_dim[2][2]), max_id_basis))
+            append!(Lchain, ordered_to_linear_index( (first_index, basis_per_dim[2][2]), max_id_basis))
         end
         corner_basis = ordered_to_linear_index( (basis_per_dim[1][1], basis_per_dim[2][2]), max_id_basis)
     else
         throw(ArgumentError("Invalid chain type. Supported types are \"LR\" or \"UL\" and \"$chain_type\" was given."))
     end
 
-    return L_chain[2:end-1], corner_basis
+    return Lchain[2:end-1], corner_basis
 end
 
-@doc raw"""
-    get_level_marked_basis(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, marked_elements_per_level::Vector{Vector{Int}}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
 
-Returns the  basis functions in `level` that will contribute to the marked domains. These are given by the basis functions with non-empty support on `marked_elements` togheter with the ones introduced by L-chains.
+function _compute_Lchain_basis(hier_space::HierarchicalFiniteElementSpace{n, S, T}, level::Int, marked_elements_per_level::Vector{Vector{Int}}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
 
-# Arguments
+    num_levels = get_num_levels(hier_space)
 
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
-- `level::Int`: current level.
-- `marked_elements::Vector{Int}`: marked elements from error analysis.
-- `new_two_scale_operator::AbstractTwoScaleOperator`: operator to be used when a new level needs to be created or checked.
-
-# Returns
-
-- `new_inactive_basis::Vector{Int}`: basis used to contrsuct the marked domains for refinement.
-"""
-function get_level_marked_basis(hspace::HierarchicalFiniteElementSpace{n, S, T}, level::Int, marked_elements_per_level::Vector{Vector{Int}}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator} 
-    if marked_elements_per_level[level] == Int[]
-        return Int[]
-    end 
-
-    checked_pairs = Vector{Int}[]
-    new_basis_to_check, new_inactive_basis = initiate_basis_to_check(get_space(hspace, level), marked_elements_per_level[level])
-    previous_inactive_basis = get_basis_contained_in_next_level(hspace, level)
+    new_basis_to_check, new_inactive_basis = initiate_basis_to_check(get_space(hier_space, level), marked_elements_per_level[level])
+    if level < num_levels
+        previous_inactive_basis = get_basis_contained_in_next_level_domain(hier_space, level)
+    else
+        function _get_basis_contained_in_new_domain(hier_space::HierarchicalFiniteElementSpace{n, S, T}, domain::Vector{Int}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+            basis_contained_in_new_domain = Int[]
+        
+            for basis_id ∈ get_level_basis_ids(hier_space, get_num_levels(hier_space))
+                basis_support = get_support(get_space(hier_space,get_num_levels(hier_space)), basis_id)
+                basis_support_children = get_element_children(new_operator, basis_support)
+        
+                if all(basis_support_children .∈ [domain])
+                    append!(basis_contained_in_new_domain, basis_id)
+                end
+            end
+        
+            return basis_contained_in_new_domain
+        end
+        previous_inactive_basis = _get_basis_contained_in_new_domain(hier_space, marked_elements_per_level[level+1], new_operator)
+    end
     
     basis_to_check = union(previous_inactive_basis, new_basis_to_check)
     inactive_basis = union(previous_inactive_basis, new_inactive_basis)
     
     combinations_to_check = Combinatorics.combinations(basis_to_check, 2)
     
+    checked_pairs = Vector{Int}[]
+    Lchain_basis_ids = Int[]
+
     check_count = 1
     while check_count > 0 # Add L-chains until there are no more problematic intersections
         check_count = 0
         
         for basis_pair ∈ combinations_to_check # Loop over unchecked pairs of B-splines
-            problematic_pair = check_problematic_pair(hspace, level, basis_pair, inactive_basis, new_operator)
+            problematic_pair = check_problematic_pair(hier_space, level, basis_pair, inactive_basis, new_operator)
             
             if problematic_pair
-                L_chain, corner_basis = build_L_chain(hspace, level, basis_pair) # Choose chain type here default is "LR" 
+                Lchain, corner_basis = build_Lchain(hier_space, level, basis_pair) # Choose chain type. here default is "LR" 
                 append!(basis_to_check, corner_basis)
-                append!(inactive_basis, L_chain)
+                append!(inactive_basis, Lchain)
+                append!(Lchain_basis_ids, Lchain)
                 check_count += 1
             end
         end
@@ -334,95 +339,27 @@ function get_level_marked_basis(hspace::HierarchicalFiniteElementSpace{n, S, T},
         append!(checked_pairs, combinations_to_check)
         combinations_to_check = setdiff(Combinatorics.combinations(basis_to_check, 2), checked_pairs)
     end
-    
-    return inactive_basis
+
+    return Lchain_basis_ids
 end
 
-@doc raw"""
-    get_marked_element_padding(hspace::HierarchicalFiniteElementSpace{n, S, T}, marked_elements_per_level::Vector{Vector{Int}}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function add_Lchains!(marked_elements_per_level::Vector{Vector{Int}}, hier_space::HierarchicalFiniteElementSpace{n, S, T}, new_operator::T) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
 
-Returns all the elements in the support of basis functions supported on `marked_elements_per_level`.
-
-# Arguments
-
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
-- `marked_elements_per_level::Vector{Vector{Int}}`: marked elements, separated by level.
-
-# Returns
-
-- `element_padding::Vector{Vector{Int}}`: padding of marked elements.
-"""
-function get_marked_element_padding(hspace::HierarchicalFiniteElementSpace{n, S, T}, marked_elements_per_level::Vector{Vector{Int}}) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    num_levels = get_num_levels(hspace)
-
-    element_padding = Vector{Vector{Int}}(undef, num_levels)
-    
+    num_levels = get_num_levels(hier_space)
 
     for level ∈ 1:num_levels
-        if marked_elements_per_level[level] == Int[]
-            element_padding[level]= Int[]
+        Lchain_basis_ids = _compute_Lchain_basis(hier_space, level, marked_elements_per_level, new_operator)
+        if Lchain_basis_ids == Int[]
             continue
         end
-        basis_in_marked_elements = reduce(union, get_basis_indices.(Ref(hspace.spaces[level]), marked_elements_per_level[level]))
-        element_padding[level] = reduce(union, get_support.(Ref(hspace.spaces[level]), basis_in_marked_elements))
-    end
-
-    return element_padding
-end
-
-@doc raw"""
-    get_marked_domains(hspace::HierarchicalFiniteElementSpace{n, S, T}, marked_elements::Vector{Int}, new_two_scale_operator::T, L_chain::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-
-Returns a set of domains for a hierarchical space construction based on a set of `marked_elements` from error analysis. When `L_chain` is false the marked domains are given by `get_marked_element_padding`. If `L_chain` is true L-chains will be added when needed aside from the element padding.
-
-# Arguments
-- `hspace::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
-- `marked_elements::Vector{Int}`: marked elements from error analysis.
-- `new_two_scale_operator::AbstractTwoScaleOperator`: operator to be used when a new level needs to be created or checked.
-- `L_chain::Bool`: flag for whether L-chains are added or not.
-# Returns
-
-- `marked_domains::Vector{Vector{Int}}`: domains for hierarchical space construction.
-"""
-function get_marked_domains(hspace::HierarchicalFiniteElementSpace{n, S, T}, marked_elements::Vector{Int}, new_two_scale_operator::T, L_chain::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
-    num_levels = get_num_levels(hspace)
-    marked_elements_per_level = convert_element_vector_to_elements_per_level(hspace, marked_elements)
-    
-    marked_domains = Vector{Vector{Int}}(undef, num_levels)
-    marked_domains[1] = Int[]
-    if !L_chain
-        element_padding = get_marked_element_padding(hspace, marked_elements_per_level)
-
-        for level ∈ 1:1:num_levels
-            if level<num_levels
-                if element_padding[level] == Int[]
-                    marked_domains[level+1] = get_level_domain(hspace, level+1)
-                else
-                    marked_domains[level+1] = union(get_level_domain(hspace, level+1), get_finer_elements(new_two_scale_operator, element_padding[level]))
-                end
-            elseif element_padding[level] != Int[]
-                push!(marked_domains, get_finer_elements(new_two_scale_operator, element_padding[level]))
-            end
-        end
-    else
-        for level ∈ 1:1:num_levels
-            level_marked_basis = get_level_marked_basis(hspace, level, marked_elements_per_level, new_two_scale_operator)
-
-            if level<num_levels
-                if level_marked_basis == Int[]
-                    marked_domains[level+1] = get_level_domain(hspace, level+1)
-                else
-                    basis_supports = reduce(union, get_support.(Ref(hspace.spaces[level]), level_marked_basis))
-                    marked_domains[level+1] = union(get_level_domain(hspace, level+1), basis_supports)
-                end
-            elseif level_marked_basis != Int[]
-                basis_supports = reduce(union, get_support.(Ref(hspace.spaces[level]), level_marked_basis))
-                push!(marked_domains, get_finer_elements(new_two_scale_operator, basis_supports))
-            end
+        Lchain_support_ids = union(get_support.(Ref(hier_space.spaces[level]), Lchain_basis_ids)...)
+        if level==num_levels
+            union!(marked_elements_per_level[level+1], get_element_children(new_operator, Lchain_support_ids))
+        else
+            union!(marked_elements_per_level[level+1], get_element_children(get_twoscale_operator(hier_space, level), Lchain_support_ids))
         end
     end
-    
 
-    return marked_domains
+
+    return marked_elements_per_level
 end
-

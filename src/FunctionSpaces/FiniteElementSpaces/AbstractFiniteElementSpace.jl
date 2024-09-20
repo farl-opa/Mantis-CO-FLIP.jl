@@ -127,3 +127,59 @@ function _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, elemen
 
     return SparseArrays.sparse(I,J,V,ndofs,nderivatives+1)
 end
+
+"""
+    _compute_parametric_geometry_coeffs(fem_space::F) where {manifold_dim, F<:FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}}
+
+Compute the parametric geometry coefficients for a given finite element space.
+
+This function calculates the coefficients necessary for representing the parametric geometry of a finite element space.
+
+# Arguments
+- `fem_space::F`: The finite element space for which to compute the parametric geometry coefficients.
+
+# Returns
+- `coeffs::Matrix{Float64}`: The coefficients necessary for representing the parametric geometry. The size of the matrix is (num_basis x manifold_dim). 
+"""
+function _compute_parametric_geometry_coeffs(fem_space::F) where {manifold_dim, F<:AbstractFiniteElementSpace{manifold_dim}}
+
+    function _compute_element_xi(xi_canonical_prod, element_vertices)
+        element_xi = Matrix{Float64}(undef, size(xi_canonical_prod))
+
+        # affine transformation x ↦ a+x(b-a)
+        for dim ∈ axes(xi_canonical_prod, 2)
+            element_xi[:,dim] = @. element_vertices[dim][1] + xi_canonical_prod[:,dim] * (element_vertices[dim][2] - element_vertices[dim][1])
+        end
+
+        return element_xi
+    end
+    degrees = get_polynomial_degree(fem_space)
+    
+    num_xi_per_dim = degrees .+ 1
+    num_xi = prod(num_xi_per_dim)
+
+    xi_canonical = tuple(collect.(range(0,1, num_xi_per_dim[i]) for i ∈ 1:manifold_dim)...)
+    xi_canonical_prod = Matrix{Float64}(undef, num_xi, manifold_dim)
+    for (id, point) ∈ enumerate(Iterators.product(xi_canonical...))
+        xi_canonical_prod[id, :] .= point
+    end
+
+    num_elements = get_num_elements(fem_space)
+    
+    points = Matrix{Float64}(undef, num_elements*num_xi, manifold_dim)
+    A = zeros(size(points, 1), get_num_basis(fem_space))
+
+    for element_id ∈ 1:num_elements
+        element_vertices = get_element_vertices(fem_space, element_id)
+        element_xi = _compute_element_xi(xi_canonical_prod, element_vertices)
+
+        curr_points_ids = (element_id-1)*num_xi+1 : element_id*num_xi
+        points[curr_points_ids,:] = element_xi
+        eval = evaluate(fem_space, element_id, xi_canonical)
+        A[curr_points_ids, eval[2]] .= eval[1][1][1]
+    end
+
+    coeffs = A \ points
+
+    return coeffs
+end

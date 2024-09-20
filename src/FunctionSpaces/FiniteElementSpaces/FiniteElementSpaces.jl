@@ -13,6 +13,6 @@ include("TensorProductSpaces.jl")
 # two scale relations
 include("TwoScaleRelations/TwoScaleRelations.jl")
 # hierarchical function spaces
-include("HierarchicalFiniteElementSpaces.jl")
+include("Hierarchical/Hierarchical.jl")
 # multi-valued function spaces
 include("AbstractMultiValuedFiniteElementSpace.jl")
