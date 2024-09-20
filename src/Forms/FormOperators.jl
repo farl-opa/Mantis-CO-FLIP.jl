@@ -327,9 +327,7 @@ function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1,
         sharp_eval[component] = @views hcat([form_eval[i] .* inv_g[:, i, component] for i in 1:num_form_components]...)
     end
 
-    sharp_indices = repeat([vcat(form_indices...)], num_form_components)
-
-    return sharp_eval, sharp_indices
+    return sharp_eval, form_indices
 end
 
 @doc raw"""
@@ -426,7 +424,7 @@ function evaluate_rotated_proxy_vector_field(form_expression::AbstractFormExpres
 end
 
 @doc raw"""
-    evaluate_rotated_proxy_vector_fiel_pushforward(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, 
+    evaluate_rotated_proxy_vector_field_pushforward(form_expression::AbstractFormExpression{manifold_dim, form_rank, G}, 
                                         element_id::Int, 
                                         xi::NTuple{manifold_dim, Vector{Float64}}) 
                                         where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
