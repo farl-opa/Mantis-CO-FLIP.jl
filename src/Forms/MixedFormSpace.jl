@@ -104,16 +104,19 @@ function build_form_fields(mixed_space::MixedFormSpace{num_forms, F}, coeffs::Ve
         throw(ArgumentError("The number of coefficients does not match the number of basis functions in the mixed form space."))
     end
     
-    form_fields = Vector{FormFields}(undef, num_forms)
+    form_fields = Vector{FormField}(undef, num_forms)
     start_idx = 1
     for form_idx ∈ 1:num_forms
         num_coeffs = Forms.get_num_basis(mixed_space.form_spaces[form_idx])
         if isnothing(labels)
-            form_fields[form_idx] = Mantis.Forms.FormField(mixed_space.form_spaces[form_idx], "ζ" * string(form_idx))
+            field = FormField(mixed_space.form_spaces[form_idx], "ζ" * string(form_idx))
         else
-            form_fields[form_idx] = Mantis.Forms.FormField(mixed_space.form_spaces[form_idx], labels[form_idx])
+            field = FormField(mixed_space.form_spaces[form_idx], labels[form_idx])
         end
-        form_fields[form_idx].coefficients = coeffs[start_idx:start_idx+num_coeffs-1]
+        field.coefficients .= coeffs[start_idx:start_idx+num_coeffs-1]
+
+        # store the form field
+        form_fields[form_idx] = field
         start_idx += num_coeffs
     end
     return MixedFormField(Tuple(form_fields))

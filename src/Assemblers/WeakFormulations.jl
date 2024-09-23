@@ -160,7 +160,7 @@ function poisson_mixed(inputs::WeakFormInputs{manifold_dim, 2, Frhs, Ttrial, Tte
     A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(Forms.exterior_derivative(inputs.space_test[1]), inputs.space_trial[2], element_id, inputs.quad_rule)
     
     # <ε², du¹>
-    A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(inputs.space_test[2], Forms.exterior_derivative(inputs.space_trial[2]), element_id, inputs.quad_rule)
+    A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(inputs.space_test[2], Forms.exterior_derivative(inputs.space_trial[1]), element_id, inputs.quad_rule)
 
     # The remain term, A22, is zero, so not computed.
 
