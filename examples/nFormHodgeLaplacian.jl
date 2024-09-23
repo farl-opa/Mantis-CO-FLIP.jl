@@ -34,7 +34,7 @@ end
 # mesh type
 mesh_type = "curvilinear" # ∈ {"curvilinear", "cartesian"}
 # number of elements in each direction
-num_el = (2,2) .* 2^1
+num_el = (2,2) .* 2^5
 # polynomial degree of the zero-form space in each direction
 p⁰ = (2, 2)
 # length of the domain in each direction
