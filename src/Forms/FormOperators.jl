@@ -288,7 +288,7 @@ function inner_product_0_form_component!(prod_form_rows::Vector{Int}, prod_form_
             prod_form_rows[linear_idx] = form1_indices[1][i]
             prod_form_cols[linear_idx] = form2_indices[1][j]
 
-            prod_form_eval[linear_idx] = @views (quad_rule.weights .* form1_eval[1][:,i])' * (form2_eval[1][:,j] .* sqrt_g)    
+            prod_form_eval[linear_idx] = @views (quad_rule.weights .* form1_eval[1][:,i])' * (form2_eval[1][:,j] .* sqrt_g)
         end
     end
 

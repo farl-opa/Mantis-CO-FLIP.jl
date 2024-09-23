@@ -8,22 +8,24 @@ function stokes()
 end
 
 function n_form_mixed_laplacian(X, Y, ∫, fₑ)
+    # create mixed form space
+    V = Mantis.Forms.MixedFormSpace((X,Y))
+    F = Mantis.Forms.MixedFormField((nothing,fₑ))
+
     # inputs for the mixed weak form
-    weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(fₑ, X, Y, X, Y, ∫)
-    
+    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(F, V, ∫)
+
     # assemble all matrices
     weak_form = Mantis.Assemblers.poisson_mixed
-    global_assembler = Mantis.Assemblers.Assembler(Dict{Int, Float64}())
-    A, b = global_assembler(weak_form, weak_form_inputs)
+    A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, Dict{Int, Float64}())
 
     # solve for coefficients of solution
     sol = A \ b
 
-    # create solution as forms and return
-    σₕ = Mantis.Forms.FormField(X, "σ")
-    uₕ = Mantis.Forms.FormField(Y, "u")
-    σₕ.coefficients .= sol[1:Mantis.Forms.get_num_basis(X)]
-    uₕ.coefficients .= sol[Mantis.Forms.get_num_basis(X)+1:end]
+    # create solution as form fields and return
+    V_fields = Mantis.Forms.build_form_fields(V, sol; labels=("σ", "u"))
+    σₕ = V_fields[1]
+    uₕ = V_fields[2]
     
     return σₕ, uₕ
 end
@@ -32,7 +34,7 @@ end
 # mesh type
 mesh_type = "curvilinear" # ∈ {"curvilinear", "cartesian"}
 # number of elements in each direction
-num_el = (2,2) .* 2^5
+num_el = (2,2) .* 2^1
 # polynomial degree of the zero-form space in each direction
 p⁰ = (2, 2)
 # length of the domain in each direction

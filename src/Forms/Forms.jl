@@ -83,6 +83,7 @@ end
 include("./FormSpaces.jl")
 include("./FormExpressions.jl") # Requires FormSpaces
 include("./FormOperators.jl") # Mind the order, FormOperators requires FormSpaces and FormExpressions
+include("./MixedFormSpace.jl")
 
 # 0-form: no basis
 # 1-forms: (dx1, dx2, dx3)
