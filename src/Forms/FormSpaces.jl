@@ -117,15 +117,14 @@ For example, in 1D, let the mapping from canonical coordinates to the `i`-th par
 """
 function _pullback_to_canonical_coordinates(geometry::Geometry.AbstractGeometry{manifold_dim}, form_evaluations::Vector{Matrix{Float64}}, element_idx::Int, form_rank::Int) where {manifold_dim}
     
-    # Get the element dimensions
-    element_dimensions = Geometry.get_element_dimensions(geometry, element_idx)
-
     # Pullback the evaluations to the canonical coordinates of the element
     if form_rank > 0
+        # Get the element dimensions
+        element_dimensions = Geometry.get_element_dimensions(geometry, element_idx)
         if form_rank == manifold_dim
             form_evaluations[1] .*= prod(element_dimensions)
         elseif form_rank == 1
-            for i ∈ eachindex(form_evaluations)
+            for i ∈ 1:manifold_dim
                 form_evaluations[i] .*= element_dimensions[i]
             end
         elseif manifold_dim == 3
@@ -178,11 +177,12 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # Evaluate derivatives
     d_local_fem_basis, fem_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 1)
 
-    # Account for the transformation from a parametric mesh element to the canonical mesh element
-    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
     # Store the values
     for coordinate_idx = 1:manifold_dim
-        @. local_d_form_basis_eval[coordinate_idx] = d_local_fem_basis[2][coordinate_idx][1] * element_dimensions[coordinate_idx]
+        key = zeros(Int, manifold_dim)
+        key[coordinate_idx] = 1
+        der_idx = FunctionSpaces._get_derivative_idx(key)
+        @. local_d_form_basis_eval[coordinate_idx] = d_local_fem_basis[2][der_idx][1]
     end
 
     return local_d_form_basis_eval, fem_basis_indices
