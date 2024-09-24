@@ -83,26 +83,11 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     #   3-forms: single component
     # We use the numbering of the function space.
     
-    # Evaluate the form spaces ...
-    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 0)  # only evaluate the basis (0-th order derivative)
+    # Evaluate the form spaces on parametric domain ...
+    local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 0)  # (only evaluate the basis (0-th order derivative))
     # ... and account for the transformation from a parametric mesh element to the canonical mesh element
-    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
-    if form_rank > 0
-        if form_rank == manifold_dim
-            local_form_basis[1][1][1] .*= prod(element_dimensions)
-        elseif form_rank == 1
-            for i ∈ eachindex(local_form_basis[1][1])
-                local_form_basis[1][1][i] .*= element_dimensions[i]
-            end
-        elseif manifold_dim == 3
-            local_form_basis[1][1][1] .*= prod(element_dimensions[2:3])
-            local_form_basis[1][1][2] .*= prod(element_dimensions[1:2:3])
-            local_form_basis[1][1][3] .*= prod(element_dimensions[1:2])
-        else
-            throw(ArgumentError("Mantis.Forms.evaluate: combination of ($form_rank, $manifold_dim) not supported."))
-        end
-    end
-
+    local_form_basis = _pullback_to_canonical_coordinates(local_form_basis, element_idx, form_rank, manifold_dim)
+    
     # Note that local_multivalued_basis[j][k][i][l, m] contains
     # the (j-1)th-order derivative, derivative with respect to the k-th coordinate, 
     # of the m-th multivalued basis of component i evaluated at the lth-point
@@ -112,6 +97,47 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     return local_form_basis[1][1], form_basis_indices
 end
 
+"""
+    _pullback_to_canonical_coordinates(local_form_basis::Matrix{Matrix{Float64}}, element_idx::Int, form_rank::Int, manifold_dim::Int)
+
+Pullback the basis functions to the canonical coordinates of the element.
+
+All of our function spaces are built in the parameteric domain (e.g., B-splines on a parametric patch with breakpoints [0.0, 0.5, 0.6, 2.0]). However, when we evaluate the (values/derivatives of) the function spaces, what is actually returned are the evaluations for the functions pulled-back to the canonical coordinates [0, 1].
+    
+For example, in 1D, let the mapping from canonical coordinates to the `i`-th parametric element be `Φᵢ: [0, 1] -> [aᵢ, bᵢ]` then, for a function `f` defined on the parametric patch, the evaluate method actually returns the values/derivatives of `f∘Φᵢ`. This means that the function `f` is always (implicitly) treated as a zero form in the FunctionSpaces module. This obviously does not hold for differential forms in general, and that's why the proper pullback is needed corresponding to the map `Φᵢ`.
+ 
+# Arguments
+- `local_form_basis::Matrix{Matrix{Float64}}`: The basis functions evaluated at the parametric coordinates.
+- `element_idx::Int`: Index of the element to evaluate.
+- `form_rank::Int`: Rank of the form.
+- `manifold_dim::Int`: Dimension of the manifold.
+
+# Returns
+- `local_form_basis`: The basis functions evaluated at the canonical coordinates of the element.
+"""
+function _pullback_to_canonical_coordinates(form_evaluations::Matrix{Matrix{Float64}}, element_idx::Int, form_rank::Int, manifold_dim::Int)
+    
+    # Get the element dimensions
+    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
+
+    # Pullback the evaluations to the canonical coordinates of the element
+    if form_rank > 0
+        if form_rank == manifold_dim
+            form_evaluations[1][1][1] .*= prod(element_dimensions)
+        elseif form_rank == 1
+            for i ∈ eachindex(form_evaluations[1][1])
+                form_evaluations[1][1][i] .*= element_dimensions[i]
+            end
+        elseif manifold_dim == 3
+            form_evaluations[1][1][1] .*= prod(element_dimensions[2:3])
+            form_evaluations[1][1][2] .*= prod(element_dimensions[1:2:3])
+            form_evaluations[1][1][3] .*= prod(element_dimensions[1:2])
+        else
+            throw(ArgumentError("Mantis.Forms.evaluate: combination of (form rank, manifold dim) = ($form_rank, $manifold_dim) is not supported."))
+        end
+    end
+    return form_evaluations
+end
 
 @doc raw"""
     evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, 0, G}} where {G <: Geometry.AbstractGeometry}
