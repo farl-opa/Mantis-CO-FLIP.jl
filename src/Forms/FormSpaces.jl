@@ -72,7 +72,7 @@ Evaluate the basis functions of a differential form space at given points `xi`.
 - `local_form_basis`: Vector of length `n_form_components`, where each element is an Array{Float64, 2} of size (n_evaluation_points, n_basis_functions)
 - `form_basis_indices`: Vector{Int} of length n_basis_functions
 """
-function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, FS <: AbstractFormSpace{manifold_dim, form_rank, G} where {G <: Geometry.AbstractGeometry{manifold_dim}}} where {form_rank}
+function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
     # The form space is made up of components 
     # e.g, 
     #   0-forms: single component
@@ -83,8 +83,25 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     #   3-forms: single component
     # We use the numbering of the function space.
     
-    # Evaluate the form spaces
+    # Evaluate the form spaces ...
     local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 0)  # only evaluate the basis (0-th order derivative)
+    # ... and account for the transformation from a parametric mesh element to the canonical mesh element
+    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
+    if form_rank > 0
+        if form_rank == manifold_dim
+            local_form_basis[1][1][1] .*= prod(element_dimensions)
+        elseif form_rank == 1
+            for i ∈ eachindex(local_form_basis[1][1])
+                local_form_basis[1][1][i] .*= element_dimensions[i]
+            end
+        elseif manifold_dim == 3
+            local_form_basis[1][1][1] .*= prod(element_dimensions[2:3])
+            local_form_basis[1][1][2] .*= prod(element_dimensions[1:2:3])
+            local_form_basis[1][1][3] .*= prod(element_dimensions[1:2])
+        else
+            throw(ArgumentError("Mantis.Forms.evaluate: combination of ($form_rank, $manifold_dim) not supported."))
+        end
+    end
 
     # Note that local_multivalued_basis[j][k][i][l, m] contains
     # the (j-1)th-order derivative, derivative with respect to the k-th coordinate, 
