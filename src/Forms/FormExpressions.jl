@@ -417,7 +417,7 @@ end
 function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormField, F2 <: AbstractFormField}
     #print("Evaluating: " * form.label * "\n")
     if form.op == "∧"
-        throw("∧ not imlemented yet: (form.children[1].label, form.children[2].label)")
+        form_eval = evaluate_wedge(form.children[1], form.children[2], element_idx, xi)
         return 1.0
 
     elseif form.op == "-"
