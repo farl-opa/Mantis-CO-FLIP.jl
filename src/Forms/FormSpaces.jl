@@ -86,7 +86,7 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     # Evaluate the form spaces on parametric domain ...
     local_form_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 0)  # (only evaluate the basis (0-th order derivative))
     # ... and account for the transformation from a parametric mesh element to the canonical mesh element
-    local_form_basis = _pullback_to_canonical_coordinates(local_form_basis, element_idx, form_rank, manifold_dim)
+    local_form_basis = _pullback_to_canonical_coordinates(get_geometry(form_space), local_form_basis[1][1], element_idx, form_rank)
     
     # Note that local_multivalued_basis[j][k][i][l, m] contains
     # the (j-1)th-order derivative, derivative with respect to the k-th coordinate, 
@@ -94,7 +94,7 @@ function evaluate(form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vec
     # Since we want the evaluation of the basis, for all components, we return 
     # local_form_basis[1][1] (1-1 = 0 order derivative, and first coordinate (there is
     # only one since it is zeroth order derivative))
-    return local_form_basis[1][1], form_basis_indices
+    return local_form_basis, form_basis_indices
 end
 
 """
@@ -115,23 +115,23 @@ For example, in 1D, let the mapping from canonical coordinates to the `i`-th par
 # Returns
 - `local_form_basis`: The basis functions evaluated at the canonical coordinates of the element.
 """
-function _pullback_to_canonical_coordinates(form_evaluations::Matrix{Matrix{Float64}}, element_idx::Int, form_rank::Int, manifold_dim::Int)
+function _pullback_to_canonical_coordinates(geometry::Geometry.AbstractGeometry{manifold_dim}, form_evaluations::Vector{Matrix{Float64}}, element_idx::Int, form_rank::Int) where {manifold_dim}
     
     # Get the element dimensions
-    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
+    element_dimensions = Geometry.get_element_dimensions(geometry, element_idx)
 
     # Pullback the evaluations to the canonical coordinates of the element
     if form_rank > 0
         if form_rank == manifold_dim
-            form_evaluations[1][1][1] .*= prod(element_dimensions)
+            form_evaluations[1] .*= prod(element_dimensions)
         elseif form_rank == 1
-            for i ∈ eachindex(form_evaluations[1][1])
-                form_evaluations[1][1][i] .*= element_dimensions[i]
+            for i ∈ eachindex(form_evaluations)
+                form_evaluations[i] .*= element_dimensions[i]
             end
         elseif manifold_dim == 3
-            form_evaluations[1][1][1] .*= prod(element_dimensions[2:3])
-            form_evaluations[1][1][2] .*= prod(element_dimensions[1:2:3])
-            form_evaluations[1][1][3] .*= prod(element_dimensions[1:2])
+            form_evaluations[1] .*= prod(element_dimensions[2:3])
+            form_evaluations[2] .*= prod(element_dimensions[1:2:3])
+            form_evaluations[3] .*= prod(element_dimensions[1:2])
         else
             throw(ArgumentError("Mantis.Forms.evaluate: combination of (form rank, manifold dim) = ($form_rank, $manifold_dim) is not supported."))
         end
@@ -178,9 +178,11 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # Evaluate derivatives
     d_local_fem_basis, fem_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 1)
 
+    # Account for the transformation from a parametric mesh element to the canonical mesh element
+    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
     # Store the values
     for coordinate_idx = 1:manifold_dim
-        local_d_form_basis_eval[coordinate_idx] .= d_local_fem_basis[2][coordinate_idx][1]
+        @. local_d_form_basis_eval[coordinate_idx] = d_local_fem_basis[2][coordinate_idx][1] * element_dimensions[coordinate_idx]
     end
 
     return local_d_form_basis_eval, fem_basis_indices
@@ -228,9 +230,12 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # Evaluate the underlying FEM space and its first order derivatives (all derivatives for each component)
     local_fem_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 1)
     
+    # Account for the transformation from a parametric mesh element to the canonical mesh element
+    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
     # The exterior derivative is 
     # (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
-    local_d_form_basis_eval[1] .= local_fem_basis[2][1][2] .- local_fem_basis[2][2][1]
+    @. local_d_form_basis_eval[1] = local_fem_basis[2][1][2]/element_dimensions[2] - local_fem_basis[2][2][1]/element_dimensions[1]
+    local_d_form_basis_eval[1] .*= prod(element_dimensions)
     
     return local_d_form_basis_eval, form_basis_indices
 end
@@ -274,16 +279,22 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # Evaluate the underlying FEM space and its first order derivatives (all derivatives for each component)
     local_fem_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 1)
     
+    # Account for the transformation from a parametric mesh element to the canonical mesh element
+    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
     # The exterior derivative is 
     # (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃ + (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁ + (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
     # First: (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃
-    local_d_form_basis_eval[1] .= local_fem_basis[2][2][3] - local_fem_basis[2][3][2]
+    @. local_d_form_basis_eval[1] = local_fem_basis[2][2][3]/element_dimensions[3] - local_fem_basis[2][3][2]/element_dimensions[2]
 
     # Second: (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁
-    local_d_form_basis_eval[2] .= local_fem_basis[2][3][1] - local_fem_basis[2][1][3]
+    @. local_d_form_basis_eval[2] = local_fem_basis[2][3][1]/element_dimensions[1] - local_fem_basis[2][1][3]/element_dimensions[3]
 
     # Third: (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
-    local_d_form_basis_eval[3] .= local_fem_basis[2][1][2] - local_fem_basis[2][2][1]
+    @. local_d_form_basis_eval[3] = local_fem_basis[2][1][2]/element_dimensions[2] - local_fem_basis[2][2][1]/element_dimensions[1]
+
+    local_d_form_basis_eval[1] .*= prod(element_dimensions[2:3])
+    local_d_form_basis_eval[2] .*= prod(element_dimensions[1:2:3])
+    local_d_form_basis_eval[3] .*= prod(element_dimensions[1:2])
     
     return local_d_form_basis_eval, form_basis_indices
 end
@@ -327,11 +338,15 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # Evaluate the underlying FEM space and its first order derivatives (all derivatives for each component)
     local_fem_basis, form_basis_indices = FunctionSpaces.evaluate(form_space.fem_space, element_idx, xi, 1)
     
+
+    # Account for the transformation from a parametric mesh element to the canonical mesh element
+    element_dimensions = Geometry.get_element_dimensions(form_space.geometry, element_idx)
     # The form is 
     # α₁ dξ₂∧dξ₃ + α₂ dξ₃∧dξ₁ + α₃ dξ₁∧dξ₂
     # The exterior derivative is 
     # (∂α₁/∂ξ₁ + ∂α₂/∂ξ₂ + ∂α₃/∂ξ₃) dξ₁∧dξ₂∧dξ₃
-    local_d_form_basis_eval[1] .= local_fem_basis[2][1][1] + local_fem_basis[2][2][2] + local_fem_basis[2][3][3]
+    @. local_d_form_basis_eval[1] = local_fem_basis[2][1][1]/element_dimensions[1] + local_fem_basis[2][2][2]/element_dimensions[2] + local_fem_basis[2][3][3]/element_dimensions[3]
+    local_d_form_basis_eval[1] .*= prod(element_dimensions)
 
     return local_d_form_basis_eval, form_basis_indices
 end
