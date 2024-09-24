@@ -745,38 +745,27 @@ function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, e
     end
 
     return hodge_eval, form_indices
-    
-    # # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
-    # n_expression_components = 3
-    # n_hodge_components = 3
+end
 
-    # # Compute the metric terms
-    # inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
 
-    # # Evaluate the form expression to which we wish to apply the Hodge-⋆
-    # form_eval, form_indices = evaluate(form_expression, element_id, xi)
+# 0-forms
+@doc raw"""
+    evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
-    # # Preallocate memory for the Hodge evaluation matrix
-    # n_eval_points = prod(size.(xi, 1))  # number of points where the forms are evaluated (tensor product)
-    # n_active_basis = length(form_indices)
-    # hodge_eval = [zeros(n_eval_points, n_active_basis) for _ in 1:n_hodge_components]
+Evaluates the wedge operator ∧ between a 0-form and a k-form.
 
-    # # Compute the Hodge-⋆ following the analytical expression
-    # # ⋆(α₁²dξ₂∧dξ₃ + α₂²dξ₃∧dξ₁ + α₃²dξ₁∧dξ₂) = [(α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹ +
-    # #                                            (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ² +
-    # #                                            (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³ ]√det(gᵢⱼ). 
-    # # First: (α₁²(g²²g³³-g²³g³²) + α₂²(g²³g³¹-g²¹g³³) + α₃²(g²¹g³²-g²²g³¹))dξ¹
-    # hodge_eval[1] .= @views (form_eval[1] .* (inv_g[:, 2, 2] .* inv_g[:, 3, 3] - inv_g[:, 2, 3] .* inv_g[:, 3, 2]) .+
-    #                          form_eval[2] .* (inv_g[:, 2, 3] .* inv_g[:, 3, 1] - inv_g[:, 2, 1] .* inv_g[:, 3, 3]) .+
-    #                          form_eval[3] .* (inv_g[:, 2, 1] .* inv_g[:, 3, 2] - inv_g[:, 2, 2] .* inv_g[:, 3, 1])) .* sqrt_g
-    # # Second: (α₁²(g³²g¹³-g³³g¹²) + α₂²(g³³g¹¹-g³¹g¹³) + α₃²(g³¹g¹²-g³²g¹¹))dξ²
-    # hodge_eval[2] .= @views (form_eval[1] .* (inv_g[:, 3, 2] .* inv_g[:, 1, 3] - inv_g[:, 3, 3] .* inv_g[:, 1, 2]) .+
-    #                          form_eval[2] .* (inv_g[:, 3, 3] .* inv_g[:, 1, 1] - inv_g[:, 3, 1] .* inv_g[:, 1, 3]) .+
-    #                          form_eval[3] .* (inv_g[:, 3, 1] .* inv_g[:, 1, 2] - inv_g[:, 3, 2] .* inv_g[:, 1, 1])) .* sqrt_g
-    # # Third: (α₁²(g¹²g²³-g¹³g²²) + α₂²(g¹³g²¹-g¹¹g²³) + α₃²(g¹¹g²²-g¹²g²¹))dξ³
-    # hodge_eval[3] .= @views (form_eval[1] .* (inv_g[:, 1, 2] .* inv_g[:, 2, 3] - inv_g[:, 1, 3] .* inv_g[:, 2, 2]) .+
-    #                          form_eval[2] .* (inv_g[:, 1, 3] .* inv_g[:, 2, 1] - inv_g[:, 1, 1] .* inv_g[:, 2, 3]) .+
-    #                          form_eval[3] .* (inv_g[:, 1, 1] .* inv_g[:, 2, 2] - inv_g[:, 1, 2] .* inv_g[:, 2, 1])) .* sqrt_g
-    
-    # return hodge_eval, form_indices
+# Arguments
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, G}`: The differential 0-form expression. It represents a 0-form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank, G}`: The differential form_rank-form expression. It represents a form_rank-form on a manifold.
+- `element_idx::Int`: Index of the element to evaluate
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+    Points are the tensor product of the coordinates per dimension, therefore there will be
+    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+
+# Returns
+- `wedge_eval`: Vector of arrays containing evaluated wedge operator of the basis functions for each of the components.
+- `wedge_indices`: Vector of containing the indices of the basis functions.
+"""
+function evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return wedge_eval, wedge_indices
 end

@@ -397,8 +397,20 @@ Evaluate a binary FormExpression at given points.
 """
 function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
     #print("Evaluating: " * form.label * "\n")
-    throw("∧ not imlemented yet: (form.children[1].label, form.children[2].label)")
-    form_eval = 1.0
+    if form.op == "∧"
+        form_eval = evaluate_wedge(form.children[1], form.children[2], element_idx, xi)
+        
+    elseif form.op == "-"
+        form_1_eval = evaluate(form.children[1], element_idx, xi)
+        form_2_eval = evaluate(form.children[2], element_idx, xi)
+        form_eval = form_1_eval[1] - form_2_eval[1], form_1_eval[2]
+
+    elseif form.op == "+"
+        form_1_eval = evaluate(form.children[1], element_idx, xi)
+        form_2_eval = evaluate(form.children[2], element_idx, xi)
+        form_eval = form_1_eval[1] + form_2_eval[1], form_1_eval[2]
+    end
+
     return form_eval
 end
 
