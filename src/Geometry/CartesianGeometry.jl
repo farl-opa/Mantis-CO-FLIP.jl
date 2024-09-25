@@ -91,7 +91,7 @@ function jacobian(geometry::CartesianGeometry{n}, element_idx::Int, ξ::NTuple{n
 end
 
 function _get_element_size(geometry::CartesianGeometry{n}, element_id::Int) where {n}
-    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, geometry.n_elements)
+    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, Vector(geometry.n_elements))
 
     element_measure = 1
     for k ∈ 1:1:n
@@ -102,7 +102,7 @@ function _get_element_size(geometry::CartesianGeometry{n}, element_id::Int) wher
 end
 
 function _get_element_dimensions(geometry::CartesianGeometry{n}, element_id::Int) where {n}
-    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, geometry.n_elements)
+    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, [geometry.n_elements...])
 
     return [abs(geometry.breakpoints[k][ordered_index[k]+1] - geometry.breakpoints[k][ordered_index[k]]) for k in 1:n]
 end

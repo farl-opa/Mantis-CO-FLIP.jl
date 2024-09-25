@@ -103,6 +103,12 @@ function get_image_dim(geometry::TensorProductGeometry{n, G1, G2}) where {n, G1<
     return sum(geometry.image_dims)
 end
 
+function _get_element_dimensions(geometry::TensorProductGeometry{n, G1, G2}, element_id::Int) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
+    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, [get_num_elements(geometry.geometry_1), get_num_elements(geometry.geometry_2)])
+
+    return [get_element_dimensions(geometry.geometry_1, ordered_index[1]); get_element_dimensions(geometry.geometry_2, ordered_index[2])]
+end
+
 @doc raw"""
     evaluate(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n, Vector{Float64}})
 
