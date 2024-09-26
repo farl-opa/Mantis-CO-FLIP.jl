@@ -11,7 +11,7 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
 
     function CompositeDirectSumSpace(component_spaces::F) where {num_spaces, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
         manifold_dim = get_manifold_dim(component_spaces[1])
-        num_components = get_num_components(component_spaces[1])
+        num_components = 0
         for space in component_spaces
             if get_manifold_dim(space) != manifold_dim
                 throw(ArgumentError("All component spaces must have the same manifold dimension"))
