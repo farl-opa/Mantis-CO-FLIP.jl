@@ -10,5 +10,6 @@ get_manifold_dim(_::AbstractMultiValuedFiniteElementSpace{manifold_dim,num_compo
 
 get_num_components(_::AbstractMultiValuedFiniteElementSpace{manifold_dim,num_components}) where {manifold_dim, num_components} = num_components
 
-include("DirectSumSpace.jl")
-include("SumSpace.jl")
+include("./MultivaluedSpaces/DirectSumSpace.jl")
+include("./MultivaluedSpaces/SumSpace.jl")
+include("./MultivaluedSpaces/CompositeDirectSumSpace.jl")
