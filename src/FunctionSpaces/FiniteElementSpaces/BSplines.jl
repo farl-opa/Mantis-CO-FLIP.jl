@@ -257,6 +257,10 @@ function get_element_size(bspline::BSplineSpace, element_id::Int)
     return get_element_size(bspline.knot_vector, element_id)
 end
 
+function get_element_dimensions(bspline::BSplineSpace, element_id::Int)
+    return get_element_size(bspline.knot_vector, element_id)
+end
+
 """
     get_element_vertices(bspline::BSplineSpace, element_id::Int)
 
