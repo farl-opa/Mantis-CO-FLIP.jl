@@ -56,7 +56,7 @@ Evaluate the basis functions of the composite direct sum space at the points `xi
     we should follow a flattenned numbering using the indices of the derivatives.
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
-function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
+function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, num_components, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
     
     # get the multi-valued basis indices
     multivalued_basis_indices, component_space_basis_indices = get_basis_indices_w_components(space, element_idx)
