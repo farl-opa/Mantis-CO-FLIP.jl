@@ -15,6 +15,21 @@ struct DirectSumSpace{manifold_dim, num_components, F} <: AbstractMultiValuedFin
 end
 
 """
+    get_component_spaces(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+
+Get the component spaces of the direct sum space.
+
+# Arguments
+- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct-sum space
+
+# Returns
+- `component_spaces::F`: Tuple of component spaces
+"""
+function get_component_spaces(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    return space.component_spaces
+end
+
+"""
     evaluate(space::DirectSumSpace{manifold_dim,num_components,F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components}
 
 Evaluate the basis functions of the direct sum space at the points `xi` in the element with index `element_idx`. The function returns a tuple of `num_components` arrays, each containing the evaluations of the basis functions of the corresponding component space.

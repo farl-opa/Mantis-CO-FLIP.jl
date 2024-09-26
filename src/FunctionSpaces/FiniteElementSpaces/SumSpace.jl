@@ -16,6 +16,21 @@ struct SumSpace{manifold_dim, num_components, F} <: AbstractMultiValuedFiniteEle
 end
 
 """
+    get_component_spaces(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+
+Get the component spaces of the sum space.
+
+# Arguments
+- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+
+# Returns
+- `component_spaces::F`: Tuple of component spaces
+"""
+function get_component_spaces(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    return space.component_spaces
+end
+
+"""
     evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components}
 
 Evaluate the basis functions of the sum space at the points `xi` in the element with index `element_idx`. The function returns a tuple of `num_components` arrays, each containing the evaluations of the basis functions of the component spaces.
