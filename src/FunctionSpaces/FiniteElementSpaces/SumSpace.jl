@@ -38,6 +38,8 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
     num_multivaluedbasis = length(multivalued_basis_indices) 
     # find the local column that each component contributes to
     column_indices_per_component = [indexin(component_basis_indices[i], multivalued_basis_indices) for i in 1:num_components]
+    # number of evaluation points
+    n_evaluation_points = prod(size.(xi, 1))
     
     # Generate keys for all possible derivative combinations
     der_keys = _integer_sums(nderivatives, manifold_dim+1)
