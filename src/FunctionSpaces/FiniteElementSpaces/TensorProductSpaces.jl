@@ -447,14 +447,24 @@ function _integer_sums(n, k)
     return solutions
 end
 
-function _get_element_size(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+function get_element_size(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
-    space_1_measure = _get_element_size(tp_space.function_space_1, ordered_index[1])
-    space_2_measure = _get_element_size(tp_space.function_space_2, ordered_index[2])
+    space_1_measure = get_element_size(tp_space.function_space_1, ordered_index[1])
+    space_2_measure = get_element_size(tp_space.function_space_2, ordered_index[2])
 
     return space_1_measure * space_2_measure
+end
+
+function get_element_dimensions(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    element_dim_1 = get_element_dimensions(tp_space.function_space_1, ordered_index[1])
+    element_dim_2 = get_element_dimensions(tp_space.function_space_2, ordered_index[2])
+
+    return [element_dim_1; element_dim_2]
 end
 
 function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, F1, F2}, element_id::Int) where {manifold_dim, n1, n2, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}}
@@ -476,6 +486,7 @@ function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, F1, F2}
     return tuple(vertices...)
 end
 
+# TODO : This function doesn't make sense for general TP spaces.
 function get_greville_points(tp_space::TensorProductSpace{manifold_dim, F1, F2}) where {manifold_dim, n1, n2, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}}
     space_1_points = get_greville_points(tp_space.function_space_1)
     space_2_points = get_greville_points(tp_space.function_space_2)

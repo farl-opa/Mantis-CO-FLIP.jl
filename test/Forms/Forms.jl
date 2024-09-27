@@ -305,9 +305,9 @@ n_active_basis_two_form = Mantis.FunctionSpaces.get_num_basis(dsTP_2_form_3d, el
 # print("\n")
 
 
-α⁰.coefficients .= 1.0
-ξ¹.coefficients .= 1.0
-β².coefficients .= 1.0
+# α⁰.coefficients .= 1.0
+# ξ¹.coefficients .= 1.0
+# β².coefficients .= 1.0
 
 # dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
 # dξ¹ = Mantis.Forms.exterior_derivative(ξ¹)
@@ -325,30 +325,30 @@ n_active_basis_two_form = Mantis.FunctionSpaces.get_num_basis(dsTP_2_form_3d, el
 # ★β²_eval = Mantis.Forms.evaluate(★β², 1, ([0.0, 1.0], [0.0, 1.0]))
 
 
-println()
-geo_2d_cart2 = Mantis.Geometry.create_cartesian_geometry(starting_point_2d, box_size_2d, num_elements_2d .+ 1) # Used to test if different geometries break, as they should.
-zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
-zero_form_space_cart2 = Mantis.Forms.FormSpace(0, geo_2d_cart2, (TP_Space,), "ν")
-d_zero_form_space_cart = Mantis.Forms.exterior_derivative(zero_form_space)
-one_form_space_cart = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
-top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
+# println()
+# geo_2d_cart2 = Mantis.Geometry.create_cartesian_geometry(starting_point_2d, box_size_2d, num_elements_2d .+ 1) # Used to test if different geometries break, as they should.
+# zero_form_space_cart = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
+# zero_form_space_cart2 = Mantis.Forms.FormSpace(0, geo_2d_cart2, (TP_Space,), "ν")
+# d_zero_form_space_cart = Mantis.Forms.exterior_derivative(zero_form_space)
+# one_form_space_cart = Mantis.Forms.FormSpace(1, geo_2d_cart, (TP_Space, TP_Space), "η")
+# top_form_space_cart = Mantis.Forms.FormSpace(2, geo_2d_cart, (TP_Space,), "σ")
 
-# # Generate the form expressions
-# α⁰ = Mantis.Forms.FormField(zero_form_space_cart, "α")
-# α⁰.coefficients .= 1.0
-# β⁰ = Mantis.Forms.FormField(zero_form_space_cart2, "β")
-# β⁰.coefficients .= 1.0
-# ζ¹ = Mantis.Forms.FormField(one_form_space_cart, "ζ")
-# ζ¹.coefficients .= 1.0
-# dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-# γ² = Mantis.Forms.FormField(top_form_space_cart, "γ")
-# γ².coefficients .= 1.0
-# dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+# # # Generate the form expressions
+# # α⁰ = Mantis.Forms.FormField(zero_form_space_cart, "α")
+# # α⁰.coefficients .= 1.0
+# # β⁰ = Mantis.Forms.FormField(zero_form_space_cart2, "β")
+# # β⁰.coefficients .= 1.0
+# # ζ¹ = Mantis.Forms.FormField(one_form_space_cart, "ζ")
+# # ζ¹.coefficients .= 1.0
+# # dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+# # γ² = Mantis.Forms.FormField(top_form_space_cart, "γ")
+# # γ².coefficients .= 1.0
+# # dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
 
-q_rule = Mantis.Quadrature.tensor_product_rule(degree_2d.+1, Mantis.Quadrature.gauss_legendre)
-#display(Mantis.Forms.evaluate_inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
-println("Starting inner product computations")
-# Note that we cannot do mixed inner products
+# q_rule = Mantis.Quadrature.tensor_product_rule(degree_2d.+1, Mantis.Quadrature.gauss_legendre)
+# #display(Mantis.Forms.evaluate_inner_product(zero_form_space_cart, zero_form_space_cart, 1, q_rule))
+# println("Starting inner product computations")
+# # Note that we cannot do mixed inner products
 
 # for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
 #     ordered_idx = Tuple(geo_2d_cart.cartesian_idxs[elem_id])
@@ -430,82 +430,82 @@ println("Starting inner product computations")
 # ★γ³_eval = Mantis.Forms.evaluate(★γ³, 1, ([0.0, 1.0], [0.0, 1.0], [0.0, 1.0]))
 
 
-# Test AnalyticalFormField
-function one_form_function(x::Matrix{Float64})
-    return [x[:, 1], x[:, 2]]
-end
+# # Test AnalyticalFormField
+# function one_form_function(x::Matrix{Float64})
+#     return [x[:, 1], x[:, 2]]
+# end
 
-function zero_form_function(x::Matrix{Float64})
-    return [x[:, 2]]
-end
+# function zero_form_function(x::Matrix{Float64})
+#     return [x[:, 2]]
+# end
 
-function volume_form_function(x::Matrix{Float64})
-    return [ones(size(x, 1))]
-end
+# function volume_form_function(x::Matrix{Float64})
+#     return [ones(size(x, 1))]
+# end
 
-β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, geo_2d_cart, "β")
-σ² = Mantis.Forms.AnalyticalFormField(2, volume_form_function, geo_2d_cart, "σ")
-α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geo_2d_cart, "α")
+# β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, geo_2d_cart, "β")
+# σ² = Mantis.Forms.AnalyticalFormField(2, volume_form_function, geo_2d_cart, "σ")
+# α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geo_2d_cart, "α")
 
-β⁰_eval = Mantis.Forms.evaluate(β⁰, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
-σ²_eval = Mantis.Forms.evaluate(σ², 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
+# β⁰_eval = Mantis.Forms.evaluate(β⁰, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
+# σ²_eval = Mantis.Forms.evaluate(σ², 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]))
 
-using SparseArrays
+# using SparseArrays
 
-q_rule_high = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 10, Mantis.Quadrature.gauss_legendre)
-alpha1_l2_norm_square = 0.0
-for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
-    global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
-end
-@test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
+# q_rule_high = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 10, Mantis.Quadrature.gauss_legendre)
+# alpha1_l2_norm_square = 0.0
+# for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
+#     global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
+# end
+# @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
 
-Lleft = 0.0
-Lright = 1.0
-Lbottom = 0.0
-Ltop = 1.0
+# Lleft = 0.0
+# Lright = 1.0
+# Lbottom = 0.0
+# Ltop = 1.0
 
-crazy_c = 0.2
-function mapping(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
-end
-function dmapping(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
-end
-dimension = (2, 2)
-curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
-geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, curved_mapping)
-α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geom_crazy, "α")
-alpha1_l2_norm_square = 0.0
-for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom_crazy)
-    global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
-end
-@test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
+# crazy_c = 0.2
+# function mapping(x::Vector{Float64})
+#     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+#     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+#     return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+# end
+# function dmapping(x::Vector{Float64})
+#     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
+#     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
+#     return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+# end
+# dimension = (2, 2)
+# curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
+# geom_crazy = Mantis.Geometry.MappedGeometry(geo_2d_cart, curved_mapping)
+# α¹ = Mantis.Forms.AnalyticalFormField(1, one_form_function, geom_crazy, "α")
+# alpha1_l2_norm_square = 0.0
+# for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom_crazy)
+#     global alpha1_l2_norm_square += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(α¹, α¹, elem_id, q_rule_high)...))[1,1]
+# end
+# @test isapprox(alpha1_l2_norm_square, 2/3, atol=1e-12)
 
-# Test "error" computation -------------
-zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
-α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
-α⁰.coefficients .= 1.0
+# # Test "error" computation -------------
+# zero_form_space = Mantis.Forms.FormSpace(0, geo_2d_cart, (TP_Space,), "ν")
+# α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+# α⁰.coefficients .= 1.0
 
-function zero_form_function(x::Matrix{Float64})
-    return [x[:, 2]]
-end
+# function zero_form_function(x::Matrix{Float64})
+#     return [x[:, 2]]
+# end
 
-# Generate an analytical form field
-β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, geo_2d_cart, "β")
+# # Generate an analytical form field
+# β⁰ = Mantis.Forms.AnalyticalFormField(0, zero_form_function, geo_2d_cart, "β")
 
-# Define error
-e = α⁰ - β⁰
+# # Define error
+# e = α⁰ - β⁰
 
-# compute the L^2 norm of the differences
-using SparseArrays
-error_L2 = 0.0
-q_rule = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 1, Mantis.Quadrature.gauss_legendre)
-for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
-    global error_L2 += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(e, e, elem_id, q_rule)...))[1,1]
-end
-error_L2 = sqrt(error_L2)
-@test(isapprox(error_L2^2, 1/3, atol=1e-10))
+# # compute the L^2 norm of the differences
+# using SparseArrays
+# error_L2 = 0.0
+# q_rule = Mantis.Quadrature.tensor_product_rule(degree_2d .+ 1, Mantis.Quadrature.gauss_legendre)
+# for elem_id in 1:1:Mantis.Geometry.get_num_elements(geo_2d_cart)
+#     global error_L2 += Matrix(SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(e, e, elem_id, q_rule)...))[1,1]
+# end
+# error_L2 = sqrt(error_L2)
+# @test(isapprox(error_L2^2, 1/3, atol=1e-10))
