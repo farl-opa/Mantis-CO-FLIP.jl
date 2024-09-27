@@ -23,7 +23,7 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
         if num_components != maximum(tmp)
             throw(ArgumentError("The number of components does not correspond to the component ordering provided."))
         end
-        if length(unique(tmp)) != length(temp)
+        if length(unique(tmp)) != length(tmp)
             throw(ArgumentError("The component ordering must not contain duplicates."))
         end
         
@@ -38,9 +38,9 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
         end
         # construct default component ordering
         component_offsets = cumsum([0; num_components_per_space])
-        component_ordering = (collect(component_offsets[i]+1:component_offsets[i+1]) for i in 1:num_spaces)
+        component_ordering = Tuple(collect(component_offsets[i]+1:component_offsets[i+1]) for i in 1:num_spaces)
 
-        new{manifold_dim, num_spaces, num_components, F}(component_spaces, component_ordering)
+        CompositeDirectSumSpace(component_spaces, component_ordering)
     end
 end
 
@@ -120,7 +120,6 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
         end
 
         count += num_basis_per_space[space_idx]
-        component_count += num_components_per_space[space_idx]
     end
     
     return local_multivalued_basis, multivalued_basis_indices
