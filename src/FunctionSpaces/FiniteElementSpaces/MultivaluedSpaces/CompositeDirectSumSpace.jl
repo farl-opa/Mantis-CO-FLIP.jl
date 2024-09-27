@@ -8,8 +8,9 @@ A multi-valued space that is the direct sum of `num_spaces` multi-valued functio
 """
 struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: AbstractMultiValuedFiniteElementSpace{manifold_dim, num_components}
     component_spaces::F
+    component_ordering::NTuple{num_spaces, Vector{Int}}
 
-    function CompositeDirectSumSpace(component_spaces::F) where {num_spaces, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
+    function CompositeDirectSumSpace(component_spaces::F, component_ordering::NTuple{num_spaces, Vector{Int}}) where {num_spaces, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
         manifold_dim = get_manifold_dim(component_spaces[1])
         num_components = 0
         for space in component_spaces
@@ -18,7 +19,28 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
             end
             num_components += get_num_components(space)
         end
-        new{manifold_dim, num_spaces, num_components, F}(component_spaces)
+        tmp = vcat(component_ordering...)
+        if num_components != maximum(tmp)
+            throw(ArgumentError("The number of components does not correspond to the component ordering provided."))
+        end
+        if length(unique(tmp)) != length(temp)
+            throw(ArgumentError("The component ordering must not contain duplicates."))
+        end
+        
+        new{manifold_dim, num_spaces, num_components, F}(component_spaces, component_ordering)
+    end
+
+    function CompositeDirectSumSpace(component_spaces::F) where {num_spaces, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
+        # number of components per space
+        num_components_per_space = zeros(Int, num_spaces)
+        for i in eachindex(component_spaces)
+            num_components_per_space[i] = get_num_components(component_spaces[i])
+        end
+        # construct default component ordering
+        component_offsets = cumsum([0; num_components_per_space])
+        component_ordering = (collect(component_offsets[i]+1:component_offsets[i+1]) for i in 1:num_spaces)
+
+        new{manifold_dim, num_spaces, num_components, F}(component_spaces, component_ordering)
     end
 end
 
@@ -63,7 +85,7 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
     num_basis_per_space = length.(component_space_basis_indices)
     num_multivaluedbasis = length(multivalued_basis_indices)
     n_evaluation_points = prod(size.(xi, 1))
-    num_components_per_space = get_num_components.(space.component_spaces)
+    num_components_per_space = length.(space.component_ordering)
 
     # Generate keys for all possible derivative combinations
     der_keys = _integer_sums(nderivatives, manifold_dim+1)
@@ -81,7 +103,6 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
 
     # loop over all components...
     count = 0
-    component_count = 0
     for space_idx in 1:num_spaces
         # ... evaluate component spaces ...
         local_space_basis, _ = FunctionSpaces.evaluate(space.component_spaces[space_idx], element_idx, xi, nderivatives)
@@ -91,8 +112,10 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
             j = sum(key) # order of derivative
             der_idx = _get_derivative_idx(key) # index of derivative
             
-            for component_idx in component_count+1:component_count+num_components_per_space[space_idx]
-                local_multivalued_basis[j + 1][der_idx][component_idx][:, count .+ (1:num_basis_per_space[space_idx])] .= local_space_basis[j+1][der_idx][component_idx-component_count]
+            for i in 1:num_components_per_space[space_idx]
+                component_idx = space.component_ordering[space_idx][i]
+                # the `i`-th local component is stored as the `component_idx`-th component of the multi-valued space
+                local_multivalued_basis[j + 1][der_idx][component_idx][:, count .+ (1:num_basis_per_space[space_idx])] .= local_space_basis[j+1][der_idx][i]
             end
         end
 
@@ -144,11 +167,11 @@ Get the global indices of the basis functions of the composite direct sum space 
 """
 function get_basis_indices(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int) where {manifold_dim, num_spaces, num_components, F}
     component_space_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-    num_dofs_space = FunctionSpaces.get_num_basis.(space.component_spaces)
-    dof_offset_space = zeros(Int, num_spaces)
-    dof_offset_space[2:end] .= cumsum(num_dofs_space[1:(num_spaces-1)])
+    num_dofs_per_space = FunctionSpaces.get_num_basis.(space.component_spaces)
+    dof_offset_per_space = zeros(Int, num_spaces)
+    dof_offset_per_space[2:end] .= cumsum(num_dofs_per_space[1:(num_spaces-1)])
     
-    return vcat(map(.+, component_space_basis_indices, dof_offset_space)...)
+    return vcat(map(.+, component_space_basis_indices, dof_offset_per_space)...)
 end
 
 """
@@ -166,11 +189,11 @@ Get the global indices of the multivalued basis functions of the direct sum spac
 """
 function get_basis_indices_w_components(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int) where {manifold_dim, num_spaces, num_components, F}
     component_space_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-    num_dofs_space = FunctionSpaces.get_num_basis.(space.component_spaces)
-    dof_offset_space = zeros(Int, num_spaces)
-    dof_offset_space[2:end] .= cumsum(num_dofs_space[1:(num_spaces-1)])
+    num_dofs_per_space = FunctionSpaces.get_num_basis.(space.component_spaces)
+    dof_offset_per_space = zeros(Int, num_spaces)
+    dof_offset_per_space[2:end] .= cumsum(num_dofs_per_space[1:(num_spaces-1)])
     
-    return vcat(map(.+, component_space_basis_indices, dof_offset_space)...), component_space_basis_indices
+    return vcat(map(.+, component_space_basis_indices, dof_offset_per_space)...), component_space_basis_indices
 end
 
 """
