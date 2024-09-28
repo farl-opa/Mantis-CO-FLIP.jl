@@ -120,6 +120,9 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(zero_form_inner_product_from_wedge - zero_form_inner_product_evaluate)), 0.0, atol=1e-12)
 
+        # Test if the wedge product expression has the correct expression rank 
+        @test Mantis.Forms.get_expression_rank(zero_form_wedge) == 2
+
         # Compare the inner product
         #   <ϵⁿ, ϵⁿ>
         # with 
@@ -142,6 +145,8 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(top_form_inner_product_from_wedge - top_form_inner_product_evaluate)), 0.0, atol=1e-12)
 
+        # Test if the wedge product expression has the correct expression rank 
+        @test Mantis.Forms.get_expression_rank(top_form_wedge) == 2
 
         # Compare the inner product
         #   <ϵ¹, ϵ¹>
@@ -165,9 +170,14 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(one_form_inner_product_from_wedge - one_form_inner_product_evaluate)), 0.0, atol=1e-12)
 
+        # Test if the wedge product expression has the correct expression rank 
+        @test Mantis.Forms.get_expression_rank(one_form_wedge) == 2
+
         # Test αⁿ ∧ βⁿ (top forms) throws error
-        invalid_wedge = Mantis.Forms.wedge(ϵⁿ, ϵⁿ)
-        @test_throws ArgumentError Mantis.Forms.evaluate(invalid_wedge, elem_id, ξ_quadrature_nodes)
+        @test_throws ArgumentError Mantis.Forms.wedge(ϵⁿ, ϵⁿ)
+
+        # Test ϵ¹ ∧ ⋆ϵ¹ ∧ ϵ¹ to check if rank 3 expressions are not allowed
+        @test_throws ArgumentError Mantis.Forms.wedge(one_form_wedge, ϵ⁰)
 
         a = 2
         # # 1-forms

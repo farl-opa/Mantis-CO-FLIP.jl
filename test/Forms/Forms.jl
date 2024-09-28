@@ -2,7 +2,6 @@ import Mantis
 
 using Test
 
-
 # 2D tests --------------------------------------------------------------------
 
 # Setup the geometry 

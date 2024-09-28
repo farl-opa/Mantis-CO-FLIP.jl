@@ -2,8 +2,8 @@
 
 # (0-forms, 0-forms)
 @doc raw"""
-    evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 0, G}, 
-                           form_expression2::AbstractFormExpression{manifold_dim, 0, G}, 
+    evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, 
+                           form_expression2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, 
                            element_id::Int, 
                            quad_rule::Quadrature.QuadratureRule{manifold_dim}) 
                            where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
@@ -11,8 +11,8 @@
 Compute the inner product of two differential 0-forms over a specified element of a manifold.
 
 # Arguments
-- `form_expression1::AbstractFormExpression{manifold_dim, 0, G}`: The first differential form expression. It represents a form on a manifold of dimension `manifold_dim`.
-- `form_expression2::AbstractFormExpression{manifold_dim, 0, G}`: The second differential form expression. It should have the same dimension and geometry as `form_expression1`.
+- `form_expression1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}`: The first differential form expression. It represents a form on a manifold of dimension `manifold_dim`.
+- `form_expression2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}`: The second differential form expression. It should have the same dimension and geometry as `form_expression1`.
 - `element_id::Int`: The identifier of the element on which the inner product is to be evaluated. This is typically an index into a mesh or other discretized representation of the manifold.
 - `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: The quadrature rule used to approximate the integral of the inner product over the specified element. The quadrature rule should be compatible with the dimension of the manifold.
 
@@ -21,9 +21,13 @@ Compute the inner product of two differential 0-forms over a specified element o
 - `prod_form_cols::Vector{Int}`: Indices of the second form expression. 
 - `prod_form_eval::Vector{Float64}`: Evaluation of the inner product. Hence, prod_form_eval[l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. 
 """
-function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 0, G}, form_expression2::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
-    _, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
+function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, expression_rank_1, expression_rank_2, G<:Geometry.AbstractGeometry{manifold_dim}}
+    if (expression_rank_1 + expression_rank_2) > 2
+        throw(ArgumentError("Inner product only valid for expressions with total rank < 3, got: $expression_rank_1 and $expression_rank_2."))
+    end
 
+    _, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
+    
     # evaluate both the form expressions; it is assumed that the output is of the following form:
     # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
@@ -72,7 +76,11 @@ Compute the inner product of two differential n-forms over a specified element o
 - `prod_form_cols::Vector{Int}`: Indices of the second form expression. 
 - `prod_form_eval::Vector{Float64}`: Evaluation of the inner product. Hence, prod_form_eval[l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. 
 """ 
-function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, manifold_dim, G}, form_expression2::AbstractFormExpression{manifold_dim, manifold_dim, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank_1, G}, form_expression2::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank_2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, expression_rank_1, expression_rank_2, G<:Geometry.AbstractGeometry{manifold_dim}}
+    if (expression_rank_1 + expression_rank_2) > 2
+        throw(ArgumentError("Inner product only valid for expressions with total rank < 3, got: $expression_rank_1 and $expression_rank_2."))
+    end
+
     _, sqrt_g = Geometry.metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
     # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
@@ -122,7 +130,11 @@ Compute the inner product of two differential 1-forms over a specified element o
 - `prod_form_cols::Vector{Int}`: Indices of the second form expression. 
 - `prod_form_eval::Vector{Float64}`: Evaluation of the inner product. Hence, prod_form_eval[l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. 
 """
-function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 1, G}, form_expression2::AbstractFormExpression{manifold_dim, 1, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, G<:Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_inner_product(form_expression1::AbstractFormExpression{manifold_dim, 1, expression_rank_1, G}, form_expression2::AbstractFormExpression{manifold_dim, 1, expression_rank_2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, expression_rank_1, expression_rank_2, G<:Geometry.AbstractGeometry{manifold_dim}}
+    if (expression_rank_1 + expression_rank_2) > 2
+        throw(ArgumentError("Inner product only valid for expressions with total rank < 3, got: $expression_rank_1 and $expression_rank_2."))
+    end
+
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
     # form_eval::Vector{Matrix{Float64}} of length manifold_dim, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
@@ -163,11 +175,11 @@ end
 
 # (2-forms, 2-forms) in 3D
 @doc raw"""
-    evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G}, 
-                           form_expression2::AbstractFormExpression{3, 2, G}, 
+    evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, expression_rank_1, G}, 
+                           form_expression2::AbstractFormExpression{3, 2, expression_rank_2, G}, 
                            element_id::Int, 
                            quad_rule::Quadrature.QuadratureRule{3}) 
-                           where {G<:Geometry.AbstractGeometry{3}}
+                           where {expression_rank_1, expression_rank_2, G<:Geometry.AbstractGeometry{3}}
 
 Compute the inner product of two differential 2-forms over a specified element of a 3-dimensional manifold.
 
@@ -182,7 +194,11 @@ Compute the inner product of two differential 2-forms over a specified element o
 - `prod_form_cols::Vector{Int}`: Indices of the seconWd form expression. 
 - `prod_form_eval::Vector{Float64}`: Evaluation of the inner product. Hence, prod_form_eval[l(i,j)] stores the inner product of the i-indexed function of the first form expression with the j-indexed function from the second form expression, where l(i,j) is a linear indexing. 
 """
-function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, G}, form_expression2::AbstractFormExpression{3, 2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {G<:Geometry.AbstractGeometry{3}}
+function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, expression_rank_1, G}, form_expression2::AbstractFormExpression{3, 2, expression_rank_2, G}, element_id::Int, quad_rule::Quadrature.QuadratureRule{3}) where {expression_rank_1, expression_rank_2, G<:Geometry.AbstractGeometry{3}}
+    if (expression_rank_1 + expression_rank_2) > 2
+        throw(ArgumentError("Inner product only valid for expressions with total rank < 3, got: $expression_rank_1 and $expression_rank_2."))
+    end
+    
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes)
 
     # assumes that the output is of the following form:
@@ -294,8 +310,9 @@ end
 
 # Useful proxy vector fields associated to forms
 
+# TODO Is the sharp supposed to work for expressions with expression_rank higher than 0? If not, then enforce it.
 @doc raw"""
-    evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, G}, 
+    evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, expression_rank, G}, 
                    element_id::Int, 
                    xi::NTuple{manifold_dim, Vector{Float64}}) 
                    where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
@@ -311,7 +328,7 @@ Compute the sharp of a differential 1-form over a specified element of a manifol
 - `sharp_eval::Vector{Matrix{Float64}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
 - `sharp_indices::Vector{Vector{Int}}`: Each component of the vector, corresponding to each ∂ᵢ, stores the indices of the evaluated basis functions.
 """
-function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     manifold_dim >= 2 || throw(ArgumentError("Manifold dimension should be 2 or 3 for 1-forms. Dimension $manifold_dim was given."))
 
     inv_g, _, _ = Geometry.inv_metric(form_expression.geometry, element_id, xi)
@@ -330,6 +347,8 @@ function evaluate_sharp(form_expression::AbstractFormExpression{manifold_dim, 1,
     return sharp_eval, form_indices
 end
 
+# TODO Is the pushforward supposed to work for expressions with expression_rank higher than 0? If not, then enforce it.
+#      There should be a vector expression and a vector field.
 @doc raw"""
     evaluate_pushforward(vfield::Vector{Matrix{Float64}}, 
                          jacobian::Array{Float64,3})
@@ -356,7 +375,8 @@ function evaluate_pushforward(vfield::Vector{Matrix{Float64}}, jacobian::Array{F
     return evaluated_pushforward
 end
 
-@doc raw"""
+# TODO Similar thing here. This is a concrete expression. If we make general expressions and combine them, everything becomes simpler.
+""" 
     evaluate_sharp_pushforward(form_expression::AbstractFormExpression{manifold_dim, 1, G}, 
                                 element_id::Int, 
                                 xi::NTuple{manifold_dim, Vector{Float64}}) 
@@ -534,12 +554,12 @@ end
 
 # 0-forms (n dimensions)
 @doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}})
+    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}})
 
 Evaluates the Hodge star operator ⋆ of a 0-form in n dimensions.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, G}`: The differential 0-form expression. It represents a form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G}`: The differential 0-form expression. It represents a form on a manifold.
 - `element_idx::Int`: Index of the element to evaluate,
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
         Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -549,7 +569,7 @@ Evaluates the Hodge star operator ⋆ of a 0-form in n dimensions.
 - `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `form_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
@@ -565,12 +585,12 @@ end
 
 # n-forms (n dimensions)
  @doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Evaluates the Hodge star operator ⋆ of a n-form in n dimensions.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, manifold_dim, G}`: The differential n-form expression. It represents a form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G}`: The differential n-form expression. It represents a form on a manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
         Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -580,7 +600,7 @@ Evaluates the Hodge star operator ⋆ of a n-form in n dimensions.
 - `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `form_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
@@ -596,12 +616,12 @@ end
 
 # 1-forms (2 dimensions)
 @doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+    evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, expression_rank, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{2}}
 
 Evaluates the Hodge star operator ⋆ of a 1-form in 2 dimensions.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{2, 1, G}`: The differential 1-form expression. It represents a form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{2, 1, expression_rank, G}`: The differential 1-form expression. It represents a form on a manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{2, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
     Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -611,7 +631,7 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 2 dimensions.
 - `hodge_eval::Vector{Matrix{Float64}}`: Vector of arrays containing evaluated hodge star of the basis functions.
 - `hodge_indices`: Vector of vectors containing indices of the basis functions.
 """
-function evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+function evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, expression_rank, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank,G <: Geometry.AbstractGeometry{2}}
     inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
@@ -638,12 +658,12 @@ end
 
 # 1-forms (3 dimensions)
 @doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, expression_rank, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
 
 Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{3, 1, G}`: The differential 1-form expression. It represents a form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{3, 1, expression_rank, G}`: The differential 1-form expression. It represents a form on a manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{3, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
     Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -653,7 +673,7 @@ Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
 - `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions for each of the components.
 - `hodge_indices`: Vector of containing the indices of the basis functions.
 """
-function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, expression_rank, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
     # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
     n_expression_components = 3
     n_hodge_components = 3
@@ -691,7 +711,7 @@ end
 
 # 2-forms (3 dimensions)
 @doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, expression_rank, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
 
 Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
 
@@ -706,7 +726,7 @@ Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
 - `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions for each of the components.
 - `hodge_indices`: Vector of containing the indices of the basis functions.
 """
-function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{3}}
+function evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, expression_rank, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
     # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
     n_expression_components = 3
     n_hodge_components = 3
@@ -750,13 +770,13 @@ end
 
 # 0-forms \wedge k-forms
 @doc raw"""
-    evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Evaluates the wedge operator ∧ between a 0-form and a k-form.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, G}`: The differential 0-form expression. It represents a 0-form on a manifold.
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank, G}`: The differential form_rank-form expression. It represents a form_rank-form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}`: The differential 0-form expression. It represents a 0-form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G}`: The differential form_rank-form expression. It represents a form_rank-form on a manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
     Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -767,7 +787,7 @@ Evaluates the wedge operator ∧ between a 0-form and a k-form.
 - `wedge_indices`: Vector of Vectors containing the indices of the basis functions for the rank 2 product.
         `wedge_indices[1]` contains the row indices, and `wedge_indices[2]` contains the column indices.
 """
-function evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
     # Evaluate the two forms that make up the wedge product 
     form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 0-form 
     form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # k-form
@@ -821,13 +841,13 @@ end
 
 # k-forms ∧ 0-forms
 @doc raw"""
-    evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Evaluates the wedge operator ∧ between a 0-form and a k-form.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank, G}`: The differential form_rank-form expression. It represents a form_rank-form on a manifold.
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, G}`: The differential 0-form expression. It represents a 0-form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G}`: The differential form_rank-form expression. It represents a form_rank-form on a manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}`: The differential 0-form expression. It represents a 0-form on a manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
     Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -838,7 +858,7 @@ Evaluates the wedge operator ∧ between a 0-form and a k-form.
 - `wedge_indices`: Vector of Vectors containing the indices of the basis functions for the rank 2 product.
         `wedge_indices[1]` contains the row indices, and `wedge_indices[2]` contains the column indices.
 """
-function evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
     # Get the number of components of the wedge 
     # In this case because it is the wedge of a 0-form with a k-form 
     # there are as many components in the wedge as components in the k-form
@@ -865,13 +885,13 @@ end
 
 # 1-forms ∧ 1-forms in 2D
 @doc raw"""
-    evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, G}, form_expression_2::AbstractFormExpression{2, 1, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+    evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{2, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{2}}
 
 Evaluates the wedge operator ∧ between a 1-form and a 1-form in 2D.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 1, G}`: The differential 1-form expression. It represents a 1-form on a 2D manifold.
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 1, G}`: The differential 1-form expression. It represents a 1-form on a 2D manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 1, expression_rank_1, G}`: The differential 1-form expression. It represents a 1-form on a 2D manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 1, expression_rank_2, G}`: The differential 1-form expression. It represents a 1-form on a 2D manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
     Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -882,7 +902,7 @@ Evaluates the wedge operator ∧ between a 1-form and a 1-form in 2D.
 - `wedge_indices`: Vector of Vectors containing the indices of the basis functions for the rank 2 product.
         `wedge_indices[1]` contains the row indices, and `wedge_indices[2]` contains the column indices.
 """
-function evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, G}, form_expression_2::AbstractFormExpression{2, 1, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+function evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{2, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{2}}
     # Evaluate the two forms that make up the wedge product 
     form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
     form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
@@ -932,13 +952,13 @@ end
 
 # 2-forms ∧ 2-forms in 2D
 @doc raw"""
-    evaluate_wedge(form_expression_1::AbstractFormExpression{2, 2, G}, form_expression_2::AbstractFormExpression{2, 2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+    evaluate_wedge(form_expression_1::AbstractFormExpression{2, 2, expression_rank_1, G}, form_expression_2::AbstractFormExpression{2, 2, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{2}}
 
 Evaluates the wedge operator ∧ between a 2-form and a 2-form in 2D.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 2, G}`: The differential 2-form expression. It represents a 2-form on a 2D manifold.
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 2, G}`: The differential 2-form expression. It represents a 2-form on a 2D manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 2, expression_rank_1, G}`: The differential 2-form expression. It represents a 2-form on a 2D manifold.
+- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 2, expression_rank_2, G}`: The differential 2-form expression. It represents a 2-form on a 2D manifold.
 - `element_idx::Int`: Index of the element to evaluate
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
     Points are the tensor product of the coordinates per dimension, therefore there will be
@@ -949,6 +969,6 @@ Evaluates the wedge operator ∧ between a 2-form and a 2-form in 2D.
 - `wedge_indices`: Vector of Vectors containing the indices of the basis functions for the rank 2 product.
         `wedge_indices[1]` contains the row indices, and `wedge_indices[2]` contains the column indices.
 """
-function evaluate_wedge(form_expression_1::AbstractFormExpression{2, 2, G}, form_expression_2::AbstractFormExpression{2, 2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {G <: Geometry.AbstractGeometry{2}}
+function evaluate_wedge(form_expression_1::AbstractFormExpression{2, 2, expression_rank_1, G}, form_expression_2::AbstractFormExpression{2, 2, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{2}}
     throw(ArgumentError("The wedge product of two tops forms in 2D is zero."))
 end
