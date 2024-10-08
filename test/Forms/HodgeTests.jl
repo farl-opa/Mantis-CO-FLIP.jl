@@ -106,30 +106,33 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         # 1-forms
         # Constant dx form
         hodge_dx_one_form_eval, hodge_dx_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        a = 1
-        @test all(isapprox(hodge_dx_one_form_eval[1], -inv_g_times_det_g[:,1,2], atol=1e-12))
-        @test all(isapprox(hodge_dx_one_form_eval[2], inv_g_times_det_g[:,1,1], atol=1e-12))
+        dx_one_form_eval, dx_one_form_indices = Mantis.Forms.evaluate(constdx, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_dx_one_form_eval[1], -inv_g_times_det_g[:,1,2].*dx_one_form_eval[1], atol=1e-12))
+        @test all(isapprox(hodge_dx_one_form_eval[2], inv_g_times_det_g[:,1,1].*dx_one_form_eval[1], atol=1e-12))
 
         # Constant dy form
         hodge_dy_one_form_eval, hodge_dy_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_dy_one_form_eval[1], -inv_g_times_det_g[:,2,2], atol=1e-12))
-        @test all(isapprox(hodge_dy_one_form_eval[2], inv_g_times_det_g[:,2,1], atol=1e-12))
+        dy_one_form_eval, dy_one_form_indices = Mantis.Forms.evaluate(constdy, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_dy_one_form_eval[1], -inv_g_times_det_g[:,2,2].*dy_one_form_eval[2], atol=1e-12))
+        @test all(isapprox(hodge_dy_one_form_eval[2], inv_g_times_det_g[:,2,1].*dy_one_form_eval[2], atol=1e-12))
 
         # Constant 1-form
         hodge_1_eval, hodge_1_indices = Mantis.Forms.evaluate(★ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_1_eval[1], -inv_g_times_det_g[:, 1, 2] - inv_g_times_det_g[:, 2, 2], atol=1e-12))
-        @test all(isapprox(hodge_1_eval[2], inv_g_times_det_g[:, 1, 1] + inv_g_times_det_g[:, 2, 1], atol=1e-12))
+        zeta_one_form_eval, zeta_one_form_indices = Mantis.Forms.evaluate(ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_1_eval[1], -inv_g_times_det_g[:, 1, 2].*zeta_one_form_eval[1] - inv_g_times_det_g[:, 2, 2].*zeta_one_form_eval[2], atol=1e-12))
+        @test all(isapprox(hodge_1_eval[2], inv_g_times_det_g[:, 1, 1].*zeta_one_form_eval[1] + inv_g_times_det_g[:, 2, 1].*zeta_one_form_eval[2], atol=1e-12))
 
         # Test if the Hodge-⋆ is the inverse of itself (in 2D with minus sign needed)
         hodge_hodge_1_eval, hodge_hodge_1_indices = Mantis.Forms.evaluate(★★ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_hodge_1_eval[1], -ones(Float64, size(hodge_hodge_1_eval[1])), atol=1e-12))
-        @test all(isapprox(hodge_hodge_1_eval[2], -ones(Float64, size(hodge_hodge_1_eval[1])), atol=1e-12))
+        @test all(isapprox(hodge_hodge_1_eval[1], -zeta_one_form_eval[1], atol=1e-12))
+        @test all(isapprox(hodge_hodge_1_eval[2], -zeta_one_form_eval[2], atol=1e-12))
         
 
         # n-forms
         # Hodge of a unity n-form is a form and has only 1 component.
         hodge_top_eval, hodge_top_indices = Mantis.Forms.evaluate(★γ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_top_eval[1], 1.0./det_g, atol=1e-12))
+        top_eval, top_indices = Mantis.Forms.evaluate(γ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_top_eval[1], top_eval[1]./det_g, atol=1e-12))
     end
 end
 
@@ -260,45 +263,54 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         
         # 1-forms
         hodge_1_form_dx_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_1_form_dx_eval[1][:,1], inv_g_times_det_g[:,1,1], atol=1e-12))
+        form_dx_eval, form_dx_indices = Mantis.Forms.evaluate(constdx, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_1_form_dx_eval[1][:,1], inv_g_times_det_g[:,1,1].*form_dx_eval[1], atol=1e-12))
         
         hodge_1_form_dy_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_1_form_dy_eval[2][:,1], inv_g_times_det_g[:,2,2], atol=1e-12))
+        form_dy_eval, form_dy_indices = Mantis.Forms.evaluate(constdy, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_1_form_dy_eval[2][:,1], inv_g_times_det_g[:,2,2].*form_dy_eval[2], atol=1e-12))
         
         hodge_1_form_dz_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdz), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_1_form_dz_eval[3][:,1], inv_g_times_det_g[:,3,3], atol=1e-12))
+        form_dz_eval, form_dz_indices = Mantis.Forms.evaluate(constdz, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_1_form_dz_eval[3][:,1], inv_g_times_det_g[:,3,3].*form_dz_eval[3], atol=1e-12))
 
         hodge_1_eval, hodge_1_indices = Mantis.Forms.evaluate(★ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_1_eval[1], inv_g_times_det_g[:, 1, 1] .+ inv_g_times_det_g[:, 1, 2] .+ inv_g_times_det_g[:, 1, 3], atol=1e-12))
-        @test all(isapprox(hodge_1_eval[2], inv_g_times_det_g[:, 2, 1] .+ inv_g_times_det_g[:, 2, 2] .+ inv_g_times_det_g[:, 2, 3], atol=1e-12))
-        @test all(isapprox(hodge_1_eval[3], inv_g_times_det_g[:, 3, 1] .+ inv_g_times_det_g[:, 3, 2] .+ inv_g_times_det_g[:, 3, 3], atol=1e-12))
+        form_zeta_eval, form_zeta_indices = Mantis.Forms.evaluate(ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_1_eval[1], inv_g_times_det_g[:, 1, 1].*form_zeta_eval[1] .+ inv_g_times_det_g[:, 1, 2].*form_zeta_eval[2] .+ inv_g_times_det_g[:, 1, 3].*form_zeta_eval[3], atol=1e-12))
+        @test all(isapprox(hodge_1_eval[2], inv_g_times_det_g[:, 2, 1].*form_zeta_eval[1] .+ inv_g_times_det_g[:, 2, 2].*form_zeta_eval[2] .+ inv_g_times_det_g[:, 2, 3].*form_zeta_eval[3], atol=1e-12))
+        @test all(isapprox(hodge_1_eval[3], inv_g_times_det_g[:, 3, 1].*form_zeta_eval[1] .+ inv_g_times_det_g[:, 3, 2].*form_zeta_eval[2] .+ inv_g_times_det_g[:, 3, 3].*form_zeta_eval[3], atol=1e-12))
 
         # Finally, test if the Hodge-⋆ is the inverse of itself (in 3D without minus signs needed)
         hodge_hodge_1_eval, hodge_hodge_1_indices = Mantis.Forms.evaluate(★★ζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_hodge_1_eval[1], ones(Float64, size(hodge_hodge_1_eval[1])), atol=1e-12))
-        @test all(isapprox(hodge_hodge_1_eval[2], ones(Float64, size(hodge_hodge_1_eval[1])), atol=1e-12))
-        @test all(isapprox(hodge_hodge_1_eval[3], ones(Float64, size(hodge_hodge_1_eval[1])), atol=1e-12))
+        @test all(isapprox(hodge_hodge_1_eval[1], form_zeta_eval[1], atol=1e-12))
+        @test all(isapprox(hodge_hodge_1_eval[2], form_zeta_eval[2], atol=1e-12))
+        @test all(isapprox(hodge_hodge_1_eval[3], form_zeta_eval[3], atol=1e-12))
 
         # 2-forms
-        hodge_2_form_dy_dz_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dy_dz), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_2_form_dy_dz_eval[1][:,1], g_div_det_g[:,1,1], atol=1e-12))
+        hodge_2_form_dy_dz_eval, hodge_2_form_dy_dz_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dy_dz), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        form_dy_dz_eval, form_dy_dz_indices = Mantis.Forms.evaluate(const_dy_dz, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_2_form_dy_dz_eval[1][:,1], g_div_det_g[:,1,1].*form_dy_dz_eval[1], atol=1e-12))
         
         hodge_2_form_dz_dx_eval, hodge_2_form_dz_dx_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dz_dx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_2_form_dz_dx_eval[2][:,1], g_div_det_g[:,2,2], atol=1e-12))
+        form_dz_dx_eval, form_dz_dx_indices = Mantis.Forms.evaluate(const_dz_dx, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_2_form_dz_dx_eval[2][:,1], g_div_det_g[:,2,2].*form_dz_dx_eval[2], atol=1e-12))
         
         hodge_2_form_dx_dy_eval, hodge_2_form_dx_dy_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dx_dy), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_2_form_dx_dy_eval[3][:,1], g_div_det_g[:,3,3], atol=1e-12))
+        form_dx_dy_eval, form_dx_dy_indices = Mantis.Forms.evaluate(const_dx_dy, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_2_form_dx_dy_eval[3][:,1], g_div_det_g[:,3,3].*form_dx_dy_eval[3], atol=1e-12))
 
         hodge_2_eval, hodge_2_indices = Mantis.Forms.evaluate(★ζ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_2_eval[1], g_div_det_g[:, 1, 1] .+ g_div_det_g[:, 1, 2] .+ g_div_det_g[:, 1, 3], atol=1e-12))
-        @test all(isapprox(hodge_2_eval[2], g_div_det_g[:, 2, 1] .+ g_div_det_g[:, 2, 2] .+ g_div_det_g[:, 2, 3], atol=1e-12))
-        @test all(isapprox(hodge_2_eval[3], g_div_det_g[:, 3, 1] .+ g_div_det_g[:, 3, 2] .+ g_div_det_g[:, 3, 3], atol=1e-12))
+        zeta_eval, zeta_indices = Mantis.Forms.evaluate(ζ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_2_eval[1], g_div_det_g[:, 1, 1].*zeta_eval[1] .+ g_div_det_g[:, 1, 2].*zeta_eval[2] .+ g_div_det_g[:, 1, 3].*zeta_eval[3], atol=1e-12))
+        @test all(isapprox(hodge_2_eval[2], g_div_det_g[:, 2, 1].*zeta_eval[1] .+ g_div_det_g[:, 2, 2].*zeta_eval[2] .+ g_div_det_g[:, 2, 3].*zeta_eval[3], atol=1e-12))
+        @test all(isapprox(hodge_2_eval[3], g_div_det_g[:, 3, 1].*zeta_eval[1] .+ g_div_det_g[:, 3, 2].*zeta_eval[2] .+ g_div_det_g[:, 3, 3].*zeta_eval[3], atol=1e-12))
 
         # Finally, test if the Hodge-⋆ is the inverse of itself (in 3D without minus signs needed)
         hodge_hodge_2_eval, hodge_hodge_2_indices = Mantis.Forms.evaluate(★★ζ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_hodge_2_eval[1], ones(Float64, size(hodge_hodge_2_eval[1])), atol=1e-12))
-        @test all(isapprox(hodge_hodge_2_eval[2], ones(Float64, size(hodge_hodge_2_eval[1])), atol=1e-12))
-        @test all(isapprox(hodge_hodge_2_eval[3], ones(Float64, size(hodge_hodge_2_eval[1])), atol=1e-12))
+        zeta_eval, zeta_indices = Mantis.Forms.evaluate(ζ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_hodge_2_eval[1], zeta_eval[1], atol=1e-12))
+        @test all(isapprox(hodge_hodge_2_eval[2], zeta_eval[2], atol=1e-12))
+        @test all(isapprox(hodge_hodge_2_eval[3], zeta_eval[3], atol=1e-12))
 
 
     # hodge_eval[1] .= @views (form_eval[1] .* (inv_g[:, 2, 2] .* inv_g[:, 3, 3] - inv_g[:, 2, 3] .* inv_g[:, 3, 2]) .+
@@ -327,7 +339,8 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         # n-forms
         # Hodge of a unity n-form is a form and has only 1 component.
         hodge_top_form_eval, hodge_top_form_indices = Mantis.Forms.evaluate(★γ³, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
-        @test all(isapprox(hodge_top_form_eval[1], 1.0./det_g, atol=1e-12))
+        top_form_eval, top_form_indices = Mantis.Forms.evaluate(γ³, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        @test all(isapprox(hodge_top_form_eval[1], top_form_eval[1]./det_g, atol=1e-12))
     end
 end
 
