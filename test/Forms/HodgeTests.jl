@@ -106,6 +106,7 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
         # 1-forms
         # Constant dx form
         hodge_dx_one_form_eval, hodge_dx_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        a = 1
         @test all(isapprox(hodge_dx_one_form_eval[1], -inv_g_times_det_g[:,1,2], atol=1e-12))
         @test all(isapprox(hodge_dx_one_form_eval[2], inv_g_times_det_g[:,1,1], atol=1e-12))
 

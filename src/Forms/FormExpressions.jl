@@ -76,7 +76,8 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 0, G, E}, element_idx:
     
     form_eval = form.expression(x)
     
-    return form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_eval, [[1]]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
@@ -90,7 +91,8 @@ function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, e
 
     form_eval[1][:] .*= LinearAlgebra.det.(eachslice(J; dims=1))
     
-    return form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_eval, [[1]]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
@@ -115,7 +117,8 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx:
         form_pullback[j] = a[:,j]
     end
     
-    return form_pullback, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_pullback, [[1]]
 end
 
 @doc raw"""
@@ -234,10 +237,11 @@ function evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::
     form_eval = Vector{Vector{Float64}}(undef, n_form_components)
 
     for form_component_idx in 1:n_form_components
-        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices]
+        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices[1]]  # note that FormSpace has only one set of basis indices
     end
 
-    return form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_eval, [[1]]
 end
 
 @doc raw"""
@@ -305,7 +309,8 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G
         d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices]
     end
 
-    return d_form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return d_form_eval, [[1]]
 end
 
 @doc raw"""
@@ -463,19 +468,19 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank,
     #print("Evaluating: " * form.label * "\n")
     if form.op == "∧"
         form_eval = evaluate_wedge(form.children[1], form.children[2], element_idx, xi)
-        return 1.0
 
     elseif form.op == "-"
         form_1_eval = evaluate(form.children[1], element_idx, xi)
         form_2_eval = evaluate(form.children[2], element_idx, xi)
-        return form_1_eval[1] - form_2_eval[1], form_1_eval[2]
+        form_eval = form_1_eval[1] - form_2_eval[1], form_1_eval[2]
 
     elseif form.op == "+"
         form_1_eval = evaluate(form.children[1], element_idx, xi)
         form_2_eval = evaluate(form.children[2], element_idx, xi)
-        return form_1_eval[1] + form_2_eval[1], form_1_eval[2]
-
+        form_eval = form_1_eval[1] + form_2_eval[1], form_1_eval[2]
     end
+
+    return form_eval
 end
 
 @doc raw"""
@@ -494,7 +499,7 @@ function wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{ma
     return FormExpression((form_1, form_2), "∧")
 end
 
-# TODO This is seems correct, partially.
+# TODO This seems correct, partially.
 """
     Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
@@ -511,7 +516,7 @@ function Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manif
     return FormExpression((form_1, form_2), 0, "-")
 end
 
-# TODO This is seems correct, partially.
+# TODO This seems correct, partially.
 """
     Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
@@ -554,7 +559,7 @@ Create an exterior derivative expression of a form.
 # Returns
 - `FormExpression`: A new FormExpression representing the exterior derivative
 """
-function exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     return FormExpression((form,), "d")
 end
 
