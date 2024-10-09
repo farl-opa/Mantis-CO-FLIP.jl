@@ -53,7 +53,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{manifol
 
     prod_form_rows, prod_form_cols, prod_form_eval = inner_product_0_form_component!(
         prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, sqrt_g, 
-        form1_eval, form1_indices, form2_eval, form2_indices, 
+        form1_eval, form1_indices[1], form2_eval, form2_indices[1], 
         n_indices_1, n_indices_2
     ) # Evaluates α⁰₁β⁰₁√det(g)
 
@@ -112,7 +112,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{manifol
 
     prod_form_rows, prod_form_cols, prod_form_eval = inner_product_n_form_component!(
         prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, sqrt_g,
-        form1_eval, form1_indices, form2_eval, form2_indices, 
+        form1_eval, form1_indices[1], form2_eval, form2_indices[1], 
         n_indices_1, n_indices_2
     ) # Evaluates αⁿ₁βⁿ₁ⱼ√det(g)⁻¹
 
@@ -180,7 +180,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{manifol
         for j ∈ 1:manifold_dim
             prod_form_rows, prod_form_cols, prod_form_eval = inner_product_1_form_component!(
                 prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
-                inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
+                inv_g, sqrt_g, form1_eval, form1_indices[1], form2_eval, form2_indices[1], 
                 n_indices_1, n_indices_2, (i,j)) # Evaluates α¹ᵢβ¹ⱼgⁱʲ√det(g)
         end
     end
@@ -245,7 +245,7 @@ function evaluate_inner_product(form_expression1::AbstractFormExpression{3, 2, e
         for j ∈1:3
             prod_form_rows, prod_form_cols, prod_form_eval = inner_product_2_form_component!(
                 prod_form_rows, prod_form_cols, prod_form_eval, quad_rule, 
-                inv_g, sqrt_g, form1_eval, form1_indices, form2_eval, form2_indices, 
+                inv_g, sqrt_g, form1_eval, form1_indices[1], form2_eval, form2_indices[1], 
                 n_indices_1, n_indices_2, (i,j)
             ) # Evaluates α¹ᵢβ¹ⱼ(gⁱ¹ʲ¹gⁱ²ʲ²-gⁱ¹ʲ²gⁱ²ʲ¹)√det(g)
         end

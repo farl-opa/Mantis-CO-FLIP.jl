@@ -306,7 +306,7 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G
     #       3-forms: dξ₁ ∧ dξ₂ ∧ dξ₃
     # 
     for derivative_form_component_idx in 1:n_derivative_components
-        d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices]
+        d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices[1]]
     end
 
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
