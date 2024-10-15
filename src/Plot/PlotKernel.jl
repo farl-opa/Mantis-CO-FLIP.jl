@@ -99,7 +99,7 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
         I_ref = node_ordering("line", degree)
 
         n_edges_per_element = length(edge_ordering)
-        n_total_edges = n_total_cells * n_edges_per_element
+        n_total_edges = n_total_elements * n_subcells * n_edges_per_element
         n_vertices_per_subedge = degree+1
         n_vertices_on_edges = n_total_edges * n_vertices_per_subedge
 
@@ -276,7 +276,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
         I_ref = node_ordering("line", degree)
 
         n_edges_per_element = length(edge_ordering)
-        n_total_edges = n_total_cells * n_edges_per_element
+        n_total_edges = n_total_elements * n_subcells * n_edges_per_element
         n_vertices_per_subedge = degree+1
         n_vertices_on_edges = n_total_edges * n_vertices_per_subedge
 
