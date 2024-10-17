@@ -11,7 +11,7 @@ Lright = 1.0
 Lbottom = 0.0
 Ltop = 1.0
 
-# Setup the form spaces
+# Setup the form spaces -------------------------------------------------------
 # First the patches
 breakpoints1 = [Lleft, 0.5, Lright]
 patch1 = Mantis.Mesh.Patch1D(breakpoints1)
@@ -33,7 +33,7 @@ dTP_Space_dy = Mantis.FunctionSpaces.TensorProductSpace(B1, dB2)
 TP_Space_1 = Mantis.FunctionSpaces.DirectSumSpace((dTP_Space_dx, dTP_Space_dy))
 TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace(dB1, dB2),))
 
-# then, the geometry 
+# then, the geometries
 # Line 1
 line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
 # Line 2
@@ -56,29 +56,9 @@ end
 dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
 geom_crazy = Mantis.Geometry.MappedGeometry(geom_cart, crazy_mapping)
+# -----------------------------------------------------------------------------
 
-# Test the inner product of the 0-form spaces -----------------------------
-q_rule = Mantis.Quadrature.tensor_product_rule((deg1+3, deg2+3), Mantis.Quadrature.gauss_legendre)
-for geom in [geom_cart, geom_crazy]
-    # build a 0-form space
-    zero_form_space = Mantis.Forms.FormSpace(0, geom, TP_Space_0, "ξ")
-    # compute inner product assuming unit coefficients for both spaces
-    inner_prod_0 = 0.0
-    for element_id in 1:1:Mantis.Geometry.get_num_elements(geom)
-        prod_form_rows, prod_form_cols, prod_form_eval = Mantis.Forms.evaluate_inner_product(zero_form_space, zero_form_space, element_id, q_rule)
-        inner_prod_0 += sum(prod_form_eval)
-    end
-    @test isapprox(inner_prod_0, 1.0, atol=1e-12)
-end
-# -------------------------------------------------------------------------
-
-# Test the inner product of analytical form fields -----------------------------
-function analytical_1valued_form_func(x::Matrix{Float64})
-    return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
-end
-function analytical_2valued_form_func(x::Matrix{Float64})
-    return @. [8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2]), 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
-end
+# Test wedge product ----------------------------------------------------------
 
 # Test on multiple geometries
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+25, deg2+25), Mantis.Quadrature.gauss_legendre)
@@ -133,7 +113,7 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         
         # Compute the wedge product: ϵⁿ ∧ ⋆ϵⁿ
         top_form_wedge = Mantis.Forms.wedge(ϵⁿ, ★ϵⁿ)
-        
+
         # Evaluate it at the quadrature nodes
         ξ_quadrature_nodes = Mantis.Quadrature.get_quadrature_nodes(q_rule)
         top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(top_form_wedge, elem_id, ξ_quadrature_nodes)
@@ -178,37 +158,7 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
 
         # Test ϵ¹ ∧ ⋆ϵ¹ ∧ ϵ¹ to check if rank 3 expressions are not allowed
         @test_throws ArgumentError Mantis.Forms.wedge(one_form_wedge, ϵ⁰)
-
-        a = 2
-        # # 1-forms
-        # integrated_metric_1 = zeros((2,2))
-        # for node_idx in eachindex(Mantis.Quadrature.get_quadrature_weights(q_rule))
-        #     integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* (inv_g[node_idx,:,:].*det_g[node_idx])
-        # end
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1], sum(integrated_metric_1), atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)[3][1], integrated_metric_1[1,2], atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)[3][1], integrated_metric_1[2,1], atol=1e-12)
-        # @test isapprox(sum(Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]), sum(integrated_metric_1), atol=1e-12)
-        
-        # # 2-forms
-        # integrated_metric_2 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* (1.0./det_g))
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], integrated_metric_2, atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
-        # @test isapprox(sum(Mantis.Forms.evaluate_inner_product(top_form_space, top_form_space, elem_id, q_rule)[3]), integrated_metric_2, atol=1e-12)
-
-        # # Test if the inner product of the hodges of the forms equals that of the forms
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3], atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3], atol=1e-12)
-        # @test isapprox(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3], atol=1e-12)
-
-        # # AnalyticalFormField tests
-        # # 0-form
-        # total_integrated_analytical_field_0 += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
-        # total_integrated_analytical_field_1 += Mantis.Forms.evaluate_inner_product(f¹_analytic, f¹_analytic, elem_id, q_rule)[3][1]
-        # total_integrated_analytical_field_n += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
     end
-    # @test isapprox(total_integrated_analytical_field_0, 1558.5454565440389, atol=1e-12)
-    # @test isapprox(total_integrated_analytical_field_1/2, 1558.5454565440389, atol=1e-12)
-    # @test isapprox(total_integrated_analytical_field_n, 1558.5454565440389, atol=1e-12)
 end
+
+# -----------------------------------------------------------------------------
