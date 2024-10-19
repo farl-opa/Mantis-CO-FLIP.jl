@@ -364,7 +364,7 @@ struct FormExpression{manifold_dim, form_rank, expression_rank, G, F} <:Abstract
         end
         
         if op == "∧"
-            if (expression_rank_1 + expression_rank_1) > 2
+            if (expression_rank_1 + expression_rank_2) > 2
                 throw(ArgumentError("Wedge of FormExpressions requires expressions with total expression rank smaller than three, got: $expression_rank_1 and $expression_rank_2"))
             end
             if (form_rank_1 + form_rank_2) > manifold_dim
