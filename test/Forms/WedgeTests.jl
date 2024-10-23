@@ -81,7 +81,7 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         #   <ϵ⁰, ϵ⁰>
         # with 
         #   ϵ⁰ ∧ ⋆ϵ⁰
-        
+
         # Compute the inner product: <ϵ⁰, ϵ⁰>
         zero_form_rows_idx, zero_form_columns_idx, zero_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ⁰, ϵ⁰, elem_id, q_rule)
         
