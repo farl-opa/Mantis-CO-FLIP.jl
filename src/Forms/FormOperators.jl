@@ -964,206 +964,8 @@ function evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 
     return _evaluate_wedge(form_expression_1, form_expression_2, element_id, xi)
 end
 
-
-# 0-forms ∧ k-forms (expression rank 0 on the 0-form)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, 0, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 0-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # k-form
-
-    # Compute the wedge product between the 0-form and the k-form
-    
-    # Given 
-    #   α⁰ := α
-    #   βᵏ := ∑ᵢβᵢ dᵏξᵢ  (note that here we use dᵏξᵢ to mean dξᵢ for 1-forms, d²ξ₁ = dξ₂dξ₃, etc for 2-forms, and so forth) 
-    # then 
-    #   α⁰ ∧ βᵏ = ∑ᵢ α βᵢ dᵏξᵢ
-    # In terms of size of the results, the format is the following
-    # If α⁰ has no basis and βᵏ has num_basis_2_l basis for each of the expression_rank_2 ranks 
-    # of the expression (and n_components) then the final result will be 
-    # Vector of n_components with each component a (1+expression_rank_2)-matrix of dimension 
-    #   n_evaluation_points x num_basis_2_1 x ... x num_basis_2_expression_rank_2
-    
-    # Get the number of components of the wedge 
-    # In this case because it is the wedge of a 0-form with a k-form 
-    # there are as many components in the wedge as components in the k-form
-    n_components_form_expression_2 = binomial(manifold_dim, form_rank)
-    n_components_wedge = n_components_form_expression_2
-
-    # Allocate memory space for wedge_eval and wedge_indices
-    wedge_eval = form_expression_2_eval  # because form_expression_1 is an expression of rank 0, so we just multiply by a number, not a vector or an array, the dimensions do not change
-    wedge_indices = form_expression_2_indices  # same as above
-
-    # Compute the wedge evaluation
-    for form_expression_2_component_idx = 1:n_components_form_expression_2
-        form_expression_1_component_idx = 1  # the first form expression is a 0-form, therefore only one component
-        form_expression_1_basis_idx = 1  # only one basis since it is an expression of rank 0
-        wedge_component_idx = form_expression_2_component_idx  # the wedge has the same components as the second expression
-
-        wedge_eval[wedge_component_idx] .*= @views form_expression_1_eval[form_expression_1_component_idx][:, form_expression_1_basis_idx]  # note that above we set wedge_eval = form_expression_2_eval
-    end
-    
-    return wedge_eval, wedge_indices
-end
-
-# k-forms ∧ 0-forms (expression rank 0 on the 0-form)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # We intend to evaluate αᵏ ∧ β⁰, but this is equal to β⁰ ∧ αᵏ, therefore we just 
-    # use the existing function with reversed inputs
-    # The wedge with an expression of expression rank 0, does not change the shape of 
-    # the evaluations, a Vector remains a Vector, etc.
-    wedge_eval, wedge_indices = _evaluate_wedge(form_expression_2, form_expression_1, element_id, xi)
-    
-    return wedge_eval, wedge_indices
-end
-
-
-# 0-forms ∧ k-forms (expression rank 0 on the k-form)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank_2, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank_2, expression_rank_1, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 0-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # k-form
-
-    # Compute the wedge product between the 0-form and the k-form
-    
-    # Given 
-    #   α⁰ := α
-    #   βᵏ := ∑ᵢβᵢ dᵏξᵢ  (note that here we use dᵏξᵢ to mean dξᵢ for 1-forms, d²ξ₁ = dξ₂dξ₃, etc for 2-forms, and so forth) 
-    # then 
-    #   α⁰ ∧ βᵏ = ∑ᵢ α βᵢ dᵏξᵢ
-    # In terms of size of the results, the format is the following
-    # If α⁰ has num_basis_1_l basis for each of the expression_rank_1 ranks 
-    # of the expression (and n_components) and βᵏ has no basis (expression rank 0)
-    # then the final result will be a Vector of n_components with each component a 
-    # (1+expression_rank_1)-matrix of dimension 
-    #   n_evaluation_points x num_basis_1_1 x ... x num_basis_1_expression_rank_1
-
-    # Get the number of components of the wedge 
-    # In this case because it is the wedge of a 0-form with a k-form 
-    # there are as many components in the wedge as components in the k-form
-    n_components_form_expression_2 = binomial(manifold_dim, form_rank)
-    n_components_wedge = n_components_form_expression_2
-
-    # Allocate memory space for wedge_eval and wedge_indices
-    # The wedge evaluation on each component will have the shape of form_expression_1
-    # because form_expression_2 has expression rank 0
-    # The indices will also be the ones from expression 1, for the same reason
-    wedge_eval = [zeros(Float64, size(expression_1_eval[1])) for _ in 1:n_components_wedge]
-    wedge_indices = form_expression_1_indices
-
-    # Compute the wedge evaluation
-    for wedge_component_idx = 1:n_components_wedge
-        form_expression_1_component_idx = 1  # the first form expression is a 0-form, therefore only one component
-        form_expression_1_basis_idx = 1  # only one basis since it is an expression of rank 0
-        
-        wedge_eval[wedge_component_idx] .= @views form_expression_2_eval[wedge_component_idx] .* form_expression_1_eval[form_expression_1_component_idx][:, form_expression_1_basis_idx]
-    end
-    
-    return wedge_eval, wedge_indices
-end
-
-# k-forms ∧ 0-forms (expression rank 0 on the 0-form)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank_1, 0, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # We intend to evaluate αᵏ ∧ β⁰, but this is equal to β⁰ ∧ αᵏ, therefore we just 
-    # use the existing function with reversed inputs
-    # The wedge with an expression of expression rank 0, does not change the shape of 
-    # the evaluations, a Vector remains a Vector, etc.
-    wedge_eval, wedge_indices = _evaluate_wedge(form_expression_2, form_expression_1, element_id, xi)
-    
-    return wedge_eval, wedge_indices
-end
-
-# 1-forms ∧ 1-forms in 2D (left 1-form an expression with expression rank 0)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, 0, G}, form_expression_2::AbstractFormExpression{2, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_2, G <: Geometry.AbstractGeometry{2}}
-    # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
-
-    # Compute the wedge product between the 1-form and the 1-form in 2D
-    
-    # Given 
-    #   α¹ := ∑ᵢ αᵢ dξⁱ
-    #   β¹ := ∑ᵢ βᵢ dξⁱ
-    # with i = [1, 2], then
-    #   α¹ ∧ β¹ = (α₁β₂ - α₂β₁)dξ¹∧dξ²
-    # In terms of size of the results, the format is the following
-    # If α¹ has num_basis_1 basis and β¹ has num_basis_2 basis then the final result will be 
-    # Vector of size 1 components with each component a 3-matrix of dimension n_evaluation_points x num_basis_1 x num_basis_2
-    # Note: For now both form expressions must be a FormBasis (also a FormField works, but the results will not be consistent).
-
-    # Allocate memory space for wedge_eval and wedge_indices
-    # The wedge will be a top form (wedge of two one forms in 2-D)
-    # The shape of the evaluation output is the same as each component of expression_2_eval 
-    # because the expression_1 is an expression of rank 0
-    # The indices are the same
-    n_components_wedge = 1
-    wedge_eval = [zeros(Float64, size(expression_2_eval[1])) for _ in 1:n_components_wedge]
-    wedge_indices = form_expression_2_indices
-
-    # Compute the wedge evaluation
-    wedge_eval[1] .= @views (form_expression_1_eval[1] .* form_expression_2_eval[2]) .- (form_expression_1_eval[2] .* form_expression_2_eval[1])
-    
-    return wedge_eval, wedge_indices
-end
-
-# 1-forms ∧ 1-forms in 3D (left 1-form an expression with expression rank 0)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, 0, G}, form_expression_2::AbstractFormExpression{3, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_2, G <: Geometry.AbstractGeometry{3}}
-    # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
-
-    # Compute the wedge product between the 1-form and the 1-form in 2D
-    
-    # Given 
-    #   α¹ := ∑ᵢ αᵢ dξⁱ
-    #   β¹ := ∑ᵢ βᵢ dξⁱ
-    # with i = [1, 2, 3], then
-    #   α¹ ∧ β¹ = (α₂β₃ - α₃β₂)dξ²∧dξ³ + (α₃β₁ - α₁β₃)dξ³∧dξ¹ + (α₁β₂ - α₂β₁)dξ¹∧dξ²
-    # In terms of size of the results, the format is the following
-    # If α¹ has zero basis (expression rank 0) and β¹ has expression rank expression_rank_2  and 
-    # num_basis_2_l in each of the expression_rank_2 dimension then the final result will be 
-    # Vector of size 3 components with each component a (expression_rank_2)-matrix of dimension 
-    #   n_evaluation_points x num_basis_2_1 × … × num_basis_2_expression_rank_2
-    
-    # Allocate memory space for wedge_eval and wedge_indices
-    # The wedge will be a 2-form (wedge of two one forms in 3-D)
-    # The shape of each component of the evaluation output is the same as 
-    # each component of expression_2_eval because the expression_1 is an expression of rank 0
-    # The indices are the same
-    n_components_wedge = 3
-    wedge_eval = [zeros(Float64, size(expression_2_eval[1])) for _ in 1:n_components_wedge]
-    wedge_indices = form_expression_2_indices
-
-    # Compute the wedge evaluation
-    # (α₂β₃ - α₃β₂)dξ²∧dξ³
-    wedge_eval[1] .= @views (form_expression_1_eval[2] .* form_expression_2_eval[3]) .- (form_expression_1_eval[3] .* form_expression_2_eval[2])
-    # (α₃β₁ - α₁β₃)dξ³∧dξ¹
-    wedge_eval[2] .= @views (form_expression_1_eval[3] .* form_expression_2_eval[1]) .- (form_expression_1_eval[1] .* form_expression_2_eval[3])
-    # (α₁β₂ - α₂β₁)dξ¹∧dξ²
-    wedge_eval[3] .= @views (form_expression_1_eval[1] .* form_expression_2_eval[2]) .- (form_expression_1_eval[2] .* form_expression_2_eval[1])
-    
-    return wedge_eval, wedge_indices
-end
-
-# 1-forms ∧ 1-forms in nD (right 1-form an expression with expression rank 0)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 1, 0, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {manifold_dim, expression_rank_1, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # We wish to evaluate 
-    #   α¹ ∧ β¹
-    # which is the same as
-    #   -β¹ ∧ α¹
-    # We therefore use second form (already implemented function) and add the minus sign
-
-    wedge_eval, wedge_indices = _evaluate_wedge(form_expression_2, form_expresson_1, element_id, xi)
-
-    return -wedge_eval, wedge_indices
-end
-
-# 0-forms ∧ 0-forms (both form expressions ranks > 0)
+# 0-forms ∧ 0-forms
 function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # Check if total rank of wedge expression is valid
-    if (expression_rank_1 + expression_rank_1) > 2
-        throw(ArgumentError("Wedge of FormExpressions requires expressions with total expression rank smaller than three, got: $expression_rank_1 and $expression_rank_2"))
-    end
 
     # Evaluate the two forms that make up the wedge product 
     form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 0-form 
@@ -1208,28 +1010,25 @@ function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim,
     return wedge_eval, wedge_indices
 end
 
-# 0-forms ∧ k-forms (both form expressions ranks > 0)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
-    # Check if total rank of wedge expression is valid
-    if (expression_rank_1 + expression_rank_1) > 2
-        throw(ArgumentError("Wedge of FormExpressions requires expressions with total expression rank smaller than three, got: $expression_rank_1 and $expression_rank_2"))
-    end
-
+# k-forms ∧ 0-forms
+function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank_1, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
     # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 0-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # k-form
+    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # k-form 
+    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 0-form
 
-    # Compute the wedge product between the 0-form and the k-form
+    # Compute the wedge product between the 0-form and the 0-form
     
     # Given 
-    #   α⁰ := α
-    #   βᵏ := ∑ᵢβᵢ dᵏξᵢ  (note that here we use dᵏξᵢ to mean dξᵢ for 1-forms, d²ξ₁ = dξ₂dξ₃, etc for 2-forms, and so forth) 
+    #   αᵏ := ∑ᵢαᵢ dᵏξᵢ  (note that here we use dᵏξᵢ to mean dξᵢ for 1-forms, d²ξ₁ = dξ₂dξ₃, etc for 2-forms, and so forth) 
+    #   β⁰ := β  
     # then 
-    #   α⁰ ∧ βᵏ = ∑ᵢ α βᵢ dᵏξᵢ
-    # In terms of size of the results, the format is the following
-    # If α⁰ has num_basis_1 basis and βᵏ has num_basis_2 basis (and n_components) then the final result will be 
-    # Vector of n_components with each component a 3-matrix of dimension n_evaluation_points x num_basis_1 x num_basis_2
-    # Note: For now both form expressions must be a FormBasis (also a FormField works, but the results will not be consistent)
+    #   αᵏ ∧ β⁰ = ∑ᵢ αᵢ β dᵏξᵢ
+    
+    # Get the number of components of the wedge 
+    # In this case because it is the wedge of a k-form with a 0-form 
+    # there will be has many components in the wedge as components in the k-form
+    n_components_form_expression_1 = binomial(manifold_dim, form_rank_1)
+    n_components_wedge = n_components_form_expression_1
 
     # Get the number of basis in each expression 
     num_basis_form_expression_1 = size.(form_expression_1_indices, 1)
@@ -1238,90 +1037,72 @@ function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim,
     # Get the number of evaluation points 
     n_evaluation_points = size(form_expression_1_eval[1], 1)  # all components are evaluated at the same points and both forms are evaluated at the same points
 
-    # Get the number of components of the wedge 
-    # In this case because it is the wedge of a 0-form with a k-form 
-    # there are as many components in the wedge as components in the k-form
-    n_components_form_expression_2 = binomial(manifold_dim, form_rank)
-    n_components_wedge = n_components_form_expression_2
-
     # Allocate memory space for wedge_eval
-    wedge_eval = [zeros(Float64, n_evaluation_points, num_basis_form_expression_1..., num_basis_form_expression_2...) for _ in 1:n_components_wedge]
+    # In this case, both forms have arbitrary expression rank, hence the num_basis_from_expression_i, but only the first from has a variable form_rank
+    wedge_eval = [zeros(Float64, n_evaluation_points, num_basis_form_expression_1..., num_basis_form_expression_2...) for _ ∈ 1:n_components_form_expression_1]
 
     # Assign wedge_indices: wedge_indices is just the concatenation of the indices of each expression
     wedge_indices = vcat(form_expression_1_indices, form_expression_2_indices)
 
     # Compute the wedge evaluation
-    for form_expression_2_component_idx = 1:n_components_form_expression_2
-        form_expression_1_component_idx = 1  # the first form expression is a 0-form, therefore only one component
-        wedge_component_idx = form_expression_2_component_idx  # the wedge has the same components as the second expression
-        
-        for form_expression_1_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_1))
-            for form_expression_2_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_2))
-                wedge_eval[wedge_component_idx][:, form_expression_1_basis_idx, form_expression_2_basis_idx] .= @views form_expression_1_eval[form_expression_1_component_idx][:, form_expression_1_basis_idx] .* form_expression_2_eval[form_expression_2_component_idx][:, form_expression_2_basis_idx]
+    for wedge_component_idx ∈ 1:n_components_form_expression_1
+        for form_expression_1_basis_idx ∈ CartesianIndices(Tuple(num_basis_form_expression_1))
+            for form_expression_2_basis_idx ∈ CartesianIndices(Tuple(num_basis_form_expression_2))
+                wedge_eval[wedge_component_idx][:, form_expression_1_basis_idx, form_expression_2_basis_idx] .= @views form_expression_1_eval[wedge_component_idx][:, form_expression_1_basis_idx] .* form_expression_2_eval[1][:, form_expression_2_basis_idx]
             end
         end
     end
-    
+
     return wedge_eval, wedge_indices
 end
 
-# k-forms ∧ 0-forms
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
+# 0-forms ∧ k-forms
+function _evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank_2, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
+    # Evaluate the two forms that make up the wedge product 
+    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 0-form 
+    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # k-form
+
+    # Compute the wedge product between the 0-form and the 0-form
+    
+    # Given 
+    #   α⁰ := α 
+    #   βᵏ := ∑ᵢβᵢ dᵏξᵢ (note that here we use dᵏξᵢ to mean dξᵢ for 1-forms, d²ξ₁ = dξ₂dξ₃, etc for 2-forms, and so forth) 
+    # then 
+    #   α⁰ ∧ βᵏ = ∑ᵢ α βᵢ dᵏξᵢ
+    
     # Get the number of components of the wedge 
     # In this case because it is the wedge of a 0-form with a k-form 
-    # there are as many components in the wedge as components in the k-form
-    n_components_form_expression_1 = binomial(manifold_dim, form_rank)
-    n_components_wedge = n_components_form_expression_1
+    # there will be has many components in the wedge as components in the k-form
+    n_components_form_expression_2 = binomial(manifold_dim, form_rank_2)
+    n_components_wedge = n_components_form_expression_2
 
-    # We know that for   α⁰, βᵏ  we have that
-    #   α⁰ ∧ βᵏ = βᵏ ∧ α⁰
-    # We can use the evaluation function for α⁰ ∧ βᵏ to compute βᵏ ∧ α⁰
-    # We just need to take care to transpose the results, because for expressions with more than 
-    # one basis, the result is the computation of all wedge products among all basis 
-    wedge_eval, wedge_indices = evaluate_wedge(form_expression_2, form_expression_1, element_id, xi)
+    # Get the number of basis in each expression 
+    num_basis_form_expression_1 = size.(form_expression_1_indices, 1)
+    num_basis_form_expression_2 = size.(form_expression_2_indices, 1)
 
-    # Transpose the results over the two expressions (for all components) and flip the order of the indices
-    # As mentioned above, we intend to compute 
-    #   βᵏ ∧ α⁰
-    # but we use the function that computes 
-    #   α⁰ ∧ βᵏ
-    # This means we need to permute the dimensions of the outputs to get the intended result.
-    # If
-    #   - βᵏ is a form expression of expression rank n > 0
-    #   - α⁰ is a form expression of expression rank m > 0
-    # then
-    #   βᵏ's components will be an array of dimension 1 + n (+1 is for the point evaluation dimension)
-    #   α⁰'s unique component will be an array of dimension 1 + m
-    # therefore 
-    #   wedge_eval[j] will be an array of dimension 1 + n x m (because we compute all wedge product combinations)
-    #
-    # As indicated above, we first compute α⁰ ∧ βᵏ and then convert it to βᵏ ∧ α⁰ 
-    # If wedge_eval[j] contains the values of the evaluation of the wedge product α⁰ ∧ βᵏ
-    # for component j, then the intended inner product is given by 
-    #   wedge_eval_intended[j][i₁, …, iₙ, l₁, …, lₘ] = wedge_eval[j][l₁, …, lₘ, i₁, …, iₙ]
-    expression_2_column_indices = (expression_rank_1 + 1 + 1):((expression_rank_1 + 1) + expression_rank_2)
-    expression_1_column_indices = 2:(expression_rank_1 + 1)
-    for component_idx = 1:n_components_wedge
-        wedge_eval[component_idx] = permutedims(wedge_eval[component_idx], (1, expression_2_column_indices..., expression_1_column_indices...))  # this transposes in the basis 
+    # Get the number of evaluation points 
+    n_evaluation_points = size(form_expression_1_eval[1], 1)  # all components are evaluated at the same points and both forms are evaluated at the same points
+
+    # Allocate memory space for wedge_eval
+    # In this case, both forms have arbitrary expression rank, hence the num_basis_from_expression_i, but only the first from has a variable form_rank
+    wedge_eval = [zeros(Float64, n_evaluation_points, num_basis_form_expression_1..., num_basis_form_expression_2...) for _ ∈ 1:n_components_form_expression_2]
+
+    # Assign wedge_indices: wedge_indices is just the concatenation of the indices of each expression
+    wedge_indices = vcat(form_expression_1_indices, form_expression_2_indices)
+
+    # Compute the wedge evaluation
+    for wedge_component_idx ∈ 1:n_components_form_expression_2
+        for form_expression_1_basis_idx ∈ CartesianIndices(Tuple(num_basis_form_expression_1))
+            for form_expression_2_basis_idx ∈ CartesianIndices(Tuple(num_basis_form_expression_2))
+                wedge_eval[wedge_component_idx][:, form_expression_1_basis_idx, form_expression_2_basis_idx] .= @views form_expression_1_eval[1][:, form_expression_1_basis_idx] .* form_expression_2_eval[wedge_component_idx][:, form_expression_2_basis_idx]
+            end
+        end
     end
-
-    # The final step is to do the same for the indices
-    # The evaluation of α⁰ ∧ βᵏ provides the indices 
-    #   wedge_indices = [[r₁], …, [rₙ], [s₁], …, [sₘ]]
-    # where 
-    #   [r₁], …, [rₙ] are the n vectors of indices for each of the n dimensions of α⁰
-    #   [s₁], …, [sₙ] are the m vectors of indices for each of the m dimensions of βᵏ
-    # since the intended ouput is βᵏ ∧ α⁰ we must flip the indices to 
-    #   wedge_indices_intended = [[s₁], …, [sₘ], [r₁], …, [rₙ]]
-    expression_2_column_indices = (expression_rank_1 + 1):(expression_rank_1 + expression_rank_2)
-    expression_1_column_indices = 1:expression_rank_1
-    wedge_indices = wedge_indices[[expression_2_column_indices..., expression_1_column_indices...]]
 
     return wedge_eval, wedge_indices
 end
 
-
-# 1-forms ∧ 1-forms in 2D (both form expressions ranks > 0)
+# 1-forms ∧ 1-forms in 2D
 function _evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{2, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{2}}
     # Evaluate the two forms that make up the wedge product 
     form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
@@ -1363,7 +1144,7 @@ function _evaluate_wedge(form_expression_1::AbstractFormExpression{2, 1, express
     return wedge_eval, wedge_indices
 end
 
-# 1-forms ∧ 1-forms in 3D (both form expressions ranks > 0)
+# 1-forms ∧ 1-forms in 3D
 function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{3, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{3}}
     # Evaluate the two forms that make up the wedge product 
     form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
@@ -1419,100 +1200,13 @@ function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, express
     return wedge_eval, wedge_indices
 end
 
-
-# 1-forms ∧ 2-forms in 3D (left expression with rank = 0 and right expression with rank > 0)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, 0, G}, form_expression_2::AbstractFormExpression{3, 2, expression_rank_2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank_2, G <: Geometry.AbstractGeometry{3}}
-    # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
-
-    # Compute the wedge product between the 1-form and the 1-form in 2D
-    
-    # Given 
-    #   α¹ := ∑ᵢ αᵢ dξⁱ
-    #   β² := β₁dξ²∧dξ³ + β₂dξ³∧dξ¹ + β₃dξ¹∧dξ²
-    # with i = [1, 2, 3], then
-    #   α¹ ∧ β² = (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
-    
-    # Get the number of basis for the second expression
-    num_basis_form_expression_2 = size.(form_expression_2_indices, 1)
-
-    # Get the number of evaluation points 
-    n_evaluation_points = size(form_expression_1_eval[1], 1)  # all components are evaluated at the same points and both forms are evaluated at the same points
-
-    # Get the number of components of the wedge
-    # in this case we have a 1-form wedge with a 2-form, therefore the 
-    # results has only one component because it is a 3-form in 3D
-    # n_components_wedge = 1
-
-    # Allocate memory space for wedge_eval
-    wedge_eval = [zeros(Float64, n_evaluation_points, num_basis_form_expression_2...)]
-
-    # Assign wedge_indices: wedge_indices are just the indices of the second expression,
-    # the first expression has rank 0
-    wedge_indices = form_expression_2_indices
-
-    # Compute the wedge evaluation
-    # (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
-    for form_expression_2_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_2))
-        for form_components_idx in 1:3
-            wedge_eval[1][:, form_expression_2_basis_idx] .+= @views (form_expression_1_eval[form_components_idx][:, 1] .* form_expression_2_eval[form_components_idx][:, form_expression_2_basis_idx])
-        end
-    end
-    
-    return wedge_eval, wedge_indices
-end
-
-# 1-forms ∧ 2-forms in 3D (left expression with rank > 0 and right expression with rank = 0)
-function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{3, 2, 0, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank_1, G <: Geometry.AbstractGeometry{3}}
-    # Evaluate the two forms that make up the wedge product 
-    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
-
-    # Compute the wedge product between the 1-form and the 1-form in 2D
-    
-    # Given 
-    #   α¹ := ∑ᵢ αᵢ dξⁱ
-    #   β² := β₁dξ²∧dξ³ + β₂dξ³∧dξ¹ + β₃dξ¹∧dξ²
-    # with i = [1, 2, 3], then
-    #   α¹ ∧ β² = (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
-    
-    # Get the number of basis for the second expression
-    num_basis_form_expression_1 = size.(form_expression_1_indices, 1)
-
-    # Get the number of evaluation points 
-    n_evaluation_points = size(form_expression_1_eval[1], 1)  # all components are evaluated at the same points and both forms are evaluated at the same points
-
-    # Get the number of components of the wedge
-    # in this case we have a 1-form wedge with a 2-form, therefore the 
-    # results has only one component because it is a 3-form in 3D
-    # n_components_wedge = 1
-
-    # Allocate memory space for wedge_eval
-    wedge_eval = [zeros(Float64, n_evaluation_points, num_basis_form_expression_1...)]
-
-    # Assign wedge_indices: wedge_indices are just the indices of the second expression,
-    # the first expression has rank 0
-    wedge_indices = form_expression_1_indices
-
-    # Compute the wedge evaluation
-    # (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
-    for form_expression_1_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_1))
-        for form_components_idx in 1:3
-            wedge_eval[1][:, form_expression_1_basis_idx] .+= @views (form_expression_1_eval[form_components_idx][:, 1] .* form_expression_2_eval[form_components_idx][:, form_expression_1_basis_idx])
-        end
-    end
-    
-    return wedge_eval, wedge_indices
-end
-
-# 1-forms ∧ 2-forms in 3D (both form expressions ranks > 0)
+# 1-forms ∧ 2-forms in 3D
 function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{3, 2, expression_rank_2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{3}}
     # Evaluate the two forms that make up the wedge product 
     form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 1-form 
-    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
+    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 2-form
 
-    # Compute the wedge product between the 1-form and the 1-form in 2D
+    # Compute the wedge product between the 1-form and the 2-form in 3D
     
     # Given 
     #   α¹ := ∑ᵢ αᵢ dξⁱ
@@ -1551,56 +1245,47 @@ function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 1, express
     return wedge_eval, wedge_indices
 end
 
-
-
-# 2-forms ∧ 1-forms
+# 2-forms ∧ 1-forms in 3D
 function _evaluate_wedge(form_expression_1::AbstractFormExpression{3, 2, expression_rank_1, G}, form_expression_2::AbstractFormExpression{3, 1, expression_rank_2, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{3}}
-    # Get the number of components of the wedge 
-    # In this case because it is the wedge of a 2-form with a 1-form, so a 3-form in 3D,
-    # which means only one component.
-    # n_components_wedge = 1
+    # Evaluate the two forms that make up the wedge product 
+    form_expression_1_eval, form_expression_1_indices = evaluate(form_expression_1, element_id, xi)  # 2-form 
+    form_expression_2_eval, form_expression_2_indices = evaluate(form_expression_2, element_id, xi)  # 1-form
 
-    # We know that for   α⁰, βᵏ  we have that
-    #   α¹ ∧ β² = β² ∧ α¹
-    # We can use the evaluation function for α¹ ∧ β² to compute β² ∧ α¹
-    # We just need to take care to transpose the results, because for expressions with more than 
-    # one basis, the result is the computation of all wedge products among all basis 
-    wedge_eval, wedge_indices = evaluate_wedge(form_expression_2, form_expression_1, element_id, xi)
-
-    # Transpose the results over the two expressions (for all components) and flip the order of the indices
-    # As mentioned above, we intend to compute 
-    #   β² ∧ α¹
-    # but we use the function that computes 
-    #   α¹ ∧ β²
-    # This means we need to permute the dimensions of the outputs to get the intended result.
-    # If
-    #   - β² is a form expression of expression rank n > 0
-    #   - α¹ is a form expression of expression rank m > 0
-    # then
-    #   β²'s components will be an array of dimension 1 + n (+1 is for the point evaluation dimension)
-    #   α¹'s unique component will be an array of dimension 1 + m
-    # therefore 
-    #   wedge_eval[j] will be an array of dimension 1 + n x m (because we compute all wedge product combinations)
-    #
-    # As indicated above, we first compute α¹ ∧ β² and then convert it to β² ∧ α¹ 
-    # If wedge_eval[j] contains the values of the evaluation of the wedge product α¹ ∧ β²
-    # for component j, then the intended inner product is given by 
-    #   wedge_eval_intended[j][i₁, …, iₙ, l₁, …, lₘ] = wedge_eval[j][l₁, …, lₘ, i₁, …, iₙ]
-    expression_2_column_indices = (expression_rank_1 + 1 + 1):((expression_rank_1 + 1) + expression_rank_2)
-    expression_1_column_indices = 2:(expression_rank_1 + 1)
-    wedge_eval[1] = permutedims(wedge_eval[1], (1, expression_2_column_indices..., expression_1_column_indices...))  # this transposes in the basis 
+    # Compute the wedge product between the 2-form and the 1-form in 3D
     
-    # The final step is to do the same for the indices
-    # The evaluation of α⁰ ∧ βᵏ provides the indices 
-    #   wedge_indices = [[r₁], …, [rₙ], [s₁], …, [sₘ]]
-    # where 
-    #   [r₁], …, [rₙ] are the n vectors of indices for each of the n dimensions of α⁰
-    #   [s₁], …, [sₙ] are the m vectors of indices for each of the m dimensions of βᵏ
-    # since the intended ouput is βᵏ ∧ α⁰ we must flip the indices to 
-    #   wedge_indices_intended = [[s₁], …, [sₘ], [r₁], …, [rₙ]]
-    expression_2_column_indices = (expression_rank_1 + 1):(expression_rank_1 + expression_rank_2)
-    expression_1_column_indices = 1:expression_rank_1
-    wedge_indices = wedge_indices[[expression_2_column_indices..., expression_1_column_indices...]]
+    # Given 
+    #   α² := α₁dξ²∧dξ³ + α₂dξ³∧dξ¹ + α₃dξ¹∧dξ²
+    #   β¹ := ∑ᵢ βᵢ dξⁱ
+    # with i = [1, 2, 3], then
+    #   α² ∧ β¹ = (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
+    
+    # Get the number of basis in each expression 
+    num_basis_form_expression_1 = size.(form_expression_1_indices, 1)
+    num_basis_form_expression_2 = size.(form_expression_2_indices, 1)
 
+    # Get the number of evaluation points 
+    n_evaluation_points = size(form_expression_1_eval[1], 1)  # all components are evaluated at the same points and both forms are evaluated at the same points
+
+    # Get the number of components of the wedge
+    # in this case we have a 2-form wedge with a 1-form, therefore the 
+    # results has only one component because it is a 3-form in 3D
+    n_components_wedge = 1
+
+    # Allocate memory space for wedge_eval
+    wedge_eval = [zeros(Float64, n_evaluation_points, num_basis_form_expression_1..., num_basis_form_expression_2...) for _ in 1:n_components_wedge]
+
+    # Assign wedge_indices: wedge_indices is just the concatenation of the indices of each expression
+    wedge_indices = vcat(form_expression_1_indices, form_expression_2_indices)
+
+    # Compute the wedge evaluation
+    # (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
+    for form_expression_1_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_1))
+        for form_expression_2_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_2))
+            for form_components_idx in 1:3
+                wedge_eval[1][:, form_expression_1_basis_idx, form_expression_2_basis_idx] .+= @views (form_expression_1_eval[form_components_idx][:, form_expression_1_basis_idx] .* form_expression_2_eval[form_components_idx][:, form_expression_2_basis_idx])
+            end
+        end
+    end
+    
     return wedge_eval, wedge_indices
 end
