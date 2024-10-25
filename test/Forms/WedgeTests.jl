@@ -388,7 +388,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
 
         # Test if ϵ² ∧ ⋆ϵ² == ϵ² ∧ ⋆ϵ² ∧ α⁰ == ϵ² ∧ α⁰ ∧ ⋆ϵ² (since α⁰ = 1) 
         @test isapprox(sum(abs.(two_form_wedge_evaluate[1] - two_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
-        @test isapprox(sum(abs.(two_form_wedge_triple_evaluate[1] - permutedims(two_form_wedge_triple_alt_evaluate[1],[1,2,4,3]))), 0.0, atol=1e-12) # rearrange array to match wedge product order
+        @test isapprox(sum(abs.(two_form_wedge_triple_evaluate[1] - two_form_wedge_triple_alt_evaluate[1])), 0.0, atol=1e-12) # rearrange array to match wedge product order
 
         # Integrate
         two_form_inner_product_from_wedge = sum(quadrature_weights .* two_form_wedge_evaluate[1], dims=1)[:]
