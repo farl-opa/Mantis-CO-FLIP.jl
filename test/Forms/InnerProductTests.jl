@@ -154,7 +154,7 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         reference_result = element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1]
         @test isapprox(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)[3][1], element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1], atol=1e-12)
         
-        # This test follows the same logive as the < ζ¹, ζ¹ > test above
+        # This test follows the same logic as the < ζ¹, ζ¹ > test above
         reference_result = dot(element_dimensions, integrated_metric_1*element_dimensions)
         @test isapprox(sum(Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]), reference_result, atol=1e-12)
         
@@ -177,9 +177,9 @@ for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
         total_integrated_analytical_field_1 += Mantis.Forms.evaluate_inner_product(f¹_analytic, f¹_analytic, elem_id, q_rule)[3][1]
         total_integrated_analytical_field_n += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
     end
-    @test isapprox(total_integrated_analytical_field_0, 1558.5454565440389, atol=1e-12)
-    @test isapprox(total_integrated_analytical_field_1/2, 1558.5454565440389, atol=1e-12)
-    @test isapprox(total_integrated_analytical_field_n, 1558.5454565440389, atol=1e-12)
+    @test isapprox(total_integrated_analytical_field_0, 16π^4, atol=1e-11)
+    @test isapprox(total_integrated_analytical_field_1, 32π^4, atol=1e-11)
+    @test isapprox(total_integrated_analytical_field_n, 16π^4, atol=1e-11)
 end
 
 

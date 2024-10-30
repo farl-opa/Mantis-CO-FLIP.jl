@@ -135,7 +135,13 @@ function get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F
     dof_offset_component = zeros(Int, num_components)
     dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
     
-    return vcat(map(.+, component_basis_indices, dof_offset_component)...)
+    multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
+
+    for component_idx in 1:num_components
+        multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
+    end
+
+    return vcat(multivalued_basis_indices...)
 end
 
 """
@@ -156,8 +162,14 @@ function get_basis_indices_w_components(space::DirectSumSpace{manifold_dim, num_
     num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
     dof_offset_component = zeros(Int, num_components)
     dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
-    
-    return vcat(map(.+, component_basis_indices, dof_offset_component)...), component_basis_indices
+
+    multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
+
+    for component_idx in 1:num_components
+        multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
+    end
+
+    return vcat(multivalued_basis_indices...), component_basis_indices
 end
 
 """

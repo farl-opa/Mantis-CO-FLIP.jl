@@ -55,7 +55,7 @@ function get_domain_dim(_::MappedGeometry{n, G, Map} ) where {n, G<:AbstractGeom
     return n
 end
 
-function get_image_dim(geometry::MappedGeometry{n, G, Map} ) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
+function get_image_dim(geometry::MappedGeometry{n, G, Map}) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
     return geometry.mapping.dimensions[2]
 end
 
