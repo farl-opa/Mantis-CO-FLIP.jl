@@ -124,7 +124,8 @@ function _evaluate_form_in_canonical_coordinates(form_space::FS, element_idx::In
     # ... and account for the transformation from a parametric mesh element to the canonical mesh element
     local_form_basis = _pullback_to_canonical_coordinates(get_geometry(form_space), local_form_basis, element_idx, form_rank)
 
-    return local_form_basis, form_basis_indices
+    # We need to return form_basis_indices as a vector of vectors to allow for multiple index expressions, like the wedge
+    return local_form_basis, [form_basis_indices]
 end
 
 """
@@ -323,7 +324,8 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # Third: (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
     @. local_d_form_basis_eval[3] = d_local_fem_basis[2][der_idx_1][2] - d_local_fem_basis[2][der_idx_2][1]
 
-    return local_d_form_basis_eval, form_basis_indices
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return local_d_form_basis_eval, [form_basis_indices]
 end
 
 @doc raw"""
@@ -373,8 +375,9 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     der_idx_2 = FunctionSpaces._get_derivative_idx([0, 1, 0])
     der_idx_3 = FunctionSpaces._get_derivative_idx([0, 0, 1])
     @. local_d_form_basis_eval[1] = d_local_fem_basis[2][der_idx_1][1] + d_local_fem_basis[2][der_idx_2][2] + d_local_fem_basis[2][der_idx_3][3]
-
-    return local_d_form_basis_eval, form_basis_indices
+    
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return local_d_form_basis_eval, [form_basis_indices]
 end
 
 @doc raw"""

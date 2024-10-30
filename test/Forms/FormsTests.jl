@@ -2,7 +2,6 @@ import Mantis
 
 using Test
 
-
 # 2D tests --------------------------------------------------------------------
 
 # Setup the geometry 
@@ -56,7 +55,7 @@ n_active_basis_0_form = Mantis.FunctionSpaces.get_num_basis(dsTP_0_form_2d, elem
  
 @test size(zero_form_space_eval) == (1,)  # check that we get one components
 @test size(zero_form_space_eval[1]) == (n_evaluation_points, n_active_basis_0_form)   # check that we get a matrix with the correct dimensions for the single component
-@test size(zero_form_space_idx) == (n_active_basis_0_form, ) # check that we get one single vector with as many indices as the active basis in the element
+@test size(zero_form_space_idx[1]) == (n_active_basis_0_form, ) # check that we get one single vector with as many indices as the active basis in the element
 
 # 1-forms
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space_2d, element_idx, ξ_evaluation)
@@ -68,7 +67,7 @@ n_nonzero_basis_in_xi_2 = n_nonzero_basis_in_xi_1  # because we are using the sa
 
 @test size(one_form_space_eval) == (2,)  # check that we get two components
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_1_form) for form_component in one_form_space_eval])  # check that we get a matrix with the correct dimensions per component
-@test size(one_form_space_idx) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(one_form_space_idx[1]) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
 
 @test sum(abs.(one_form_space_eval[1][:, (n_nonzero_basis_in_xi_1 + 1):end])) == 0.0  # check that for the first component the second set of basis are all zero (because the underlying space is a direct sum space)
 @test sum(abs.(one_form_space_eval[2][:, 1:n_nonzero_basis_in_xi_1])) == 0.0  # check that for the second component the first set of basis are all zero (because the underlying space is a direct sum space) 
@@ -81,7 +80,7 @@ n_active_basis_top_form = Mantis.FunctionSpaces.get_num_basis(dsTP_top_form_2d, 
  
 @test size(top_form_space_eval) == (1,)  # check that we get one components
 @test size(top_form_space_eval[1]) == (n_evaluation_points, n_active_basis_top_form)   # check that we get a matrix with the correct dimensions for the single component
-@test size(top_form_space_idx) == (n_active_basis_top_form, ) # check that we get one single vector with as many indices as the active basis in the element
+@test size(top_form_space_idx[1]) == (n_active_basis_top_form, ) # check that we get one single vector with as many indices as the active basis in the element
 
 # Exterior derivative 
 
@@ -94,7 +93,7 @@ d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_d
 n_active_basis_0_form = Mantis.FunctionSpaces.get_num_basis(dsTP_0_form_2d, element_idx)
  
 @test size(d_zero_form_space_eval) == (2,)  # check that we get three components (3D)
-@test size(d_zero_form_space_idx) == (n_active_basis_0_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(d_zero_form_space_idx[1]) == (n_active_basis_0_form, )  # check that we get one single vector with as many indices as the active basis in the element
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_0_form) for form_component in d_zero_form_space_eval])  # check that we get a matrix with the correct dimensions per component
 @test isapprox(sum(sum.(d_zero_form_space_eval)), 0.0, atol=1e-12) 
 
@@ -105,7 +104,7 @@ d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_der
 n_active_basis_1_form = Mantis.FunctionSpaces.get_num_basis(dsTP_1_form_2d, element_idx)
  
 @test size(d_one_form_space_eval) == (1,)  # check that we get three components (3D)
-@test size(d_one_form_space_idx) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(d_one_form_space_idx[1]) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_1_form) for form_component in d_one_form_space_eval])  # check that we get a matrix with the correct dimensions per component
 @test isapprox(sum(sum.(d_zero_form_space_eval)), 0.0, atol=1e-12) 
 
@@ -185,7 +184,7 @@ n_active_basis_0_form = Mantis.FunctionSpaces.get_num_basis(dsTP_0_form_3d, elem
  
 @test size(zero_form_space_eval) == (1,)  # check that we get one components
 @test size(zero_form_space_eval[1]) == (n_evaluation_points, n_active_basis_0_form)   # check that we get a matrix with the correct dimensions for the single component
-@test size(zero_form_space_idx) == (n_active_basis_0_form, ) # check that we get one single vector with as many indices as the active basis in the element
+@test size(zero_form_space_idx[1]) == (n_active_basis_0_form, ) # check that we get one single vector with as many indices as the active basis in the element
 
 # 1-forms
 one_form_space_eval, one_form_space_idx = Mantis.Forms.evaluate(one_form_space_3d, element_idx, ξ_evaluation)
@@ -198,7 +197,7 @@ n_nonzero_basis_in_xi_3 = n_nonzero_basis_in_xi_1  # because we are using the sa
 
 @test size(one_form_space_eval) == (3,)  # check that we get three components (3D)
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_1_form) for form_component in one_form_space_eval])  # check that we get a matrix with the correct dimensions per component
-@test size(one_form_space_idx) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(one_form_space_idx[1]) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
 
 @test sum(abs.(one_form_space_eval[1][:, (n_nonzero_basis_in_xi_1 + 1):end])) == 0.0  # check that for the first component the second  and third sets of basis are all zero (because the underlying space is a direct sum space)
 @test sum(abs.(one_form_space_eval[2][:, 1:n_nonzero_basis_in_xi_1])) == 0.0  # check that for the second component the first and third sets of basis are all zero (because the underlying space is a direct sum space) 
@@ -216,7 +215,7 @@ n_nonzero_basis_in_xi_3 = n_nonzero_basis_in_xi_1  # because we are using the sa
 
 @test size(two_form_space_eval) == (3,)  # check that we get three components (3D)
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_1_form) for form_component in two_form_space_eval])  # check that we get a matrix with the correct dimensions per component
-@test size(two_form_space_idx) == (n_active_basis_2_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(two_form_space_idx[1]) == (n_active_basis_2_form, )  # check that we get one single vector with as many indices as the active basis in the element
 
 @test sum(abs.(two_form_space_eval[1][:, (n_nonzero_basis_in_xi_1 + 1):end])) == 0.0  # check that for the first component the second  and third sets of basis are all zero (because the underlying space is a direct sum space)
 @test sum(abs.(two_form_space_eval[2][:, 1:n_nonzero_basis_in_xi_1])) == 0.0  # check that for the second component the first and third sets of basis are all zero (because the underlying space is a direct sum space) 
@@ -232,7 +231,7 @@ n_active_basis_top_form = Mantis.FunctionSpaces.get_num_basis(dsTP_top_form_3d, 
  
 @test size(top_form_space_eval) == (1,)  # check that we get one components
 @test size(top_form_space_eval[1]) == (n_evaluation_points, n_active_basis_top_form)   # check that we get a matrix with the correct dimensions for the single component
-@test size(top_form_space_idx) == (n_active_basis_top_form, ) # check that we get one single vector with as many indices as the active basis in the element
+@test size(top_form_space_idx[1]) == (n_active_basis_top_form, ) # check that we get one single vector with as many indices as the active basis in the element
 
 # Exterior derivative 
 
@@ -243,7 +242,7 @@ d_zero_form_space_eval, d_zero_form_space_idx = Mantis.Forms.evaluate_exterior_d
 n_active_basis_0_form = Mantis.FunctionSpaces.get_num_basis(dsTP_0_form_3d, element_idx)
  
 @test size(d_zero_form_space_eval) == (3,)  # check that we get three components (3D)
-@test size(d_zero_form_space_idx) == (n_active_basis_0_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(d_zero_form_space_idx[1]) == (n_active_basis_0_form, )  # check that we get one single vector with as many indices as the active basis in the element
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_0_form) for form_component in d_zero_form_space_eval])  # check that we get a matrix with the correct dimensions per component
 @test isapprox(sum(sum.(d_zero_form_space_eval)), 0.0, atol=1e-12) 
 
@@ -255,7 +254,7 @@ d_one_form_space_eval, d_one_form_space_idx = Mantis.Forms.evaluate_exterior_der
 n_active_basis_1_form = Mantis.FunctionSpaces.get_num_basis(dsTP_1_form_3d, element_idx)
  
 @test size(d_one_form_space_eval) == (3,)  # check that we get three components (3D)
-@test size(d_one_form_space_idx) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(d_one_form_space_idx[1]) == (n_active_basis_1_form, )  # check that we get one single vector with as many indices as the active basis in the element
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_1_form) for form_component in d_one_form_space_eval])  # check that we get a matrix with the correct dimensions per component
 @test isapprox(sum(sum.(d_zero_form_space_eval)), 0.0, atol=1e-12) 
 
@@ -266,7 +265,7 @@ d_two_form_space_eval, d_two_form_space_idx = Mantis.Forms.evaluate_exterior_der
 n_active_basis_two_form = Mantis.FunctionSpaces.get_num_basis(dsTP_2_form_3d, element_idx)
  
 @test size(d_two_form_space_eval) == (1,)  # check that we get three components (3D)
-@test size(d_two_form_space_idx) == (n_active_basis_2_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(d_two_form_space_idx[1]analytical) == (n_active_basis_2_form, )  # check that we get one single vector with as many indices as the active basis in the element
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_2_form) for form_component in d_two_form_space_eval])  # check that we get a matrix with the correct dimensions per component
 @test isapprox(sum(sum.(d_two_form_space_eval)), 0.0, atol=1e-12) 
 

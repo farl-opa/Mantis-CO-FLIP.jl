@@ -1,7 +1,7 @@
 import LinearAlgebra
 using Subscripts
 
-struct AnalyticalFormField{manifold_dim, form_rank, G, E} <: AbstractFormField{manifold_dim, form_rank, G}
+struct AnalyticalFormField{manifold_dim, form_rank, G, E} <: AbstractFormField{manifold_dim, form_rank, 0, G}
     geometry::G
     expression::E
     label::String
@@ -76,7 +76,8 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 0, G, E}, element_idx:
     
     form_eval = form.expression(x)
     
-    return form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_eval, [[1]]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
@@ -90,7 +91,8 @@ function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, e
 
     form_eval[1][:] .*= LinearAlgebra.det.(eachslice(J; dims=1))
     
-    return form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_eval, [[1]]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
@@ -115,11 +117,12 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx:
         form_pullback[j] = a[:,j]
     end
     
-    return form_pullback, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_pullback, [[1]]
 end
 
-"""
-    FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_dim, form_rank, G}
+@doc raw"""
+    FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_dim, form_rank, 0, G}
 
 Represents a differential form field.
 
@@ -139,14 +142,14 @@ Represents a differential form field.
 - `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη})`: Constructor for 1-forms in 2D
 - `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ})`: Constructor for 1-forms and 2-forms in 3D
 """
-struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_dim, form_rank, G}
+struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_dim, form_rank, 0, G}
     geometry::G
     form_space::FS
     coefficients::Vector{Float64}
     label::String
 
     """
-        FormField(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+        FormField(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank, 1, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
     Construct a FormField with zero coefficients.
 
@@ -157,7 +160,7 @@ struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_d
     # Returns
     - `FormField`: A new FormField instance with zero coefficients
     """
-    function FormField(form_space::FS, label::String) where {FS <: AbstractFormSpace{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    function FormField(form_space::FS, label::String) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
         # Here we just generate the coefficients as zeros, i.e., initialize the coefficients
         n_dofs = get_num_basis(form_space)
         coefficients = zeros(Float64, n_dofs)
@@ -166,8 +169,14 @@ struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_d
     end
 end
 
+# TODO This function breaks if called on an analytical form field
+#      On which objects is this supposed to be used with? I think this should 
+#      only be used on FormSpaces. If we want to get the number of basis used 
+#      in a FormField, we should get the FormBasis of the FormField and then 
+#      get the number of basis of it. If we start mixing things the code becomes 
+#      entangled and this makes it very difficult to work with.
 @doc raw"""
-    get_num_basis(form_field::FF) where {FF <: AbstractFormField{manifold_dim, form_rank, G, FS}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
+    get_num_basis(form_field::FF) where {FF <: AbstractFormField{manifold_dim, form_rank, expression_rank, G, FS}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
 
 Returns the number of degrees of freedom of the FormSpace `form_space`.
 
@@ -177,16 +186,22 @@ Returns the number of degrees of freedom of the FormSpace `form_space`.
 # Returns
 - `::Int`: The total number of degrees of freedom of the space.
 """
-function get_num_basis(form_field::FF) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, G}}
+function get_num_basis(form_field::FF) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, expression_rank, G}}
     return get_num_basis(form_field.form_space)
 end
 
-function get_max_local_dim(form_field::FF) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, G}}
+# TODO This function breaks if called on an analytical form field
+#      On which objects is this supposed to be used with? I think this should 
+#      only be used on FormSpaces. If we want to get the number of basis used 
+#      in a FormField, we should get the FormBasis of the FormField and then 
+#      get the get_max_local_dim of it. If we start mixing things the code becomes 
+#      entangled and this makes it very difficult to work with.
+function get_max_local_dim(form_field::FF) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, expression_rank, G}}
     return get_max_local_dim(form_field.form_space)
 end
 
 @doc raw"""
-    evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
+    evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
 
 Evaluate a FormField at given points.
 
@@ -222,10 +237,11 @@ function evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::
     form_eval = Vector{Vector{Float64}}(undef, n_form_components)
 
     for form_component_idx in 1:n_form_components
-        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices]
+        form_eval[form_component_idx] = form_basis_eval[form_component_idx] * form.coefficients[form_basis_indices[1]]  # note that FormSpace has only one set of basis indices
     end
 
-    return form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return form_eval, [[1]]
 end
 
 @doc raw"""
@@ -290,10 +306,11 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G
     #       3-forms: dξ₁ ∧ dξ₂ ∧ dξ₃
     # 
     for derivative_form_component_idx in 1:n_derivative_components
-        d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices]
+        d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices[1]]
     end
 
-    return d_form_eval, [1]
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
+    return d_form_eval, [[1]]
 end
 
 @doc raw"""
@@ -309,16 +326,19 @@ Represents an expression involving differential forms.
 # Type parameters
 - `n`: Dimension of the manifold.
 - `k`: Rank of the resulting form.
+- `expression_rank`: The rank of the expression. 0-rank means no basis forms in expression, 1-rank 
+      means one set of basis forms in the expression, 2-rank means two sets of basis forms in the 
+      expression. Higher ranks are not possible.
 - `G`: Type of the geometry
 - `F`: Type of the children tuple. Can be another FormExpression, a FormField, in the future also FormSpaces.
 """
-struct FormExpression{manifold_dim, form_rank, G, F} <:AbstractFormExpression{manifold_dim, form_rank, G}
+struct FormExpression{manifold_dim, form_rank, expression_rank, G, F} <:AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
     geometry::G
     children::F
     op::String
     label::String
 
-    function FormExpression(form::Tuple{F}, op::String) where {F <: AbstractFormExpression{manifold_dim, child_form_rank, G}} where {manifold_dim, child_form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    function FormExpression(form::Tuple{F}, op::String) where {F <: AbstractFormExpression{manifold_dim, child_form_rank, child_expression_rank, G}} where {manifold_dim, child_form_rank, child_expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
         label = op * form[1].label
         if op == "★"
             form_rank = manifold_dim - child_form_rank
@@ -327,10 +347,10 @@ struct FormExpression{manifold_dim, form_rank, G, F} <:AbstractFormExpression{ma
             @assert (F <: FormField) || (F <: AbstractFormSpace) "Exterior derivative can only be applied to FormFields."
             form_rank = child_form_rank + 1
         end
-        new{manifold_dim, form_rank, G, Tuple{F}}(get_geometry(form...), form, op, label)
+        new{manifold_dim, form_rank, child_expression_rank, G, Tuple{F}}(get_geometry(form...), form, op, label)
     end
 
-    function FormExpression(forms::Tuple{F_1, F_2}, expression_rank::Int, op::String) where {F_1 <: AbstractFormExpression{manifold_dim, form_rank_1, G}, F_2 <: AbstractFormExpression{manifold_dim, form_rank_2, G}} where {manifold_dim, form_rank_1, form_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
+    function FormExpression(forms::Tuple{F_1, F_2}, op::String) where {F_1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}, F_2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}} where {manifold_dim, form_rank_1, form_rank_2, expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
         if typeof(forms[1]) <: FormField
             label_1 = forms[1].label
         else
@@ -343,13 +363,38 @@ struct FormExpression{manifold_dim, form_rank, G, F} <:AbstractFormExpression{ma
             label_2 = "(" * forms[2].label * ")" * super("$form_rank_2")
         end
         
+        if op == "∧"
+            if (expression_rank_1 + expression_rank_2) > 2
+                throw(ArgumentError("Wedge of FormExpressions requires expressions with total expression rank smaller than three, got: $expression_rank_1 and $expression_rank_2"))
+            end
+            if (form_rank_1 + form_rank_2) > manifold_dim
+                throw(ArgumentError("Wedge of FormExpressions requires expressions with total form rank smaller than the manifold dimension ($manifold_dim), got: $form_rank_1 and $form_rank_2"))
+            end
+            # With the wedge sum the resulting form has a rank equal to the sum of the two forms
+            form_rank = form_rank_1 + form_rank_2
+            
+        elseif op == "-"
+            if form_rank_1 != form_rank_2
+                throw(ArgumentError("Subtraction of FormExpressions requires expressions with the same rank, got: $form_rank_1 and $form_rank_2"))
+            end
+            # Since they are the same the resulting expression has the same rank
+            form_rank = form_rank_1
+    
+        elseif op == "+"
+            if form_rank_1 != form_rank_2
+                throw(ArgumentError("Subtraction of FormExpressions requires expressions with the same rank, got: $form_rank_1 and $form_rank_2"))
+            end
+            # Since they are the same the resulting expression has the same rank
+            form_rank = form_rank_1
+        end
+
         label = label_1 * " " * op * " " * label_2
-        new{manifold_dim, expression_rank, G, Tuple{F_1, F_2}}(get_geometry(forms...), forms, op, label)
+        new{manifold_dim, form_rank, expression_rank_1 + expression_rank_2, G, Tuple{F_1, F_2}}(get_geometry(forms...), forms, op, label)
     end
 end
 
 @doc raw"""
-    evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F <: AbstractFormExpression, G <: Geometry.AbstractGeometry{manifold_dim}}
+    evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank, G, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F <: AbstractFormExpression, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Evaluate a unary FormExpression at given points.
 
@@ -366,7 +411,7 @@ Evaluate a unary FormExpression at given points.
 # Sizes
 - `form_eval`: Vector of length `n_form_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
 """
-function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F <: AbstractFormExpression}
+function evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank, G, Tuple{F}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F <: AbstractFormExpression}
     #print("Evaluating: " * form.label * "\n")
     if form.op == "d"
         form_eval = evaluate_exterior_derivative(form.children[1], element_idx, xi)
@@ -379,7 +424,7 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F}}, el
 end
 
 @doc raw"""
-    evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
+    evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
 
 Evaluate a binary FormExpression at given points.
 
@@ -395,34 +440,51 @@ Evaluate a binary FormExpression at given points.
 
 # Note: This function is not fully implemented yet.
 """
-function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
-    #print("Evaluating: " * form.label * "\n")
-    throw("∧ not imlemented yet: (form.children[1].label, form.children[2].label)")
-    form_eval = 1.0
-    return form_eval
-end
-
-function evaluate(form::FormExpression{manifold_dim, form_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormField, F2 <: AbstractFormField}
+function evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormExpression, F2 <: AbstractFormExpression}
     #print("Evaluating: " * form.label * "\n")
     if form.op == "∧"
-        throw("∧ not imlemented yet: (form.children[1].label, form.children[2].label)")
-        return 1.0
-
+        form_eval = evaluate_wedge(form.children[1], form.children[2], element_idx, xi)
+        
     elseif form.op == "-"
         form_1_eval = evaluate(form.children[1], element_idx, xi)
         form_2_eval = evaluate(form.children[2], element_idx, xi)
-        return form_1_eval[1] - form_2_eval[1], form_1_eval[2]
+        form_eval = form_1_eval[1] - form_2_eval[1], form_1_eval[2]
 
     elseif form.op == "+"
         form_1_eval = evaluate(form.children[1], element_idx, xi)
         form_2_eval = evaluate(form.children[2], element_idx, xi)
-        return form_1_eval[1] + form_2_eval[1], form_1_eval[2]
-
+        form_eval = form_1_eval[1] + form_2_eval[1], form_1_eval[2]
     end
+
+    return form_eval
+end
+
+
+# TODO Why is this function here? The one above is not sufficient?
+#      "-" and "+" should only exist for FormFields and AnalyticalFormFields.
+#      It makes no sense for FormSpaces. As it is it will try to evaluate it for FormSpaces.
+#      Should only be valid for FormExpressions of expression_rank = 0.
+function evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank, G, Tuple{F1, F2}}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, F1 <: AbstractFormField, F2 <: AbstractFormField}
+    #print("Evaluating: " * form.label * "\n")
+    if form.op == "∧"
+        form_eval = evaluate_wedge(form.children[1], form.children[2], element_idx, xi)
+
+    elseif form.op == "-"
+        form_1_eval = evaluate(form.children[1], element_idx, xi)
+        form_2_eval = evaluate(form.children[2], element_idx, xi)
+        form_eval = form_1_eval[1] - form_2_eval[1], form_1_eval[2]
+
+    elseif form.op == "+"
+        form_1_eval = evaluate(form.children[1], element_idx, xi)
+        form_2_eval = evaluate(form.children[2], element_idx, xi)
+        form_eval = form_1_eval[1] + form_2_eval[1], form_1_eval[2]
+    end
+
+    return form_eval
 end
 
 @doc raw"""
-    wedge(form_1::F_1, form_2::F_2) {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1, G1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2, G2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2, G1 <: Geometry.AbstractGeometry{manifold_dim_1}, G2 <: Geometry.AbstractGeometry{manifold_dim_2}}
+    wedge(form_1::F_1, form_2::F_2) {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1, expression_rank_1, G1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2, expression_rank_2, G2}} where {manifold_dim_1, form_rank_1, expression_rank_1, manifold_dim_2, form_rank_2, expression_rank_2, G1 <: Geometry.AbstractGeometry{manifold_dim_1}, G2 <: Geometry.AbstractGeometry{manifold_dim_2}}
 
 Create a wedge product expression of two forms.
 
@@ -433,12 +495,13 @@ Create a wedge product expression of two forms.
 # Returns
 - `FormExpression`: A new FormExpression representing the wedge product.
 """
-function wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1, G1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2, G2}} where {manifold_dim_1, form_rank_1, manifold_dim_2, form_rank_2, G1 <: Geometry.AbstractGeometry{manifold_dim_1}, G2 <: Geometry.AbstractGeometry{manifold_dim_2}}
-    return FormExpression((form_1, form_2), form_rank_1 + form_rank_2, "∧")
+function wedge(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim_1, form_rank_1, expression_rank_1, G1}, F_2 <: AbstractFormExpression{manifold_dim_2, form_rank_2, expression_rank_2, G2}} where {manifold_dim_1, form_rank_1, expression_rank_1, manifold_dim_2, form_rank_2, expression_rank_2, G1 <: Geometry.AbstractGeometry{manifold_dim_1}, G2 <: Geometry.AbstractGeometry{manifold_dim_2}}
+    return FormExpression((form_1, form_2), "∧")
 end
 
+# TODO This seems correct, partially.
 """
-    Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Subtract two form fields.
 
@@ -449,12 +512,13 @@ Subtract two form fields.
 # Returns
 - `FormExpression`: A new FormExpression representing the subtraction of the two form fields.
 """
-function Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    return FormExpression((form_1, form_2), form_rank, "-")
+function Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return FormExpression((form_1, form_2), 0, "-")
 end
 
+# TODO This seems correct, partially.
 """
-    Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Add two form fields.
 
@@ -465,12 +529,12 @@ Add two form fields.
 # Returns
 - `FormExpression`: A new FormExpression representing the addition of the two form fields.
 """
-function Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     return FormExpression((form_1, form_2), form_rank, "+")
 end
 
 @doc raw"""
-    hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Create a Hodge star expression of a form.
 
@@ -480,7 +544,7 @@ Create a Hodge star expression of a form.
 # Returns
 - `FormExpression`: A new FormExpression representing the Hodge star operation
 """
-function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function hodge(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     return FormExpression((form,), "★")
 end
 
@@ -495,7 +559,7 @@ Create an exterior derivative expression of a form.
 # Returns
 - `FormExpression`: A new FormExpression representing the exterior derivative
 """
-function exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     return FormExpression((form,), "d")
 end
 
