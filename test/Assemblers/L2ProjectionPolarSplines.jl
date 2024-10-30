@@ -150,7 +150,7 @@ for deg in 2:3
         nel_θ = 15
         R = 1.0
         n_ref = 4
-        verbose=true
+        verbose=false
         
         # form rank
         if form_rank == 1
@@ -312,7 +312,7 @@ for deg in 2:2
         R_θr = 1.0
         R_ϕ = 2.0
         n_ref = 3
-        verbose=true
+        verbose=false
         
         # form rank
         if form_rank == 1 || form_rank == 2

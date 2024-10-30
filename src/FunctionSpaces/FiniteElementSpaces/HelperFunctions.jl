@@ -10,7 +10,7 @@ This function generates all possible combinations of non-negative integers that 
 Return Value
 The function returns a vector of vectors, where each inner vector represents a combination of integers that sum up to sum_indices. If no valid combinations exist, the function returns an empty vector.
 """
-function _integer_sums(sum_indices::Int, num_indices::Int)
+@Memoization.memoize function _integer_sums(sum_indices::Int, num_indices::Int)
     solutions = Vector{Vector{Int}}(undef,0)
     if num_indices == 1
         push!(solutions, [sum_indices])
@@ -110,7 +110,7 @@ If `local_basis` corresponds to basis evaluations for some `n`-variate function 
 # Returns
 - `::Int`: The linear index corresponding to the derivative's storage location in basis evaluations.
 """
-function _get_derivative_idx(der_key::Vector{Int})
+@Memoization.memoize Dict function _get_derivative_idx(der_key::Vector{Int})
     # generate all valid derivative keys
     all_keys = _integer_sums(sum(der_key),length(der_key))
     # return the index corresponding to der_key

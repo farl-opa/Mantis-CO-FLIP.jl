@@ -138,9 +138,7 @@ Compute the local basis functions and their derivatives for a B-spline element.
 - `::Matrix{Float64}`: Local basis functions and their derivatives.
 """
 function get_local_basis(bspline::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
-    local_basis = evaluate(bspline.polynomials, xi, nderivatives)
-
-    return local_basis
+    return evaluate(bspline.polynomials, xi, nderivatives)
 end
 
 """
