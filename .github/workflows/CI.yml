@@ -1,9 +1,10 @@
-name: NightlyRun
+name: CL
 on:
-  schedule:
-    # The format is minute(0 - 59) hour(0 - 23) day of the month(1 - 31) month(1 - 12 or JAN - DEC) day of the week (0 - 6 or SUN - SAT) 
-    # This means: run every Sunday at 5:30 in the morning.
-    - cron:  '30 5 * * 0'
+  push:
+    branches:
+      - main
+    tags: ['*']
+  pull_request:
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
