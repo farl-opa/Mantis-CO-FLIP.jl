@@ -1,0 +1,55 @@
+@doc raw"""
+    tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}
+
+Returns a tensor product quadrature rule of given degree and rule type.
+
+# Arguments
+- `p::NTuple{domain_dim, Int}`: Degree of the quadrature rule per dimension.
+- `quad_rule::F`: The function that returns quadrature nodes and weights 
+                  given an integer degree.
+
+# Returns
+- `::QuadratureRule{domain_dim}`: QuadratureRule of the new dimension.
+"""
+function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}
+    # Compute the nodes and weights per dimensions for given rule type 
+    # and degree.
+    points = NTuple{domain_dim, Vector{Float64}}(get_quadrature_nodes(quad_rule(p[k]))[1] for k = 1:domain_dim)
+    weights_1d = NTuple{domain_dim, Vector{Float64}}(get_quadrature_weights(quad_rule(p[k])) for k = 1:domain_dim)
+    
+    # Compute the tensor product of the quadrature weights.
+    weights = Vector{Float64}(undef, prod(size.(weights_1d, 1)))
+    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
+        weights[linear_idx] = prod(weights_all)
+    end
+    
+    return QuadratureRule{domain_dim}(points, weights)
+end
+
+@doc raw"""
+    tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}) where {domain_dim}
+
+Returns a tensor product quadrature rule from the given rules.
+
+# Arguments
+- `qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}`: Quadrature 
+                                                               rules per 
+                                                               dimension.
+
+# Returns
+- `::QuadratureRule{domain_dim}`: QuadratureRule of the new dimension.
+"""
+function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}) where {domain_dim}
+    # Compute the nodes and weights per dimensions for given rule type 
+    # and degree.
+    points = NTuple{domain_dim, Vector{Float64}}(get_quadrature_nodes(qrules_1d[k])[1] for k = 1:domain_dim)
+    weights_1d = NTuple{domain_dim, Vector{Float64}}(get_weights_nodes(qrules_1d[k]) for k = 1:domain_dim)
+    
+    # Compute the tensor product of the quadrature weights.
+    weights = Vector{Float64}(undef, prod(size.(weights_1d, 1)))
+    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
+        weights[linear_idx] = prod(weights_all)
+    end
+    
+    return QuadratureRule{domain_dim}(points, weights)
+end
