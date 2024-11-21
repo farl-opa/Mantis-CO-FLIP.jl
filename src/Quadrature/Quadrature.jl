@@ -56,6 +56,7 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 - `weights::Vector{Float64}`: Tensor product of quadrature rules. The 
                               shape is consistent with the output of the 
                               evaluate methods for FunctionSpaces.
+- `rule_type::String`: Type of quadrature rule.
 
 # Type parameters
 - `domain_dim`: Dimension of the domain
@@ -75,6 +76,7 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 struct QuadratureRule{domain_dim} <: AbstractQuadratureRule{domain_dim}
     nodes::NTuple{domain_dim, Vector{Float64}}
     weights::Vector{Float64}
+    rule_type::String
 end
 
 @doc raw"""
@@ -105,6 +107,21 @@ Returns the quadrature weights of a quadrature rule.
 """
 function get_quadrature_weights(qr::QuadratureRule{domain_dim}) where {domain_dim}
     return qr.weights
+end
+
+@doc raw"""
+    get_quadrature_rule_type(qr::QuadratureRule{domain_dim}) where {domain_dim}
+
+Returns the type of a quadrature rule.
+
+# Arguments
+- `qr::QuadratureRule{domain_dim}`: Rule to get the type from.
+
+# Returns
+- `rule_type::String`: Type of the quadrature rule.
+"""
+function get_quadrature_rule_type(qr::QuadratureRule{domain_dim}) where {domain_dim}
+    return qr.rule_type
 end
 
 

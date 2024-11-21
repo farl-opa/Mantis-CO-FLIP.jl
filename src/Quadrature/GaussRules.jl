@@ -22,7 +22,7 @@ function gauss_lobatto(p::Int)
     ξ, w = FastGaussQuadrature.gausslobatto(p)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
-    return QuadratureRule{1}((ξ,), w)
+    return QuadratureRule{1}((ξ,), w, "Gauss-Lobatto")
 end
 
 @doc raw"""
@@ -49,5 +49,5 @@ function gauss_legendre(p::Int)
     ξ, w = FastGaussQuadrature.gausslegendre(p)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
-    return QuadratureRule{1}((ξ,), w)
+    return QuadratureRule{1}((ξ,), w, "Gauss-Legendre")
 end

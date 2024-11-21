@@ -46,5 +46,5 @@ function clenshaw_curtis(p::Int)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
 
-    return QuadratureRule{1}((ξ,), w)
+    return QuadratureRule{1}((ξ,), w, "Clenshaw-Curtis")
 end
