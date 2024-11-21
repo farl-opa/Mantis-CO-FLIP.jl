@@ -127,7 +127,7 @@ end
 
 
 # One-dimensional quadrature rules.
-include("GaussRules.jl")
+include("Gauss.jl")
 include("ClenshawCurtis.jl")
 
 # Quadrature rules on equally spaced nodes.
@@ -138,7 +138,7 @@ include("NewtonCotes.jl")
 # Multi-dimensional quadrature rules. The tensor product rules are made
 # by combining one-dimensional rules, so this file must be included 
 # after the one-dimensional rules.
-include("TensorProductRules.jl")
+include("TensorProduct.jl")
 
 
 end

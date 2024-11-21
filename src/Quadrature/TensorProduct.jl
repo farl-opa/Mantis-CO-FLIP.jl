@@ -15,7 +15,7 @@ function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {do
     # Compute the nodes and weights per dimensions for given rule type 
     # and degree.
     qrules = NTuple{domain_dim, QuadratureRule{1}}(quad_rule(p[k]) for k = 1:domain_dim)
-    points = NTuple{domain_dim, Vector{Float64}}(get_quadrature_nodes(qrules[k]) for k = 1:domain_dim)
+    points = NTuple{domain_dim, Vector{Float64}}(get_quadrature_nodes(qrules[k])[1] for k = 1:domain_dim)
     weights_1d = NTuple{domain_dim, Vector{Float64}}(get_quadrature_weights(qrules[k]) for k = 1:domain_dim)
     
     # Compute the tensor product of the quadrature weights.
