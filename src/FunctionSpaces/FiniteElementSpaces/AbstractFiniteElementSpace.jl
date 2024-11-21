@@ -60,16 +60,21 @@ For given global element id `element_id` for a given finite element `space`, eva
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n}
     extraction_coefficients, basis_indices = get_extraction(space, element_id)
     local_basis = get_local_basis(space, element_id, xi, nderivatives)
+    evaluation = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
+    for j = 0:nderivatives
+        n_ders = length(local_basis[j+1])
+        evaluation[j+1] = Vector{Matrix{Float64}}(undef, n_ders)
+    end
 
     for j = 0:nderivatives
         for k = 1:length(local_basis[j+1])
             if isassigned(local_basis[j+1],k)
-                local_basis[j+1][k] = @views local_basis[j+1][k] * extraction_coefficients
+                evaluation[j+1][k] = @views local_basis[j+1][k] * extraction_coefficients
             end
         end
     end
 
-    return local_basis, basis_indices
+    return evaluation, basis_indices
 end
 
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}) where {n}
@@ -77,17 +82,17 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTu
 end
 
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int, coeffs::Vector{Float64}) where {n}
-    local_basis, basis_indices = evaluate(space, element_id, xi, nderivatives) 
+    basis_eval, basis_indices = evaluate(space, element_id, xi, nderivatives) 
     evaluation = Vector{Vector{Vector{Float64}}}(undef, nderivatives + 1)
     for j = 0:nderivatives
-        n_ders = length(local_basis[j+1])
+        n_ders = length(basis_eval[j+1])
         evaluation[j+1] = Vector{Vector{Float64}}(undef, n_ders)
     end
 
     for j = 0:nderivatives
-        for k = 1:length(local_basis[j+1])
-            if isassigned(local_basis[j+1],k)
-                evaluation[j+1][k] = @views local_basis[j+1][k] * coeffs[basis_indices]
+        for k = 1:length(basis_eval[j+1])
+            if isassigned(basis_eval[j+1],k)
+                evaluation[j+1][k] = @views basis_eval[j+1][k] * coeffs[basis_indices]
             end
         end
     end
@@ -109,7 +114,7 @@ Evaluates all derivatives upto order `nderivatives` for all basis functions of `
 - `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
 """
 function _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, element_id::Int, xi::Float64, nderivatives::Int)
-    local_basis, basis_indices = evaluate(fem_space, element_id, ([xi],), nderivatives)
+    basis_eval, basis_indices = evaluate(fem_space, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
     ndofs = get_num_basis(fem_space)
     I = zeros(Int, nloc * (nderivatives + 1))
@@ -120,7 +125,7 @@ function _evaluate_all_at_point(fem_space::AbstractFiniteElementSpace{1}, elemen
         for i = 1:nloc
             I[count+1] = basis_indices[i]
             J[count+1] = r+1
-            V[count+1] = local_basis[r+1][1][1, i]
+            V[count+1] = basis_eval[r+1][1][1, i]
             count += 1
         end
     end

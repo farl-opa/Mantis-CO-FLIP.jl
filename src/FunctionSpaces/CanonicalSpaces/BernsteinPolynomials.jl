@@ -25,7 +25,7 @@ polynomials of degree `p` at `ξ` for ``\xi \in [0.0, 1.0]``.
 
 See also [`evaluate(polynomial::Bernstein, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int)
+@Memoization.memoize function evaluate(polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int)
     # store the values and derivatives here
     neval = length(ξ)
 

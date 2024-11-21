@@ -6,6 +6,7 @@ module FunctionSpaces
 
 import .. Mesh
 import SparseArrays
+import Memoization
 
 """
     AbstractFunctionSpace

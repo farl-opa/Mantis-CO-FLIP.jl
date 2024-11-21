@@ -57,7 +57,7 @@ Compute derivatives up to order `nderivatives` for all basis functions of degree
 
 See also [`evaluate(gtrig::GeneralizedTrigonometric, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(gtrig::GeneralizedTrigonometric, ξ::Vector{Float64}, nderivatives::Int)
+@Memoization.memoize function evaluate(gtrig::GeneralizedTrigonometric, ξ::Vector{Float64}, nderivatives::Int)
     neval = length(ξ)
     # allocate space for derivatives
     # - ders[j+1][1] contains the matrix of evaluations of the j-th derivative
