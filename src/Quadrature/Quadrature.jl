@@ -70,8 +70,8 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 - [`gauss_legendre`](@ref).
 - [`clenshaw_curtis`](@ref).
 - [`newton_cotes`](@ref).
-- [`tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F)`](@ref).
-- [`tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}})`](@ref).
+- [`tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}`](@ref).
+- [`tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) where {domain_dim}`](@ref).
 """
 struct QuadratureRule{domain_dim} <: AbstractQuadratureRule{domain_dim}
     nodes::NTuple{domain_dim, Vector{Float64}}

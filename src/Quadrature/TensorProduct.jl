@@ -28,14 +28,13 @@ function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {do
 end
 
 @doc raw"""
-    tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}) where {domain_dim}
+    tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) where {domain_dim}
 
 Returns a tensor product quadrature rule from the given rules.
 
 # Arguments
-- `qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}`: Quadrature 
-                                                               rules per 
-                                                               dimension.
+- `qrules_1d::NTuple{domain_dim, QuadratureRule{1}}`: Quadrature rules 
+                                                      per dimension.
 
 # Returns
 - `::QuadratureRule{domain_dim}`: QuadratureRule of the new dimension.
