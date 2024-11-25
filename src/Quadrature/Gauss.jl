@@ -12,7 +12,8 @@ instead of ξ ∈ [-1, 1] as usual.
 
 # Returns
 - `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the 
-                         nodes and weights.
+                         nodes and weights. There will be `p` nodes and
+                         weights.
 
 # Notes
 Uses the FastGaussQuadrature.jl package. We only linearly map the nodes
@@ -39,13 +40,17 @@ instead of ξ ∈ [-1, 1] as usual.
 
 # Returns
 - `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the 
-                         nodes and weights.
+                         nodes and weights. There will be `p` nodes and
+                         weights.
 
 # Notes
 Uses the FastGaussQuadrature.jl package. We only linearly map the nodes
 and weights to the interval [0, 1].
 """
 function gauss_legendre(p::Int)
+    if p <= 0
+        throw(DomainError("Invalid degree: $p. The degree of the Gauss-Legendre quadrature rule must be greater than zero."))
+    end
     ξ, w = FastGaussQuadrature.gausslegendre(p)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w

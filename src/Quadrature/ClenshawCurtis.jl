@@ -5,14 +5,16 @@ Find the roots and weights for Clenshaw-Curtis quadrature on the
 interval [0, 1]. The roots include the endpoints 0 and 1 and Clenshaw-
 Curtis quadrature is exact for polynomials up to degree `p`. However, in 
 practise, this quadrature rule can obtain results comparable to Gauss 
-quadrature (in some cases), see [Trefethen2008](@cite).
+quadrature (in some cases), see [Trefethen2008](@cite) and 
+[Trefethen2022](@cite).
 
 # Arguments
 - `p::Int`: Degree of the quadrature rule.
 
 # Returns
 - `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the 
-                         nodes and weights.
+                         nodes and weights. There will be `p+1` nodes 
+                         and weights.
 
 # Notes
 See [Waldvogel2006](@cite) for the algorithm based on fast fourier 
@@ -21,10 +23,10 @@ given MATLAB code on page 201.
 """
 function clenshaw_curtis(p::Int)
     if p <= 1
-        throw(ArgumentError("Invalid degree: $p. The degree must be greater than 1."))
+        throw(DomainError("Invalid degree: $p. The degree for Clenshaw-Curtis quadrature must be greater than 1."))
     end
     
-    N = collect(1:2:p-1)
+    N = 1:2:p-1
     l = length(N)
     m = p - l
 

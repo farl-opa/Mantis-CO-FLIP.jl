@@ -21,23 +21,23 @@ function newton_cotes(num_points::Int, type::String="closed")
     # Compute the equally spaced nodes on the interval [-1, 1].
     if type == "closed"
         if num_points <= 1
-            throw(ArgumentError("Invalid number of points: $num_points. 
-                                A closed Newton-Cotes rule requires at 
-                                least 2 points."))
+            throw(DomainError("Invalid number of points: $num_points. 
+                               A closed Newton-Cotes rule requires at 
+                               least 2 points."))
         else
             ξ = [-1.0 + i * 2.0 / (num_points-1) for i = 0:num_points-1]
         end
     elseif type == "open"
         if num_points <= 0
-            throw(ArgumentError("Invalid number of points: $num_points. 
-                                An open Newton-Cotes rule requires at 
-                                least 1 point."))
+            throw(DomainError("Invalid number of points: $num_points. 
+                               An open Newton-Cotes rule requires at 
+                               least 1 point."))
         else
             ξ = [-1.0 + i * 2.0 / (num_points+1) for i = 1:num_points]
         end
     else
         throw(ArgumentError("Invalid Newton-Cotes type: $type. Valid 
-                            types are 'closed' and 'open'."))
+                             types are 'closed' and 'open'."))
     end
 
     # Compute the weights by integrating the Lagrange basis functions.

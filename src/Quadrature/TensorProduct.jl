@@ -40,7 +40,7 @@ Returns a tensor product quadrature rule from the given rules.
 # Returns
 - `::QuadratureRule{domain_dim}`: QuadratureRule of the new dimension.
 """
-function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{domain_dim}}) where {domain_dim}
+function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) where {domain_dim}
     # Compute the nodes and weights per dimensions for given rule type 
     # and degree.
     points = NTuple{domain_dim, Vector{Float64}}(get_quadrature_nodes(qrules_1d[k])[1] for k = 1:domain_dim)
