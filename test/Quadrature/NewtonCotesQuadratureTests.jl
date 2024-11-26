@@ -25,7 +25,7 @@ for N in range(2, 12, step=3)
 
     
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes"
+    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes (closed)"
 
 
     # Constructor tests.
@@ -103,7 +103,7 @@ for N in range(1, 10, step=3)
 
     
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes"
+    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes (open)"
 
 
     # Constructor tests.

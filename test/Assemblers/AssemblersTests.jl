@@ -457,13 +457,13 @@ for case in cases
         α⁰.coefficients .= sol
         if run_tests
             @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"), 0.0, atol=1e-14)
-            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50), "Linf"), 0.0, atol=1e-14)
+            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50, "closed"), "Linf"), 0.0, atol=1e-14)
         end
         if verbose
             print("Total L2 error 0-form: ")
             println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"))
             print("Total Linf error 0-form: ")
-            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50), "Linf"))
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50, "closed"), "Linf"))
         end
         if write_to_output_file
             write_form_sol_to_file([α⁰, sol⁰_const_1d_exact_sol], ["zero_form", "exact_zero_form"], geom_1d, p_1d, k_1d, case, n_1d, verbose)
