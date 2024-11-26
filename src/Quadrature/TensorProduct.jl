@@ -20,10 +20,7 @@ function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F, rule_args
     weights_1d = NTuple{domain_dim, Vector{Float64}}(get_quadrature_weights(qrules[k]) for k = 1:domain_dim)
     
     # Compute the tensor product of the quadrature weights.
-    weights = Vector{Float64}(undef, prod(size.(weights_1d, 1)))
-    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
-        weights[linear_idx] = prod(weights_all)
-    end
+    weights = _compute_tensor_product_weights(weights_1d)
     
     # Create the label. If only one rule is used, the label is the same 
     # as the rule type of the 1D rule.
@@ -55,10 +52,7 @@ function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) w
     weights_1d = NTuple{domain_dim, Vector{Float64}}(get_quadrature_weights(qrules_1d[k]) for k = 1:domain_dim)
     
     # Compute the tensor product of the quadrature weights.
-    weights = Vector{Float64}(undef, prod(size.(weights_1d, 1)))
-    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
-        weights[linear_idx] = prod(weights_all)
-    end
+    weights = _compute_tensor_product_weights(weights_1d)
     
     # Create the label. If only one rule is used, the label is the same 
     # as the rule type of the 1D rule.
@@ -70,4 +64,13 @@ function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) w
     end
     
     return QuadratureRule{domain_dim}(points, weights, rule_type)
+end
+
+
+function _compute_tensor_product_weights(weights_1d::NTuple{domain_dim, Vector{T}}) where {domain_dim, T <: Number}
+    weights = Vector{T}(undef, prod(size.(weights_1d, 1)))
+    for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
+        weights[linear_idx] = prod(weights_all)
+    end
+    return weights
 end
