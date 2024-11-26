@@ -58,6 +58,7 @@ function chebyshev(degree::Int, x::Vector{Float64})
     end
 end
 
+
 function integrated_chebyshev(degree::Int, x::Float64)
     if degree == 0
         return x
@@ -76,4 +77,18 @@ function integrated_chebyshev(degree::Int, x::Vector{Float64})
     else
         return degree.*chebyshev(degree+1, x)./(degree^2-1) .- x.*chebyshev(degree, x)./(degree-1)
     end
+end
+
+
+function chebyshev_nd(degrees::NTuple{N, Int}, x::NTuple{N, Vector{Float64}}) where {N}
+    cheb_1d = [chebyshev(degrees[i], x[i]) for i = 1:N]
+    result = Vector{Float64}(undef, prod(size.(cheb_1d, 1)))
+    for (linear_idx, poly_all) in enumerate(Iterators.product(cheb_1d...))
+        result[linear_idx] = prod(poly_all)
+    end
+    return result
+end
+
+function integrated_chebyshev_nd(degrees::NTuple{N, Int}) where {N}
+    return prod([integrated_chebyshev(degrees[i], 1.0) - integrated_chebyshev(degrees[i], 0.0) for i = 1:N])
 end

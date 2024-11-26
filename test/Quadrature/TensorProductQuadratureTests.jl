@@ -66,6 +66,7 @@ for one_d_rule in one_dim_quad_rules
             label = "Tensor-product of $dimension $(Quad.get_quadrature_rule_type(one_d_rule(deg[1]))) rules"
         end
         
+        ξ = Quad.get_quadrature_nodes(quad_rule)
         w = Quad.get_quadrature_weights(quad_rule)
 
 
@@ -96,6 +97,10 @@ for one_d_rule in one_dim_quad_rules
 
 
         # Value tests on [0,1]^d.
+        f = chebyshev_nd(deg.-1, ξ)
+        I_num = LinearAlgebra.dot(w, f)
+        I = integrated_chebyshev_nd(deg.-1)
+        @test isapprox(I_num, I, atol=atol)
     end
 end
 
