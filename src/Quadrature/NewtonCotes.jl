@@ -17,7 +17,7 @@ Cotes rules do not.
 - `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the 
                          nodes and weights.
 """
-function newton_cotes(num_points::Int, type::String="closed")
+function newton_cotes(num_points::Int, type::String)
     # Compute the equally spaced nodes on the interval [-1, 1].
     if type == "closed"
         if num_points <= 1
@@ -69,6 +69,6 @@ function newton_cotes(num_points::Int, type::String="closed")
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
 
-    return QuadratureRule{1}((ξ,), w, "Newton-Cotes")
+    return QuadratureRule{1}((ξ,), w, "Newton-Cotes ($type)")
     
 end
