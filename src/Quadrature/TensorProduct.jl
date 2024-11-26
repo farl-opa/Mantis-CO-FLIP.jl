@@ -1,20 +1,21 @@
 @doc raw"""
-    tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}
+    tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F, rule_args_1d...) where {domain_dim, F <: Function}
 
 Returns a tensor product quadrature rule of given degree and rule type.
 
 # Arguments
 - `p::NTuple{domain_dim, Int}`: Degree of the quadrature rule per dimension.
 - `quad_rule::F`: The function that returns a `QuadratureRule{1}` given 
-                  an integer degree.
+                  an integer degree. May take additional arguments.
+- `rule_args_1d...`: Additional arguments for the 1D quadrature rule. Optional.
 
 # Returns
 - `::QuadratureRule{domain_dim}`: QuadratureRule of the new dimension.
 """
-function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}
+function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F, rule_args_1d...) where {domain_dim, F <: Function}
     # Compute the nodes and weights per dimensions for given rule type 
     # and degree.
-    qrules = NTuple{domain_dim, QuadratureRule{1}}(quad_rule(p[k]) for k = 1:domain_dim)
+    qrules = NTuple{domain_dim, QuadratureRule{1}}(quad_rule(p[k], rule_args_1d...) for k = 1:domain_dim)
     points = NTuple{domain_dim, Vector{Float64}}(get_quadrature_nodes(qrules[k])[1] for k = 1:domain_dim)
     weights_1d = NTuple{domain_dim, Vector{Float64}}(get_quadrature_weights(qrules[k]) for k = 1:domain_dim)
     
@@ -24,7 +25,15 @@ function tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {do
         weights[linear_idx] = prod(weights_all)
     end
     
-    return QuadratureRule{domain_dim}(points, weights, "Tensor-product of $domain_dim $(get_quadrature_rule_type(qrules[1])) rules")
+    # Create the label. If only one rule is used, the label is the same 
+    # as the rule type of the 1D rule.
+    if domain_dim == 1
+        rule_type = get_quadrature_rule_type(qrules[1])
+    else
+        rule_type = "Tensor-product of $domain_dim $(get_quadrature_rule_type(qrules[1])) rules"
+    end
+
+    return QuadratureRule{domain_dim}(points, weights, rule_type)
 end
 
 @doc raw"""
@@ -51,6 +60,14 @@ function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) w
         weights[linear_idx] = prod(weights_all)
     end
     
-    rule_type = join([get_quadrature_rule_type(qrules_1d[i]) for i = 1:domain_dim], ", ")
-    return QuadratureRule{domain_dim}(points, weights, "Tensor-product of ($rule_type) rules")
+    # Create the label. If only one rule is used, the label is the same 
+    # as the rule type of the 1D rule.
+    if domain_dim == 1
+        rule_type = get_quadrature_rule_type(qrules_1d[1])
+    else
+        rule_types = join([get_quadrature_rule_type(qrules_1d[i]) for i = 1:domain_dim], ", ")
+        rule_type = "Tensor-product of ($rule_types) rules"
+    end
+    
+    return QuadratureRule{domain_dim}(points, weights, rule_type)
 end
