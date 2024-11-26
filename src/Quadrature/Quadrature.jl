@@ -13,10 +13,11 @@ varies per rule.
 
 In general, a quadrature rule can be written as:
 ```math
-\int_{0}^{1} f(x) dx \approx \sum_{i=1}^{p} w_i f(x_i)
+\int_{0}^{1} f(x) dx \approx \sum_{i=1}^{N} w_i f(x_i)
 ```
-where `p` is the number of quadrature nodes, `w_i` are the weights, and
-`x_i` are the quadrature nodes.
+where `N` is the number of quadrature nodes, `w_i` are the weights, and
+`x_i` are the quadrature nodes. Note that the integral is computed on 
+the interval [0, 1].
 
 The exported names are:
 """
@@ -70,7 +71,7 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 - [`gauss_legendre`](@ref).
 - [`clenshaw_curtis`](@ref).
 - [`newton_cotes`](@ref).
-- [`tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F) where {domain_dim, F <: Function}`](@ref).
+- [`tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F, rule_args_1d...) where {domain_dim, F <: Function}`](@ref).
 - [`tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) where {domain_dim}`](@ref).
 """
 struct QuadratureRule{domain_dim} <: AbstractQuadratureRule{domain_dim}
