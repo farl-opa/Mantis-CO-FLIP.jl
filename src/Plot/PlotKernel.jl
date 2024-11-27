@@ -51,11 +51,11 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
             ξ_shift_per_dir = dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  Tuple(ones(Int,manifold_dim)))
             ξ = Tuple(ξ_shift_per_dir[i] .+ dξ .* ξ_ref_per_dir for i in 1:manifold_dim)
             # evaluate geometry and rearrange 
-            vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= (Geometry.evaluate(geometry, element_idx, ξ)[I_ref, :])'
+            vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
 
             # compute data to plot 
             if !isnothing(field)
-                point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] = (Fields.evaluate(field, element_idx, ξ)[I_ref, :])'
+                point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view (Fields.evaluate(field, element_idx, ξ))'[:, I_ref]
             end
             # apply offset
             if !isnothing(offset)
@@ -123,7 +123,7 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
                     ξ_shift_per_dir = dξ_edge .* (subcell_cartesian_idx[subcell_idx][1] - 1)
                     ξ = Tuple(ξ_shift_per_dir[i] .+ ξ_ref_scaled[i] for i in 1:manifold_dim)
                     # evaluate geometry and rearrange 
-                    vertices_on_edges[:, vertex_offset .+ (1:n_vertices_per_subedge)] .= (Geometry.evaluate(geometry, element_idx, ξ)[I_ref, :])'
+                    vertices_on_edges[:, vertex_offset .+ (1:n_vertices_per_subedge)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
 
                     # Add cell
                     cell_idx = (element_idx - 1) * (n_subcells * n_edges_per_element) + (edge_idx - 1) * n_subcells + subcell_idx
@@ -193,8 +193,8 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
     else
         field_dim = binomial(manifold_dim, form_rank)
     end
-    if form_rank == 1 && form_rank < manifold_dim
-        point_data = zeros(3, n_vertices) # 1-forms in 2D and 1- and 2-forms in 3D are plotted as vector fields
+    if form_rank == 1 && form_rank < manifold_dim && is_field
+        point_data = zeros(3, n_vertices) # 1-forms in 2D and 1- and 2-forms in 3D are plotted as 3D vector fields
     else
         point_data = zeros(field_dim, n_vertices)
     end
@@ -212,26 +212,25 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
         for subcell_idx in 1:n_subcells^manifold_dim
             ξ_shift_per_dir = dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  Tuple(ones(Int,manifold_dim)))
             ξ = Tuple(ξ_shift_per_dir[i] .+ dξ .* ξ_ref_per_dir for i in 1:manifold_dim)
-            # evaluate geometry and rearrange 
-            vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= (Geometry.evaluate(geometry, element_idx, ξ)[I_ref, :])'
+            
+            # evaluate geometry and rearrange
+            vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
             
             # Compute data to plot 
             if is_field
                 if form_rank == 0
-                    point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] = hcat(Forms.evaluate(form, element_idx, ξ)[1]...)[I_ref, :]'
+                    point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(form, element_idx, ξ)[1]...)'[:, I_ref]
                     
                 elseif form_rank == manifold_dim
-                    point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= hcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)[I_ref, :]'
-
+                    point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)'[:, I_ref]
+                    
                 elseif form_rank == 1
                     if range_dim == 2
-                        # convert 2D vector field to 3D vector field
-                        point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= vcat(hcat(reduce.(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1],dims=2)...)[I_ref,:]', zeros(n_vertices_per_subcell))
-
+                        point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view vcat(hcat(reduce.(+,Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1], dims=2)...), zeros(1,n_vertices_per_subcell))'[:, I_ref]
                     elseif range_dim == 3
-                        point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= hcat(reduce.(+, Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1],dims=2)...)[I_ref,:]'
-
+                        point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(reduce.(+,Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1], dims=2)...)'[:, I_ref]
                     end
+
                 end
             end
 
@@ -300,7 +299,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
                     ξ_shift_per_dir = dξ_edge .* (subcell_cartesian_idx[subcell_idx][1] - 1)
                     ξ = Tuple(ξ_shift_per_dir[i] .+ ξ_ref_scaled[i] for i in 1:manifold_dim)
                     # evaluate geometry and rearrange 
-                    vertices_on_edges[:, vertex_offset .+ (1:n_vertices_per_subedge)] .= (Geometry.evaluate(geometry, element_idx, ξ)[I_ref, :])'
+                    vertices_on_edges[:, vertex_offset .+ (1:n_vertices_per_subedge)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
 
                     # Add cell
                     cell_idx = (element_idx - 1) * (n_subcells * n_edges_per_element) + (edge_idx - 1) * n_subcells + subcell_idx
