@@ -66,7 +66,17 @@ function tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) w
     return QuadratureRule{domain_dim}(points, weights, rule_type)
 end
 
+@doc raw"""
+    _compute_tensor_product_weights(weights_1d::NTuple{domain_dim, Vector{T}}) where {domain_dim, T <: Number}
 
+Compute the tensor product of the given 1D quadrature weights.
+
+# Arguments
+- `weights_1d::NTuple{domain_dim, Vector{T}}`: Quadrature weights per dimension.
+
+# Returns
+- `::Vector{T}`: Tensor product of the quadrature weights.
+"""
 function _compute_tensor_product_weights(weights_1d::NTuple{domain_dim, Vector{T}}) where {domain_dim, T <: Number}
     weights = Vector{T}(undef, prod(size.(weights_1d, 1)))
     for (linear_idx, weights_all) in enumerate(Iterators.product(weights_1d...))
