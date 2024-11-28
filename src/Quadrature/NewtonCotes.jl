@@ -8,6 +8,9 @@ are two types of Newton-Cotes rules: closed and open. Closed Newton-
 Cotes rules include the endpoints of the interval, while open Newton-
 Cotes rules do not.
 
+The algorithm used to compute the weights is not the most efficient nor
+the most accurate.
+
 # Arguments
 - `num_points::Int`: Number of points in the quadrature rule.
 - `type::String`: Type of the Newton-Cotes rule. Valid types are 
@@ -62,7 +65,6 @@ function newton_cotes(num_points::Int, type::String)
         for j in eachindex(ql, wl)
             w[i] += wl[j] * lagrange_at_ql[i,j]
         end
-        
     end
 
     # Map roots and weights to the interval [0, 1].
