@@ -103,7 +103,10 @@ end
 
 Convert the given derivative key to a linear index corresponding to its storage location.
 
-If `local_basis` corresponds to basis evaluations for some `n`-variate function space, then its `k`-th derivatives will all be stored in the location `local_basis[k+1]`. Moreover, the `k`-th derivative corresponding to the key `(i₁,i₂,...,iₙ)` in the location `local_basis[k+1][m]` if the key is the `m`-th key returned by the function `_integer_sums(k, n)`.
+If `local_basis` corresponds to basis evaluations for some `n`-variate function space, then its `k`-th derivatives will all be stored in the location `local_basis[k+1]`. Moreover, the `k`-th derivative corresponding to the key `(i₁,i₂,...,iₙ)` in the location `local_basis[k+1][m]` where:
+- `m = 1` when `iⱼ = 0` for all `j`, i.e., for basis function values;
+- `m = 1+r` when `iⱼ = 0` for all `j` except for `j = r` and `iⱼ = 1`, i.e., for the first derivative w.r.t. the `j`-th canonical coordinate;
+- in all other cases (i.e., when `k>1`),  the value of `m` is equal to `l` if `(i₁,i₂,...,iₙ)` is the `l`-th key returned by the function `_integer_sums(k, n)`.
 
 # Arguments
 - `der_key::Vector{Int}`: A key for the desired derivative order.
