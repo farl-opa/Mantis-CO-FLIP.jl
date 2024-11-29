@@ -54,8 +54,8 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
                 k = min(r, gexp.p-1)
                 wxl = gexp.w * xi
                 E = [1.0; cumprod((1.0 ./ (1:gexp.p-k)) * wxl)]
-                E[gexp.p-k, :] = exp(wxl);
-                E[gexp.n-k, :] = (-1)^r * exp(-wxl);
+                E[gexp.p-k, :] .= exp(wxl);
+                E[gexp.p+1-k, :] .= (-1)^r * exp(-wxl);
                 M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E)
             end
         else
@@ -119,18 +119,18 @@ function gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
         M0[p, :] .= 1
         M0[p+1, 1:2:p+1] .= 1
         M0[p+1, 2:2:p+1] .= -1
-        M1 = ToeplitzMatrices.Toeplitz([1; cumprod(w ./ (1:p))], I[:,1])
-        M1[p, :] = ew;
-        M1[p+1, 1:2:p+1] = ewm;
-        M1[p+1, 2:2:p+1] = -ewm;
+        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(w ./ (1:p))], I[:,1]))
+        M1[p, :] .= ew;
+        M1[p+1, 1:2:p+1] .= ewm;
+        M1[p+1, 2:2:p+1] .= -ewm;
 
     else
         M0 = I[:,:]
         ww = [1 cumprod(repeat([w * w], 1, m), dims=2)]
         M = ToeplitzMatrices.Toeplitz([1; cumprod(1.0 ./ (1:p+2*m))], I[:,1])
         M1 = M[1:p+1, :]
-        M1[p, :] = ww * M[p:2:end, :]
-        M1[p+1, :] = ww * M[p+1:2:end, :]
+        M1[p, :] .= ww * M[p:2:end, :]
+        M1[p+1, :] .= ww * M[p+1:2:end, :]
     end
     cs = zeros(Float64, p+1)
     C = zeros(Float64, p+1, p+1)
@@ -139,9 +139,9 @@ function gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
         cs = cs + C[p+1-i+2, :]
         cc = zeros(Float64, p+1)
         cc[i] = -cs' * M1[:, i]
-        C[p+1-i+1, :] = [M1[:, 1:i] M0[:, 1:p+1-i]]' \ cc
+        C[p+1-i+1, :] .= [M1[:, 1:i] M0[:, 1:p+1-i]]' \ cc
     end
-    C[1, :] = [M0[:, 1] M1[:, 1:p]]' \ I[:,1]
+    C[1, :] .= [M0[:, 1] M1[:, 1:p]]' \ I[:,1]
 
     return C
 end

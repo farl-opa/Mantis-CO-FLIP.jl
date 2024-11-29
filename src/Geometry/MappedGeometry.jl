@@ -59,6 +59,10 @@ function get_image_dim(geometry::MappedGeometry{n, G, Map} ) where {n, G<:Abstra
     return geometry.mapping.dimensions[2]
 end
 
+function _get_element_dimensions(geometry::MappedGeometry{n, G, Map}, element_id::Int) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
+    return _get_element_dimensions(geometry.geometry, element_id)
+end
+
 function evaluate(geometry::MappedGeometry{n, G, Map}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
     x = evaluate(geometry.geometry, element_idx, ξ)
     x_mapped = evaluate(geometry.mapping, x)

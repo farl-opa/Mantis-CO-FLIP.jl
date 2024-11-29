@@ -226,7 +226,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
                     
                 elseif form_rank == 1
                     if range_dim == 2
-                        point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view vcat(hcat(reduce.(+,Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1], dims=2)...), zeros(1,n_vertices_per_subcell))'[:, I_ref]
+                        point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view vcat(hcat(reduce.(+,Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1], dims=2)...)', zeros(1,n_vertices_per_subcell))[:, I_ref]
                     elseif range_dim == 3
                         point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(reduce.(+,Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1], dims=2)...)'[:, I_ref]
                     end
