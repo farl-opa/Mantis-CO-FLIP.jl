@@ -143,10 +143,10 @@ function evaluate(rat_space::RationalFiniteElementSpace{n,F}, element_id::Int, x
             # Rationalize with the weights
             homog_basis[1][1] .= LinearAlgebra.Diagonal(weight) \ temp
         elseif j == 1
-            der_keys = _integer_sums(j, n)
+            der_keys = integer_sums(j, n)
             for key in der_keys
                 # Get the location where the derivative is stored
-                der_idx = _get_derivative_idx(key)
+                der_idx = get_derivative_idx(key)
                 # Compute the weight and its derivative
                 temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
                 dtemp = homog_basis[j+1][der_idx] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])

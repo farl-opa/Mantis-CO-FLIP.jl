@@ -341,7 +341,7 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
     local_basis_per_dim = _get_local_basis_per_dim(tp_space, el_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
-    der_keys = _integer_sums(nderivatives, n+1)
+    der_keys = integer_sums(nderivatives, n+1)
     # Initialize storage of local basis functions and derivatives
     local_basis = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
@@ -353,13 +353,13 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
     for key in der_keys
         key = key[1:n]
         j = sum(key)
-        der_idx = _get_derivative_idx(key)
+        der_idx = get_derivative_idx(key)
         key_1 = key[1:n1]
         j_1 = sum(key_1)
-        der_idx_1 = _get_derivative_idx(key_1)
+        der_idx_1 = get_derivative_idx(key_1)
         key_2 = key[n1+1:n]
         j_2 = sum(key_2)
-        der_idx_2 = _get_derivative_idx(key_2)
+        der_idx_2 = get_derivative_idx(key_2)
         local_basis[j + 1][der_idx] = kron(local_basis_per_dim[2][j_2 + 1][der_idx_2], local_basis_per_dim[1][j_1 + 1][der_idx_1])
     end
 

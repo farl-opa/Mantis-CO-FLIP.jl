@@ -88,7 +88,7 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
     num_components_per_space = length.(space.component_ordering)
 
     # Generate keys for all possible derivative combinations
-    der_keys = _integer_sums(nderivatives, manifold_dim+1)
+    der_keys = integer_sums(nderivatives, manifold_dim+1)
     # Initialize storage of local basis functions and derivatives
     local_multivalued_basis = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
@@ -110,7 +110,7 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
         for key in der_keys
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
-            der_idx = _get_derivative_idx(key) # index of derivative
+            der_idx = get_derivative_idx(key) # index of derivative
             
             for i in 1:num_components_per_space[space_idx]
                 component_idx = space.component_ordering[space_idx][i]

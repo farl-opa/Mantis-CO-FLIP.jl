@@ -1,5 +1,5 @@
 """
-    _integer_sums(sum_indices::Int, num_indices::Int)
+    integer_sums(sum_indices::Int, num_indices::Int)
 
 This function generates all possible combinations of non-negative integers that sum up to a given value, where each combination has a specified number of elements.
 
@@ -10,7 +10,7 @@ This function generates all possible combinations of non-negative integers that 
 Return Value
 The function returns a vector of vectors, where each inner vector represents a combination of integers that sum up to sum_indices. If no valid combinations exist, the function returns an empty vector.
 """
-@Memoization.memoize function _integer_sums(sum_indices::Int, num_indices::Int)
+@Memoization.memoize function integer_sums(sum_indices::Int, num_indices::Int)
     solutions = Vector{Vector{Int}}(undef,0)
     if num_indices == 1
         push!(solutions, [sum_indices])
@@ -99,21 +99,21 @@ function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{Int,Int})
 end
 
 """
-    _get_derivative_idx(der_key::Vector{Int})
+    get_derivative_idx(der_key::Vector{Int})
 
 Convert the given derivative key to a linear index corresponding to its storage location.
 
 If `local_basis` corresponds to basis evaluations for some `n`-variate function space, then its `k`-th derivatives will all be stored in the location `local_basis[k+1]`. Moreover, the `k`-th derivative corresponding to the key `(i₁,i₂,...,iₙ)` in the location `local_basis[k+1][m]` where:
 - `m = 1` when `iⱼ = 0` for all `j`, i.e., for basis function values;
 - `m = 1+r` when `iⱼ = 0` for all `j` except for `j = r` and `iⱼ = 1`, i.e., for the first derivative w.r.t. the `j`-th canonical coordinate;
-- in all other cases (i.e., when `k>1`),  the value of `m` is equal to `l` if `(i₁,i₂,...,iₙ)` is the `l`-th key returned by the function `_integer_sums(k, n)`.
+- in all other cases (i.e., when `k>1`),  the value of `m` is equal to `l` if `(i₁,i₂,...,iₙ)` is the `l`-th key returned by the function `integer_sums(k, n)`.
 
 # Arguments
 - `der_key::Vector{Int}`: A key for the desired derivative order.
 # Returns
 - `::Int`: The linear index corresponding to the derivative's storage location in basis evaluations.
 """
-@Memoization.memoize Dict function _get_derivative_idx(der_key::Vector{Int})
+@Memoization.memoize Dict function get_derivative_idx(der_key::Vector{Int})
     if any(der_key .< 0)
         throw(ArgumentError("Derivative key $der_key is not valid!"))
     end
@@ -133,7 +133,7 @@ If `local_basis` corresponds to basis evaluations for some `n`-variate function 
         # Request derivatives with order higher than 1
 
         # Generate all valid derivative keys
-        all_keys = _integer_sums(sum(der_key),length(der_key))
+        all_keys = integer_sums(sum(der_key),length(der_key))
 
         # Find the linear index associated to the input key der_key
         derivative_idx = findfirst(x -> x == der_key, all_keys)
