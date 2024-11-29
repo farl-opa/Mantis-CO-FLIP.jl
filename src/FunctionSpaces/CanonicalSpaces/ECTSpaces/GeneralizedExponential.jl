@@ -129,8 +129,8 @@ function gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
         ww = [1 cumprod(repeat([w * w], 1, m), dims=2)]
         M = ToeplitzMatrices.Toeplitz([1; cumprod(1.0 ./ (1:p+2*m))], I[:,1])
         M1 = M[1:p+1, :]
-        M1[p, :] .= ww * M[p:2:end, :]
-        M1[p+1, :] .= ww * M[p+1:2:end, :]
+        M1[p, :] = ww * M[p:2:end, :]
+        M1[p+1, :] = ww * M[p+1:2:end, :]
     end
     cs = zeros(Float64, p+1)
     C = zeros(Float64, p+1, p+1)
