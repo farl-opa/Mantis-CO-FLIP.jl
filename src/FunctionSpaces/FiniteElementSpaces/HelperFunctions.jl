@@ -111,15 +111,35 @@ If `local_basis` corresponds to basis evaluations for some `n`-variate function 
 - `::Int`: The linear index corresponding to the derivative's storage location in basis evaluations.
 """
 @Memoization.memoize Dict function _get_derivative_idx(der_key::Vector{Int})
-    # generate all valid derivative keys
-    all_keys = _integer_sums(sum(der_key),length(der_key))
-    # return the index corresponding to der_key
-    count = 1
-    for key in all_keys
-        if der_key == key
-            return count
-        else
-            count += 1
+    if any(der_key .< 0)
+        throw(ArgumentError("Derivative key $der_key is not valid!"))
+    end
+    
+    if sum(der_key) == 0
+        # Request 0th order derivatives, i.e., evaluation of the function
+        derivative_idx = 1
+
+    elseif sum(der_key) == 1
+        # Request first derivatives
+        
+        # Trivial indexing: the linear index associated to the input key der_key is just the
+        # index of the value with the 1 (the first derivative we wish)
+        derivative_idx = findfirst(x -> x == 1, der_key)
+
+    else
+        # Request derivatives with order higher than 1
+
+        # Generate all valid derivative keys
+        all_keys = _integer_sums(sum(der_key),length(der_key))
+
+        # Find the linear index associated to the input key der_key
+        derivative_idx = findfirst(x -> x == der_key, all_keys)
+
+        # Throw and error if the derivative key does not exist/is not valid
+        if isnothing(derivative_idx)
+            throw(ArgumentError("Derivative key $der_key is not valid!"))
         end
     end
+
+    return derivative_idx
 end

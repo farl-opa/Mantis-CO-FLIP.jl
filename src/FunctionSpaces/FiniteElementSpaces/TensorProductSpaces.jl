@@ -394,23 +394,6 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
     return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
 end
 
-function _integer_sums(n, k)
-    if k == 1
-        solutions = [n]
-    elseif k > 1
-        solutions = []
-        for combo in Combinatorics.combinations(0:n+k-2, k-1)
-            s = (combo[1],)
-            for i in 2:k-1
-                s = (s..., combo[i] - combo[i-1] - 1)
-            end
-            s = (s..., n+k-2 - combo[k-1])
-            push!(solutions, s)
-        end
-    end
-    return solutions
-end
-
 function _get_element_size(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
