@@ -66,6 +66,7 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTu
         evaluation[j+1] = Vector{Matrix{Float64}}(undef, n_ders)
     end
 
+    #TODO: This can be merged into a single loop
     for j = 0:nderivatives
         for k = 1:length(local_basis[j+1])
             if isassigned(local_basis[j+1],k)

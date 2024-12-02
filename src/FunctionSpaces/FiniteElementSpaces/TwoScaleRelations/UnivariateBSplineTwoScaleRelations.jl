@@ -532,3 +532,35 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, fine_bspline::NTuple{n, BSplineSpace}) where {n}
     return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]), n)
 end
+
+function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+    if supp_intersection == []
+        breakpoint_idxs = get_element_children(ts, first(supp_intersection))[1]
+    else
+        element_idxs = Int[]
+
+        for element ∈ supp_intersection
+            append!(element_idxs, get_element_children(ts, element))
+        end
+        
+        breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)
+    end
+
+    breakpoints = get_patch(fine_space).breakpoints[breakpoint_idxs]
+    multiplicity = get_multiplicity_vector(fine_space)[breakpoint_idxs]
+
+    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity)
+end
+
+function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, fem_space::BSplineSpace)
+    if supp_intersection == []
+        breakpoint_idxs = first(supp_intersection)
+    else
+        breakpoint_idxs = minimum(supp_intersection):maximum(supp_intersection)+1
+    end
+
+    breakpoints = get_patch(fem_space).breakpoints[breakpoint_idxs]
+    multiplicity = get_multiplicity_vector(fem_space)[breakpoint_idxs]
+
+    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fem_space), multiplicity)
+end

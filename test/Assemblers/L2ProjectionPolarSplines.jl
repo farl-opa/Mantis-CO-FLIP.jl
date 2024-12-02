@@ -53,9 +53,9 @@ function visualize_tensor_product_controlnet(control_points::Array{Float64}, man
     end
     for i in 2:manifold_dim
         if periodic[i]
-            TP = Mantis.FunctionSpaces.TensorProductSpace(TP, Mantis.FunctionSpaces.GTBSplineSpace((B[i],), [0]))
+            TP = Mantis.FunctionSpaces.TensorProductSpace((TP, Mantis.FunctionSpaces.GTBSplineSpace((B[i],), [0])))
         else
-            TP = Mantis.FunctionSpaces.TensorProductSpace(TP, B[i])
+            TP = Mantis.FunctionSpaces.TensorProductSpace((TP, B[i]))
         end
     end
 
@@ -282,7 +282,7 @@ function build_toroidal_spline_space_and_geometry(deg, nel_r, nel_θ, nel_ϕ, R_
     end
 
     # Toroidal spline space and global extraction matrix for the geometry
-    T_geom = Mantis.FunctionSpaces.TensorProductSpace(○.fem_space, GBϕ)
+    T_geom = Mantis.FunctionSpaces.TensorProductSpace((○.fem_space, GBϕ))
     # control points for the toroidal spline space
     geom_coeffs_toroidal = reshape(geom_coeffs_tp, n_θ*n_r, :, 3)
     geom_coeffs_toroidal = cat([((geom_coeffs_toroidal[:,:,i]*E_ϕ) / (E_ϕ' * E_ϕ)) for i = 1:3]..., dims=3) # impose periodicity in ϕ
@@ -292,11 +292,11 @@ function build_toroidal_spline_space_and_geometry(deg, nel_r, nel_θ, nel_ϕ, R_
 
     # Toroidal form space
     if form_rank == 0
-        T_sol = Mantis.FunctionSpaces.TensorProductSpace(X.fem_space[1], GBϕ)
+        T_sol = Mantis.FunctionSpaces.TensorProductSpace((X.fem_space[1], GBϕ))
     elseif form_rank == 3
         dBϕ = Mantis.FunctionSpaces.get_derivative_space(Bϕ)
         dGBϕ = Mantis.FunctionSpaces.GTBSplineSpace((dBϕ,), [deg-2])
-        T_sol = Mantis.FunctionSpaces.TensorProductSpace(X.fem_space[1], dGBϕ)
+        T_sol = Mantis.FunctionSpaces.TensorProductSpace((X.fem_space[1], dGBϕ))
     end
     # form space
     X = Mantis.Forms.FormSpace(form_rank, T, (T_sol,), "σ")

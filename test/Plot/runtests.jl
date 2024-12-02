@@ -25,7 +25,7 @@ Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1,
 geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GBθ),Mantis.FunctionSpaces.get_num_basis(Br),1.0)
 PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]))
 geom_coeffs_θr = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
-S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(PSplines[1], GBθ)
+S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((PSplines[1], GBθ))
 # control points for geometry cross-section
 geom_coeffs_θr0 = [geom_coeffs_θr.+[4 0] zeros(size(geom_coeffs_θr,1))]
 # rotate the cross-section points around the y-axis to create control points for torus
@@ -52,8 +52,8 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
 GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
 Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP_θr = Mantis.FunctionSpaces.TensorProductSpace(GBθ, Br)
-TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(TP_θr, GBθ)
+TP_θr = Mantis.FunctionSpaces.TensorProductSpace((GBθ, Br))
+TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((TP_θr, GBθ))
 # control points for geometry
 geom_coeffs_θ =   [1.0  -1.0
 1.0   1.0
@@ -89,9 +89,9 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
 GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
 Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP_θr = Mantis.FunctionSpaces.TensorProductSpace(GBθ, Br)
+TP_θr = Mantis.FunctionSpaces.TensorProductSpace((GBθ, Br))
 Bz = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP_θrz = Mantis.FunctionSpaces.TensorProductSpace(TP_θr, Bz)
+TP_θrz = Mantis.FunctionSpaces.TensorProductSpace((TP_θr, Bz))
 # control points for geometry
 geom_coeffs_θ =   [1.0  -1.0
 1.0   1.0

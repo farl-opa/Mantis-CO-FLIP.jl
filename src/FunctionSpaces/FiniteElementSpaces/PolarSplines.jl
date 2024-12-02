@@ -33,11 +33,11 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
     E = E[form_rank+1]
     # tensor-product space which will form the foundation of the polar spline space
     if form_rank == 0
-        tp_space = TensorProductSpace(space_p, space_r)
+        tp_space = TensorProductSpace((space_p, space_r))
     elseif form_rank == 2
-        tp_space = TensorProductSpace(dspace_p, dspace_r)
+        tp_space = TensorProductSpace((dspace_p, dspace_r))
     elseif form_rank == 1
-        tp_space = (TensorProductSpace(dspace_p, space_r), TensorProductSpace(space_p, dspace_r))
+        tp_space = (TensorProductSpace((dspace_p, space_r)), TensorProductSpace((space_p, dspace_r)))
     end
 
     # convert to tuple if form_rank is not 1 for uniformity

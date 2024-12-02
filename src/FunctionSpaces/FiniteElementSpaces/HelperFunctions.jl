@@ -25,6 +25,7 @@ The function returns a vector of vectors, where each inner vector represents a c
             push!(solutions, s)
         end
     end
+    #TODO should throw argument error if num_indices < 1
     return solutions
 end
 
@@ -52,15 +53,11 @@ function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
 end
 
 # Additional method overloads for ordered_to_linear_index
-function ordered_to_linear_index(ord_ind::Tuple{m,Int}, max_ind::Tuple{m,Int}) where {m}
+function ordered_to_linear_index(ord_ind::NTuple{m,Int}, max_ind::NTuple{m,Int}) where {m}
     return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
 end
 
-function ordered_to_linear_index(ord_ind::Tuple{Int, Int}, max_ind::Tuple{Int,Int})
-    return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
-end
-
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Tuple{Int,Int})
+function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::NTuple{m,Int}) where {m}
     return ordered_to_linear_index(ord_ind, collect(max_ind))
 end
 
@@ -90,7 +87,7 @@ function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
 end
 
 # Additional method overloads for linear_to_ordered_index
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{m,Int}) where {m}
+function linear_to_ordered_index(lin_ind::Int, max_ind::NTuple{m,Int}) where {m}
     return linear_to_ordered_index(lin_ind, collect(max_ind))
 end
 

@@ -249,7 +249,7 @@ function get_active_objects_and_nested_domains(spaces::Vector{S}, two_scale_oper
         for Ni ∈ active_basis_per_level[level] # Loop over active basis on current level
             # Gets the support of Ni on current level and the next one
             support = get_support(spaces[level], Ni)
-            element_children = get_element_children(two_scale_operators[level], support)
+            element_children = [child for parent in support for child in get_element_children(two_scale_operators[level], parent)]
             check_in_next_domain = element_children .∈ next_level_domain # checks if the support is contained in the next level domain
 
             # Updates elements and basis to add and remove based on check_in_next_domain
