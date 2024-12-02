@@ -51,7 +51,11 @@ function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vec
 end
 
 function _get_element_size(geometry::FEMGeometry{n, F}, element_id::Int) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
-    return FunctionSpaces._get_element_size(geometry.fem_space, element_id)
+    return FunctionSpaces.get_element_size(geometry.fem_space, element_id)
+end
+
+function _get_element_dimensions(geometry::FEMGeometry{n, F}, element_id::Int) where {n, F<:FunctionSpaces.AbstractFiniteElementSpace{n}}
+    return FunctionSpaces.get_element_dimensions(geometry.fem_space, element_id)
 end
 
 # compute FEMGeometry for different FESpaces

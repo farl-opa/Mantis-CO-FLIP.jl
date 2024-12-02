@@ -633,10 +633,10 @@ end
 
 # Geometry methods
 
-function _get_element_size(hier_space::HierarchicalFiniteElementSpace{n, S, T}, hier_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function get_element_size(hier_space::HierarchicalFiniteElementSpace{n, S, T}, hier_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     element_level, element_level_id = convert_to_element_level_and_level_id(hier_space, hier_id)
 
-    return _get_element_size(hier_space.spaces[element_level], element_level_id)
+    return get_element_size(hier_space.spaces[element_level], element_level_id)
 end
 
 function _compute_thb_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{manifold_dim, S, T}) where {manifold_dim, S<:AbstractFiniteElementSpace{manifold_dim}, T<:AbstractTwoScaleOperator}

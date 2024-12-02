@@ -57,7 +57,7 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
     n_evaluation_points = prod(size.(xi, 1))
 
     # Generate keys for all possible derivative combinations
-    der_keys = integer_sums(nderivatives, manifold_dim+1)
+    der_keys = _integer_sums(nderivatives, manifold_dim+1)
     # Initialize storage of local basis functions and derivatives
     local_multivalued_basis = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
@@ -79,7 +79,7 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
         for key in der_keys
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
-            der_idx = get_derivative_idx(key) # index of derivative
+            der_idx = _get_derivative_idx(key) # index of derivative
             
             local_multivalued_basis[j + 1][der_idx][component_idx][:, count .+ (1:num_basis_per_component[component_idx])] .= local_component_basis[j+1][der_idx]
         end
@@ -134,14 +134,14 @@ function get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F
     num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
     dof_offset_component = zeros(Int, num_components)
     dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
-
+    
     multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
 
     for component_idx in 1:num_components
         multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
-    
-    return reduce(vcat, multivalued_basis_indices)
+
+    return vcat(multivalued_basis_indices...)
 end
 
 """
@@ -168,8 +168,8 @@ function get_basis_indices_w_components(space::DirectSumSpace{manifold_dim, num_
     for component_idx in 1:num_components
         multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
-    
-    return reduce(vcat, multivalued_basis_indices), component_basis_indices
+
+    return vcat(multivalued_basis_indices...), component_basis_indices
 end
 
 """
