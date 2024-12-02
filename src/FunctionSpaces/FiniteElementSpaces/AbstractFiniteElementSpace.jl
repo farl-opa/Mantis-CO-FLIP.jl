@@ -55,7 +55,7 @@ For given global element id `element_id` for a given finite element `space`, eva
 - `::Matrix{Float64}`: array of evaluated global basis (size: num_eval_points x num_funcs x nderivatives+1)
 - `::Vector{Int}`: vector of global basis indices (size: num_funcs).
 
-# See also [`_get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
+# See also [`get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
 """
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n}
     extraction_coefficients, basis_indices = get_extraction(space, element_id)
