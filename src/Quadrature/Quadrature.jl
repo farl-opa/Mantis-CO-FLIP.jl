@@ -32,27 +32,27 @@ import FFTW
 
 
 @doc raw"""
-    AbstractQuadratureRule{domain_dim}
+    AbstractQuadratureRule{manifold_dim}
 
-Abstract type for a quadrature rule on a domain of dimension `domain_dim`.
+Abstract type for a quadrature rule on a domain of dimension `manifold_dim`.
 
 # Type parameters
-- `domain_dim`: Dimension of the domain
+- `manifold_dim`: Dimension of the domain
 
 # Concrete types
-- `QuadratureRule{domain_dim}`: See [`QuadratureRule`](@ref).
+- `QuadratureRule{manifold_dim}`: See [`QuadratureRule`](@ref).
 """
-abstract type AbstractQuadratureRule{domain_dim} end
+abstract type AbstractQuadratureRule{manifold_dim} end
 
 
 
 @doc raw"""
-    QuadratureRule{domain_dim} <: AbstractQuadratureRule{domain_dim}
+    QuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim}
 
-Represents a quadrature rule on a domain of dimension `domain_dim`.
+Represents a quadrature rule on a domain of dimension `manifold_dim`.
 
 # Fields
-- `nodes::NTuple{domain_dim, Vector{Float64}}`: Quadrature nodes per 
+- `nodes::NTuple{manifold_dim, Vector{Float64}}`: Quadrature nodes per 
                                                 dimension.
 - `weights::Vector{Float64}`: Tensor product of quadrature rules. The 
                               shape is consistent with the output of the 
@@ -60,10 +60,10 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 - `rule_type::String`: Type of quadrature rule.
 
 # Type parameters
-- `domain_dim`: Dimension of the domain
+- `manifold_dim`: Dimension of the domain
 
 # Inner Constructors
-- `QuadratureRule(nodes::NTuple{domain_dim, Vector{Float64}}, 
+- `QuadratureRule(nodes::NTuple{manifold_dim, Vector{Float64}}, 
                   weights::Vector{Float64})`: General constructor.
 
 # Outer Constructors
@@ -71,57 +71,57 @@ Represents a quadrature rule on a domain of dimension `domain_dim`.
 - [`gauss_legendre`](@ref).
 - [`clenshaw_curtis`](@ref).
 - [`newton_cotes`](@ref).
-- [`tensor_product_rule(p::NTuple{domain_dim, Int}, quad_rule::F, rule_args_1d...) where {domain_dim, F <: Function}`](@ref).
-- [`tensor_product_rule(qrules_1d::NTuple{domain_dim, QuadratureRule{1}}) where {domain_dim}`](@ref).
+- [`tensor_product_rule(p::NTuple{manifold_dim, Int}, quad_rule::F, rule_args_1d...) where {manifold_dim, F <: Function}`](@ref).
+- [`tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}) where {manifold_dim}`](@ref).
 """
-struct QuadratureRule{domain_dim} <: AbstractQuadratureRule{domain_dim}
-    nodes::NTuple{domain_dim, Vector{Float64}}
+struct QuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim}
+    nodes::NTuple{manifold_dim, Vector{Float64}}
     weights::Vector{Float64}
     rule_type::String
 end
 
 @doc raw"""
-    get_quadrature_nodes(qr::QuadratureRule{domain_dim}) where {domain_dim}
+    get_quadrature_nodes(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
 
 Returns the quadrature nodes of a quadrature rule.
 
 # Arguments
-- `qr::QuadratureRule{domain_dim}`: Rule to get the nodes from.
+- `qr::QuadratureRule{manifold_dim}`: Rule to get the nodes from.
 
 # Returns
-- `nodes::NTuple{domain_dim, Vector{Float64}}`: Nodes of the quadrature rule.
+- `nodes::NTuple{manifold_dim, Vector{Float64}}`: Nodes of the quadrature rule.
 """
-function get_quadrature_nodes(qr::QuadratureRule{domain_dim}) where {domain_dim}
+function get_quadrature_nodes(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.nodes
 end
 
 @doc raw"""
-    get_quadrature_weights(qr::QuadratureRule{domain_dim}) where {domain_dim}
+    get_quadrature_weights(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
 
 Returns the quadrature weights of a quadrature rule.
 
 # Arguments
-- `qr::QuadratureRule{domain_dim}`: Rule to get the weights from.
+- `qr::QuadratureRule{manifold_dim}`: Rule to get the weights from.
 
 # Returns
 - `weights::Vector{Float64}`: Weights of the quadrature rule.
 """
-function get_quadrature_weights(qr::QuadratureRule{domain_dim}) where {domain_dim}
+function get_quadrature_weights(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.weights
 end
 
 @doc raw"""
-    get_quadrature_rule_type(qr::QuadratureRule{domain_dim}) where {domain_dim}
+    get_quadrature_rule_type(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
 
 Returns the type of a quadrature rule.
 
 # Arguments
-- `qr::QuadratureRule{domain_dim}`: Rule to get the type from.
+- `qr::QuadratureRule{manifold_dim}`: Rule to get the type from.
 
 # Returns
 - `rule_type::String`: Type of the quadrature rule.
 """
-function get_quadrature_rule_type(qr::QuadratureRule{domain_dim}) where {domain_dim}
+function get_quadrature_rule_type(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.rule_type
 end
 
