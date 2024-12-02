@@ -89,8 +89,8 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
 GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
 Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP_θr = Mantis.FunctionSpaces.TensorProductSpace(GBθ, Br)
-TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(TP_θr, GBθ)
+TP_θr = Mantis.FunctionSpaces.TensorProductSpace((GBθ, Br))
+TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((TP_θr, GBθ))
 # control points for geometry
 geom_coeffs_θ =   [1.0  -1.0
 1.0   1.0
