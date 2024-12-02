@@ -1,14 +1,17 @@
 """
     integer_sums(sum_indices::Int, num_indices::Int)
 
-This function generates all possible combinations of non-negative integers that sum up to a given value, where each combination has a specified number of elements.
+Generates all possible combinations of non-negative integers that sum up 
+to a given value, where each combination has a specified number of elements.
 
 # Arguments
 - `sum_indices::Int`: The target sum of the integers in each combination.
 - `num_indices::Int`: The number of integers in each combination.
 
-Return Value
-The function returns a vector of vectors, where each inner vector represents a combination of integers that sum up to sum_indices. If no valid combinations exist, the function returns an empty vector.
+# Returns
+- `::Vector{Vector{Int}}`: Each inner vector represents a combination of 
+                           integers that sum up to `sum_indices`. If no 
+                           valid combinations exist, the vectors are empty.
 """
 @Memoization.memoize function integer_sums(sum_indices::Int, num_indices::Int)
     solutions = Vector{Vector{Int}}(undef,0)
@@ -103,13 +106,23 @@ end
 
 Convert the given derivative key to a linear index corresponding to its storage location.
 
-If `local_basis` corresponds to basis evaluations for some `n`-variate function space, then its `k`-th derivatives will all be stored in the location `local_basis[k+1]`. Moreover, the `k`-th derivative corresponding to the key `(i₁,i₂,...,iₙ)` in the location `local_basis[k+1][m]` where:
+If `local_basis` corresponds to basis evaluations for some `n`-variate function space, 
+then its `k`-th derivatives will all be stored in the location `local_basis[k+1]`. 
+Moreover, the `k`-th derivative corresponding to the key `[i₁,i₂,...,iₙ]` in the 
+location `local_basis[k+1][m]` where:
 - `m = 1` when `iⱼ = 0` for all `j`, i.e., for basis function values;
-- `m = 1+r` when `iⱼ = 0` for all `j` except for `j = r` and `iⱼ = 1`, i.e., for the first derivative w.r.t. the `j`-th canonical coordinate;
-- in all other cases (i.e., when `k>1`),  the value of `m` is equal to `l` if `(i₁,i₂,...,iₙ)` is the `l`-th key returned by the function `integer_sums(k, n)`.
+- `m = 1+r` when `iⱼ = 0` for all `j` except for `j = r` and `iⱼ = 1`, i.e., 
+  for the first derivative w.r.t. the `j`-th canonical coordinate;
+- in all other cases (i.e., when `k>1`),  the value of `m` is equal to `l` 
+  if `[i₁,i₂,...,iₙ]` is the `l`-th key returned by the function `integer_sums(k, n)`.
+
+As an example, consider the first derivative with respect to x₁ (∂/∂x₁) 
+in 2D, which has key [1, 0]. In 3D, this same derivative has key 
+[1, 0, 0]. In 3D, the derivative ∂³/∂x₁²∂x₂ thus has key [2, 1, 0].
 
 # Arguments
 - `der_key::Vector{Int}`: A key for the desired derivative order.
+
 # Returns
 - `::Int`: The linear index corresponding to the derivative's storage location in basis evaluations.
 """
