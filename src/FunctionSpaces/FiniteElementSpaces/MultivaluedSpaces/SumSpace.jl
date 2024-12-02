@@ -57,7 +57,7 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
     n_evaluation_points = prod(size.(xi, 1))
     
     # Generate keys for all possible derivative combinations
-    der_keys = _integer_sums(nderivatives, manifold_dim+1)
+    der_keys = integer_sums(nderivatives, manifold_dim+1)
     # Initialize storage of local basis functions and derivatives
     local_multivalued_basis = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
@@ -78,7 +78,7 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
         for key in der_keys
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
-            der_idx = _get_derivative_idx(key) # index of derivative
+            der_idx = get_derivative_idx(key) # index of derivative
             
             local_multivalued_basis[j + 1][der_idx][component_idx][:, column_indices_per_component[component_idx]] .= local_component_basis[j+1][der_idx]
         end

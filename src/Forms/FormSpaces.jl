@@ -210,10 +210,11 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     d_local_fem_basis, form_basis_indices = _evaluate_form_in_canonical_coordinates(form_space, element_idx, xi, 1)
 
     # Store the required values
+    key = zeros(Int, manifold_dim)
     for coordinate_idx = 1:manifold_dim
-        key = zeros(Int, manifold_dim)
         key[coordinate_idx] = 1
-        der_idx = FunctionSpaces._get_derivative_idx(key)
+        der_idx = FunctionSpaces.get_derivative_idx(key)
+        key[coordinate_idx] = 0
         @. local_d_form_basis_eval[coordinate_idx] = d_local_fem_basis[2][der_idx][1]
     end
 
@@ -265,9 +266,9 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # The exterior derivative is 
     # (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
     # Store the required values
-    der_idx_1 = FunctionSpaces._get_derivative_idx([1, 0])
-    der_idx_2 = FunctionSpaces._get_derivative_idx([0, 1])
-    local_d_form_basis_eval[1] = d_local_fem_basis[2][der_idx_1][2] - d_local_fem_basis[2][der_idx_2][1]
+    der_idx_1 = FunctionSpaces.get_derivative_idx([1, 0])
+    der_idx_2 = FunctionSpaces.get_derivative_idx([0, 1])
+    @. local_d_form_basis_eval[1] = d_local_fem_basis[2][der_idx_1][2] - d_local_fem_basis[2][der_idx_2][1]
     
     return local_d_form_basis_eval, form_basis_indices
 end
@@ -313,10 +314,9 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     
     # The exterior derivative is 
     # (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃ + (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁ + (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
-    
-    der_idx_1 = FunctionSpaces._get_derivative_idx([1, 0, 0])
-    der_idx_2 = FunctionSpaces._get_derivative_idx([0, 1, 0])
-    der_idx_3 = FunctionSpaces._get_derivative_idx([0, 0, 1])
+    der_idx_1 = FunctionSpaces.get_derivative_idx([1, 0, 0])
+    der_idx_2 = FunctionSpaces.get_derivative_idx([0, 1, 0])
+    der_idx_3 = FunctionSpaces.get_derivative_idx([0, 0, 1])
     # First: (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃
     @. local_d_form_basis_eval[1] = d_local_fem_basis[2][der_idx_2][3] - d_local_fem_basis[2][der_idx_3][2]
     # Second: (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁

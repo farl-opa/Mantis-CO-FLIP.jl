@@ -87,7 +87,7 @@ up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \f
 
 See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64)
+@Memoization.memoize function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64)
     # Get information from inputs on size of computation 
     n_points = size(ξ, 1)  # the number of points where to evaluate the polynomials and their derivatives
     p = polynomials.p # the degree of the polynomials, the number of polynomials is p + 1
@@ -212,7 +212,7 @@ up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \f
 
 See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int64)
+@Memoization.memoize function evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int64)
     # The edge basis functions are given by, see documentation of EdgeLobattoLegendre:
     #   
     #   edge_{i}(x) = -\sum_{j=1}^{i} dh_{j}(x)/dx, i=1,...,p
