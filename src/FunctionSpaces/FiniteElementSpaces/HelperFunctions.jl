@@ -27,8 +27,10 @@ to a given value, where each combination has a specified number of elements.
             s[end] = sum_indices+num_indices-2 - combo[num_indices-1]
             push!(solutions, s)
         end
+    else
+        throw(ArgumentError("Number of indices must be greater than 0."))
     end
-    #TODO should throw argument error if num_indices < 1
+
     return solutions
 end
 
