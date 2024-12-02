@@ -62,9 +62,7 @@ geom_crazy = Mantis.Geometry.MappedGeometry(geom_cart, crazy_mapping)
 
 # Test on multiple geometries
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+25, deg2+25), Mantis.Quadrature.gauss_legendre)
-for geom in [geom_cart, geom_crazy]#[geom_cart, geom_crazy]
-    println("Geom type: ",typeof(geom))
-    
+for geom in [geom_cart, geom_crazy]
     # Create the form spaces
     ϵ⁰ = Mantis.Forms.FormSpace(0, geom, TP_Space_0, "ν")
     ϵ¹ = Mantis.Forms.FormSpace(1, geom, TP_Space_1, "η")
@@ -290,8 +288,6 @@ quadrature_weights = Mantis.Quadrature.get_quadrature_weights(q_rule)
 
 # Test on multiple geometries. Type-wise and content/metric wise.
 for geom in [geo_3d_cart, crazy_geo_3d_cart]
-    println("Geom type: ",typeof(geom))
-
     # Create form spaces
     ϵ⁰ = Mantis.Forms.FormSpace(0, geom, dsTP_0_form_3d, "ν")
     ϵ¹ = Mantis.Forms.FormSpace(1, geom, dsTP_1_form_3d, "η")

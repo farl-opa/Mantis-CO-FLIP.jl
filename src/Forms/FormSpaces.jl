@@ -371,9 +371,9 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # α₁ dξ₂∧dξ₃ + α₂ dξ₃∧dξ₁ + α₃ dξ₁∧dξ₂
     # The exterior derivative is 
     # (∂α₁/∂ξ₁ + ∂α₂/∂ξ₂ + ∂α₃/∂ξ₃) dξ₁∧dξ₂∧dξ₃
-    der_idx_1 = FunctionSpaces._get_derivative_idx([1, 0, 0])
-    der_idx_2 = FunctionSpaces._get_derivative_idx([0, 1, 0])
-    der_idx_3 = FunctionSpaces._get_derivative_idx([0, 0, 1])
+    der_idx_1 = FunctionSpaces.get_derivative_idx([1, 0, 0])
+    der_idx_2 = FunctionSpaces.get_derivative_idx([0, 1, 0])
+    der_idx_3 = FunctionSpaces.get_derivative_idx([0, 0, 1])
     @. local_d_form_basis_eval[1] = d_local_fem_basis[2][der_idx_1][1] + d_local_fem_basis[2][der_idx_2][2] + d_local_fem_basis[2][der_idx_3][3]
     
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges

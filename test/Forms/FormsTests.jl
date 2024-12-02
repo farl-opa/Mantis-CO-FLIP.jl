@@ -265,7 +265,7 @@ d_two_form_space_eval, d_two_form_space_idx = Mantis.Forms.evaluate_exterior_der
 n_active_basis_two_form = Mantis.FunctionSpaces.get_num_basis(dsTP_2_form_3d, element_idx)
  
 @test size(d_two_form_space_eval) == (1,)  # check that we get three components (3D)
-@test size(d_two_form_space_idx[1]analytical) == (n_active_basis_2_form, )  # check that we get one single vector with as many indices as the active basis in the element
+@test size(d_two_form_space_idx[1]) == (n_active_basis_2_form, )  # check that we get one single vector with as many indices as the active basis in the element
 @test all([size(form_component) == (n_evaluation_points, n_active_basis_2_form) for form_component in d_two_form_space_eval])  # check that we get a matrix with the correct dimensions per component
 @test isapprox(sum(sum.(d_two_form_space_eval)), 0.0, atol=1e-12) 
 
