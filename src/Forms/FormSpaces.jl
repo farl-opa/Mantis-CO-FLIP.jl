@@ -185,7 +185,7 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     for derivative_component_idx in 1:n_derivative_form_components
         # Select the derivative for this component
         first_derivative_base_key[derivative_component_idx] = 1
-        first_derivative_idx = FunctionSpaces._get_derivative_idx(first_derivative_base_key)
+        first_derivative_idx = FunctionSpaces.get_derivative_idx(first_derivative_base_key)
         first_derivative_base_key[derivative_component_idx] = 0
         
         # I think deepcopy is needed  because someone may make changes in place
@@ -250,8 +250,8 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     form_basis_indices_dξ_2 .+= dof_offset_component[2]  # the second component basis need to be offset to have the correct numbering
     # The exterior derivative is 
     # (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
-    der_idx_dξ_1_2 = FunctionSpaces._get_derivative_idx([0, 1])
-    der_idx_dξ_2_1 = FunctionSpaces._get_derivative_idx([1, 0])
+    der_idx_dξ_1_2 = FunctionSpaces.get_derivative_idx([0, 1])
+    der_idx_dξ_2_1 = FunctionSpaces.get_derivative_idx([1, 0])
     local_d_form_basis_eval[1] = hcat(d_local_fem_basis_dξ_2[2][der_idx_dξ_2_1], -d_local_fem_basis_dξ_1[2][der_idx_dξ_1_2])
     form_basis_indices[1] = vcat(form_basis_indices_dξ_2, form_basis_indices_dξ_1)
     
@@ -312,18 +312,18 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # The exterior derivative is 
     # (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃ + (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁ + (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
     # First: (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃
-    der_idx_dξ_3_2 = FunctionSpaces._get_derivative_idx([0,1,0])
-    der_idx_dξ_2_3 = FunctionSpaces._get_derivative_idx([0,0,1])
+    der_idx_dξ_3_2 = FunctionSpaces.get_derivative_idx([0,1,0])
+    der_idx_dξ_2_3 = FunctionSpaces.get_derivative_idx([0,0,1])
     local_d_form_basis_eval[1] = hcat(d_local_fem_basis_dξ_3[2][der_idx_dξ_3_2], -d_local_fem_basis_dξ_2[2][der_idx_dξ_2_3])
     form_basis_indices[1] = vcat(form_basis_indices_dξ_3, form_basis_indices_dξ_2)
     # Second: (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁
-    der_idx_dξ_1_3 = FunctionSpaces._get_derivative_idx([0,0,1])
-    der_idx_dξ_3_1 = FunctionSpaces._get_derivative_idx([1,0,0])
+    der_idx_dξ_1_3 = FunctionSpaces.get_derivative_idx([0,0,1])
+    der_idx_dξ_3_1 = FunctionSpaces.get_derivative_idx([1,0,0])
     local_d_form_basis_eval[2] = hcat(d_local_fem_basis_dξ_1[2][der_idx_dξ_1_3], -d_local_fem_basis_dξ_3[2][der_idx_dξ_3_1])
     form_basis_indices[2] = vcat(form_basis_indices_dξ_1, form_basis_indices_dξ_3)
     # Third: (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
-    der_idx_dξ_2_1 = FunctionSpaces._get_derivative_idx([1,0,0])
-    der_idx_dξ_1_2 = FunctionSpaces._get_derivative_idx([0,1,0])
+    der_idx_dξ_2_1 = FunctionSpaces.get_derivative_idx([1,0,0])
+    der_idx_dξ_1_2 = FunctionSpaces.get_derivative_idx([0,1,0])
     local_d_form_basis_eval[3] = hcat(d_local_fem_basis_dξ_2[2][der_idx_dξ_2_1], -d_local_fem_basis_dξ_1[2][der_idx_dξ_1_2])
     form_basis_indices[3] = vcat(form_basis_indices_dξ_2, form_basis_indices_dξ_1)
     
@@ -386,9 +386,9 @@ function evaluate_exterior_derivative(form_space::FS, element_idx::Int, xi::NTup
     # α₁ dξ₂∧dξ₃ + α₂ dξ₃∧dξ₁ + α₃ dξ₁∧dξ₂
     # The exterior derivative is 
     # (∂α₁/∂ξ₁ + ∂α₂/∂ξ₂ + ∂α₃/∂ξ₃) dξ₁∧dξ₂∧dξ₃
-    der_idx_dξ_2_dξ_3_1 = FunctionSpaces._get_derivative_idx([1,0,0])
-    der_idx_dξ_3_dξ_1_2 = FunctionSpaces._get_derivative_idx([0,1,0])
-    der_idx_dξ_1_dξ_2_3 = FunctionSpaces._get_derivative_idx([0,0,1])
+    der_idx_dξ_2_dξ_3_1 = FunctionSpaces.get_derivative_idx([1,0,0])
+    der_idx_dξ_3_dξ_1_2 = FunctionSpaces.get_derivative_idx([0,1,0])
+    der_idx_dξ_1_dξ_2_3 = FunctionSpaces.get_derivative_idx([0,0,1])
     local_d_form_basis_eval[1] = hcat(d_local_fem_basis_dξ_2_dξ_3[1][der_idx_dξ_2_dξ_3_1], d_local_fem_basis_dξ_3_dξ_1[2][der_idx_dξ_3_dξ_1_2], d_local_fem_basis_dξ_1_dξ_2[2][der_idx_dξ_1_dξ_2_3])
     form_basis_indices[1] = vcat(form_basis_indices_dξ_2_dξ_3, form_basis_indices_dξ_3_dξ_1, form_basis_indices_dξ_1_dξ_2)
     

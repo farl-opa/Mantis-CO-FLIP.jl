@@ -42,7 +42,7 @@ function jacobian(geometry::FEMGeometry{n, F}, element_id::Int, xi::NTuple{n,Vec
     m = get_image_dim(geometry)
     J = zeros(n_eval_points, m, n)
     for k = 1:n 
-        der_idx = FunctionSpaces._get_derivative_idx(keys[k,:])  # Get derivative index
+        der_idx = FunctionSpaces.get_derivative_idx(keys[k,:])  # Get derivative index
         # Compute partial derivatives and store in Jacobian matrix
         J[:, :, k] .= fem_basis[2][der_idx] * geometry.geometry_coeffs[fem_basis_indices,:]
     end

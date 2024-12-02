@@ -296,7 +296,7 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::I
     local_basis_per_space = _get_local_basis_per_space(tp_space, el_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
-    der_keys = _integer_sums(nderivatives, manifold_dim+1)
+    der_keys = integer_sums(nderivatives, n+1)
     # Initialize storage of local basis functions and derivatives
     local_basis = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
@@ -320,9 +320,9 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::I
     for key in der_keys
         key = key[1:manifold_dim]
         j = sum(key)
-        der_idx = _get_derivative_idx(key)
+        der_idx = get_derivative_idx(key)
 
-        local_basis[j + 1][der_idx] = kron((local_basis_per_space[num_spaces - i + 1][sum(key[keys_idx[num_spaces - i + 1]]) + 1][_get_derivative_idx(key[keys_idx[num_spaces- i + 1]])] for i ∈ 1:num_spaces)...)
+        local_basis[j + 1][der_idx] = kron((local_basis_per_space[num_spaces - i + 1][sum(key[keys_idx[num_spaces - i + 1]]) + 1][get_derivative_idx(key[keys_idx[num_spaces- i + 1]])] for i ∈ 1:num_spaces)...)
     end
 
     return local_basis
@@ -340,7 +340,7 @@ function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi:
     local_basis_per_space = _get_local_basis_per_space(tp_space, el_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
-    der_keys = _integer_sums(nderivatives, manifold_dim+1)
+    der_keys = integer_sums(nderivatives, manifold_dim+1)
 
     # Split manifold dimensions of each constituent space
     manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
@@ -364,9 +364,9 @@ function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi:
     for key in der_keys
         key = key[1:manifold_dim]
         j = sum(key)
-        der_idx = _get_derivative_idx(key)
+        der_idx = get_derivative_idx(key)
 
-        evaluation[j + 1][der_idx] = kron((local_basis_per_space[num_spaces - i + 1][sum(key[keys_idx[num_spaces - i + 1]]) + 1][_get_derivative_idx(key[keys_idx[num_spaces- i + 1]])]*extraction_per_space[num_spaces-i+1][1] for i ∈ 1:num_spaces)...)
+        evaluation[j + 1][der_idx] = kron((local_basis_per_space[num_spaces - i + 1][sum(key[keys_idx[num_spaces - i + 1]]) + 1][get_derivative_idx(key[keys_idx[num_spaces- i + 1]])]*extraction_per_space[num_spaces-i+1][1] for i ∈ 1:num_spaces)...)
     end
 
     return evaluation, basis_indices
