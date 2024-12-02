@@ -296,7 +296,7 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::I
     local_basis_per_space = _get_local_basis_per_space(tp_space, el_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
-    der_keys = integer_sums(nderivatives, n+1)
+    der_keys = integer_sums(nderivatives, manifold_dim+1)
     # Initialize storage of local basis functions and derivatives
     local_basis = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
