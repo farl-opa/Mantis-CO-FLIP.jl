@@ -58,11 +58,11 @@ function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::Vector{Int})
 end
 
 # Additional method overloads for ordered_to_linear_index
-function ordered_to_linear_index(ord_ind::NTuple{m,Int}, max_ind::NTuple{m,Int}) where {m}
+function ordered_to_linear_index(ord_ind::NTuple{m,Int}, max_ind::NTuple{m,Int}) where {m} #TODO Are the methods for vector inputs ever being used? Or should we just stick to Tuples?
     return ordered_to_linear_index(collect(ord_ind), collect(max_ind))
 end
 
-function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::NTuple{m,Int}) where {m}
+function ordered_to_linear_index(ord_ind::Vector{Int}, max_ind::NTuple{m,Int}) where {m} #TODO Are the methods for vector inputs ever being used? Or should we just stick to Tuples?
     return ordered_to_linear_index(ord_ind, collect(max_ind))
 end
 
@@ -92,11 +92,7 @@ function linear_to_ordered_index(lin_ind::Int, max_ind::Vector{Int})
 end
 
 # Additional method overloads for linear_to_ordered_index
-function linear_to_ordered_index(lin_ind::Int, max_ind::NTuple{m,Int}) where {m}
-    return linear_to_ordered_index(lin_ind, collect(max_ind))
-end
-
-function linear_to_ordered_index(lin_ind::Int, max_ind::Tuple{Int,Int})
+function linear_to_ordered_index(lin_ind::Int, max_ind::NTuple{m,Int}) where {m} #TODO Are the methods for vector inputs ever being used? Or should we just stick to Tuples?
     return linear_to_ordered_index(lin_ind, collect(max_ind))
 end
 

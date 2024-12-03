@@ -60,6 +60,10 @@ for deg1 in 0:5
             end
         end
 
+        # tests for number of basis functions
+        @test Mantis.FunctionSpaces.get_num_basis(TP1) == Mantis.FunctionSpaces.get_num_basis(TP2)
+        @test Mantis.FunctionSpaces.get_num_basis(TP2) == Mantis.FunctionSpaces.get_num_basis(TP3)
+
         # tests for dof partitioning
         @test Mantis.FunctionSpaces.get_dof_partition(TP1) == Mantis.FunctionSpaces.get_dof_partition(TP2)
         @test Mantis.FunctionSpaces.get_dof_partition(TP2) == Mantis.FunctionSpaces.get_dof_partition(TP3)

@@ -123,8 +123,8 @@ m_1d = 5
 p_1d = 3
 k_1d = 2
 # Domain.
-const Lleft_1d = 0.0  # exact solutions are for xl = 0.0
-const Lright_1d = 2.0  # exact solution for xr > 0.0
+Lleft_1d = 0.0  # exact solutions are for xl = 0.0
+Lright_1d = 2.0  # exact solution for xr > 0.0
 
 
 # Create function spaces (b-splines here).
@@ -135,8 +135,8 @@ trial_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1
 test_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1d-1)
 
 # Set Dirichlet boundary conditions.
-const bc_left_sine_1d = 0.0
-const bc_right_sine_1d = 1.0
+bc_left_sine_1d = 0.0
+bc_right_sine_1d = 1.0
 bc_sine_1d = Dict{Int, Float64}(1 => bc_left_sine_1d, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => bc_right_sine_1d)
 bc_cos_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 0.0)
 bc_const_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 0.0)
@@ -218,10 +218,10 @@ m_y = 10
 p_2d = (4, 4)
 k_2d = (3, 3)
 # Domain.
-const Lleft = 0.0
-const Lright = 1.0
-const Lbottom = 0.0
-const Ltop = 1.0
+Lleft = 0.0
+Lright = 1.0
+Lbottom = 0.0
+Ltop = 1.0
 
 
 # Create function spaces (b-splines here).
@@ -255,7 +255,7 @@ brk_2d_x = collect(LinRange(Lleft, Lright, m_x+1))
 brk_2d_y = collect(LinRange(Lbottom, Ltop, m_y+1))
 geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_2d_x, brk_2d_y))
 
-const crazy_c = 0.2
+crazy_c = 0.2
 function mapping(x::Vector{Float64})
     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
@@ -358,12 +358,12 @@ k_3d = (2, 2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-const Lx1 = 0.0
-const Lx2 = 1.0
-const Ly1 = 0.0
-const Ly2 = 1.0
-const Lz1 = 0.0
-const Lz2 = 1.0
+Lx1 = 0.0
+Lx2 = 1.0
+Ly1 = 0.0
+Ly2 = 1.0
+Lz1 = 0.0
+Lz2 = 1.0
 
 # Tensor product b-spline case on a Cartesian geometry.
 # Create Patch.

@@ -76,6 +76,13 @@ function _get_basis_indices_per_space(tp_space::TensorProductSpace{manifold_dim,
     return tuple(map(get_basis_indices, tp_space.fem_spaces, ordered_index)...)::NTuple{num_spaces, Vector{Int}}
 end
 
+function _get_num_basis_per_space(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    return tuple(map(get_num_basis, tp_space.fem_spaces, ordered_index)...)::NTuple{num_spaces, Int}
+end
+
 function _get_support_per_space(tp_space::TensorProductSpace{manifold_dim, T}, basis_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     max_ind_basis = _get_num_basis_per_space(tp_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_basis)
@@ -167,6 +174,20 @@ function get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
     
     return basis_indices
 end
+
+"""
+    get_num_basis(tp_space::TensorProductSpace, element_id::Int)
+
+Compute and return the total number of basis functions for a specific element within a `TensorProductSpace`.
+
+# Arguments
+- `tp_space::TensorProductSpace`: The tensor product space.
+- `element_id::Int`: The identifier of the element.
+
+# Returns
+- `::Int`: The total number of basis functions for the specified element.
+"""
+get_num_basis(tp_space::TensorProductSpace, element_id::Int) = prod(_get_num_basis_per_space(tp_space, element_id))
 
 """
     get_num_elements(tp_space::TensorProductSpace)
@@ -403,7 +424,7 @@ end
 # Methods for tensor product B-spline spaces
 
 """
-    get_greville_points(tp_space::TensorProductSpace{manifold_dim, T})
+    get_greville_points(tp_space::TensorProductSpace{manifold_dim, T}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, BSplineSpace}}
 
 Compute and return the Greville points for a `TensorProductSpace` composed of B-spline spaces.
 
