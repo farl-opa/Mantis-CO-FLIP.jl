@@ -6,7 +6,7 @@ import Combinatorics
 
 A structure representing a tensor product space composed of multiple finite element spaces.
 The functions in this space are `manifold_dim`-variate where `manifold_dim` is equal to the sum of the
-manifold dimensions of the two input spaces.
+manifold dimensions of the input spaces.
 
 # Fields
 - `fem_spaces::T`: A tuple of finite element spaces.
@@ -69,9 +69,9 @@ _get_num_basis_per_space(tp_space::TensorProductSpace) = map(get_num_basis, tp_s
 
 _get_num_elements_per_space(tp_space::TensorProductSpace) = map(get_num_elements, tp_space.fem_spaces)
 
-function _get_basis_indices_per_space(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+function _get_basis_indices_per_space(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     max_ind_el = _get_num_elements_per_space(tp_space)
-    ordered_index = linear_to_ordered_index(el_id, max_ind_el)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
     return tuple(map(get_basis_indices, tp_space.fem_spaces, ordered_index)...)::NTuple{num_spaces, Vector{Int}}
 end
@@ -83,44 +83,42 @@ function _get_support_per_space(tp_space::TensorProductSpace{manifold_dim, T}, b
     return tuple(map(get_support, tp_space.fem_spaces, ordered_index)...)::NTuple{num_spaces, Vector{Int}}
 end
 
-function _get_extraction_per_space(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+function _get_extraction_per_space(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     max_ind_el = _get_num_elements_per_space(tp_space)
-    ordered_index = linear_to_ordered_index(el_id, max_ind_el)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
     return tuple(map(get_extraction, tp_space.fem_spaces, ordered_index)...)::NTuple{num_spaces, Tuple{Matrix{Float64}, Vector{Int}}}
 end
 
 """
-    get_polynomial_degree_per_space(tp_space::TensorProductSpace) -> Vector{Int}
+    get_polynomial_degree_per_space(tp_space::TensorProductSpace{manifold_dim, T}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, BSplineSpace}}
 
-Compute and return the polynomial degree for each space in a `TensorProductSpace`.
+Compute and return the polynomial degree for each space in a `TensorProductSpace` composed of univariate B-splines.
 
 # Arguments
 - `tp_space::TensorProductSpace`: The tensor-product space.
 
 # Returns
-- `::Vector{Int}`: A vector containing the polynomial degree for each space in the tensor-product space.
+- `::NTuple{manifold_dim, Int}`: A vector containing the polynomial degree for each space in the tensor-product space.
 """
-get_polynomial_degree_per_space(tp_space::TensorProductSpace) = map(get_polynomial_degree, tp_space.fem_spaces)
+function get_polynomial_degree_per_space(tp_space::TensorProductSpace{manifold_dim, T}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, BSplineSpace}}
+    return map(get_polynomial_degree, tp_space.fem_spaces)
+end
 
-function _get_local_basis_per_space(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+function _get_local_basis_per_space(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     # Get number of elements in each constituent space
     max_ind_el = _get_num_elements_per_space(tp_space)
 
     # Convert linear element ID to ordered index
-    ordered_index = linear_to_ordered_index(el_id, max_ind_el)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
     manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
-    cum_manifold_dim_per_space = cumsum(manifold_dim_per_space)
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
     # Split evaluation points for each constituent space
     num_points = size(xi,1)
     xis = [Tuple([Vector{Float64}(undef, num_points) for _ in 1:get_manifold_dim(space)]) for space in tp_space.fem_spaces]
     for i ∈ 1:num_spaces
-        if i == 1
-            xis[i] = xi[1:manifold_dim_per_space[i]]
-        else
-            xis[i] = xi[cum_manifold_dim_per_space[i-1]+1:cum_manifold_dim_per_space[i-1]+manifold_dim_per_space[i]]
-        end
+        xis[i] = xi[cum_manifold_dim_per_space[i]+1:cum_manifold_dim_per_space[i]+manifold_dim_per_space[i]]
     end
 
     return tuple(map(get_local_basis, tp_space.fem_spaces, ordered_index, xis, fill(nderivatives, num_spaces))...)::NTuple{num_spaces,Vector{Vector{Matrix{Float64}}}}
@@ -144,25 +142,25 @@ function get_space(tp_space::TensorProductSpace, space_id::Int)
 end
 
 """
-    get_basis_indices(tp_space::TensorProductSpace, el_id::Int)
+    get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
 
 Compute and return the basis indices for a specified element within a `TensorProductSpace`.
 
 # Arguments
 - `tp_space::TensorProductSpace`: The tensor-product space.
-- `el_id::Int`: ID of the element.
+- `element_id::Int`: ID of the element.
 
 # Returns
 - `::Vector{Int}`: Basis indices for the element.
 """
-function get_basis_indices(tp_space::TensorProductSpace, el_id::Int)
+function get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
     max_ind_basis = _get_num_basis_per_space(tp_space)
-    indices_per_dim = _get_basis_indices_per_space(tp_space, el_id)
+    indices_per_space = _get_basis_indices_per_space(tp_space, element_id)
     
     # Compute basis indices
-    basis_indices = Vector{Int}(undef, prod(length.(indices_per_dim)))
+    basis_indices = Vector{Int}(undef, prod(map(length, indices_per_space)))
     idx = 1
-    for basis in Iterators.product(indices_per_dim...)
+    for basis in Iterators.product(indices_per_space...)
         basis_indices[idx] = ordered_to_linear_index(basis, max_ind_basis)
         idx += 1
     end
@@ -211,33 +209,33 @@ get_dof_partition(tp_space::TensorProductSpace) = copy(tp_space.dof_partition)
 """
     get_max_local_dim(tp_space::TensorProductSpace)
 
-Compute and return the maximum local dimension for a `TensorProductSpace`.
+Compute and return an estimate of the maximum local dimension for a `TensorProductSpace`.
 
 # Arguments
 - `tp_space::TensorProductSpace`: The tensor-product space.
 
 # Returns
-- `::Int`: The maximum local dimension of the tensor-product space.
+- `::Int`: The estimate of the maximum local dimension of the tensor-product space.
 """
 get_max_local_dim(tp_space::TensorProductSpace) = prod(map(get_max_local_dim, tp_space.fem_spaces))
 
 """
     get_support(tp_space::TensorProductSpace, basis_id::Int) -> Vector{Int}
 
-Compute and return the support indices for a given basis function within a `TensorProductSpace`.
+Compute and return all the indices of elements that make up the support of a given basis function within a `TensorProductSpace`.
 
 # Arguments
 - `tp_space::TensorProductSpace`: The tensor-product space.
 - `basis_id::Int`: The identifier of the basis function.
 
 # Returns
-- `::Vector{Int}`: A vector containing the support indices for the specified basis function.
+- `::Vector{Int}`: A vector containing all the indices of elements that make up the support of the specified basis function.
 """
 function get_support(tp_space::TensorProductSpace, basis_id::Int)
     max_ind_els = _get_num_elements_per_space(tp_space)
     support_per_space = _get_support_per_space(tp_space, basis_id)
     
-    support = Vector{Int}(undef, prod(length.(support_per_space)))
+    support = Vector{Int}(undef, prod(map(length, support_per_space)))
     idx = 1
     for id in Iterators.product(support_per_space...)
         support[idx] = ordered_to_linear_index(id, max_ind_els)
@@ -248,20 +246,20 @@ function get_support(tp_space::TensorProductSpace, basis_id::Int)
 end
 
 """
-    get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int)
+    get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int)
 
 Compute and return the extraction coefficients and basis indices for a given element within a `TensorProductSpace`.
 
 # Arguments
 - `tp_space::TensorProductSpace{manifold_dim, T}`: The tensor-product space.
-- `el_id::Int`: The identifier of the element.
+- `element_id::Int`: The identifier of the element.
 
 # Returns
 - `::Tuple{Matrix{Float64}, Vector{Int}}`: A tuple containing the extraction coefficients matrix and a vector of basis indices.
 """
-function get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+function get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     max_ind_basis = _get_num_basis_per_space(tp_space)
-    extraction_per_space = _get_extraction_per_space(tp_space, el_id)
+    extraction_per_space = _get_extraction_per_space(tp_space, element_id)
     
     # Compute Kronecker product of extraction coefficients
     extraction_coeffs = kron((extraction_per_space[num_spaces-i+1][1] for i ∈ 1:num_spaces)...)
@@ -278,22 +276,22 @@ function get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, el_id::In
 end
 
 """
-    get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int)
+    get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int)
 
 Compute and return the local basis functions and their derivatives for a given element within a `TensorProductSpace`.
 
 # Arguments
 - `tp_space::TensorProductSpace{manifold_dim, T}`: The tensor-product space.
-- `el_id::Int`: The identifier of the element.
+- `element_id::Int`: The identifier of the element.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The evaluation points in each dimension.
 - `nderivatives::Int`: The number of derivatives to compute.
 
 # Returns
 - `::Vector{Vector{Matrix{Float64}}}`: A nested vector structure containing the local basis functions and their derivatives.
 """
-function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     # Compute local basis for each constituent space
-    local_basis_per_space = _get_local_basis_per_space(tp_space, el_id, xi, nderivatives)
+    local_basis_per_space = _get_local_basis_per_space(tp_space, element_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
     der_keys = integer_sums(nderivatives, manifold_dim+1)
@@ -305,15 +303,11 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::I
     end
 
     manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
-    cum_manifold_dim_per_space = cumsum(manifold_dim_per_space)
-    # Split evaluation points for each constituent space
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
+    # Split manifold dimensions for each constituent space
     keys_idx = Vector{UnitRange{Int}}(undef, num_spaces)
     for i ∈ 1:num_spaces
-        if i == 1
-            keys_idx[i] = 1:manifold_dim_per_space[i]
-        else
-            keys_idx[i] = cum_manifold_dim_per_space[i-1]+1:cum_manifold_dim_per_space[i-1]+manifold_dim_per_space[i]
-        end
+        keys_idx[i] = cum_manifold_dim_per_space[i]+1:cum_manifold_dim_per_space[i]+manifold_dim_per_space[i]
     end
 
     # Compute tensor product of constituent basis functions for each derivative combination
@@ -322,36 +316,59 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, el_id::I
         j = sum(key)
         der_idx = get_derivative_idx(key)
 
-        local_basis[j + 1][der_idx] = kron((local_basis_per_space[num_spaces - i + 1][sum(key[keys_idx[num_spaces - i + 1]]) + 1][get_derivative_idx(key[keys_idx[num_spaces- i + 1]])] for i ∈ 1:num_spaces)...)
+        # Initialize an array to hold the basis functions for each space
+        basis_functions_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
+
+        # Loop over each space to extract the relevant basis function
+        for i in 1:num_spaces
+            space_index = num_spaces - i + 1
+            key_sum = sum(key[keys_idx[space_index]]) + 1
+            derivative_index = get_derivative_idx(key[keys_idx[space_index]])
+            basis_functions_per_space[i] = local_basis_per_space[space_index][key_sum][derivative_index]
+        end
+
+        local_basis[j + 1][der_idx] = kron(basis_functions_per_space...)
     end
 
     return local_basis
 end
 
+@doc raw"""
+    evaluate(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
 
-function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+For given global element id `element_id` for a tensor product finite element space, evaluate the local basis functions and return.
+
+# Arguments 
+- `space::TensorProductSpace`: finite element space.
+- `element_id::Int`: global element id.
+- `xi::Vector{Float64}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated.
+- `nderivatives::Int`: number of derivatives to evaluate.
+
+# Returns
+- `::Vector{Vector{Matrix{Float64}}}`: array of evaluated global basis and derivatives.
+- `::Vector{Int}`: vector of global basis indices (size: num_funcs).
+
+# See also [`get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
+"""
+function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     # Get basis indices for the current element
-    basis_indices = get_basis_indices(tp_space, el_id)
+    basis_indices = get_basis_indices(tp_space, element_id)
 
     # Get the extraction coefficients per space
-    extraction_per_space = _get_extraction_per_space(tp_space, el_id)
+    extraction_per_space = _get_extraction_per_space(tp_space, element_id)
     
     # Compute local basis functions per space and their derivatives
-    local_basis_per_space = _get_local_basis_per_space(tp_space, el_id, xi, nderivatives)
+    local_basis_per_space = _get_local_basis_per_space(tp_space, element_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
     der_keys = integer_sums(nderivatives, manifold_dim+1)
 
     # Split manifold dimensions of each constituent space
     manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
-    cum_manifold_dim_per_space = cumsum(manifold_dim_per_space)
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
     keys_idx = Vector{UnitRange{Int}}(undef, num_spaces)
     for i ∈ 1:num_spaces
-        if i == 1
-            keys_idx[i] = 1:manifold_dim_per_space[i]
-        else
-            keys_idx[i] = cum_manifold_dim_per_space[i-1]+1:cum_manifold_dim_per_space[i-1]+manifold_dim_per_space[i]
-        end
+        keys_idx[i] = cum_manifold_dim_per_space[i]+1:cum_manifold_dim_per_space[i]+manifold_dim_per_space[i]
     end
 
     # Compute tensor product of constituent basis functions for each derivative combination
@@ -366,7 +383,18 @@ function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, el_id::Int, xi:
         j = sum(key)
         der_idx = get_derivative_idx(key)
 
-        evaluation[j + 1][der_idx] = kron((local_basis_per_space[num_spaces - i + 1][sum(key[keys_idx[num_spaces - i + 1]]) + 1][get_derivative_idx(key[keys_idx[num_spaces- i + 1]])]*extraction_per_space[num_spaces-i+1][1] for i ∈ 1:num_spaces)...)
+        # Initialize an array to hold the basis functions for each space
+        evaluation_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
+
+        # Loop over each space to extract the relevant basis function
+        for i in 1:num_spaces
+            space_index = num_spaces - i + 1
+            key_sum = sum(key[keys_idx[space_index]]) + 1
+            derivative_index = get_derivative_idx(key[keys_idx[space_index]])
+            evaluation_per_space[i] = local_basis_per_space[space_index][key_sum][derivative_index] * extraction_per_space[space_index][1]
+        end
+
+        evaluation[j + 1][der_idx] = kron(evaluation_per_space...)
     end
 
     return evaluation, basis_indices
