@@ -27,6 +27,10 @@ function get_element_size(geometry::G, element_id::Int) where {G<:AbstractGeomet
     return _get_element_size(geometry, element_id)
 end
 
+function get_element_dimensions(geometry::G, element_id::Int) where {G<:AbstractGeometry{n} where {n}}
+    return _get_element_dimensions(geometry, element_id)
+end
+
 include("./CartesianGeometry.jl")
 include("./FEMGeometry.jl")
 include("./MappedGeometry.jl")

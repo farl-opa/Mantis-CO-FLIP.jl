@@ -103,6 +103,19 @@ function get_image_dim(geometry::TensorProductGeometry{n, G1, G2}) where {n, G1<
     return sum(geometry.image_dims)
 end
 
+# TODO Simplify this: make function that acts on geometry and returns ordered index and level, for example. 
+#      Add explanations. If comments are added, the code becomes easier to read. Also, does this work
+#      for tensor products of 2D with 1D? Or will it return [[ξ₁, ξ₂], [ξ₃]], is this what we want?
+#      Why is this _get_element_dimensions and other are without the underscore? The difference between 
+#      element_size and element_dimensions is not clear. Why not call it element measure? Or better, element volume?
+#      Also the element_size and element_dimensions is misleading. Because this is the parametric manifold element
+#      dimensions than the element itself. We should think about this.
+function _get_element_dimensions(geometry::TensorProductGeometry{n, G1, G2}, element_id::Int) where {n, G1<:AbstractGeometry{n1}, G2<:AbstractGeometry{n2}} where {n1, n2}
+    ordered_index = FunctionSpaces.linear_to_ordered_index(element_id, [get_num_elements(geometry.geometry_1), get_num_elements(geometry.geometry_2)])
+
+    return [get_element_dimensions(geometry.geometry_1, ordered_index[1]); get_element_dimensions(geometry.geometry_2, ordered_index[2])]
+end
+
 @doc raw"""
     evaluate(geometry::TensorProductGeometry{n, G1, G2}, element_idx::Int, ξ::NTuple{n, Vector{Float64}})
 

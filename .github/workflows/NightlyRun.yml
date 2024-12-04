@@ -1,10 +1,10 @@
-name: CL
+name: NightlyRun
 on:
-  push:
-    branches:
-      - main
-    tags: ['*']
-  pull_request:
+  schedule:
+    # The format is minute(0 - 59) hour(0 - 23) day of the month(1 - 31) month(1 - 12 or JAN - DEC) day of the week (0 - 6 or SUN - SAT) 
+    # This means: run every Sunday at 5:30 in the morning.
+    - cron:  '30 5 * * 0'
+  workflow_dispatch:
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
@@ -18,10 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.9'
-          - '1.10'
-          - '1.11'
-          #- 'nightly'
+          - 'nightly'
         os:
           - ubuntu-latest
         arch:

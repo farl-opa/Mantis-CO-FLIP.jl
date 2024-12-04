@@ -80,6 +80,62 @@ output_filename = "fem_geometry_toroidal_annulus_test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
+# Test Plotting of 3D Geometry + form fields (toroidal annulus) -------------------------------------------
+deg = 2
+Wt = pi/2
+bθ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
+GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
+Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
+TP_θr = Mantis.FunctionSpaces.TensorProductSpace(GBθ, Br)
+TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(TP_θr, GBθ)
+# control points for geometry
+geom_coeffs_θ =   [1.0  -1.0
+1.0   1.0
+-1.0   1.0
+-1.0  -1.0]
+r0 = 1
+r1 = 2
+geom_coeffs_θr = [geom_coeffs_θ.*r0
+                  geom_coeffs_θ.*r1]
+geom_coeffs_θr0 = [geom_coeffs_θr.+[3*r1 0] zeros(8)]
+
+# rotate the 3D points around the y-axis
+geom_coeffs_θrϕ = Vector{Matrix{Float64}}(undef,4)
+geom_coeffs_θrϕ[1] = geom_coeffs_θr0
+for i ∈ 1:3
+    ϕ = i*π/2
+    R = [cos(ϕ) 0 sin(ϕ); 0 1 0; -sin(ϕ) 0 cos(ϕ)]
+    geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
+end
+geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
+geom = Mantis.Geometry.FEMGeometry(TP_θrϕ, geom_coeffs_θrϕ)
+
+# form spaces and fields
+zero_form_space = Mantis.Forms.FormSpace(0, geom, (TP_θrϕ,), "ν")
+one_form_space = Mantis.Forms.FormSpace(1, geom, (TP_θrϕ, TP_θrϕ, TP_θrϕ), "η")
+top_form_space = Mantis.Forms.FormSpace(3, geom, (TP_θrϕ,), "σ")
+α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+ξ¹ = Mantis.Forms.FormField(one_form_space, "ξ")
+β³ = Mantis.Forms.FormField(top_form_space, "β")
+
+num_basis = Mantis.FunctionSpaces.get_num_basis(TP_θrϕ)
+
+α⁰.coefficients .= collect(range(0,3,num_basis))
+ξ¹.coefficients .= vcat(ones(num_basis), collect(range(0,3,num_basis)), zeros(num_basis))
+β³.coefficients .= collect(range(0,3,num_basis))
+
+# Generate the plot
+output_filename = "fem_geometry_toroidal_annulus_and_forms_test"
+output_file = joinpath(output_data_folder, output_filename * "-0form")
+Mantis.Plot.plot(α⁰; vtk_filename = output_file, n_subcells = 1, degree = 4, ascii = false, compress = false)
+output_file = joinpath(output_data_folder, output_filename * "-3form")
+Mantis.Plot.plot(β³; vtk_filename = output_file, n_subcells = 1, degree = 4, ascii = false, compress = false)
+output_file = joinpath(output_data_folder, output_filename * "-1form")
+Mantis.Plot.plot(ξ¹; vtk_filename = output_file, n_subcells = 1, degree = 4, ascii = false, compress = false)
+
 # Test Plotting of 3D Geometry (hollow cylinder) -------------------------------------------
 deg = 2
 Wt = pi/2
