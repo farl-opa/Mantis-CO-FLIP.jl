@@ -75,15 +75,12 @@ for N in range(2, 12, step=3)
 
     # For Newton-Cotes rules, the error for the integration of a 
     # monomial of degree N will be zero when N is odd.
+    f = monomial(N, ξ)
+    I_num = LinearAlgebra.dot(w, f)
+    I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
     if N % 2 != 0
-        f = monomial(N, ξ)
-        I_num = LinearAlgebra.dot(w, f)
-        I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
         @test isapprox(I_num, I, atol=atol)
     else
-        f = monomial(N, ξ)
-        I_num = LinearAlgebra.dot(w, f)
-        I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
         @test !isapprox(I_num, I, atol=atol)
     end
 
@@ -149,15 +146,12 @@ for N in range(1, 10, step=3)
 
     # For Newton-Cotes rules, the error for the integration of a 
     # monomial of degree N will be zero when N is odd.
+    f = monomial(N, ξ)
+    I_num = LinearAlgebra.dot(w, f)
+    I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
     if N % 2 != 0
-        f = monomial(N, ξ)
-        I_num = LinearAlgebra.dot(w, f)
-        I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
         @test isapprox(I_num, I, atol=atol)
     else
-        f = monomial(N, ξ)
-        I_num = LinearAlgebra.dot(w, f)
-        I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
         @test !isapprox(I_num, I, atol=atol)
     end
 

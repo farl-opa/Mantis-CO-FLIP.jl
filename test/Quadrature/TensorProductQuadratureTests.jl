@@ -88,8 +88,10 @@ for one_d_rule in one_dim_quad_rules
         # Test that sum of weights is one.
         @test isapprox(sum(w), 1.0, atol=atol)
         # Test that all weights are positive if they should be. This is 
-        # the case for all rules but Newton-Cotes.
-        if typeof(one_d_rule) <: Quad.QuadratureRule
+        # the case for all rules but Newton-Cotes. Note that the Newton-
+        # Cotes rules in the list are a tuple, while the others are 
+        # functions.
+        if typeof(one_d_rule) <: Function
             @test all(w .> 0.0)
         end
         # Test that the weights are symmetric.
