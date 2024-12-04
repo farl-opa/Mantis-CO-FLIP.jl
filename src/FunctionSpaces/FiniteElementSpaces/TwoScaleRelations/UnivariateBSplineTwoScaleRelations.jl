@@ -219,7 +219,7 @@ function subdivide_knot_vector(coarse_knot_vector::KnotVector, nsubdivisions::In
 end
 
 """
-    subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
+    subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
 
 Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times. The coarse multiplicities
 are preserved in the final multiplicity vector, and newly inserted ones are given multiplicity `fine_multiplicity`.
@@ -231,7 +231,7 @@ are preserved in the final multiplicity vector, and newly inserted ones are give
 # Returns 
 - `::BSplineSpace`: Refined B-spline space.
 """
-function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
+function subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
     fine_knot_vector = subdivide_knot_vector(coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity)
     p = coarse_bspline.knot_vector.polynomial_degree
 
@@ -239,7 +239,7 @@ function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int, fin
 end
 
 """
-    subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int)
+    subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int)
 
 Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times. The coarse multiplicities
 are preserved in the `fine_multiplicity`, and newly inserted ones are given multiplicity 1.
@@ -250,12 +250,12 @@ are preserved in the `fine_multiplicity`, and newly inserted ones are given mult
 # Returns 
 - `::BSplineSpace`: Refined B-spline space.
 """
-function subdivide_bspline(coarse_bspline::BSplineSpace, nsubdivisions::Int)
-    return subdivide_bspline(coarse_bspline, nsubdivisions, 1)
+function subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int)
+    return subdivide_space(coarse_bspline, nsubdivisions, 1)
 end
 
 """
-    subdivide_bspline(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}) where {n}
+    subdivide_space(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}) where {n}
 
 Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times,
 across each dimentions. 
@@ -268,12 +268,12 @@ are given multiplicity 1.
 # Returns 
 - `::NTuple{n, BSplineSpace}`: Fine B-spline.
 """
-function subdivide_bspline(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}) where {n}
-    return ntuple(d -> subdivide_bspline(coarse_bspline[d], nsubdivisions[d]), n)
+function subdivide_space(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}) where {n}
+    return ntuple(d -> subdivide_space(coarse_bspline[d], nsubdivisions[d]), n)
 end
 
 """
-    subdivide_bspline(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}, fine_multiplicity::NTuple{n, Vector{Int}}) where {n}
+    subdivide_space(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}, fine_multiplicity::NTuple{n, Vector{Int}}) where {n}
 
 Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times,
 across each dimentions. 
@@ -287,8 +287,8 @@ are given multiplicity `fine_multiplicity`.
 # Returns 
 - `::NTuple{n, BSplineSpace}`: Fine B-spline.
 """
-function subdivide_bspline(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}, fine_multiplicity::NTuple{n, Vector{Int}}) where {n}
-    return ntuple(d -> subdivide_bspline(coarse_bspline[d], nsubdivisions[d], fine_multiplicity[d]), n)
+function subdivide_space(coarse_bspline::NTuple{n, BSplineSpace}, nsubdivisions::NTuple{n, Int}, fine_multiplicity::NTuple{n, Vector{Int}}) where {n}
+    return ntuple(d -> subdivide_space(coarse_bspline[d], nsubdivisions[d], fine_multiplicity[d]), n)
 end
 
 # Oslo knot insertion algorithms
@@ -445,7 +445,7 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::I
     nsubdivisions > 0 || throw(ArgumentError("Number of subdivions must be greater than 0. 
     nsubdivisions=$nsubdivisions was given."))
 
-    fine_bspline = subdivide_bspline(coarse_bspline, nsubdivisions, fine_multiplicity)
+    fine_bspline = subdivide_space(coarse_bspline, nsubdivisions, fine_multiplicity)
 
     return build_two_scale_operator(coarse_bspline, fine_bspline, nsubdivisions)
 end
@@ -533,33 +533,59 @@ function build_two_scale_operator(coarse_bspline::NTuple{n, BSplineSpace}, fine_
     return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]), n)
 end
 
-function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
-    if supp_intersection == []
-        breakpoint_idxs = get_element_children(ts, first(supp_intersection))[1]
+
+"""
+    get_contained_knot_vector(element_range::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+
+Compute and return the biggest knot vector of level l+1, corresponding to `fine_space`, contained within the specified range of level l elements `element_range`.
+
+# Arguments
+- `element_range::StepRange{Int, Int}`: The range of level l element indices.
+- `ts::T`: The two-scale operator.
+- `fine_space::BSplineSpace`: The level l+1 B-spline space.
+
+# Returns
+- `::KnotVector`: The level l+1 knot vector contained within the specified range of level l elements.
+"""
+function get_contained_knot_vector(element_range::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+    if element_range == []
+        breakpoint_idxs = get_element_children(ts, first(element_range))[1]
     else
         element_idxs = Int[]
 
-        for element ∈ supp_intersection
+        for element ∈ element_range
             append!(element_idxs, get_element_children(ts, element))
         end
         
         breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)
     end
 
-    breakpoints = get_patch(fine_space).breakpoints[breakpoint_idxs]
+    breakpoints = get_breakpoints(get_patch(fine_space))[breakpoint_idxs]
     multiplicity = get_multiplicity_vector(fine_space)[breakpoint_idxs]
 
     return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity)
 end
 
-function get_contained_knot_vector(supp_intersection::StepRange{Int, Int}, fem_space::BSplineSpace)
-    if supp_intersection == []
-        breakpoint_idxs = first(supp_intersection)
+"""
+    get_contained_knot_vector(element_range::StepRange{Int, Int}, fem_space::BSplineSpace) 
+
+Compute and return the biggest knot vector, corresponding to `fem_space`, contained within the specified range of elements `element_range`.
+
+# Arguments
+- `element_range::StepRange{Int, Int}`: The range of element indices.
+- `fem_space::BSplineSpace`: The B-spline space.
+
+# Returns
+- `::KnotVector`: The knot vector contained within the specified range of elements.
+"""
+function get_contained_knot_vector(element_range::StepRange{Int, Int}, fem_space::BSplineSpace)
+    if element_range == []
+        breakpoint_idxs = first(element_range)
     else
-        breakpoint_idxs = minimum(supp_intersection):maximum(supp_intersection)+1
+        breakpoint_idxs = minimum(element_range):maximum(element_range)+1
     end
 
-    breakpoints = get_patch(fem_space).breakpoints[breakpoint_idxs]
+    breakpoints = get_breakpoints(get_patch(fem_space))[breakpoint_idxs]
     multiplicity = get_multiplicity_vector(fem_space)[breakpoint_idxs]
 
     return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fem_space), multiplicity)

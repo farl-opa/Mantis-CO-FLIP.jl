@@ -1,5 +1,3 @@
-#TODO: Needs to be changed to NTuple as well
-
 """
     struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <: AbstractTwoScaleOperator{manifold_dim}
 
@@ -19,6 +17,8 @@ struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <: AbstractTwoScaleOp
 
     function TensorProductTwoScaleOperator(coarse_space::TensorProductSpace{manifold_dim, T}, fine_space::TensorProductSpace{manifold_dim, T}, twoscale_operators::TS) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}, TS <: NTuple{num_spaces, AbstractTwoScaleOperator}}
         #=
+        # Does not work because equality of structures is not straightforward
+        
         for space_id ∈ 1:num_spaces
             if get_space(coarse_space, space_id) != twoscale_operators[space_id].coarse_space
                 throw(ArgumentError("The coarse space in the two-scale operator does not match the space in the coarse tensor product space at space index $space_id."))
@@ -184,6 +184,19 @@ function subdivide_space(space::TensorProductSpace{manifold_dim, T}, nsubdivisio
     return TensorProductSpace(new_spaces)
 end
 
+"""
+    build_two_scale_operator(space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int})
+
+Build a two-scale operator for a tensor product space by subdividing each constituent finite element space.
+
+# Arguments
+- `space::TensorProductSpace{manifold_dim, T}`: The tensor product space to be subdivided.
+- `nsubdivisions::NTuple{num_spaces, Int}`: A tuple specifying the number of subdivisions for each constituent finite element space.
+
+# Returns
+- `::TensorProductTwoScaleOperator`: The two-scale operator.
+- `::TensorProductSpace`: The resulting finer tensor product space after subdivision.
+"""
 function build_two_scale_operator(space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
     fine_spaces = Vector{AbstractFiniteElementSpace}(undef, num_spaces)
     twoscale_operators = Vector{AbstractTwoScaleOperator}(undef, num_spaces)

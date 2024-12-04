@@ -331,14 +331,14 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_
         keys_idx[i] = cum_manifold_dim_per_space[i]+1:cum_manifold_dim_per_space[i]+manifold_dim_per_space[i]
     end
 
+    # Initialize an array to hold the basis functions for each space
+    basis_functions_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
+
     # Compute tensor product of constituent basis functions for each derivative combination
     for key in der_keys
         key = key[1:manifold_dim]
         j = sum(key)
         der_idx = get_derivative_idx(key)
-
-        # Initialize an array to hold the basis functions for each space
-        basis_functions_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
 
         # Loop over each space to extract the relevant basis function
         for i in 1:num_spaces
@@ -399,15 +399,15 @@ function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int
         evaluation[j + 1] = Vector{Matrix{Float64}}(undef, num_j_ders)
     end
     
+    # Initialize an array to hold the evaluation for each space
+    evaluation_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
+
     for key in der_keys
         key = key[1:manifold_dim]
         j = sum(key)
         der_idx = get_derivative_idx(key)
 
-        # Initialize an array to hold the basis functions for each space
-        evaluation_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
-
-        # Loop over each space to extract the relevant basis function
+        # Loop over each space to extract the relevant evaluation
         for i in 1:num_spaces
             space_index = num_spaces - i + 1
             key_sum = sum(key[keys_idx[space_index]]) + 1
