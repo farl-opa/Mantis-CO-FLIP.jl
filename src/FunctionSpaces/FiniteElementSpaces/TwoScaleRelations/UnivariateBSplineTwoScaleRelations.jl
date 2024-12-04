@@ -535,58 +535,26 @@ end
 
 
 """
-    get_contained_knot_vector(element_range::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+    get_contained_knot_vector(first_element_id, last_element_id, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
 
-Compute and return the biggest knot vector of level l+1, corresponding to `fine_space`, contained within the specified range of level l elements `element_range`.
+Compute and return the subset of the knot vector of level l+1, corresponding to `fine_space`, contained within the interval of elements defined by `first_element_id` and `last_element_id`.
 
 # Arguments
-- `element_range::StepRange{Int, Int}`: The range of level l element indices.
+- `first_element_id::Int`: The first element index of the interval.
+- `last_element_id::Int`: The last element index of the interval.
 - `ts::T`: The two-scale operator.
 - `fine_space::BSplineSpace`: The level l+1 B-spline space.
 
 # Returns
 - `::KnotVector`: The level l+1 knot vector contained within the specified range of level l elements.
 """
-function get_contained_knot_vector(element_range::StepRange{Int, Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
-    if element_range == []
-        breakpoint_idxs = get_element_children(ts, first(element_range))[1]
-    else
-        element_idxs = Int[]
+function get_contained_knot_vector(first_element_id::Int, last_element_id::Int, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
 
-        for element ∈ element_range
-            append!(element_idxs, get_element_children(ts, element))
-        end
-        
-        breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)
-    end
+    finer_element_indices = [child for element in first_element_id:last_element_id for child in get_element_children(ts, element)]
+    breakpoint_indices = minimum(finer_element_indices):(maximum(finer_element_indices)+1)
 
-    breakpoints = get_breakpoints(get_patch(fine_space))[breakpoint_idxs]
-    multiplicity = get_multiplicity_vector(fine_space)[breakpoint_idxs]
+    breakpoints = get_breakpoints(get_patch(fine_space))[breakpoint_indices]
+    multiplicity = get_multiplicity_vector(fine_space)[breakpoint_indices]
 
     return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity)
-end
-
-"""
-    get_contained_knot_vector(element_range::StepRange{Int, Int}, fem_space::BSplineSpace) 
-
-Compute and return the biggest knot vector, corresponding to `fem_space`, contained within the specified range of elements `element_range`.
-
-# Arguments
-- `element_range::StepRange{Int, Int}`: The range of element indices.
-- `fem_space::BSplineSpace`: The B-spline space.
-
-# Returns
-- `::KnotVector`: The knot vector contained within the specified range of elements.
-"""
-function get_contained_knot_vector(element_range::StepRange{Int, Int}, fem_space::BSplineSpace)
-    if element_range == []
-        breakpoint_idxs = first(element_range)
-    else
-        breakpoint_idxs = minimum(element_range):maximum(element_range)+1
-    end
-
-    breakpoints = get_breakpoints(get_patch(fem_space))[breakpoint_idxs]
-    multiplicity = get_multiplicity_vector(fem_space)[breakpoint_idxs]
-
-    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fem_space), multiplicity)
 end
