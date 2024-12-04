@@ -82,6 +82,13 @@ function get_num_elements(us_space::UnstructuredSpace)
     return get_num_elements(us_space.extraction_op)
 end
 
+function get_element_dimensions(us_space::UnstructuredSpace, element_id::Int)
+    # Find the space ID and local element ID
+    space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
+
+    return get_element_dimensions(us_space.function_spaces[space_id], space_element_id)
+end
+
 """
     get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
 

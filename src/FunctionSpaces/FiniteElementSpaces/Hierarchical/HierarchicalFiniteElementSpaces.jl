@@ -22,7 +22,7 @@ mutable struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementS
     multilevel_extraction_coeffs::Vector{Matrix{Float64}}
     multilevel_basis_indices::Vector{Vector{Int}}
     truncated::Bool
-    dof_partition::Vector{Vector{Int}}
+    dof_partition::Vector{Vector{Vector{Int}}}
 
     # Constructor that builds the space
     function HierarchicalFiniteElementSpace(spaces::Vector{S}, two_scale_operators::Vector{T}, domains::HierarchicalActiveInfo, truncated::Bool=false) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
@@ -30,17 +30,24 @@ mutable struct HierarchicalFiniteElementSpace{n, S, T} <: AbstractFiniteElementS
         function _compute_dof_partition(spaces, active_basis)
 
             level_partition = get_dof_partition.(spaces)
-            n_partitions = length(level_partition[1])
-            dof_partition = [Int[] for _ ∈ 1:n_partitions]
+            n_patches = length(level_partition[1])
+            n_partitions = [length(level_partition[1][i]) for i ∈ 1:n_patches]
+            dof_partition = Vector{Vector{Vector{Int}}}(undef, n_patches)
 
-            for level ∈ 1:num_levels
-                level_active_basis = [get_level_ids(active_basis, level)]
-                
-                for i ∈ 1:n_partitions
-                    active_dof_partition_checks = level_partition[level][i] .∈ level_active_basis
-                    dof_ids = convert_to_hier_id.(Ref(active_basis), level, level_partition[level][i][active_dof_partition_checks])
+            for patch ∈ 1:n_patches
+                dof_partition[patch] = Vector{Vector{Int}}(undef, n_partitions[patch])
+                for partition ∈ 1:n_partitions[patch]
+                    for level ∈ 1:num_levels
+                        level_active_basis = [get_level_ids(active_basis, level)]
+                        active_dof_partition_checks = level_partition[level][patch][partition] .∈ level_active_basis
+                        dof_ids = convert_to_hier_id.(Ref(active_basis), level, level_partition[level][patch][partition][active_dof_partition_checks])
 
-                    append!(dof_partition[i], dof_ids)
+                        if level == 1
+                            dof_partition[patch][partition] = dof_ids
+                        else
+                            append!(dof_partition[patch][partition], dof_ids)
+                        end
+                    end
                 end
             end
 
@@ -633,10 +640,10 @@ end
 
 # Geometry methods
 
-function _get_element_size(hier_space::HierarchicalFiniteElementSpace{n, S, T}, hier_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
+function get_element_size(hier_space::HierarchicalFiniteElementSpace{n, S, T}, hier_id::Int) where {n, S<:AbstractFiniteElementSpace{n}, T<:AbstractTwoScaleOperator}
     element_level, element_level_id = convert_to_element_level_and_level_id(hier_space, hier_id)
 
-    return _get_element_size(hier_space.spaces[element_level], element_level_id)
+    return get_element_size(hier_space.spaces[element_level], element_level_id)
 end
 
 function _compute_thb_parametric_geometry_coeffs(hspace::HierarchicalFiniteElementSpace{manifold_dim, S, T}) where {manifold_dim, S<:AbstractFiniteElementSpace{manifold_dim}, T<:AbstractTwoScaleOperator}

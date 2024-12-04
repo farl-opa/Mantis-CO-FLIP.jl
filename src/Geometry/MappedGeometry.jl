@@ -55,12 +55,22 @@ function get_domain_dim(_::MappedGeometry{n, G, Map} ) where {n, G<:AbstractGeom
     return n
 end
 
-function get_image_dim(geometry::MappedGeometry{n, G, Map} ) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
+function get_image_dim(geometry::MappedGeometry{n, G, Map}) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
     return geometry.mapping.dimensions[2]
 end
 
-function _get_element_dimensions(geometry::MappedGeometry{n, G, Map}, element_id::Int) where {n, G<:AbstractGeometry{n}, Map<:Mapping}
-    return _get_element_dimensions(geometry.geometry, element_id)
+function _get_element_dimensions(geometry::MappedGeometry{manifold_dim, G, Map}, element_id::Int) where {manifold_dim, G <: AbstractGeometry{manifold_dim}, Map <: Mapping}
+    # Mapped geometry just maps an existing geometry into another manifold via a mapping.
+    # The underlying parametric manifold remains the same, therefore the parametric element dimensions 
+    # remains the same, we just need to return the dimensions of the elements of the underlying geometry.
+    return _get_element_dimensions(geometry.geometry, element_id) 
+end
+
+function _get_element_size(geometry::MappedGeometry{manifold_dim, G, Map}, element_id::Int) where {manifold_dim, G <: AbstractGeometry{manifold_dim}, Map <: Mapping}
+    # Mapped geometry just maps an existing geometry into another manifold via a mapping.
+    # The underlying parametric manifold remains the same, therefore the parametric element sizes 
+    # remains the same, we just need to return the size of the elements of the underlying geometry.
+    return _get_element_size(geometry.geometry, element_id) 
 end
 
 function evaluate(geometry::MappedGeometry{n, G, Map}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n, G<:AbstractGeometry{n}, Map<:Mapping}

@@ -161,6 +161,23 @@ function get_num_basis(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2
 end
 
 """
+    get_num_basis(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+
+Get the number of active basis on `element_idx` of the tensor-product function space.
+
+# Arguments
+- `tp_space::TensorProductSpace{n, F1, F2}`: The tensor-product space
+- `element_idx::Int`: The element where to get the number of active basis function.
+
+# Returns
+- `::Int`: The number of active basis functions of the space on element `element_idx`
+"""
+function get_num_basis(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+    
+    return prod(_get_num_basis_per_space(tp_space, element_idx))
+end
+
+"""
     _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
 
 Helper function to get the dimension of each constituent space.
@@ -173,6 +190,25 @@ Helper function to get the dimension of each constituent space.
 """
 function _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}) where {n, F1, F2}
     return (get_num_basis(tp_space.function_space_1), get_num_basis(tp_space.function_space_2))
+end
+
+
+"""
+    _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+
+Helper function to get the number of active basis of each constituent space on element_idx.
+
+# Arguments
+- `tp_space::TensorProductSpace{n, F1, F2}`: The tensor-product space
+- `element_idx::Int`: Element where to get the number of active basis.
+
+# Returns
+- `::Tuple{Int,Int}`: Number of active basis of each constituent space on element `element_idx`.
+"""
+function _get_num_basis_per_space(tp_space::TensorProductSpace{n, F1, F2}, element_idx::Int) where {n, F1, F2}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_idx, max_ind_el)
+    return (get_num_basis(tp_space.function_space_1, ordered_index[1]), get_num_basis(tp_space.function_space_2, ordered_index[2]))
 end
 
 """
@@ -341,7 +377,7 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
     local_basis_per_dim = _get_local_basis_per_dim(tp_space, el_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
-    der_keys = _integer_sums(nderivatives, n+1)
+    der_keys = integer_sums(nderivatives, n+1)
     # Initialize storage of local basis functions and derivatives
     local_basis = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
@@ -353,13 +389,13 @@ function get_local_basis(tp_space::TensorProductSpace{n, F1, F2}, el_id::Int, xi
     for key in der_keys
         key = key[1:n]
         j = sum(key)
-        der_idx = _get_derivative_idx(key)
+        der_idx = get_derivative_idx(key)
         key_1 = key[1:n1]
         j_1 = sum(key_1)
-        der_idx_1 = _get_derivative_idx(key_1)
+        der_idx_1 = get_derivative_idx(key_1)
         key_2 = key[n1+1:n]
         j_2 = sum(key_2)
-        der_idx_2 = _get_derivative_idx(key_2)
+        der_idx_2 = get_derivative_idx(key_2)
         local_basis[j + 1][der_idx] = kron(local_basis_per_dim[2][j_2 + 1][der_idx_2], local_basis_per_dim[1][j_1 + 1][der_idx_1])
     end
 
@@ -394,31 +430,24 @@ function _get_local_basis_per_dim(tp_space::TensorProductSpace{n, F1, F2}, el_id
     return get_local_basis(tp_space.function_space_1, ordered_index[1], xi_1, nderivatives), get_local_basis(tp_space.function_space_2, ordered_index[2], xi_2, nderivatives)
 end
 
-function _integer_sums(n, k)
-    if k == 1
-        solutions = [n]
-    elseif k > 1
-        solutions = []
-        for combo in Combinatorics.combinations(0:n+k-2, k-1)
-            s = (combo[1],)
-            for i in 2:k-1
-                s = (s..., combo[i] - combo[i-1] - 1)
-            end
-            s = (s..., n+k-2 - combo[k-1])
-            push!(solutions, s)
-        end
-    end
-    return solutions
-end
-
-function _get_element_size(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+function get_element_size(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
-    space_1_measure = _get_element_size(tp_space.function_space_1, ordered_index[1])
-    space_2_measure = _get_element_size(tp_space.function_space_2, ordered_index[2])
+    space_1_measure = get_element_size(tp_space.function_space_1, ordered_index[1])
+    space_2_measure = get_element_size(tp_space.function_space_2, ordered_index[2])
 
     return space_1_measure * space_2_measure
+end
+
+function get_element_dimensions(tp_space::TensorProductSpace{n, F1, F2}, element_id::Int) where {n, F1 <: AbstractFiniteElementSpace{n1} where {n1}, F2 <: AbstractFiniteElementSpace{n2} where {n2}}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    element_dim_1 = get_element_dimensions(tp_space.function_space_1, ordered_index[1])
+    element_dim_2 = get_element_dimensions(tp_space.function_space_2, ordered_index[2])
+
+    return [element_dim_1; element_dim_2]
 end
 
 function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, F1, F2}, element_id::Int) where {manifold_dim, n1, n2, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}}
@@ -440,6 +469,7 @@ function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, F1, F2}
     return tuple(vertices...)
 end
 
+# TODO : This function doesn't make sense for general TP spaces.
 function get_greville_points(tp_space::TensorProductSpace{manifold_dim, F1, F2}) where {manifold_dim, n1, n2, F1 <: AbstractFiniteElementSpace{n1}, F2 <: AbstractFiniteElementSpace{n2}}
     space_1_points = get_greville_points(tp_space.function_space_1)
     space_2_points = get_greville_points(tp_space.function_space_2)

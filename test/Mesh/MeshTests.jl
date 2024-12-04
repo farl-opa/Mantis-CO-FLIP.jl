@@ -4,7 +4,7 @@ import Mantis
 
 using Test
 
-const Patch = Mantis.Mesh.Patch
+Patch = Mantis.Mesh.Patch
 
 n1 = 5
 n2 = 8
