@@ -1,4 +1,4 @@
-module GaussQuadratureTests
+module NewtonCotesQuadratureTests
 
 import Mantis
 
@@ -10,21 +10,22 @@ using Test
 # Defines test functions and tolerances for quadrature rules.
 include("HelperQuadratureTests.jl")
 
-# The Gauss quadrature rules use the FastGaussQuadrature.jl package, so
-# we will focus on testing our modifications. A few additional tests for
-# the correctness of the rules are added in case there is a bug in the
-# FastGaussQuadrature.jl package.
 
-# Gauss-Lobatto --------------------------------------------------------
-for N in range(2, 17, step=3)
-    quad_rule = Mantis.Quadrature.gauss_lobatto(N)
+
+# The degree used for the Newton-Cotes quadrature rule does not 
+# affect how the nodes and weights are computed. So testing with a few
+# different degrees should be enough.
+
+# Closed rules ---------------------------------------------------------
+for N in range(2, 12, step=3)
+    quad_rule = Mantis.Quadrature.newton_cotes(N, "closed")
 
     ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
     w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
 
-
+    
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Gauss-Lobatto"
+    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes (closed)"
 
 
     # Constructor tests.
@@ -33,16 +34,16 @@ for N in range(2, 17, step=3)
 
     # Invalid constructor tests.
     # Test that the constructor throws an error for invalid degrees.
-    @test_throws DomainError Mantis.Quadrature.gauss_lobatto(1)
-    @test_throws DomainError Mantis.Quadrature.gauss_lobatto(0)
-    @test_throws DomainError Mantis.Quadrature.gauss_lobatto(-1)
+    @test_throws DomainError Mantis.Quadrature.newton_cotes(1, "closed")
+    @test_throws DomainError Mantis.Quadrature.newton_cotes(0, "closed")
+    @test_throws DomainError Mantis.Quadrature.newton_cotes(-1, "closed")
+
+    @test_throws ArgumentError Mantis.Quadrature.newton_cotes(1, "test")
     
 
     # Property tests.
     # Test that sum of weights is one.
     @test isapprox(sum(w), 1.0, atol=atol)
-    # Test that all weights are positive.
-    @test all(w .> 0.0)
     # Test that the weights are symmetric.
     @test isapprox(w, reverse(w), atol=atol)
 
@@ -56,8 +57,8 @@ for N in range(2, 17, step=3)
 
     # Value tests on [0,1].
     # Test that the quadrature rule is exact for polynomials of degree
-    # up to 2N-3 (with N the number of nodes).
-    for degree in 0:2*N-3
+    # up to N-1 (with N the number of nodes).
+    for degree in 0:N-1
         f = monomial(degree, ξ)
         I_num = LinearAlgebra.dot(w, f)
         I = integrated_monomial(degree, 1.0) - integrated_monomial(degree, 0.0)
@@ -70,35 +71,36 @@ for N in range(2, 17, step=3)
     end
 
     # Test that the quadrature rule is not exact for polynomials of
-    # degree 2N-2.
+    # degree N.
 
-    # The monomials can be exactly integrated for degrees up to 4*N-6. 
-    # This is because they have a numerical order of 0.5p, see
-    # Trefethen2022.
-    f = monomial(4*N-6, ξ)
+    # For Newton-Cotes rules, the error for the integration of a 
+    # monomial of degree N will be zero when N is odd.
+    f = monomial(N, ξ)
     I_num = LinearAlgebra.dot(w, f)
-    I = integrated_monomial(4*N-6, 1.0) - integrated_monomial(4*N-6, 0.0)
-    @test !isapprox(I_num, I, atol=atol)
+    I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
+    if N % 2 != 0
+        @test isapprox(I_num, I, atol=atol)
+    else
+        @test !isapprox(I_num, I, atol=atol)
+    end
 
-    # The higher accuracy does not hold for the Chebyshev polynomials.
-    f = chebyshev(2*N-2, ξ)
+    f = chebyshev(N+1, ξ)
     I_num = LinearAlgebra.dot(w, f)
-    I = integrated_chebyshev(2*N-2, 1.0) - integrated_chebyshev(2*N-2, 0.0)
+    I = integrated_chebyshev(N+1, 1.0) - integrated_chebyshev(N+1, 0.0)
     @test !isapprox(I_num, I, atol=atol)
 end
 
 
-
-# Gauss-Legendre -------------------------------------------------------
-for N in range(1, 16, step=3)
-    quad_rule = Mantis.Quadrature.gauss_legendre(N)
+# Open rules -----------------------------------------------------------
+for N in range(1, 10, step=3)
+    quad_rule = Mantis.Quadrature.newton_cotes(N, "open")
 
     ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
     w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
 
-
+    
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Gauss-Legendre"
+    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes (open)"
 
 
     # Constructor tests.
@@ -107,15 +109,15 @@ for N in range(1, 16, step=3)
 
     # Invalid constructor tests.
     # Test that the constructor throws an error for invalid degrees.
-    @test_throws DomainError Mantis.Quadrature.gauss_legendre(0)
-    @test_throws DomainError Mantis.Quadrature.gauss_legendre(-1)
+    @test_throws DomainError Mantis.Quadrature.newton_cotes(0, "open")
+    @test_throws DomainError Mantis.Quadrature.newton_cotes(-1, "open")
+
+    @test_throws ArgumentError Mantis.Quadrature.newton_cotes(1, "test")
     
 
     # Property tests.
     # Test that sum of weights is one.
     @test isapprox(sum(w), 1.0, atol=atol)
-    # Test that all weights are positive.
-    @test all(w .> 0.0)
     # Test that the weights are symmetric.
     @test isapprox(w, reverse(w), atol=atol)
 
@@ -126,8 +128,8 @@ for N in range(1, 16, step=3)
 
     # Value tests on [0,1].
     # Test that the quadrature rule is exact for polynomials of degree
-    # up to 2N-1 (with N the number of nodes).
-    for degree in 0:2*N-1
+    # up to N-1 (with N the number of nodes).
+    for degree in 0:N-1
         f = monomial(degree, ξ)
         I_num = LinearAlgebra.dot(w, f)
         I = integrated_monomial(degree, 1.0) - integrated_monomial(degree, 0.0)
@@ -140,21 +142,25 @@ for N in range(1, 16, step=3)
     end
 
     # Test that the quadrature rule is not exact for polynomials of
-    # degree 2N.
+    # degree N.
 
-    # The monomials can be exactly integrated for degrees up to 4*N. 
-    # This is because they have a numerical order of 0.5p, see
-    # Trefethen2022.
-    f = monomial(4*N, ξ)
+    # For Newton-Cotes rules, the error for the integration of a 
+    # monomial of degree N will be zero when N is odd.
+    f = monomial(N, ξ)
     I_num = LinearAlgebra.dot(w, f)
-    I = integrated_monomial(4*N, 1.0) - integrated_monomial(4*N, 0.0)
-    @test !isapprox(I_num, I, atol=atol)
+    I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
+    if N % 2 != 0
+        @test isapprox(I_num, I, atol=atol)
+    else
+        @test !isapprox(I_num, I, atol=atol)
+    end
 
-    # The higher accuracy does not hold for the Chebyshev polynomials.
-    f = chebyshev(2*N, ξ)
+    f = chebyshev(N+1, ξ)
     I_num = LinearAlgebra.dot(w, f)
-    I = integrated_chebyshev(2*N, 1.0) - integrated_chebyshev(2*N, 0.0)
+    I = integrated_chebyshev(N+1, 1.0) - integrated_chebyshev(N+1, 0.0)
     @test !isapprox(I_num, I, atol=atol)
 end
+
+
 
 end

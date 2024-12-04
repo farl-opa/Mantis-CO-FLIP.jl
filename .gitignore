@@ -30,3 +30,7 @@ Manifest.toml
 *.vtk
 *.vtu
 *.DS_Store
+
+# Ignore all text files
+*.txt
+
