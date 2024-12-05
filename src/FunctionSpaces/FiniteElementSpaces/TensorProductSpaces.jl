@@ -252,18 +252,32 @@ function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, T}, ele
 end
 
 """
-    get_element_dimensions(tp_space::TensorProductSpace, element_id::Int)
-
-Compute and return the total dimensions of a specified element within a `TensorProductSpace`.
+    get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    
+Compute and return the size of a specified element within a `TensorProductSpace` per manifold dim.
 
 # Arguments
 - `tp_space::TensorProductSpace`: The tensor product space.
 - `element_id::Int`: The identifier of the element.
 
 # Returns
-- `::Int`: The total dimensions of the specified element.
+- `::NTuple{manifold_dim, Float64}`: The size of the specified element per manifold dimension.
 """
-get_element_dimensions(tp_space::TensorProductSpace, element_id::Int) = prod(_get_element_dimensions_per_space(tp_space, element_id))
+function get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    element_dimensions_per_space = _get_element_dimensions_per_space(tp_space, element_id)
+    element_dimensions = Vector{Float64}(undef, manifold_dim)
+
+    manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
+
+    for space_id ∈ 1:num_spaces
+        for dim ∈ eachindex(element_dimensions_per_space[space_id])
+            element_dimensions[dim+cum_manifold_dim_per_space[space_id]] = element_dimensions_per_space[space_id][dim] 
+        end
+    end
+
+    return tuple(vertices...)::NTuple{manifold_dim, Float64}
+end 
 
 """
     get_num_basis(tp_space::TensorProductSpace)
