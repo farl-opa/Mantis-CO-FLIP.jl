@@ -537,7 +537,7 @@ end
 """
     get_contained_knot_vector(first_element_id, last_element_id, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
 
-Compute and return the subset of the knot vector of level l+1, corresponding to `fine_space`, contained within the interval of elements defined by `first_element_id` and `last_element_id`.
+Compute and return the subset of the knot vector of level l+1, corresponding to `fine_space`, contained within the interval of elements defined by `first_element_id` and `last_element_id`. Note that 'first_element_id' should be less or equal than 'last_element_id'.
 
 # Arguments
 - `first_element_id::Int`: The first element index of the interval.
@@ -549,7 +549,8 @@ Compute and return the subset of the knot vector of level l+1, corresponding to 
 - `::KnotVector`: The level l+1 knot vector contained within the specified range of level l elements.
 """
 function get_contained_knot_vector(first_element_id::Int, last_element_id::Int, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
-
+    first_element_id<=last_element_id ? nothing : throw(ArgumentError("'first_element_id' should be less or equal than 'last_element_id'"))
+    
     finer_element_indices = [child for element in first_element_id:last_element_id for child in get_element_children(ts, element)]
     breakpoint_indices = minimum(finer_element_indices):(maximum(finer_element_indices)+1)
 
