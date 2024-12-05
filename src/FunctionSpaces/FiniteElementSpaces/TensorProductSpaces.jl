@@ -276,7 +276,7 @@ function get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, e
         end
     end
 
-    return tuple(vertices...)::NTuple{manifold_dim, Float64}
+    return tuple(element_dimensions...)::NTuple{manifold_dim, Float64}
 end 
 
 """
