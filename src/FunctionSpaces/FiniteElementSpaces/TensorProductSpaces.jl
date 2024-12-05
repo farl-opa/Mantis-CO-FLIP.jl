@@ -131,6 +131,26 @@ function _get_local_basis_per_space(tp_space::TensorProductSpace{manifold_dim, T
     return tuple(map(get_local_basis, tp_space.fem_spaces, ordered_index, xis, fill(nderivatives, num_spaces))...)::NTuple{num_spaces,Vector{Vector{Matrix{Float64}}}}
 end
 
+function _get_element_vertices_per_space(tp_space::TensorProductSpace, element_id::Int)
+   # Get number of elements in each constituent space
+   max_ind_el = _get_num_elements_per_space(tp_space)
+
+   # Convert linear element ID to ordered index
+   ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    return map(get_element_vertices, tp_space.fem_spaces, ordered_index)
+end
+
+function _get_element_dimensions_per_space(tp_space::TensorProductSpace, element_id::Int) 
+    # Get number of elements in each constituent space
+   max_ind_el = _get_num_elements_per_space(tp_space)
+
+   # Convert linear element ID to ordered index
+   ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+   return map(get_element_dimensions, tp_space.fem_spaces, ordered_index)
+end
+
 # Basic getters for the tensor product space
 """
     get_space(tp_space::TensorProductSpace, space_id::Int)
@@ -201,6 +221,63 @@ Compute and return the total number of elements in a `TensorProductSpace`.
 - `::Int`: The total number of elements in the tensor-product space.
 """
 get_num_elements(tp_space::TensorProductSpace) = prod(_get_num_elements_per_space(tp_space))
+
+"""
+    get_element_vertices(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+
+Compute and return the vertices of a specified element within a `TensorProductSpace`.
+
+# Arguments
+- `tp_space::TensorProductSpace{manifold_dim, T}`: The tensor product space.
+- `element_id::Int`: The identifier of the element.
+
+# Returns
+- `::NTuple{manifold_dim, Vector{Float64}}`: A tuple of vectors containing the vertices of the specified element per manifold dimension.
+"""
+function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    vertices_per_space = _get_element_vertices_per_space(tp_space, element_id)
+
+    vertices = Vector{Vector{Float64}}(undef, manifold_dim)
+
+    manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
+
+    for space_id ∈ 1:num_spaces
+        for dim ∈ eachindex(vertices_per_space[space_id])
+            vertices[dim+cum_manifold_dim_per_space[space_id]] = vertices_per_space[space_id][dim] 
+        end
+    end
+
+    return tuple(vertices...)::NTuple{manifold_dim, Vector{Float64}}
+end
+
+"""
+    get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    
+Compute and return the size of a specified element within a `TensorProductSpace` per manifold dim.
+
+# Arguments
+- `tp_space::TensorProductSpace`: The tensor product space.
+- `element_id::Int`: The identifier of the element.
+
+# Returns
+- `::NTuple{manifold_dim, Float64}`: The size of the specified element per manifold dimension.
+"""
+function get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    element_dimensions_per_space = _get_element_dimensions_per_space(tp_space, element_id)
+    element_dimensions = Vector{Float64}(undef, manifold_dim)
+
+    manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
+
+    for space_id ∈ 1:num_spaces
+        for dim ∈ eachindex(element_dimensions_per_space[space_id])
+            element_dimensions[dim+cum_manifold_dim_per_space[space_id]] = element_dimensions_per_space[space_id][dim] 
+        end
+    end
+
+    return tuple(element_dimensions...)::NTuple{manifold_dim, Float64}
+end 
 
 """
     get_num_basis(tp_space::TensorProductSpace)
