@@ -203,6 +203,38 @@ Compute and return the total number of elements in a `TensorProductSpace`.
 get_num_elements(tp_space::TensorProductSpace) = prod(_get_num_elements_per_space(tp_space))
 
 """
+    get_element_vertices(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+
+Compute and return the vertices of a specified element within a `TensorProductSpace`.
+
+# Arguments
+- `tp_space::TensorProductSpace{manifold_dim, T}`: The tensor product space.
+- `element_id::Int`: The identifier of the element.
+
+# Returns
+- `::NTuple{manifold_dim, Vector{Float64}}`: A tuple of vectors containing the vertices of the specified element per manifold dimension.
+"""
+function get_element_vertices(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T<: NTuple{num_spaces, AbstractFiniteElementSpace}}
+    max_ind_el = _get_num_elements_per_space(tp_space)
+    ordered_index = linear_to_ordered_index(element_id, max_ind_el)
+
+    vertices_per_space = map(get_element_vertices, tp_space.fem_spaces, ordered_index)
+
+    vertices = Vector{Vector{Float64}}(undef, manifold_dim)
+
+    manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
+    cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
+
+    for space_id ∈ 1:num_spaces
+        for dim ∈ eachindex(vertices_per_space[space_id])
+            vertices[dim+cum_manifold_dim_per_space[space_id]] = vertices_per_space[space_id][dim] 
+        end
+    end
+
+    return tuple(vertices...)::NTuple{manifold_dim, Vector{Float64}}
+end
+
+"""
     get_num_basis(tp_space::TensorProductSpace)
 Compute and return the total number of basis functions in a `TensorProductSpace`.
 
