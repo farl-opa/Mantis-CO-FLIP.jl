@@ -235,16 +235,16 @@ test_space_y = create_bspline_space(Lbottom, Ltop, m_y, p_2d[2], k_2d[2])
 test_space_x_pm1 = create_bspline_space(Lleft, Lright, m_x, p_2d[1]-1, k_2d[1]-1)
 test_space_y_pm1 = create_bspline_space(Lbottom, Ltop, m_y, p_2d[2]-1, k_2d[2]-1)
 
-trial_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x_pm1, trial_space_y_pm1)
-test_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace(test_space_x_pm1, test_space_y_pm1)
+trial_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x_pm1, trial_space_y_pm1))
+test_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace((test_space_x_pm1, test_space_y_pm1))
 
-trial_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x_pm1, trial_space_y)
-trial_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y_pm1)
-test_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace(test_space_x_pm1, test_space_y)
-test_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y_pm1)
+trial_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x_pm1, trial_space_y))
+trial_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x, trial_space_y_pm1))
+test_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace((test_space_x_pm1, test_space_y))
+test_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace((test_space_x, test_space_y_pm1))
 
-trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
-test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
+trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x, trial_space_y))
+test_space_2d = Mantis.FunctionSpaces.TensorProductSpace((test_space_x, test_space_y))
 
 # Set Dirichlet boundary conditions to zero.
 bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in trial_space_2d.dof_partition[1][j])
@@ -391,11 +391,11 @@ test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3
 trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
 test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
 
-trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
-test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
+trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace((trial_space_3d_x, trial_space_3d_y))
+test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace((test_space_3d_x, test_space_3d_y))
 
-trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
-test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
+trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace((trial_space_3d_xy, trial_space_3d_z))
+test_space_3d = Mantis.FunctionSpaces.TensorProductSpace((test_space_3d_xy, test_space_3d_z))
 
 # Set Dirichlet boundary conditions to zero.
 bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] for i in trial_space_3d.dof_partition[1][j])

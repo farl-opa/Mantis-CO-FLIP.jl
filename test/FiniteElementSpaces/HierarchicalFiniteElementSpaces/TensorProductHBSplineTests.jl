@@ -23,13 +23,13 @@ nsub2 = 2
 TS1,FB1 = Mantis.FunctionSpaces.build_two_scale_operator(CB1, nsub1)
 TS2, FB2 = Mantis.FunctionSpaces.build_two_scale_operator(CB2, nsub2)
 
-CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
-FTP = Mantis.FunctionSpaces.TensorProductSpace(FB1, FB2)
+CTP = Mantis.FunctionSpaces.TensorProductSpace((CB1, CB2))
+FTP = Mantis.FunctionSpaces.TensorProductSpace((FB1, FB2))
 spaces = [CTP, FTP]
 
 CTP_num_els = Mantis.FunctionSpaces.get_num_elements(CTP)
 
-CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(TS1,TS2)
+CTS = Mantis.FunctionSpaces.TensorProductTwoScaleOperator(CTP, FTP, (TS1,TS2))
 
 coarse_elements_to_refine = [3,4,5,8,9,10]
 refined_elements = vcat(Mantis.FunctionSpaces.get_element_children.(Ref(CTS), coarse_elements_to_refine)...)

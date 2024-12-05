@@ -43,7 +43,7 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
 GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
+TP = Mantis.FunctionSpaces.TensorProductSpace((GB, b1))
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
 1.0   1.0
@@ -84,7 +84,7 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 0, 0, 0, -1])
 GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [0])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
+TP = Mantis.FunctionSpaces.TensorProductSpace((GB, b1))
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
 1.0   1.0
@@ -165,7 +165,7 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
 GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
+TP = Mantis.FunctionSpaces.TensorProductSpace((GB, b1))
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
     1.0   1.0
@@ -208,7 +208,7 @@ deg = 2
 b = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), deg, [-1, -1])
 B = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1/sqrt(2), 1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP = Mantis.FunctionSpaces.TensorProductSpace(B, b1)
+TP = Mantis.FunctionSpaces.TensorProductSpace((B, b1))
 # control points for geometry
 geom_coeffs_0 =   [0.0 1.0
     1.0   1.0
@@ -248,7 +248,7 @@ br = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1/sqrt(2), 1])
 B = (br, br, br, br)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
+TP = Mantis.FunctionSpaces.TensorProductSpace((GB, b1))
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
     1.0   1.0
@@ -289,7 +289,7 @@ br = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1/sqrt(2), 1])
 B = (br, br, br, br)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1)
+TP = Mantis.FunctionSpaces.TensorProductSpace((GB, b1))
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0
     1.0   1.0
@@ -337,9 +337,9 @@ GTB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [1])
 
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
 
-TP_bsp = Mantis.FunctionSpaces.TensorProductSpace(Bsp, b1)
-TP_nurbs = Mantis.FunctionSpaces.TensorProductSpace(Nurbs, b1)
-TP_gtb = Mantis.FunctionSpaces.TensorProductSpace(GTB, b1)
+TP_bsp = Mantis.FunctionSpaces.TensorProductSpace((Bsp, b1))
+TP_nurbs = Mantis.FunctionSpaces.TensorProductSpace((Nurbs, b1))
+TP_gtb = Mantis.FunctionSpaces.TensorProductSpace((GTB, b1))
 
 # control points for geometry
 geom_coeffs_0 =   [1.0  -1.0

@@ -29,7 +29,7 @@ for p in degrees_for_test
         
         twoscale_operator, fine_bspline = Mantis.FunctionSpaces.build_two_scale_operator(coarse_bspline, nsubdivision)
 
-        fine_coeffs = Mantis.FunctionSpaces.subdivide_coeffs(coarse_coeffs, twoscale_operator)
+        fine_coeffs = Mantis.FunctionSpaces.get_finer_basis_coeffs(coarse_coeffs, twoscale_operator)
         
         for fine_el in 1:size(fine_bspline.knot_vector.patch_1d)
             coarse_el = Mantis.FunctionSpaces.get_element_parent(fine_el, nsubdivision)

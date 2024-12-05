@@ -29,11 +29,11 @@ dB1 = Mantis.FunctionSpaces.get_derivative_space(B1)
 dB2 = Mantis.FunctionSpaces.get_derivative_space(B2)
 
 # next, tensor-product B-spline spaces
-TP_Space_0 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace(B1, B2),))
-dTP_Space_dx = Mantis.FunctionSpaces.TensorProductSpace(dB1, B2)
-dTP_Space_dy = Mantis.FunctionSpaces.TensorProductSpace(B1, dB2)
+TP_Space_0 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace((B1, B2)),))
+dTP_Space_dx = Mantis.FunctionSpaces.TensorProductSpace((dB1, B2))
+dTP_Space_dy = Mantis.FunctionSpaces.TensorProductSpace((B1, dB2))
 TP_Space_1 = Mantis.FunctionSpaces.DirectSumSpace((dTP_Space_dx, dTP_Space_dy))
-TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace(dB1, dB2),))
+TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace((dB1, dB2)),))
 
 # then, the geometries
 # Line 1
@@ -238,8 +238,8 @@ deg = 2
 B = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, deg-1, -1])
 
 # tensor-product B-spline patch
-TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace(B, B)
-TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace(TP_Space_2d, B)
+TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B, B))
+TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace((TP_Space_2d, B))
 
 # Then the geometry 
 # Line

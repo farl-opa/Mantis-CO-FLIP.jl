@@ -27,7 +27,7 @@ B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, deg1-1, -1])
 # second B-spline patch
 B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-1, -1])
 # tensor-product B-spline patch
-TP_Space = Mantis.FunctionSpaces.TensorProductSpace(B1, B2)
+TP_Space = Mantis.FunctionSpaces.TensorProductSpace((B1, B2))
 
 # Define the DirectSum spaces to be used to generate the formspaces
 dsTP_0_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space,))
@@ -159,8 +159,8 @@ deg = 2
 B = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, deg-1, -1])
 
 # tensor-product B-spline patch
-TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace(B, B)
-TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace(TP_Space_2d, B)
+TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B, B))
+TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace((TP_Space_2d, B))
 
 # Then the geometry 
 # Line

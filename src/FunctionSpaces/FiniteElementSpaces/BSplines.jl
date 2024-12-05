@@ -285,12 +285,12 @@ Returns the elements where the B-spline given by `basis_id` is supported.
 - `basis_id::Int`: The id of the basis function.
 
 # Returns
-- `::UnitRange{Int}`: The support of the basis function.
+- `::Vector{Int}`: The support of the basis function.
 """
 function get_support(bspline::BSplineSpace, basis_id::Int)
     first_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id)
     last_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id + bspline.knot_vector.polynomial_degree + 1) - 1
-    return first_element:last_element
+    return collect(first_element:last_element)
 end
 
 function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)

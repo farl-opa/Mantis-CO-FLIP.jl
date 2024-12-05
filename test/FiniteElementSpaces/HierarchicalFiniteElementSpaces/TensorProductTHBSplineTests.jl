@@ -16,8 +16,7 @@ nlevels = 3
 
 CB1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(deg1-1, ne1-1); -1])
 CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1); -1])
-CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
-
+CTP = Mantis.FunctionSpaces.TensorProductSpace((CB1, CB2))
 
 TTS, FTP = Mantis.FunctionSpaces.build_two_scale_operator(CTP, nsubs)
 
@@ -30,7 +29,10 @@ for level ∈ 3:nlevels
     push!(operators, new_operator)
 end
 
-marked_elements_per_level = [Int[], Mantis.FunctionSpaces.get_element_children(operators[1], [7,8,9,12,13,14,17,18,19]), Mantis.FunctionSpaces.get_element_children(operators[2], [23, 24, 25, 33, 34, 35, 43, 44, 45])] 
+level_2_marked_elements = [child for parent in [7,8,9,12,13,14,17,18,19] for child in Mantis.FunctionSpaces.get_element_children(operators[1], parent)]
+level_3_marked_elements = [child for parent in [23, 24, 25, 33, 34, 35, 43, 44, 45] for child in Mantis.FunctionSpaces.get_element_children(operators[2], parent)]
+
+marked_elements_per_level = [Int[], level_2_marked_elements, level_3_marked_elements] 
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)

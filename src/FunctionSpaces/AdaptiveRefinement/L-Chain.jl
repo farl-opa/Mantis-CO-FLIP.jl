@@ -135,7 +135,9 @@ function check_nl_intersection(hier_space::HierarchicalFiniteElementSpace{n, S, 
         end
 
         basis_supp_intersection = StepRange(intersect(basis_supp_per_dim1[k], basis_supp_per_dim2[k]))
-        I_k = get_contained_knot_vector(basis_supp_intersection, ts, fine_space)
+        min_basis_id = minimum(basis_supp_intersection)
+        max_basis_id = maximum(basis_supp_intersection)
+        I_k = get_contained_knot_vector(min_basis_id, max_basis_id, ts, fine_space)
         
         length_flag[k] = get_knot_vector_length(I_k) > p_fine[k]
     end
