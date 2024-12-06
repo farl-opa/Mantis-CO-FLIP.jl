@@ -16,7 +16,7 @@ function Base.getindex(mixed_field::MixedFormField{num_forms, F}, idx::Int) wher
 end
 
 function Base.setindex(_::MixedFormField{num_forms, F}, idx::Int) where {num_forms, F}
-    throw(ArgumentError("Cannot set a form space in a mixed form space."))
+    throw(ArgumentError("Cannot set a form field in a MixedFormField."))
 end
 
 """
@@ -37,7 +37,7 @@ function Base.getindex(mixed_space::MixedFormSpace{num_forms, F}, idx::Int) wher
 end
 
 function Base.setindex(_::MixedFormSpace{num_forms, F}, idx::Int) where {num_forms, F}
-    throw(ArgumentError("Cannot set a form space in a mixed form space."))
+    throw(ArgumentError("Cannot set a form space in a MixedFormSpace."))
 end
 
 """

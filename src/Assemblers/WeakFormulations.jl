@@ -3,10 +3,10 @@
     struct WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest, G} <: AbstractInputs
 
 # Fields
-- `forcing::Frhs <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}`: Forcing function defined as a form.
-- `space_trial::Ttrial <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}`: Trial (Solution) space.
-- `space_test::Ttest <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}`: Test space.
-- `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: Quadrature rule.
+- `forcing::Frhs`: The forcing `Forms.MixedFormField` of the weak form.
+- `space_trial::Ttrial`: The trial `Forms.MixedFormSpace` of the weak form.
+- `space_test::Ttest`: The test `Forms.MixedFormSpace` of the weak form.
+- `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: The quadrature rule used to evaluate the weak form.
 """
 struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractInputs
     forcing::Frhs
@@ -27,6 +27,7 @@ struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractI
         new{manifold_dim, num_forms, Frhs, Ttrial, Ttest}(forcing, space_trial, space_test, quad_rule)
     end
 
+    # Convenience constructor for the Galerkin case, i.e., when the trial and test spaces are the same.
     function WeakFormInputs(forcing::Frhs, 
             space::T, 
             quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, num_forms, F1, F2,
@@ -34,6 +35,30 @@ struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractI
             T <: Forms.MixedFormSpace{num_forms, F2}}
 
         WeakFormInputs(forcing, space, space, quad_rule)
+    end
+
+    # Convenience constructor for non-mixed problems.
+    function WeakFormInputs(forcing::Frhs, 
+            space_trial::Ttrial, 
+            space_test::Ttest, 
+            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, expression_rank,
+            G <: Geometry.AbstractGeometry{manifold_dim},
+            Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, expression_rank, G},
+            Ttrial <: Forms.AbstractFormSpace{manifold_dim, form_rank, G},
+            Ttest <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
+
+        WeakFormInputs(forcing, Forms.MixedFormSpace((space_trial,)), Forms.MixedFormSpace((space_test,)), quad_rule)
+    end
+
+    # Convenience constructor for non-mixed Galerkin problems
+    function WeakFormInputs(forcing::Frhs, 
+            space::T, 
+            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, expression_rank,
+            G <: Geometry.AbstractGeometry{manifold_dim},
+            Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, expression_rank, G},
+            T <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
+
+        WeakFormInputs(forcing, Forms.MixedFormSpace((space,)), Forms.MixedFormSpace((space,)), quad_rule)
     end
 end
 
