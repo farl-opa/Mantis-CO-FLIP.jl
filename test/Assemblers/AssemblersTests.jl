@@ -123,8 +123,8 @@ m_1d = 5
 p_1d = 3
 k_1d = 2
 # Domain.
-const Lleft_1d = 0.0  # exact solutions are for xl = 0.0
-const Lright_1d = 2.0  # exact solution for xr > 0.0
+Lleft_1d = 0.0  # exact solutions are for xl = 0.0
+Lright_1d = 2.0  # exact solution for xr > 0.0
 
 
 # Create function spaces (b-splines here).
@@ -135,8 +135,8 @@ trial_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1
 test_space_1d_pm1 = create_bspline_space(Lleft_1d, Lright_1d, m_1d, p_1d-1, k_1d-1)
 
 # Set Dirichlet boundary conditions.
-const bc_left_sine_1d = 0.0
-const bc_right_sine_1d = 1.0
+bc_left_sine_1d = 0.0
+bc_right_sine_1d = 1.0
 bc_sine_1d = Dict{Int, Float64}(1 => bc_left_sine_1d, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => bc_right_sine_1d)
 bc_cos_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 0.0)
 bc_const_1d = Dict{Int, Float64}(1 => 0.0, Mantis.FunctionSpaces.get_num_basis(trial_space_1d) => 0.0)
@@ -218,10 +218,10 @@ m_y = 10
 p_2d = (4, 4)
 k_2d = (3, 3)
 # Domain.
-const Lleft = 0.0
-const Lright = 1.0
-const Lbottom = 0.0
-const Ltop = 1.0
+Lleft = 0.0
+Lright = 1.0
+Lbottom = 0.0
+Ltop = 1.0
 
 
 # Create function spaces (b-splines here).
@@ -235,16 +235,16 @@ test_space_y = create_bspline_space(Lbottom, Ltop, m_y, p_2d[2], k_2d[2])
 test_space_x_pm1 = create_bspline_space(Lleft, Lright, m_x, p_2d[1]-1, k_2d[1]-1)
 test_space_y_pm1 = create_bspline_space(Lbottom, Ltop, m_y, p_2d[2]-1, k_2d[2]-1)
 
-trial_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x_pm1, trial_space_y_pm1)
-test_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace(test_space_x_pm1, test_space_y_pm1)
+trial_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x_pm1, trial_space_y_pm1))
+test_space_2d_volume = Mantis.FunctionSpaces.TensorProductSpace((test_space_x_pm1, test_space_y_pm1))
 
-trial_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x_pm1, trial_space_y)
-trial_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y_pm1)
-test_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace(test_space_x_pm1, test_space_y)
-test_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y_pm1)
+trial_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x_pm1, trial_space_y))
+trial_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x, trial_space_y_pm1))
+test_space_2d_1_form_x = Mantis.FunctionSpaces.TensorProductSpace((test_space_x_pm1, test_space_y))
+test_space_2d_1_form_y = Mantis.FunctionSpaces.TensorProductSpace((test_space_x, test_space_y_pm1))
 
-trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_x, trial_space_y)
-test_space_2d = Mantis.FunctionSpaces.TensorProductSpace(test_space_x, test_space_y)
+trial_space_2d = Mantis.FunctionSpaces.TensorProductSpace((trial_space_x, trial_space_y))
+test_space_2d = Mantis.FunctionSpaces.TensorProductSpace((test_space_x, test_space_y))
 
 # Set Dirichlet boundary conditions to zero.
 bc_dirichlet_2d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in trial_space_2d.dof_partition[1][j])
@@ -255,7 +255,7 @@ brk_2d_x = collect(LinRange(Lleft, Lright, m_x+1))
 brk_2d_y = collect(LinRange(Lbottom, Ltop, m_y+1))
 geom_cartesian = Mantis.Geometry.CartesianGeometry((brk_2d_x, brk_2d_y))
 
-const crazy_c = 0.2
+crazy_c = 0.2
 function mapping(x::Vector{Float64})
     x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
     x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
@@ -358,12 +358,12 @@ k_3d = (2, 2, 0)
 # Domain. The length of the domain is chosen so that the normal 
 # derivatives of the exact solution are zero at the boundary. This is 
 # the only Neumann b.c. that we can specify at the moment.
-const Lx1 = 0.0
-const Lx2 = 1.0
-const Ly1 = 0.0
-const Ly2 = 1.0
-const Lz1 = 0.0
-const Lz2 = 1.0
+Lx1 = 0.0
+Lx2 = 1.0
+Ly1 = 0.0
+Ly2 = 1.0
+Lz1 = 0.0
+Lz2 = 1.0
 
 # Tensor product b-spline case on a Cartesian geometry.
 # Create Patch.
@@ -391,11 +391,11 @@ test_space_3d_y = Mantis.FunctionSpaces.BSplineSpace(patch_3d_y, p_3d[2], kvec_3
 trial_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
 test_space_3d_z = Mantis.FunctionSpaces.BSplineSpace(patch_3d_z, p_3d[3], kvec_3d_z)
 
-trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_x, trial_space_3d_y)
-test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_x, test_space_3d_y)
+trial_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace((trial_space_3d_x, trial_space_3d_y))
+test_space_3d_xy = Mantis.FunctionSpaces.TensorProductSpace((test_space_3d_x, test_space_3d_y))
 
-trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace(trial_space_3d_xy, trial_space_3d_z)
-test_space_3d = Mantis.FunctionSpaces.TensorProductSpace(test_space_3d_xy, test_space_3d_z)
+trial_space_3d = Mantis.FunctionSpaces.TensorProductSpace((trial_space_3d_xy, trial_space_3d_z))
+test_space_3d = Mantis.FunctionSpaces.TensorProductSpace((test_space_3d_xy, test_space_3d_z))
 
 # Set Dirichlet boundary conditions to zero.
 bc_dirichlet_3d = Dict{Int, Float64}(i => 0.0 for j in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] for i in trial_space_3d.dof_partition[1][j])
@@ -457,13 +457,13 @@ for case in cases
         α⁰.coefficients .= sol
         if run_tests
             @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"), 0.0, atol=1e-14)
-            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50), "Linf"), 0.0, atol=1e-14)
+            @test isapprox(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50, "closed"), "Linf"), 0.0, atol=1e-14)
         end
         if verbose
             print("Total L2 error 0-form: ")
             println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, q_rule_1d, "L2"))
             print("Total Linf error 0-form: ")
-            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50), "Linf"))
+            println(Mantis.Assemblers.compute_error_total(α⁰, sol⁰_const_1d_exact_sol, Mantis.Quadrature.newton_cotes(50, "closed"), "Linf"))
         end
         if write_to_output_file
             write_form_sol_to_file([α⁰, sol⁰_const_1d_exact_sol], ["zero_form", "exact_zero_form"], geom_1d, p_1d, k_1d, case, n_1d, verbose)

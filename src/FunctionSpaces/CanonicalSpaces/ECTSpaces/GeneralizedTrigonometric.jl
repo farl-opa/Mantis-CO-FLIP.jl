@@ -133,7 +133,7 @@ function gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
         M0[p, 3:4:end] .= -1
         M0[p+1, 2:4:end] .= 1
         M0[p+1, 4:4:end] .= -1
-        M1 = ToeplitzMatrices.Toeplitz([1; cumprod(w ./ (1:p))], I[:,1])
+        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(w ./ (1:p))], I[:,1]))
         M1[p, 1:4:end] .= cw
         M1[p, 2:4:end] .= -sw
         M1[p, 3:4:end] .= -cw

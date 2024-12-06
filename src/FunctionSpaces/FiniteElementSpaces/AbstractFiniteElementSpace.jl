@@ -41,21 +41,30 @@ function get_num_basis(space::AbstractFiniteElementSpace, element_id::Int)
 end
 
 @doc raw"""
-    evaluate(space::S, element_id::Int, xi::Vector{Float64}, nderivatives::Int) where {S<:AbstractFiniteElementSpace}
 
-For given global element id `element_id` for a given finite element `space`, evaluate the local basis functions and return.
+    evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int)
 
-# Arguments 
-- `space<:AbstractFiniteElementSpace`: finite element space.
-- `element_id::Int`: global element id.
-- `xi::Vector{Float64}`: vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated.
-- `nderivatives::Int`: number of derivatives to evaluate.
+Evaluate the basis functions of the finite element space `space` at the point `xi` in the element with index `element_id` up to order `nderivatives`.
+
+All of our function spaces are built in the parameteric domain (e.g., B-splines on a parametric patch with breakpoints [0.0, 0.5, 0.6, 2.0]). However, when we evaluate the (values/derivatives of) the function spaces, what is actually returned are the evaluations for the functions pulled-back to the canonical coordinates [0, 1].
+
+For example, in 1D, let the mapping from canonical coordinates to the `i`-th parametric element be `Φᵢ: [0, 1] -> [aᵢ, bᵢ]` then, for a function `f` defined on the parametric patch, the evaluate method actually returns the values/derivatives of `f∘Φᵢ`. Consider the function `f₀ := f∘Φᵢ`. Then, `FunctionSpaces.evaluate(f)` returns `evaluations::Vector{Vector{Vector{Matrix{Float64}}}` where `evaluations[i][j][k][a,b]` is the evaluation of:
+- the `j`-th mixed derivative ...
+- of order `i-1` ...
+- for the `b`-th basis function ...
+- of the `k`-th component ...
+- at the `a`-th evaluation point ...
+- for `f₀`.
+See [`_get_derivative_idx(der_key::Vector{Int})`] for more details on the order in which all the mixed derivatives of order `i-1` are stored.
+
+# Arguments
+- `space::AbstractFiniteElementSpace{n}`: Finite element space
+- `element_id::Int`: Index of the element
+- `xi::NTuple{n,Vector{Float64}}`: Point in the element
+- `nderivatives::Int`: Order of the derivatives
 
 # Returns
-- `::Matrix{Float64}`: array of evaluated global basis (size: num_eval_points x num_funcs x nderivatives+1)
-- `::Vector{Int}`: vector of global basis indices (size: num_funcs).
-
-# See also [`_get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
+- `::Tuple{Vector{Vector{Vector{Float64}}}, Vector{Int}}`: Tuple containing the values of the basis functions and the global indices of the basis functions
 """
 function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n}
     extraction_coefficients, basis_indices = get_extraction(space, element_id)
@@ -66,6 +75,7 @@ function evaluate(space::AbstractFiniteElementSpace{n}, element_id::Int, xi::NTu
         evaluation[j+1] = Vector{Matrix{Float64}}(undef, n_ders)
     end
 
+    #TODO: This can be merged into a single loop
     for j = 0:nderivatives
         for k = 1:length(local_basis[j+1])
             if isassigned(local_basis[j+1],k)

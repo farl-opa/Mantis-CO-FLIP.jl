@@ -2,19 +2,19 @@ import Mantis
 
 using Test
 
-const Patch1D = Mantis.Mesh.Patch1D
-const KnotVector = Mantis.FunctionSpaces.KnotVector
-const BSplineSpace = Mantis.FunctionSpaces.BSplineSpace
+Patch1D = Mantis.Mesh.Patch1D
+KnotVector = Mantis.FunctionSpaces.KnotVector
+BSplineSpace = Mantis.FunctionSpaces.BSplineSpace
 
 # Piece-wise degree of the basis functions on which the tests are performed.
 degrees_for_test = 0:20
-const subdivisions_to_test = 2:8
+subdivisions_to_test = 2:8
 
 # Tests for validity of knot insertion algorithm
 nq = 30
 coeff_factor = 5
 
-const fine_x = collect(range(0, 1, nq + 1))
+fine_x = collect(range(0, 1, nq + 1))
 
 for p in degrees_for_test
     nel = p+2
@@ -29,7 +29,7 @@ for p in degrees_for_test
         
         twoscale_operator, fine_bspline = Mantis.FunctionSpaces.build_two_scale_operator(coarse_bspline, nsubdivision)
 
-        fine_coeffs = Mantis.FunctionSpaces.subdivide_coeffs(coarse_coeffs, twoscale_operator)
+        fine_coeffs = Mantis.FunctionSpaces.get_finer_basis_coeffs(coarse_coeffs, twoscale_operator)
         
         for fine_el in 1:size(fine_bspline.knot_vector.patch_1d)
             coarse_el = Mantis.FunctionSpaces.get_element_parent(fine_el, nsubdivision)

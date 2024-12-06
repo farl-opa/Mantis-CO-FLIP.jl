@@ -23,7 +23,7 @@ CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1);
 nsub1 = 2
 nsub2 = 2
 
-CTP = Mantis.FunctionSpaces.TensorProductSpace(CB1, CB2)
+CTP = Mantis.FunctionSpaces.TensorProductSpace((CB1, CB2))
 CTS, FTP = Mantis.FunctionSpaces.build_two_scale_operator(CTP, (nsub1, nsub2))
 spaces = [CTP, FTP]
 

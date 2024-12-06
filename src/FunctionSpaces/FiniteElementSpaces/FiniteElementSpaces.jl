@@ -11,7 +11,7 @@ include("UnivariateSplineSpaces.jl")
 include("UnstructuredSpaces.jl")
 include("TensorProductSpaces.jl")
 # two scale relations
-include("TwoScaleRelations/TwoScaleRelations.jl")
+include("TwoScaleRelations/AbstractTwoScaleRelations.jl")
 # hierarchical function spaces
 include("Hierarchical/Hierarchical.jl")
 # multi-valued function spaces
