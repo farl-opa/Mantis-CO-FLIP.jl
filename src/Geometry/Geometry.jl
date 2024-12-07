@@ -31,10 +31,14 @@ function get_element_dimensions(geometry::G, element_id::Int) where {G<:Abstract
     return _get_element_dimensions(geometry, element_id)
 end
 
+# core functionality
 include("./CartesianGeometry.jl")
 include("./FEMGeometry.jl")
 include("./MappedGeometry.jl")
 include("./TensorProductGeometry.jl")
 include("./Metric.jl")
+
+# helper functions for convenience
+include("./GeometryHelpers.jl")
 
 end

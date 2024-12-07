@@ -32,7 +32,6 @@ bspline_space_1d = create_bspline_space(start_1d, size_1d, elements_1d, section_
 ```
 """
 function create_bspline_space(starting_point::Float64, box_size::Float64, num_elements::Int, section_space::F, regularity::Int; n_dofs_left::Int = 1, n_dofs_right::Int = 1) where {F<:AbstractCanonicalSpace}
-f
     box_size > 0.0 ? nothing : throw(ArgumentError("The argumente 'box_size' must be greater than 0."))
 
     breakpoints = collect(LinRange(starting_point, starting_point+box_size, num_elements+1))
@@ -134,11 +133,29 @@ Create a tensor product B-spline space based on the specified parameters for eac
 # Returns
 - `::TensorProductSpace`: The resulting tensor product B-spline space.
 """
-function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_space::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim, F <: AbstractCanonicalSpace}
+function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim, F <: AbstractCanonicalSpace}
     
-    dim_wise_spaces = map((xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)
+    return TensorProductSpace(create_dim_wise_bspline_spaces(starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right))
+end
+
+"""
+    create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
+
+Create `manifold_dim` univariate B-spline spaces based on the specified parameters for each dimension.
+
+# Arguments
+- `starting_points::NTuple{manifold_dim, Float64}`: The starting point of the B-spline space in each dimension.
+- `box_sizes::NTuple{manifold_dim, Float64}`: The size of the box in each dimension.
+- `num_elements::NTuple{manifold_dim, Int}`: The number of elements in each dimension.
+- `section_spaces::NTuple{manifold_dim, F}`: The section spaces for each dimension.
+- `regularities::NTuple{manifold_dim, Int}`: The regularities of the B-spline in each dimension.
+
+# Returns
+- `::Tuple{BSplineSpace}`: The resulting univariate B-spline spaces.
+"""
+function create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
     
-    return TensorProductSpace(dim_wise_spaces)
+    return map((xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)::NTuple{manifold_dim, BSplineSpace{F}}
 end
 
 """
@@ -158,7 +175,25 @@ Create a tensor product B-spline space based on the specified parameters for eac
 """
 function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim}
     
-    dim_wise_spaces = map((xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, degrees, regularities, n_dofs_left, n_dofs_right)
+    return TensorProductSpace(create_dim_wise_bspline_spaces(starting_points, box_sizes, num_elements, degrees, regularities, n_dofs_left, n_dofs_right))
+end
+
+"""
+    create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim}
+
+Create `manifold_dim` univariate B-spline spaces based on the specified parameters for each dimension.
+
+# Arguments
+- `starting_points::NTuple{manifold_dim, Float64}`: The starting point of the B-spline space in each dimension.
+- `box_sizes::NTuple{manifold_dim, Float64}`: The size of the box in each dimension.
+- `num_elements::NTuple{manifold_dim, Int}`: The number of elements in each dimension.
+- `degrees::NTuple{manifold_dim, Int}`: The polynomial degree in each dimension.
+- `regularities::NTuple{manifold_dim, Int}`: The regularities of the B-spline in each dimension.
+
+# Returns
+- `::Tuple{BSplineSpace}`: The resulting univariate B-spline spaces.
+"""
+function create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim}
     
-    return TensorProductSpace(dim_wise_spaces)
+    return map((xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, degrees, regularities, n_dofs_left, n_dofs_right)::NTuple{manifold_dim, BSplineSpace{Bernstein}}
 end
