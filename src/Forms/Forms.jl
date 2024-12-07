@@ -98,9 +98,13 @@ function get_geometry(form_1::FS1, form_2::FS2) where {FS1 <: AbstractFormExpres
     end
 end
 
+# core functionality
 include("./FormSpaces.jl")
 include("./FormExpressions.jl") # Requires FormSpaces
 include("./FormOperators.jl") # Mind the order, FormOperators requires FormSpaces and FormExpressions
+
+# helper functions for convenience
+include("./FormHelpers.jl")
 
 # 0-form: no basis
 # 1-forms: (dx1, dx2, dx3)
