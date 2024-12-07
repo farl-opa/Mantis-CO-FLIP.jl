@@ -526,32 +526,3 @@ function get_greville_points(tp_space::TensorProductSpace{manifold_dim, T}) wher
 
     return tuple(greville_points...)
 end
-
-"""
-    create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
-
-Create a tensor product B-spline space based on the specified parameters for each dimension.
-
-# Arguments
-- `starting_points::NTuple{manifold_dim, Float64}`: The starting point of the B-spline space in each dimension.
-- `box_sizes::NTuple{manifold_dim, Float64}`: The size of the box in each dimension.
-- `num_elements::NTuple{manifold_dim, Int}`: The number of elements in each dimension.
-- `section_spaces::NTuple{manifold_dim, F}`: The section spaces for each dimension.
-- `regularities::NTuple{manifold_dim, Int}`: The regularities of the B-spline in each dimension.
-
-# Returns
-- `::TensorProductSpace`: The resulting tensor product B-spline space.
-"""
-function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_space::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim, F <: AbstractCanonicalSpace}
-    
-    dim_wise_spaces = map((xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)
-    
-    return TensorProductSpace(dim_wise_spaces)
-end
-
-function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim}
-    
-    dim_wise_spaces = map((xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)
-    
-    return TensorProductSpace(dim_wise_spaces)
-end
