@@ -58,7 +58,7 @@ struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractI
             Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, expression_rank, G},
             T <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
 
-        WeakFormInputs(forcing, Forms.MixedFormSpace((space,)), Forms.MixedFormSpace((space,)), quad_rule)
+        WeakFormInputs(Forms.MixedFormField((forcing,)), Forms.MixedFormSpace((space,)), Forms.MixedFormSpace((space,)), quad_rule)
     end
 end
 

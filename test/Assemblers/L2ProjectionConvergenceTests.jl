@@ -31,7 +31,7 @@ function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1,
     
 end
 
-function L2_projection(X, ∫, fₑ)
+function L2_projection(fₑ, X, ∫)
     # inputs for the mixed weak form
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(fₑ, X, ∫)
 
@@ -42,12 +42,23 @@ function L2_projection(X, ∫, fₑ)
     sol = A \ b
 
     # create solution as form fields and return
-    V_fields = Mantis.Forms.build_form_fields(V, sol; labels=("u",))
+    V_fields = Mantis.Forms.build_form_fields(weak_form_inputs.space_trial, sol; labels=("fh",))
     
     return V_fields[1]
 end
 
+function L2_norm(u, ∫)
+    norm = 0.0
+    for el_id ∈ 1:Mantis.Geometry.get_num_elements(u.geometry)
+        inner_prod = SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(u, u, el_id, ∫)...)
+        norm += inner_prod[1,1]
+    end
+    return sqrt(norm)
+end
+
 # PROBLEM PARAMETERS -------------------------------------------------------------------
+# manifold dimensions
+const manifold_dim = 2
 # mesh types to be used
 mesh_type = ["cartesian", "curvilinear"]
 # number of elements in each direction at the coarsest level of refinement
@@ -60,7 +71,7 @@ L = (1.0, 1.0)
 p⁰ = [2, 3, 4]
 # type of section spaces to use
 section_space_type = [Mantis.FunctionSpaces.Bernstein]#, "trigonometric", "legendre"]
-θ = 2*pi ./ num_el
+θ = 2*pi ./ num_el_0
 # extra quadrature points compared to degree
 dq⁰ = (2, 2)
 
@@ -83,41 +94,44 @@ end
 verbose = true
 
 # RUN L2 PROJECTION PROBLEM -------------------------------------------------------------------
+errors = zeros(Float64, num_ref_levels+1, length(p⁰), length(section_space_type), length(mesh_type), 1+manifold_dim)
 for ref_lev = 0:num_ref_levels
     num_elements = num_el_0 .* (2 .^ ref_lev)
-    for mesh in mesh_type
+    for (mesh_idx, mesh) in enumerate(mesh_type)
         if mesh == "cartesian"
             geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
         else
             geometry = Mantis.Geometry.create_curvilinear_square(origin, L, num_elements)
         end
-        for p in p⁰
-            for section_space in section_space_type
+        for (p_idx, p) in enumerate(p⁰)
+            for (ss_idx, section_space) in enumerate(section_space_type)
                 @info("Running L2 projection for p = $p, section_space = $section_space, mesh = $mesh, ref_lev = $ref_lev")
                 
                 # section spaces
                 degree = (p, p)
                 section_spaces = map(section_space, degree)
 
+                # quadrature rule
+                ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+
                 # function spaces
                 Λ = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, degree .- 1, geometry)
 
-                # exact solution
-                uₑ, _, _ = sinusoidal_solution(0, □)
+                for form_rank in 0:manifold_dim
+                    n_dofs = Mantis.Forms.get_num_basis(Λ[form_rank+1])
+                    display("   Form rank = $form_rank, n_dofs = $n_dofs")
+                    # exact solution for the problem
+                    fₑ = sinusoidal_solution(form_rank, geometry)
 
-                # SOLVE PROBLEM -------------------------------------------------------------------
-                println("Solving the problem...")
-                uₕ = run_L2_projection(W, ∫ₐ, uₑ)
+                    # solve the problem
+                    fₕ = L2_projection(fₑ, Λ[form_rank+1], ∫)
+                    
+                    # compute error
+                    error = 0#L2_norm(fₕ - fₑ, ∫)
+                    errors[ref_lev+1, p_idx, ss_idx, mesh_idx, form_rank+1] = error
 
-                # COMPUTE ERROR -------------------------------------------------------------------
-                println("Computing error...")
-                error_u = L2_norm(uₕ - uₑ, ∫ₑ)
-                println("Error in u: ", error_u)
-
-                # VISUALIZE SOLUTION -------------------------------------------------------------------
-                # println("Visualizing the solution...")
-                # visualize_solution((uₕ, uₑ), ("uh", "ue"), "L2projection_$section_space _$mesh", □, 1, 4)
-
+                    display("   Error: $error")
+                end
                 println("...done!")
             end
         end
