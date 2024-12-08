@@ -128,7 +128,7 @@ function gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
         cw = cos(w)
         sw = sin(w)
         M0 = I[:,:]
-        M0[[p, p+1], [p, p+1]] = 0.0
+        M0[[p, p+1], [p, p+1]] .= 0.0
         M0[p, 1:4:end] .= 1
         M0[p, 3:4:end] .= -1
         M0[p+1, 2:4:end] .= 1

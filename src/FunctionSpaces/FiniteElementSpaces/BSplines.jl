@@ -384,12 +384,8 @@ Returns the derivative space of the B-spline space.
 function get_derivative_space(bspline::BSplineSpace{F}) where {F <: AbstractCanonicalSpace}
     # polynomial degree of derivative space
     p = get_polynomial_degree(bspline)
-    if F <: AbstractECTSpaces
-        dpolynomials = get_derivative_space(F)
-    else
-        dpolynomials = F(p-1)
-    end
-
+    dpolynomials = get_derivative_space(bspline.polynomials)
+    
     # modified left and right dof-partitioning
     dof_partition = get_dof_partition(bspline)
     n_left = max(0, length(dof_partition[1][1])-1)

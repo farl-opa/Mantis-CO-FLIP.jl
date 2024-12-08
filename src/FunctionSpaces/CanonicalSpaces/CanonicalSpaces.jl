@@ -40,6 +40,10 @@ function get_polynomial_degree(elem_loc_basis::AbstractCanonicalSpace)
     return elem_loc_basis.p
 end
 
+function get_derivative_space(elem_loc_basis::AbstractCanonicalSpace)
+    return typeof(elem_loc_basis)(max(elem_loc_basis.p-1,0))
+end
+
 """
     _evaluate_all_at_point(canonical_space::AbstractCanonicalSpace, xi::Float64, nderivatives::Int)
 
