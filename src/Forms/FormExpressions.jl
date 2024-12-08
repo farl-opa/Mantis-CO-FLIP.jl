@@ -512,8 +512,8 @@ Subtract two form fields.
 # Returns
 - `FormExpression`: A new FormExpression representing the subtraction of the two form fields.
 """
-function Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    return FormExpression((form_1, form_2), 0, "-")
+function Base.:-(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormExpression{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return FormExpression((form_1, form_2), "-")
 end
 
 # TODO This seems correct, partially.
@@ -529,8 +529,8 @@ Add two form fields.
 # Returns
 - `FormExpression`: A new FormExpression representing the addition of the two form fields.
 """
-function Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormField{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormField{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    return FormExpression((form_1, form_2), form_rank, "+")
+function Base.:+(form_1::F_1, form_2::F_2) where {F_1 <: AbstractFormExpression{manifold_dim, form_rank, 0, G}, F_2 <: AbstractFormExpression{manifold_dim, form_rank, 0, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+    return FormExpression((form_1, form_2), "+")
 end
 
 @doc raw"""
