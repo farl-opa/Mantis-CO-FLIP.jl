@@ -98,6 +98,13 @@ end
     build_form_fields(mixed_space::MixedFormSpace, coeffs::Vector{Float64})
 
 Build the form fields for the mixed form space given a set of coefficients. This is done by assigning the right set of coefficients to the right form space.
+
+# Arguments
+- mixed_space::MixedFormSpace: The mixed form space.
+- coeffs::Vector{Float64}: The coefficients for the mixed-form field.
+
+# Returns
+- ::Tuple{FormField}: The form fields.
 """
 function build_form_fields(mixed_space::MixedFormSpace{num_forms, F}, coeffs::Vector{Float64}; labels::Union{Nothing,NTuple{num_forms,String}}=nothing) where {num_forms, F <: NTuple{num_forms, FormSpace}}
     if length(coeffs) != get_num_basis(mixed_space)
@@ -116,5 +123,21 @@ function build_form_fields(mixed_space::MixedFormSpace{num_forms, F}, coeffs::Ve
         form_fields[form_idx].coefficients .= coeffs[start_idx:start_idx+num_coeffs-1]
         start_idx += num_coeffs
     end
-    return MixedFormField(Tuple(form_fields))
+    return tuple(form_fields...)
+end
+
+"""
+    build_mixed_form_field(mixed_space::MixedFormSpace, coeffs::Vector{Float64})
+
+Build the mixed-form field for the mixed form space given a set of coefficients. This is done by assigning the right set of coefficients to the right form space.
+
+# Arguments
+- mixed_space::MixedFormSpace: The mixed form space.
+- coeffs::Vector{Float64}: The coefficients for the mixed-form field.
+
+# Returns
+- mixed_field::MixedFormField: The mixed-form field.
+"""
+function build_mixed_form_field(mixed_space::MixedFormSpace{num_forms, F}, coeffs::Vector{Float64}; labels::Union{Nothing,NTuple{num_forms,String}}=nothing) where {num_forms, F <: NTuple{num_forms, FormSpace}}
+    return MixedFormField(build_form_fields(mixed_space, coeffs; labels=labels))
 end
