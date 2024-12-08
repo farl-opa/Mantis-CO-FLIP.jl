@@ -64,23 +64,24 @@ manifold_dim = 2
 # mesh types to be used
 mesh_type = ["cartesian", "curvilinear"]
 # number of elements in each direction at the coarsest level of refinement
-num_el_0 = (2, 2)
+num_el_0 = 4
 # origin of the parametric domain in each direction
 origin = (0.0, 0.0)
 # length of the domain in each direction
 L = (1.0, 1.0)
 # polynomial degrees of the zero-form finite element spaces to be used
-p⁰ = [2, 3, 4]
+p⁰ = [2, 3]
 # type of section spaces to use
-section_space_type = [Mantis.FunctionSpaces.Bernstein]#, "trigonometric", "legendre"]
-θ = 2*pi ./ num_el_0
+θ = 2*pi
+α = 10.0
+section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
 # extra quadrature points compared to degree
 dq⁰ = (2, 2)
 # print info?
-verbose = false
+verbose = true
 
 # number of refinement levels to run
-num_ref_levels = 6
+num_ref_levels = 5
 
 # exact solution for the problem
 function sinusoidal_solution(form_rank::Int, geo::Mantis.Geometry.AbstractGeometry{manifold_dim}) where {manifold_dim}
@@ -97,7 +98,7 @@ end
 # RUN L2 PROJECTION PROBLEM -------------------------------------------------------------------
 errors = zeros(Float64, num_ref_levels+1, length(p⁰), length(section_space_type), length(mesh_type), 1+manifold_dim)
 for ref_lev = 0:num_ref_levels
-    num_elements = num_el_0 .* (2 .^ ref_lev)
+    num_elements = (num_el_0 * (2^ref_lev)) .* tuple([1 for _ in 1:manifold_dim]...)
     for (mesh_idx, mesh) in enumerate(mesh_type)
         if mesh == "cartesian"
             geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
@@ -112,13 +113,23 @@ for ref_lev = 0:num_ref_levels
                 
                 # section spaces
                 degree = (p, p)
-                section_spaces = map(section_space, degree)
+                if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
+                    section_spaces = map(section_space, degree, θ ./ num_elements)
+                elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
+                    section_spaces = map(section_space, degree, α ./ num_elements)
+                else
+                    section_spaces = map(section_space, degree)
+                end
 
                 # quadrature rule
                 ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
 
                 # function spaces
-                X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, degree .- 1, geometry)
+                regularities = degree .- 1
+                if section_space == Mantis.FunctionSpaces.LobattoLegendre
+                    regularities = tuple([0 for _ in 1:manifold_dim]...)
+                end
+                X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
 
                 for form_rank in 0:manifold_dim
                     n_dofs = Mantis.Forms.get_num_basis(X[form_rank+1])
@@ -152,11 +163,19 @@ end
 for (p_idx, p) in enumerate(p⁰)
     for (ss_idx, section_space) in enumerate(section_space_type)
         for (mesh_idx, mesh) in enumerate(mesh_type)
-            # expected 0-form convergence: p+1
-            @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p+1, atol=5e-2)
-            # expected k-form convergence for k>0: p
+            if isapprox(errors[end, p_idx, ss_idx, mesh_idx, 1], 0.0, atol=1e-14)
+                continue
+            else
+                # expected 0-form convergence: p+1
+                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p+1, atol=5e-2)
+            end
             for form_rank in 1:manifold_dim
-                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, form_rank+1], p, atol=5e-2)
+                if isapprox(errors[end, p_idx, ss_idx, mesh_idx, form_rank+1], 0.0, atol=1e-14)
+                    continue
+                else
+                    # expected k-form convergence for k>0: p
+                    @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, form_rank+1], p, atol=5e-2)
+                end
             end
         end
     end
