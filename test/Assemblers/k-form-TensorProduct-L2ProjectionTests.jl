@@ -78,7 +78,7 @@ section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.Lob
 # extra quadrature points compared to degree
 dq⁰ = (2, 2)
 # print info?
-verbose = true
+verbose = false
 
 # number of refinement levels to run
 num_ref_levels = 5
