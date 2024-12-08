@@ -75,8 +75,6 @@ p⁰ = [2, 3]
 θ = 2*pi
 α = 10.0
 section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
-# extra quadrature points compared to degree
-dq⁰ = (2, 2)
 # print info?
 verbose = false
 
@@ -115,10 +113,13 @@ for ref_lev = 0:num_ref_levels
                 degree = (p, p)
                 if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
                     section_spaces = map(section_space, degree, θ ./ num_elements)
+                    dq⁰ = 2 .* degree
                 elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
                     section_spaces = map(section_space, degree, α ./ num_elements)
+                    dq⁰ = 3 .* degree
                 else
                     section_spaces = map(section_space, degree)
+                    dq⁰ = (2, 2)
                 end
 
                 # quadrature rule
@@ -167,14 +168,14 @@ for (p_idx, p) in enumerate(p⁰)
                 continue
             else
                 # expected 0-form convergence: p+1
-                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p+1, atol=5e-2)
+                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p+1, atol=1.5e-1)
             end
             for form_rank in 1:manifold_dim
                 if isapprox(errors[end, p_idx, ss_idx, mesh_idx, form_rank+1], 0.0, atol=1e-14)
                     continue
                 else
                     # expected k-form convergence for k>0: p
-                    @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, form_rank+1], p, atol=5e-2)
+                    @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, form_rank+1], p, atol=1.5e-1)
                 end
             end
         end

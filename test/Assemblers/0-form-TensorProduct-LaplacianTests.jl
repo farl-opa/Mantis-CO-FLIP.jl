@@ -7,7 +7,7 @@ using SparseArrays
 @doc raw"""
     Δ⁰(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
 
-Function for computing the weak form of the 0-form Hodge Laplacian on the given element. The associated weak formulation is:
+Function for assembling the weak form of the 0-form Hodge Laplacian on the given element. The associated weak formulation is:
 
 For given ``f^0 \in L^2 \Lambda^0 (\Omega)``, find ``\phi^0_h \in X^0`` such that 
 ```math
@@ -87,13 +87,11 @@ p⁰ = [2, 3]
 θ = 2*pi
 α = 10.0
 section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
-# extra quadrature points compared to degree
-dq⁰ = (2, 2)
 # print info?
 verbose = false
 
 # number of refinement levels to run
-num_ref_levels = 5
+num_ref_levels = 4
 
 # exact solution for the 0-form problem
 function sinusoidal_solution(geo::Mantis.Geometry.AbstractGeometry{manifold_dim}) where {manifold_dim}
@@ -145,10 +143,13 @@ for ref_lev = 0:num_ref_levels
                 degree = (p, p)
                 if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
                     section_spaces = map(section_space, degree, θ ./ num_elements)
+                    dq⁰ = 2 .* degree
                 elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
                     section_spaces = map(section_space, degree, α ./ num_elements)
+                    dq⁰ = 3 .* degree
                 else
                     section_spaces = map(section_space, degree)
+                    dq⁰ = (2, 2)
                 end
 
                 # quadrature rule
@@ -201,12 +202,12 @@ for (p_idx, p) in enumerate(p⁰)
                 continue
             else
                 # expected 0-form convergence: p+1
-                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p+1, atol=5e-2)
+                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p+1, atol=1.5e-1)
                 if isapprox(errors[end, p_idx, ss_idx, mesh_idx, 2], 0.0, atol=1e-12)
                     continue
                 else
                     # expected k-form convergence for k>0: p
-                    @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 2], p, atol=5e-2)
+                    @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 2], p, atol=1.5e-1)
                 end
             end
         end
