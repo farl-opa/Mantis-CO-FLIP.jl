@@ -197,3 +197,80 @@ function create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Fl
     
     return map((xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, degrees, regularities, n_dofs_left, n_dofs_right)::NTuple{manifold_dim, BSplineSpace{Bernstein}}
 end
+
+################################################################################
+# Polar spline helpers
+################################################################################
+
+"""
+    create_polar_spline_space_and_geometry(deg::Int, nel_r::Int, nel_θ::Int, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0)
+
+Create a polar spline space and geometry based on the provided parameters. The function constructs a tensor-product B-spline space in the radial and angular directions, and then creates a polar spline space and geometry based on the tensor-product space. The geometry is defined by the radius `R` and the number of elements in the radial and angular directions. Optional arguments include a flag to refine the geometry, the geometry coefficients, and the form rank.
+
+# Arguments
+- `deg::Int`: The polynomial degree of the B-spline space.
+- `nel_r::Int`: The number of elements in the radial direction.
+- `nel_θ::Int`: The number of elements in the angular direction.
+- `R::Float64`: The radius of the geometry.
+- `refine::Bool`: A flag to refine the geometry.
+- `geom_coeffs_tp::Union{Nothing,Array{Float64,3}}`: The geometry coefficients.
+- `form_rank::Int`: The form rank.
+
+# Returns
+- `::Tuple{FormSpace, FEMGeometry, Array{Float64,3}, Tuple{Union{Nothing,TwoScaleOperator},Union{Nothing,TwoScaleOperator}}, Array{Float64,3}, Tuple{Union{Nothing,TwoScaleOperator},Union{Nothing,TwoScaleOperator}}}`: The polar spline space, geometry, geometry coefficients, two-scale operators, and extraction matrices.
+"""
+function create_polar_spline_space_and_geometry(deg::Int, nel_r::Int, nel_θ::Int, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0)
+    # patches in r and θ
+    patch_r = Mesh.Patch1D(collect(LinRange(0.0, 1.0, nel_r+1)))
+    patch_θ = Mesh.Patch1D(collect(LinRange(0.0, 1.0, nel_θ+1)))
+
+    # spline space in r
+    Br = BSplineSpace(patch_r, deg, deg-1)
+    # spline space in θ
+    Bθ = BSplineSpace(patch_θ, deg, deg-1)
+    GBθ = GTBSplineSpace((Bθ,), [deg-1])
+    
+    # control points for a degenerate tensor-product mapping
+    n_θ = get_num_basis(GBθ)
+    n_r = get_num_basis(Br)
+
+    ts_θ = nothing
+    ts_r = nothing
+    if isnothing(geom_coeffs_tp)
+        geom_coeffs_tp, _, _ = build_standard_degenerate_control_points(n_θ, n_r, R)
+    else
+        # geometry has already been provided, just check if we need to refine it
+        if refine
+            # refine the univariate spaces
+            ts_r, Br_ref = build_two_scale_operator(Br, 2)
+            _, Bθ_ref = build_two_scale_operator(Bθ, 2)
+            GBθ_ref = GTBSplineSpace((Bθ_ref,), [deg-1])
+            ts_θ, _ = build_two_scale_operator(GBθ,GBθ_ref,((2,),))
+            
+            # refine the tensor-product control points
+            geom_coeffs_tp = cat(ts_θ.global_subdiv_matrix * geom_coeffs_tp[:,:,1] * ts_r.global_subdiv_matrix', ts_θ.global_subdiv_matrix * geom_coeffs_tp[:,:,2] * ts_r.global_subdiv_matrix'; dims=3)
+            
+            # update old spaces
+            Br = Br_ref
+            Bθ = Bθ_ref
+            GBθ = GBθ_ref
+        end
+    end
+
+    # Polar spline space and global extraction matrix for the geometry
+    P_geom, E_geom = PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]); form_rank = 0)
+    # control points for the polar spline space
+    geom_coeffs_polar = (E_geom[1] * E_geom[1]') \ (E_geom[1] * reshape(geom_coeffs_tp,:, 2))
+    # polar spline geometry
+    geometry = Mantis.Geometry.FEMGeometry(P_geom, geom_coeffs_polar)
+
+    # Polar spline space and global extraction matrix for the solution
+    dBr = get_derivative_space(Br)
+    dBθ = get_derivative_space(Bθ)
+    dGBθ = GTBSplineSpace((dBθ,), [deg-2])
+    P_sol, E_sol = PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]); form_rank = form_rank, dspace_p = dGBθ, dspace_r = dBr)
+    # form space
+    X = Mantis.Forms.FormSpace(form_rank, geometry, P_sol, "σ")
+
+    return X, geometry, E_geom, geom_coeffs_tp, (ts_θ, ts_r), E_sol
+end
