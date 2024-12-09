@@ -13,8 +13,7 @@ Create a polar spline space from the given poloidal and radial finite element sp
 - `dspace_r::AbstractFiniteElementSpace{1}=nothing`: The derivative space for the radial space.
 
 # Returns
-- `polar_splines::UnstructuredSpace...`: The polar spline space(s).
-
+- `polar_splines::SumSpace`: The (unstructured) polar spline space returned as a SumSpace.
 """
 function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1}, degenerate_control_points::NTuple{2,Matrix{Float64}}; singularity_type::Int=1, form_rank::Int=0, dspace_p::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing, dspace_r::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing)
 
@@ -106,7 +105,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         polar_splines[component_idx] = UnstructuredSpace((tp_space[component_idx],), extraction_op, dof_partition, us_config, Dict("regularity" => 1, "control_triangle" => control_triangle))
     end
 
-    return Tuple(polar_splines), E
+    return SumSpace(tuple(polar_splines...), max(map(get_num_basis,P_sol))), E
 end
 
 """
@@ -323,6 +322,18 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
     return ((E0,), (E1_h, E1_v), (E2,)), (trix, triy)
 end
 
+"""
+    build_control_triangle_(points::NTuple{2,Matrix{Float64}})
+
+Build a standard triangle that contains the input points.
+
+# Arguments
+- `points::NTuple{2,Matrix{Float64}}`: The input points.
+
+# Returns
+- `trix::Vector{Float64}`: The x-coordinates of the control triangle.
+- `triy::Vector{Float64}`: The y-coordinates of the control triangle.
+"""
 function build_control_triangle_(points::NTuple{2,Matrix{Float64}})
     rad = sqrt.(sum((points[2] .- points[1]).^2, dims=2))
     tau = 2 * maximum(rad)
@@ -331,7 +342,20 @@ function build_control_triangle_(points::NTuple{2,Matrix{Float64}})
     return trix, triy
 end
 
-function barycentric_coordinates_(points, trix, triy)
+"""
+    barycentric_coordinates_(points, trix, triy)
+
+Compute the barycentric coordinates of the input points w.r.t. the control triangle.
+
+# Arguments
+- `points::NTuple{2,Matrix{Float64}}`: The input points.
+- `trix::Vector{Float64}`: The x-coordinates of the control triangle.
+- `triy::Vector{Float64}`: The y-coordinates of the control triangle.
+
+# Returns
+- `barycentric_coordinates::Tuple{Matrix{Float64},Matrix{Float64}}`: The barycentric coordinates.
+"""
+function barycentric_coordinates_(points::NTuple{2,Matrix{Float64}}, trix::Vector{Float64}, triy::Vector{Float64})
     L = hcat(trix, triy, ones(3))
     return (hcat(zeros(size(points[1])), ones(size(points[1], 1))) / L, hcat(points[2] .- points[1], ones(size(points[1], 1))) / L)
 end
