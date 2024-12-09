@@ -165,8 +165,8 @@ for ref_lev = 0:num_ref_levels
                 uₕ = zero_form_hodge_laplacian(fₑ, X[1], ∫)
                 
                 # compute error
-                error = L2_norm(uₕ - uₑ, ∫)
-                derror = L2_norm(Mantis.Forms.exterior_derivative(uₕ) - duₑ, ∫)
+                error = Mantis.Assemblers.L2_norm(uₕ - uₑ, ∫)
+                derror = Mantis.Assemblers.L2_norm(Mantis.Forms.exterior_derivative(uₕ) - duₑ, ∫)
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 1] = error
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 2] = derror
 

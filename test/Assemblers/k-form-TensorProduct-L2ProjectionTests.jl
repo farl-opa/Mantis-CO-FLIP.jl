@@ -135,7 +135,7 @@ for ref_lev = 0:num_ref_levels
                     fₕ = L2_projection(fₑ, X[form_rank+1], ∫)
                     
                     # compute error
-                    error = L2_norm(fₕ - fₑ, ∫)
+                    error = Mantis.Assemblers.L2_norm(fₕ - fₑ, ∫)
                     errors[ref_lev+1, p_idx, ss_idx, mesh_idx, form_rank+1] = error
 
                     if verbose; display("   Error: $error"); end

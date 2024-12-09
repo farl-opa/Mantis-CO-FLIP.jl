@@ -210,8 +210,8 @@ for ref_lev = 0:num_ref_levels
                 uₕ, ϕₕ = volume_form_hodge_laplacian(fₑ, X[2], X[3], ∫)
                 
                 # compute error
-                error = L2_norm(ϕₕ - ϕₑ, ∫)
-                δerror = L2_norm(uₕ - δϕₑ, ∫)
+                error = Mantis.Assemblers.L2_norm(ϕₕ - ϕₑ, ∫)
+                δerror = Mantis.Assemblers.L2_norm(uₕ - δϕₑ, ∫)
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 1] = error
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 2] = δerror
 
