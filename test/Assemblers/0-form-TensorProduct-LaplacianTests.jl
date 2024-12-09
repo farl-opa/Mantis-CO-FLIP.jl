@@ -5,7 +5,7 @@ using LinearAlgebra
 using SparseArrays
 
 @doc raw"""
-    Δ⁰(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+    zero_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
 
 Function for assembling the weak form of the 0-form Hodge Laplacian on the given element. The associated weak formulation is:
 
@@ -15,7 +15,7 @@ For given ``f^0 \in L^2 \Lambda^0 (\Omega)``, find ``\phi^0_h \in X^0`` such tha
 ```
 where ``X`` is the discrete de Rham complex, and such that ``\phi^0_h`` satisfies zero Dirichlet boundary conditions.
 """
-function Δ⁰(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+function zero_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
     Forms = Mantis.Forms
 
     # The inner product will be between the exterior derivative of the 
@@ -39,7 +39,7 @@ function Δ⁰(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, T
     
 end
 
-function Δ⁰(fₑ, X⁰, ∫)
+function zero_form_hodge_laplacian(fₑ, X⁰, ∫)
     # inputs for the mixed weak form
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(fₑ, X⁰, ∫)
 
@@ -49,7 +49,7 @@ function Δ⁰(fₑ, X⁰, ∫)
     bc_vals = zeros(Float64,length(bc_inds))
 
     # assemble all matrices
-    A, b = Mantis.Assemblers.assemble(Δ⁰, weak_form_inputs, Dict(zip(bc_inds, bc_vals)))
+    A, b = Mantis.Assemblers.assemble(zero_form_hodge_laplacian, weak_form_inputs, Dict(zip(bc_inds, bc_vals)))
 
     # solve for coefficients of solution
     sol = A \ b
@@ -59,15 +59,6 @@ function Δ⁰(fₑ, X⁰, ∫)
     
     # return the field
     return uₕ
-end
-
-function L2_norm(u, ∫)
-    norm = 0.0
-    for el_id ∈ 1:Mantis.Geometry.get_num_elements(u.geometry)
-        inner_prod = SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(u, u, el_id, ∫)...)
-        norm += inner_prod[1,1]
-    end
-    return sqrt(norm)
 end
 
 # PROBLEM PARAMETERS -------------------------------------------------------------------
@@ -171,7 +162,7 @@ for ref_lev = 0:num_ref_levels
                 uₑ, duₑ, fₑ = sinusoidal_solution(geometry)
 
                 # solve the problem
-                uₕ = Δ⁰(fₑ, X[1], ∫)
+                uₕ = zero_form_hodge_laplacian(fₑ, X[1], ∫)
                 
                 # compute error
                 error = L2_norm(uₕ - uₑ, ∫)

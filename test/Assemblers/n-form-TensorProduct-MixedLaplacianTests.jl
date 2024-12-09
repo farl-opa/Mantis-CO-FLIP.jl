@@ -5,7 +5,7 @@ using LinearAlgebra
 using SparseArrays
 
 @doc raw"""
-    Δⁿ(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 2, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+    volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 2, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
 
 Function for assembling the weak form of the n-form Hodge Laplacian on the given element. The associated weak formulation is:
 
@@ -17,7 +17,7 @@ Given ``f^n \in L^2 \Lambda^n (\Omega)``, find ``u^{n-1}_h \in X^{n-1}`` and ``\
 \end{gather}
 ```
 """
-function Δⁿ(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 2, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 2, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
     Forms = Mantis.Forms
 
     # Left hand side.
@@ -60,7 +60,7 @@ function Δⁿ(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 2, Frhs, T
     
 end
 
-function Δⁿ(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
+function volume_form_hodge_laplacian(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
     # create mixed form space
     V = Mantis.Forms.MixedFormSpace((Xⁿ⁻¹, Xⁿ))
     F = Mantis.Forms.MixedFormField((nothing, fₑ))
@@ -69,7 +69,7 @@ function Δⁿ(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(F, V, ∫)
 
     # assemble all matrices
-    A, b = Mantis.Assemblers.assemble(Δⁿ, weak_form_inputs, Dict{Int, Float64}())
+    A, b = Mantis.Assemblers.assemble(volume_form_hodge_laplacian, weak_form_inputs, Dict{Int, Float64}())
 
     # solve for coefficients of solution
     sol = A \ b
@@ -79,15 +79,6 @@ function Δⁿ(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
     
     # return the field
     return uₕ, ϕₕ
-end
-
-function L2_norm(u, ∫)
-    norm = 0.0
-    for el_id ∈ 1:Mantis.Geometry.get_num_elements(u.geometry)
-        inner_prod = SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(u, u, el_id, ∫)...)
-        norm += inner_prod[1,1]
-    end
-    return sqrt(norm)
 end
 
 # PROBLEM PARAMETERS -------------------------------------------------------------------
@@ -216,7 +207,7 @@ for ref_lev = 0:num_ref_levels
                 ϕₑ, δϕₑ, fₑ = sinusoidal_solution(geometry)
 
                 # solve the problem
-                uₕ, ϕₕ = Δⁿ(fₑ, X[2], X[3], ∫)
+                uₕ, ϕₕ = volume_form_hodge_laplacian(fₑ, X[2], X[3], ∫)
                 
                 # compute error
                 error = L2_norm(ϕₕ - ϕₑ, ∫)

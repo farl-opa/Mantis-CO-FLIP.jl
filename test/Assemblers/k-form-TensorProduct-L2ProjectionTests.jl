@@ -49,15 +49,6 @@ function L2_projection(fₑ, Xᵏ, ∫)
     return fₕ
 end
 
-function L2_norm(u, ∫)
-    norm = 0.0
-    for el_id ∈ 1:Mantis.Geometry.get_num_elements(u.geometry)
-        inner_prod = SparseArrays.sparse(Mantis.Forms.evaluate_inner_product(u, u, el_id, ∫)...)
-        norm += inner_prod[1,1]
-    end
-    return sqrt(norm)
-end
-
 # PROBLEM PARAMETERS -------------------------------------------------------------------
 # manifold dimensions
 manifold_dim = 2
