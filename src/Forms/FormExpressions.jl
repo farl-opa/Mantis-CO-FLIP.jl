@@ -169,37 +169,6 @@ struct FormField{manifold_dim, form_rank, G, FS} <: AbstractFormField{manifold_d
     end
 end
 
-# TODO This function breaks if called on an analytical form field
-#      On which objects is this supposed to be used with? I think this should 
-#      only be used on FormSpaces. If we want to get the number of basis used 
-#      in a FormField, we should get the FormBasis of the FormField and then 
-#      get the number of basis of it. If we start mixing things the code becomes 
-#      entangled and this makes it very difficult to work with.
-@doc raw"""
-    get_num_basis(form_field::FF) where {FF <: AbstractFormField{manifold_dim, form_rank, expression_rank, G, FS}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
-
-Returns the number of degrees of freedom of the FormSpace `form_space`.
-
-# Arguments
-- `form_space::AbstractFormSpace`: The FormSpace to compute the number of degrees of freedom.
-
-# Returns
-- `::Int`: The total number of degrees of freedom of the space.
-"""
-function get_num_basis(form_field::FF) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, expression_rank, G}}
-    return get_num_basis(form_field.form_space)
-end
-
-# TODO This function breaks if called on an analytical form field
-#      On which objects is this supposed to be used with? I think this should 
-#      only be used on FormSpaces. If we want to get the number of basis used 
-#      in a FormField, we should get the FormBasis of the FormField and then 
-#      get the get_max_local_dim of it. If we start mixing things the code becomes 
-#      entangled and this makes it very difficult to work with.
-function get_max_local_dim(form_field::FF) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry, FF <: AbstractFormField{manifold_dim, form_rank, expression_rank, G}}
-    return get_max_local_dim(form_field.form_space)
-end
-
 @doc raw"""
     evaluate(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
 
