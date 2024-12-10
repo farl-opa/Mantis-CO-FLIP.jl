@@ -16,18 +16,13 @@ output_data_folder = joinpath(data_folder, "output", "Geometry")
 # Test FEMGeometry (Polar) --------------------------------------------------
 deg = 2
 Wt = pi/2
-b = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
-breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
-patch = Mantis.Mesh.Patch1D(breakpoints)
-B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
-GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [1])
-b2 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1, -1])
-geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GB),Mantis.FunctionSpaces.get_num_basis(b2),1.0)
-PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GB, b2, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]))
-geom_coeffs = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
-geom = Mantis.Geometry.FEMGeometry(PSplines[1], geom_coeffs)
-field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_num_basis(PSplines[1]), Mantis.FunctionSpaces.get_num_basis(PSplines[1]))
-polar_surface_field = Mantis.Fields.FEMField(PSplines[1], field_coeffs)
+b_θ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+b_r = Mantis.FunctionSpaces.Bernstein(deg)
+
+(P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ = Mantis.FunctionSpaces.create_polar_spline_space_and_geometry((4, 1), (b_θ, b_r), (1, -1), 1.0)
+geom = Mantis.Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
+field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_num_basis(P_sol), Mantis.FunctionSpaces.get_num_basis(P_sol))
+polar_surface_field = Mantis.Fields.FEMField(P_sol.component_spaces[1], field_coeffs)
 
 # Generate the plot
 output_filename = "fem_geometry_polar_test.vtu"

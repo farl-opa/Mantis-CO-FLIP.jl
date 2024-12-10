@@ -119,7 +119,7 @@ function create_bspline_space(starting_point::NTuple{1, Float64}, box_size::NTup
 end
 
 """
-    create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
+    create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::F, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim, F <: NTuple{manifold_dim, AbstractCanonicalSpace}}
 
 Create a tensor product B-spline space based on the specified parameters for each dimension.
 
@@ -127,19 +127,19 @@ Create a tensor product B-spline space based on the specified parameters for eac
 - `starting_points::NTuple{manifold_dim, Float64}`: The starting point of the B-spline space in each dimension.
 - `box_sizes::NTuple{manifold_dim, Float64}`: The size of the box in each dimension.
 - `num_elements::NTuple{manifold_dim, Int}`: The number of elements in each dimension.
-- `section_spaces::NTuple{manifold_dim, F}`: The section spaces for each dimension.
+- `section_spaces::NTuple{manifold_dim, AbstractCanonicalSpace}`: The section spaces for each dimension.
 - `regularities::NTuple{manifold_dim, Int}`: The regularities of the B-spline in each dimension.
 
 # Returns
 - `::TensorProductSpace`: The resulting tensor product B-spline space.
 """
-function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim, F <: AbstractCanonicalSpace}
+function create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::F, regularities::NTuple{manifold_dim, Int}; n_dofs_left::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim)), n_dofs_right::NTuple{manifold_dim, Int} = Tuple(ones(Int,manifold_dim))) where {manifold_dim, F <: NTuple{manifold_dim, AbstractCanonicalSpace}}
     
     return TensorProductSpace(create_dim_wise_bspline_spaces(starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right))
 end
 
 """
-    create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
+    create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::F, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim, F<: NTuple{manifold_dim, AbstractCanonicalSpace}}
 
 Create `manifold_dim` univariate B-spline spaces based on the specified parameters for each dimension.
 
@@ -153,13 +153,13 @@ Create `manifold_dim` univariate B-spline spaces based on the specified paramete
 # Returns
 - `::Tuple{BSplineSpace}`: The resulting univariate B-spline spaces.
 """
-function create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
+function create_dim_wise_bspline_spaces(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::F, regularities::NTuple{manifold_dim, Int}, n_dofs_left::NTuple{manifold_dim, Int}, n_dofs_right::NTuple{manifold_dim, Int}) where {manifold_dim, F<: NTuple{manifold_dim, AbstractCanonicalSpace}}
     
-    return map((xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)::NTuple{manifold_dim, BSplineSpace{F}}
+    return map((xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) -> create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ,; n_dofs_left = lᵢ, n_dofs_right = rᵢ), starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)::NTuple{manifold_dim, BSplineSpace}
 end
 
 """
-    create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim, F<:AbstractCanonicalSpace}
+    create_bspline_space(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim}
 
 Create a tensor product B-spline space based on the specified parameters for each dimension.
 
@@ -225,17 +225,17 @@ Create a polar spline space and geometry based on the provided parameters. The f
 function create_polar_spline_space_and_geometry(num_elements::NTuple{2, Int}, degrees::NTuple{2, Int}, regularities::NTuple{2, Int}, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0)
     Bθ, Br = create_dim_wise_bspline_spaces((0.0, 0.0), (1.0, 1.0), num_elements, degrees, regularities, (1, 1), (1, 1))
     
-    return _create_polar_spline_space_and_geometry(Bθ, Br, endpt_regularity_θ, R, refine, geom_coeffs_tp, form_rank)
+    return _create_polar_spline_space_and_geometry(Bθ, Br, regularities[1], R, refine, geom_coeffs_tp, form_rank)
 end
 
 """
-    create_polar_spline_space_and_geometry(num_elements::NTuple{2, Int}, section_spaces::NTuple{2, F}, regularities::NTuple{2, Int}, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0) where {F <: AbstractCanonicalSpace}
+    create_polar_spline_space_and_geometry(num_elements::NTuple{2, Int}, section_spaces::NTuple{2, AbstractCanonicalSpace}, regularities::NTuple{2, Int}, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0)
 
 Create a polar spline space and geometry based on the provided parameters. The function constructs a tensor-product B-spline space in the angular and radial directions, and then creates a polar spline space and geometry based on the tensor-product space. The geometry is defined by the radius `R` and the number of elements in the angular and radial directions. Optional arguments include a flag to refine the geometry, the geometry coefficients, and the form rank.
 
 # Arguments
 - `num_elements::NTuple{2, Int}`: The number of elements in the angular and radial directions.
-- `section_spaces::NTuple{2, F}`: The section spaces in the angular and radial directions.
+- `section_spaces::NTuple{2, AbstractCanonicalSpace}`: The section spaces in the angular and radial directions.
 - `regularities::NTuple{2, Int}`: The regularities in the angular and radial directions.
 - `R::Float64`: The radius of the domain.
 - `refine::Bool`: A flag to refine the geometry.
@@ -248,10 +248,10 @@ Create a polar spline space and geometry based on the provided parameters. The f
 - `geom_coeffs_tp`: The tensor-product geometry coefficients
 - `(ts_θ, ts_r)`: The univariate refinement operators for the angular and radial directions
 """
-function create_polar_spline_space_and_geometry(num_elements::NTuple{2, Int}, section_spaces::NTuple{2, F}, regularities::NTuple{2, Int}, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0) where {F <: AbstractCanonicalSpace}
+function create_polar_spline_space_and_geometry(num_elements::NTuple{2, Int}, section_spaces::F, regularities::NTuple{2, Int}, R::Float64; refine::Bool = false, geom_coeffs_tp::Union{Nothing,Array{Float64,3}}=nothing, form_rank::Int = 0) where {F <: NTuple{2, AbstractCanonicalSpace}}
     Bθ, Br = create_dim_wise_bspline_spaces((0.0, 0.0), (1.0, 1.0), num_elements, section_spaces, regularities, (1, 1), (1, 1))
     
-    return _create_polar_spline_space_and_geometry(Bθ, Br, endpt_regularity_θ, R, refine, geom_coeffs_tp, form_rank)
+    return _create_polar_spline_space_and_geometry(Bθ, Br, regularities[1], R, refine, geom_coeffs_tp, form_rank)
 end
 
 """
@@ -292,7 +292,7 @@ function _create_polar_spline_space_and_geometry(Bθ, Br, endpt_regularity_θ, R
             # refine the univariate spaces
             ts_r, Br_ref = build_two_scale_operator(Br, 2)
             _, Bθ_ref = build_two_scale_operator(Bθ, 2)
-            GBθ_ref = GTBSplineSpace((Bθ_ref,), [endpt_regularity])
+            GBθ_ref = GTBSplineSpace((Bθ_ref,), [endpt_regularity_θ])
             ts_θ, _ = build_two_scale_operator(GBθ,GBθ_ref,((2,),))
             
             # refine the tensor-product control points
@@ -313,7 +313,7 @@ function _create_polar_spline_space_and_geometry(Bθ, Br, endpt_regularity_θ, R
     # Polar spline space and global extraction matrix for the solution
     dBr = get_derivative_space(Br)
     dBθ = get_derivative_space(Bθ)
-    dGBθ = GTBSplineSpace((dBθ,), [endpt_regularity-1])
+    dGBθ = GTBSplineSpace((dBθ,), [endpt_regularity_θ-1])
     P_sol, E_sol = PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]); form_rank = form_rank, dspace_p = dGBθ, dspace_r = dBr)
     
     return (P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ, ts_r)

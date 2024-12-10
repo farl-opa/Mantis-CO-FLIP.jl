@@ -106,7 +106,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
         polar_splines[component_idx] = UnstructuredSpace((tp_space[component_idx],), extraction_op, dof_partition, us_config, Dict("regularity" => 1, "control_triangle" => control_triangle))
     end
 
-    return SumSpace(tuple(polar_splines...), max(map(get_num_basis,P_sol))), E
+    return SumSpace(tuple(polar_splines...), maximum(map(get_num_basis, polar_splines))), E
 end
 
 """
