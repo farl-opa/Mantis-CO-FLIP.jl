@@ -14,6 +14,7 @@ Create a polar spline space from the given poloidal and radial finite element sp
 
 # Returns
 - `polar_splines::SumSpace`: The (unstructured) polar spline space returned as a SumSpace.
+- `E::SparseMatrixCSC{Float64,Int}`: The extraction operator.
 """
 function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1}, degenerate_control_points::NTuple{2,Matrix{Float64}}; singularity_type::Int=1, form_rank::Int=0, dspace_p::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing, dspace_r::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing)
 

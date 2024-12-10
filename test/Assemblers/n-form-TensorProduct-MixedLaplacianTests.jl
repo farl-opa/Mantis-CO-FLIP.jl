@@ -161,22 +161,40 @@ end
 
 # RUN POISSON PROBLEM -------------------------------------------------------------------
 errors = zeros(Float64, num_ref_levels+1, length(p⁰), length(section_space_type), length(mesh_type), 2)
-for ref_lev = 0:num_ref_levels
-    num_elements = (num_el_0 * (2^ref_lev)) .* tuple([1 for _ in 1:manifold_dim]...)
-    for (mesh_idx, mesh) in enumerate(mesh_type)
-        if mesh == "cartesian"
-            geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
-        else
-            geometry = Mantis.Geometry.create_curvilinear_square(origin, L, num_elements)
-        end
-        for (p_idx, p) in enumerate(p⁰)
-            for (ss_idx, section_space) in enumerate(section_space_type)
+for (mesh_idx, mesh) in enumerate(mesh_type)
+    for (p_idx, p) in enumerate(p⁰)
+        for (ss_idx, section_space) in enumerate(section_space_type)
+
+            if verbose
+                @info("Running volume-form Hodge-Laplace tests for p = $p, section_space = $section_space, mesh = $mesh")
+            end
+
+            # section space degrees
+            degree = (p, p)
+            
+            # function space regularities
+            regularities = degree .- 1
+            if section_space == Mantis.FunctionSpaces.LobattoLegendre
+                regularities = tuple([0 for _ in 1:manifold_dim]...)
+            end
+
+            for ref_lev = 0:num_ref_levels
+
                 if verbose
-                    @info("Running L2 projection for p = $p, section_space = $section_space, mesh = $mesh, ref_lev = $ref_lev")
+                    println("Refinement level = $ref_lev ------------------------------------")
                 end
-                
+
+                # update number of elements
+                num_elements = (num_el_0 * (2^ref_lev)) .* tuple([1 for _ in 1:manifold_dim]...)
+
+                # geometry
+                if mesh == "cartesian"
+                    geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
+                else
+                    geometry = Mantis.Geometry.create_curvilinear_square(origin, L, num_elements)
+                end
+
                 # section spaces
-                degree = (p, p)
                 if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
                     section_spaces = map(section_space, degree, θ ./ num_elements)
                     dq⁰ = 2 .* degree
@@ -187,15 +205,11 @@ for ref_lev = 0:num_ref_levels
                     section_spaces = map(section_space, degree)
                     dq⁰ = (2, 2)
                 end
-
+    
                 # quadrature rule
                 ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
-
-                # function spaces
-                regularities = degree .- 1
-                if section_space == Mantis.FunctionSpaces.LobattoLegendre
-                    regularities = tuple([0 for _ in 1:manifold_dim]...)
-                end
+                
+                # create tensor-product B-spline complex
                 X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
 
                 # number of dofs
