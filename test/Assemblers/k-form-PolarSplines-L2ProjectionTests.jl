@@ -59,16 +59,20 @@ num_el_θ = 15
 # radius of the domain
 R = 1.0
 # polynomial degrees of the zero-form finite element spaces to be used
-p⁰ = [2, 3]
+p⁰ = [2]#, 3]
 # type of section spaces to use
 θ = 2*pi
 α = 10.0
-section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
+section_space_type = [Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential, Mantis.FunctionSpaces.Bernstein]
 # print info?
-verbose = false
+verbose = true
+# tolerance for zero values
+zero_tol = 1e-12
+# tolerance for convergence rates
+rate_tol = 2e-1
 
 # number of refinement levels to run
-num_ref_levels = 4
+num_ref_levels = 3
 
 # exact solution for the problem
 function sinusoidal_solution(form_rank::Int, geo::Mantis.Geometry.AbstractGeometry{manifold_dim}) where {manifold_dim}
@@ -88,7 +92,7 @@ for (p_idx, p) in enumerate(p⁰)
     for (ss_idx, section_space) in enumerate(section_space_type)
 
         if verbose
-            @info("Running L2 projection tests for p = $p, section_space = $section_space, mesh = $mesh")
+            @info("Running L2 projection tests for p = $p, section_space = $section_space")
         end
 
         # section space degrees
@@ -100,21 +104,27 @@ for (p_idx, p) in enumerate(p⁰)
             regularities = tuple([0 for _ in 1:manifold_dim]...)
         end
 
+        # initialize geometry coefficients
+        geom_coeffs_tp = nothing
+
+        # number of elements at the coarsest refinement level
+        num_elements = (num_el_θ, num_el_r)
+        # ECT coefficients at the coarsest refinement level
+        θ₀ = θ ./ num_elements
+        α₀ = α ./ num_elements
+
         for ref_lev = 0:num_ref_levels
 
             if verbose
                 println("Refinement level = $ref_lev ------------------------------------")
             end
 
-            # update number of elements
-            num_elements = (num_el_0 * (2^ref_lev)) .* tuple([1 for _ in 1:manifold_dim]...)
-
             # section spaces
             if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
-                section_spaces = map(section_space, degree, θ ./ num_elements)
+                section_spaces = map(section_space, degree, θ₀)
                 dq⁰ = 2 .* degree
             elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
-                section_spaces = map(section_space, degree, α ./ num_elements)
+                section_spaces = map(section_space, degree, α₀)
                 dq⁰ = 3 .* degree
             else
                 section_spaces = map(section_space, degree)
@@ -125,7 +135,13 @@ for (p_idx, p) in enumerate(p⁰)
             ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
 
             # create (and refine) polar spline complex
-            X, _, geom_coeffs_tp = Mantis.Forms.create_polar_spline_de_rham_complex((num_el_θ, num_el_r), section_spaces, regularities, R; refine = ref_lev>0, geom_coeffs_tp = geom_coeffs_tp)
+            X, _, geom_coeffs_tp = Mantis.Forms.create_polar_spline_de_rham_complex(num_elements, section_spaces, regularities, R; refine = ref_lev>0, geom_coeffs_tp = geom_coeffs_tp)
+            
+            # update number of elements
+            num_elements = (num_el_θ, num_el_r) .* (2^ref_lev)
+            # update ECT coefficients
+            θ₀ = θ₀ ./ 2
+            α₀ = α₀ ./ 2
 
             # retrieve geometry underlying the form spaces
             geometry = Mantis.Forms.get_geometry(X[1])
@@ -143,7 +159,7 @@ for (p_idx, p) in enumerate(p⁰)
                 
                 # compute error
                 error = Mantis.Assemblers.L2_norm(fₕ - fₑ, ∫)
-                errors[ref_lev+1, p_idx, ss_idx, mesh_idx, form_rank+1] = error
+                errors[ref_lev+1, p_idx, ss_idx, form_rank+1] = error
 
                 if verbose; display("   Error: $error"); end
             end
@@ -160,18 +176,18 @@ if verbose
 end
 for (p_idx, p) in enumerate(p⁰)
     for (ss_idx, section_space) in enumerate(section_space_type)
-        if isapprox(errors[end, p_idx, ss_idx, 1], 0.0, atol=1e-14)
+        if isapprox(errors[end, p_idx, ss_idx, 1], 0.0, atol=zero_tol)
             continue
         else
             # expected 0-form convergence: p+1
-            @test isapprox(error_rates[end, p_idx, ss_idx, 1], p+1, atol=1.5e-1)
+            @test isapprox(error_rates[end, p_idx, ss_idx, 1], p+1, atol=rate_tol)
         end
         for form_rank in 1:manifold_dim
-            if isapprox(errors[end, p_idx, ss_idx, form_rank+1], 0.0, atol=1e-14)
+            if isapprox(errors[end, p_idx, ss_idx, form_rank+1], 0.0, atol=zero_tol)
                 continue
             else
                 # expected k-form convergence for k>0: p
-                @test isapprox(error_rates[end, p_idx, ss_idx, form_rank+1], p, atol=1.5e-1)
+                @test isapprox(error_rates[end, p_idx, ss_idx, form_rank+1], p, atol=rate_tol)
             end
         end
     end

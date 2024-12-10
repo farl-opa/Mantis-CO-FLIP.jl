@@ -351,7 +351,7 @@ function assemble_global_extraction_matrix(bspline::BSplineSpace)
     # Number of elements
     nel = get_num_elements(bspline)
     # Number of local basis functions
-    num_local_basis = repeat([get_polynomial_degree(bspline.polynomials) + 1], nel, 1)
+    num_local_basis = (get_polynomial_degree(bspline.polynomials) + 1) .* ones(Int, nel)
     num_local_basis_offset = cumsum([0; num_local_basis])
     # Initialize the global extraction matrix
     global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)

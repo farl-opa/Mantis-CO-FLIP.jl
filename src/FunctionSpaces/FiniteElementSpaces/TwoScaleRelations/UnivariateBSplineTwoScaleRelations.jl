@@ -415,7 +415,18 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace{F}, fine_bspline:
         gm = build_two_scale_matrix(coarse_bspline.knot_vector, fine_bspline.knot_vector)
 
     else
-        gm = build_two_scale_matrix(coarse_bspline.polynomials, nsubdivisions)
+        # build the element subdivision matrix
+        el_subdivision_mat = build_two_scale_matrix(coarse_bspline.polynomials, nsubdivisions)
+        
+        # assemble the global extraction operators for the coarse and fine spaces
+        coarse_extraction_mat = assemble_global_extraction_matrix(coarse_bspline)
+        fine_extraction_mat = assemble_global_extraction_matrix(fine_bspline)
+
+        # concatenate the two_scale_operator subdivision matrices in a block diagonal format
+        discont_subdivision_mat = SparseArrays.blockdiag([el_subdivision_mat for i = 1:get_num_elements(coarse_bspline)]...)
+
+        # compute the two-scale matrix by solving a least-squares problem
+        gm = SparseArrays.sparse(qr(fine_extraction_mat' * fine_extraction_mat) \ Array(fine_extraction_mat' * discont_subdivision_mat * coarse_extraction_mat))
     end
     
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)

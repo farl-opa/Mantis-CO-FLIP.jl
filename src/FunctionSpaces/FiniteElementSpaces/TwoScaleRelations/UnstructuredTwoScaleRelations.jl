@@ -27,9 +27,9 @@ function build_two_scale_operator(coarse_us_space::UnstructuredSpace{n,m}, fine_
 
     # Next, concatenate the two_scale_operator subdivision matrices in a block diagonal format
     discontinuous_subdivision_mat = SparseArrays.blockdiag([discontinuous_two_scale_ops[i][1].global_subdiv_matrix for i = 1:m]...)
-
+    
     # Finally, compute the two-scale matrix by solving a least-squares problem
-    global_subdiv_matrix = SparseArrays.sparse(qr(fine_extraction_mat' * fine_extraction_mat) \ Array(fine_extraction_mat' * discontinuous_subdivision_mat * coarse_extraction_mat))
+    global_subdiv_matrix = SparseArrays.sparse(fine_extraction_mat \ Array(discontinuous_subdivision_mat * coarse_extraction_mat))
 
     ###
     ### PART 2: Build the coarse-fine element relationships

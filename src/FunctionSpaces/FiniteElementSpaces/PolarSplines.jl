@@ -120,7 +120,7 @@ Generate degenerate control points for a given number of poloidal and radial div
 - R::Float64: Radius of the polar domain.
 
 # Returns
-- degenerate_control_points::Matrix{Float64}: The degenerate control points.
+- degenerate_control_points::Array{Float64,3}: The degenerate control points.
 - radii::Vector{Float64}: The radii values.
 - theta::Vector{Float64}: The theta values.
 """

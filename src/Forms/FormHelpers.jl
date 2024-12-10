@@ -149,10 +149,10 @@ Create a polar B-spline de Rham complex.
 - `::Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}`: the global extraction operators.
 - `::NTuple{2, Array{Float64,3}}`: the geometry coefficients for the underlying tensor-product B-spline spaces.
 """
-function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, section_spaces::NTuple{2, F}, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::NTuple{2,Array{Float64,3}}=nothing) where {F <: FunctionSpaces.AbstractCanonicalSpace}
+function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, section_spaces::F, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::Union{Nothing, Array{Float64,3}}=nothing) where {F <: NTuple{2, FunctionSpaces.AbstractCanonicalSpace}}
 
     form_spaces = Vector{AbstractFormSpace}(undef, 3)
-    global_extraction_operators = Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}(undef,3)
+    global_extraction_operators = Vector{NTuple{N,SparseArrays.SparseMatrixCSC{Float64,Int}} where {N}}(undef,3)
 
     ##############################
     # 0-Forms
@@ -168,7 +168,7 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, secti
     end
 
     # polar spline geometry
-    geometry = Geometry.FEMGeometry(P_geom, geom_coeffs_polar)
+    geometry = Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
@@ -219,7 +219,7 @@ Create a polar B-spline de Rham complex.
 - `::Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}`: the global extraction operators.
 - `::NTuple{2, Array{Float64,3}}`: the geometry coefficients for the underlying tensor-product B-spline spaces.
 """
-function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degrees::NTuple{2, Int}, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::NTuple{2,Array{Float64,3}}=nothing)
+function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degrees::NTuple{2, Int}, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::Union{Nothing, Array{Float64,3}}=nothing)
 
     form_spaces = Vector{AbstractFormSpace}(undef, 3)
     global_extraction_operators = Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}(undef,3)
@@ -238,7 +238,7 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degre
     end
 
     # polar spline geometry
-    geometry = Geometry.FEMGeometry(P_geom, geom_coeffs_polar)
+    geometry = Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
