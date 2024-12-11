@@ -427,7 +427,8 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace{F}, fine_bspline:
         discont_subdivision_mat = SparseArrays.blockdiag([el_subdivision_mat for i = 1:get_num_elements(coarse_bspline)]...)
 
         # compute the two-scale matrix by solving a least-squares problem
-        gm = SparseArrays.sparse(qr(fine_extraction_mat' * fine_extraction_mat) \ Array(fine_extraction_mat' * discont_subdivision_mat * coarse_extraction_mat))
+        gm = SparseArrays.sparse(fine_extraction_mat \ Array(discont_subdivision_mat * coarse_extraction_mat))
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, gm)
     end
     
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
