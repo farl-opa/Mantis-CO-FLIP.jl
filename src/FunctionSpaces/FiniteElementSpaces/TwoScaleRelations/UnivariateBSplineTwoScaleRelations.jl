@@ -234,8 +234,9 @@ are preserved in the final multiplicity vector, and newly inserted ones are give
 function subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
     fine_knot_vector = subdivide_knot_vector(coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity)
     p = coarse_bspline.knot_vector.polynomial_degree
+    fine_polynomials = get_finer_canonical_space(coarse_bspline.polynomials, nsubdivisions)
 
-    return BSplineSpace(fine_knot_vector.patch_1d, coarse_bspline.polynomials, p .- fine_knot_vector.multiplicity)
+    return BSplineSpace(fine_knot_vector.patch_1d, fine_polynomials, p .- fine_knot_vector.multiplicity)
 end
 
 """
