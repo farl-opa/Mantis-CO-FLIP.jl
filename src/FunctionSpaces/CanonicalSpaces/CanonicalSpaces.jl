@@ -38,18 +38,63 @@ function (elem_loc_basis::C where {C <: AbstractCanonicalSpace})(xi::Vector{Floa
     return evaluate(elem_loc_basis, xi, args...)
 end
 
+"""
+    get_polynomial_degree(elem_loc_basis::AbstractCanonicalSpace)
+
+Returns the polynomial degree of the element-local basis.
+
+# Arguments
+- `elem_loc_basis::AbstractCanonicalSpace`: An element-local basis.
+
+# Returns
+- `::Int`: The polynomial degree of the element-local basis.
+"""
 function get_polynomial_degree(elem_loc_basis::AbstractCanonicalSpace)
     return elem_loc_basis.p
 end
 
+"""
+    get_derivative_space(elem_loc_basis::AbstractCanonicalSpace)
+
+This default method returns the element-local basis of one degree lower than the given element-local basis. This method should be overloaded for element-local bases that do not satisfy this property or those that need additional parameters; e.g., ECT spaces.
+
+# Arguments
+- `elem_loc_basis::AbstractCanonicalSpace`: An element-local basis.
+
+# Returns
+- `::AbstractCanonicalSpace`: The element-local basis of one degree lower than the given element-local basis.
+"""
 function get_derivative_space(elem_loc_basis::AbstractCanonicalSpace)
     return typeof(elem_loc_basis)(max(elem_loc_basis.p-1,0))
 end
 
+"""
+    get_bisected_canonical_space(elem_loc_basis::AbstractCanonicalSpace)
+
+This default method returns the given element-local basis. This method should be overloaded for element-local bases that do not satisfy this property or those that need additional parameters; e.g., ECT spaces.
+
+# Arguments
+- `elem_loc_basis::AbstractCanonicalSpace`: An element-local basis.
+
+# Returns
+- `::AbstractCanonicalSpace`: The input element-local basis.
+"""
 function get_bisected_canonical_space(elem_loc_basis::AbstractCanonicalSpace)
     return elem_loc_basis
 end
 
+"""
+    get_finer_canonical_space(elem_loc_basis::AbstractCanonicalSpace, num_sub_elements::Int)
+
+This default method returns the given element-local basis. This method should be overloaded for element-local bases that do not satisfy this property or those that need additional parameters; e.g., ECT spaces.
+
+# Arguments
+- `elem_loc_basis::AbstractCanonicalSpace`: An element-local basis.
+- `num_sub_elements::Int`: The number of sub-elements to divide the canonical space into.
+
+# Returns
+- `::AbstractCanonicalSpace`: The input element-local basis.
+"""
 function get_finer_canonical_space(elem_loc_basis::AbstractCanonicalSpace, num_sub_elements::Int)
     return elem_loc_basis
 end
