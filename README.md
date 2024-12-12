@@ -30,7 +30,7 @@ from TU Delft's Institute of Applied Mathematics (DIAM).
 One can hope.
 
 
-## How to build the MANTIS docs.
+## How to locally build the MANTIS docs.
 As the documentation is not (yet) hosted online, you will have to build 
 and view the documentation locally. How to do this is described here.
 
@@ -64,10 +64,12 @@ To create the docs, follow these steps:
   julia. Enter the package manager by typing `]` and activate the 
   current environment by typing `activate .`. The environment is shown 
   in parenthesis '()' and should say 'docs'. Type `dev ../../Mantis.jl` 
-  and execute this command. The environment will be updated so that the 
-  latest version of Mantis is available with its updated structure. Then 
-  you may also have to run `instantiate` to make sure the 
-  `docs\`-environment is updated. You can now redo the previous step.
+  and execute this command. **Note that `../../Mantis.jl` refers to the 
+  folder name. If you did not call this Mantis.jl, make sure to use to 
+  correct name.** The environment will be updated so that the latest 
+  version of Mantis is available with its updated structure. Then you 
+  may also have to run `instantiate` to make sure the `docs\`-environment 
+  is updated. You can now redo the previous step.
 - Then you need to create a (local) webserver to view the HTML docs, for 
   which there are a few options, see the [Documenter Docs](https://documenter.juliadocs.org/stable/man/guide/). 
   Since I have `Python` installed, I use the python option. Run
