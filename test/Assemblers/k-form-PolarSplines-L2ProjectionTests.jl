@@ -59,7 +59,7 @@ num_el_θ = 15
 # radius of the domain
 R = 1.0
 # polynomial degrees of the zero-form finite element spaces to be used
-p⁰ = [2]#, 3]
+p⁰ = [2, 3]
 # type of section spaces to use
 θ = 2*pi
 α = 10.0
@@ -72,7 +72,7 @@ zero_tol = 1e-12
 rate_tol = 2e-1
 
 # number of refinement levels to run
-num_ref_levels = 3
+num_ref_levels = 4
 
 # exact solution for the problem
 function sinusoidal_solution(form_rank::Int, geo::Mantis.Geometry.AbstractGeometry{manifold_dim}) where {manifold_dim}

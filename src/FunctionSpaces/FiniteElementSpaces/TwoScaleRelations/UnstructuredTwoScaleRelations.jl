@@ -14,7 +14,7 @@ Build the two-scale operator for a general unstructured space. The fine space is
 - `two_scale_op::TwoScaleOperator`: The two-scale operator.
 """
 function build_two_scale_operator(coarse_us_space::UnstructuredSpace{n,m}, fine_us_space::UnstructuredSpace{n,m}, nsubdivisions::NTuple{m, NTuple{n,Int}}) where {n,m}
-    # Build the two-scale operators for the individual function spaces that form the coarse unstructured space
+    # Build the two-scale operators for the individual function spaces that form the coarse unstructured space.
     discontinuous_two_scale_ops = ntuple(i -> build_two_scale_operator(coarse_us_space.function_spaces[i], nsubdivisions[i]), m)
 
     ###
@@ -30,6 +30,7 @@ function build_two_scale_operator(coarse_us_space::UnstructuredSpace{n,m}, fine_
     
     # Finally, compute the two-scale matrix by solving a least-squares problem
     global_subdiv_matrix = SparseArrays.sparse(fine_extraction_mat \ Array(discontinuous_subdivision_mat * coarse_extraction_mat))
+    SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, global_subdiv_matrix)
 
     ###
     ### PART 2: Build the coarse-fine element relationships

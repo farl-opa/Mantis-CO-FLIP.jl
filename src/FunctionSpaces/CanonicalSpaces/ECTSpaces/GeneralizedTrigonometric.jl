@@ -178,3 +178,39 @@ Get the space of one degree lower than the input space.
 function get_derivative_space(ect_space::GeneralizedTrigonometric)
     return GeneralizedTrigonometric(ect_space.p-1, ect_space.w, ect_space.t, ect_space.m)
 end
+
+"""
+    get_bisected_canonical_space(ect_space::GeneralizedTrigonometric)
+
+Bisect the canonical space by dividing the weight in half.
+
+# Arguments
+- `ect_space::GeneralizedTrigonometric`: A ect space.
+
+# Returns
+- `::GeneralizedTrigonometric`: A ect space with the weight divided by 2.
+"""
+function get_bisected_canonical_space(ect_space::GeneralizedTrigonometric)
+    return GeneralizedTrigonometric(ect_space.p, ect_space.w/2, ect_space.t, ect_space.m)
+end
+
+"""
+    get_finer_canonical_space(ect_space::GeneralizedTrigonometric, num_sub_elements::Int)
+
+For number of sub-elements which is powers of 2, bisect the canonical space by dividing the weight in half for each power.
+
+# Arguments
+- `ect_space::GeneralizedTrigonometric`: A ect space.
+- `num_sub_elements::Int`: Number of sub-elements to be created.
+
+# Returns
+- `::GeneralizedTrigonometric`: A ect space with the subdivided weight.
+"""
+function get_finer_canonical_space(ect_space::GeneralizedTrigonometric, num_sub_elements::Int)
+    num_ref = log2(num_sub_elements)
+    if num_sub_elements < 2 || !isapprox(num_ref-round(num_ref), 0.0, atol=1e-12)
+        throw(ArgumentError("Number of subdivisions should be a power of 2 and greater than 1"))
+    end
+
+    return GeneralizedTrigonometric(ect_space.p, ect_space.w/num_sub_elements, ect_space.t, ect_space.m)
+end

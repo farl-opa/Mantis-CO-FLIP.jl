@@ -234,8 +234,9 @@ are preserved in the final multiplicity vector, and newly inserted ones are give
 function subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
     fine_knot_vector = subdivide_knot_vector(coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity)
     p = coarse_bspline.knot_vector.polynomial_degree
+    fine_polynomials = get_finer_canonical_space(coarse_bspline.polynomials, nsubdivisions)
 
-    return BSplineSpace(fine_knot_vector.patch_1d, coarse_bspline.polynomials, p .- fine_knot_vector.multiplicity)
+    return BSplineSpace(fine_knot_vector.patch_1d, fine_polynomials, p .- fine_knot_vector.multiplicity)
 end
 
 """
@@ -426,7 +427,8 @@ function build_two_scale_operator(coarse_bspline::BSplineSpace{F}, fine_bspline:
         discont_subdivision_mat = SparseArrays.blockdiag([el_subdivision_mat for i = 1:get_num_elements(coarse_bspline)]...)
 
         # compute the two-scale matrix by solving a least-squares problem
-        gm = SparseArrays.sparse(qr(fine_extraction_mat' * fine_extraction_mat) \ Array(fine_extraction_mat' * discont_subdivision_mat * coarse_extraction_mat))
+        gm = SparseArrays.sparse(fine_extraction_mat \ Array(discont_subdivision_mat * coarse_extraction_mat))
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, gm)
     end
     
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
