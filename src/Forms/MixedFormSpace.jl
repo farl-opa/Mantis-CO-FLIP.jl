@@ -27,7 +27,7 @@ A container for multiple form spaces. This is useful for mixed finite element me
 struct MixedFormSpace{num_forms, F}
     form_spaces::F
 
-    function MixedFormSpace(form_spaces::F) where {num_forms, F <: NTuple{num_forms, FormSpace}}
+    function MixedFormSpace(form_spaces::F) where {num_forms, F <: NTuple{num_forms, AbstractFormSpace}}
         new{num_forms, F}(form_spaces)
     end
 end
@@ -111,18 +111,17 @@ function build_form_fields(mixed_space::MixedFormSpace{num_forms, F}, coeffs::Ve
         throw(ArgumentError("The number of coefficients does not match the number of basis functions in the mixed form space."))
     end
     
-    form_fields = Vector{FormField}(undef, num_forms)
-    start_idx = 1
-    for form_idx ∈ 1:num_forms
-        num_coeffs = Forms.get_num_basis(mixed_space.form_spaces[form_idx])
-        if isnothing(labels)
-            form_fields[form_idx] = FormField(mixed_space.form_spaces[form_idx], "ζ" * string(form_idx))
-        else
-            form_fields[form_idx] = FormField(mixed_space.form_spaces[form_idx], labels[form_idx])
-        end
-        form_fields[form_idx].coefficients .= coeffs[start_idx:start_idx+num_coeffs-1]
-        start_idx += num_coeffs
-    end
+    start_idx = 1 
+    for form_idx ∈ 1:num_forms 
+        num_coeffs = Forms.get_num_basis(mixed_space.form_spaces[form_idx]) 
+        if isnothing(labels) 
+            form_fields[form_idx] = FormField(mixed_space.form_spaces[form_idx], "ζ" * string(form_idx)) 
+        else 
+            form_fields[form_idx] = FormField(mixed_space.form_spaces[form_idx], labels[form_idx]) 
+        end 
+        form_fields[form_idx].coefficients .= coeffs[start_idx:start_idx+num_coeffs-1] 
+        start_idx += num_coeffs 
+    end 
     return tuple(form_fields...)
 end
 
