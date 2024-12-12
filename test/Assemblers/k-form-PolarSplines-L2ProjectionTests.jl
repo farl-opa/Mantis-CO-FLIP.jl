@@ -65,7 +65,7 @@ p⁰ = [2]#, 3]
 α = 10.0
 section_space_type = [Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential, Mantis.FunctionSpaces.Bernstein]
 # print info?
-verbose = true
+verbose = false
 # tolerance for zero values
 zero_tol = 1e-12
 # tolerance for convergence rates

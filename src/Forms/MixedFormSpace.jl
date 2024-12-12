@@ -111,6 +111,7 @@ function build_form_fields(mixed_space::MixedFormSpace{num_forms, F}, coeffs::Ve
         throw(ArgumentError("The number of coefficients does not match the number of basis functions in the mixed form space."))
     end
     
+    form_fields = Vector{FormField}(undef, num_forms)
     start_idx = 1 
     for form_idx ∈ 1:num_forms 
         num_coeffs = Forms.get_num_basis(mixed_space.form_spaces[form_idx]) 
