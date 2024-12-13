@@ -131,17 +131,21 @@ Get the global indices of the basis functions of the direct sum space in the ele
 """
 function get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
-    dof_offset_component = zeros(Int, num_components)
-    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
-
+    dof_offset_component = _get_dof_offsets(space)
+    
     multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
-
     for component_idx in 1:num_components
         multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
     
     return reduce(vcat, multivalued_basis_indices)
+end
+
+function _get_dof_offsets(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
+    dof_offset_component = zeros(Int, num_components)
+    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
+    return dof_offset_component
 end
 
 """
@@ -159,12 +163,9 @@ Get the global indices of the multivalued basis functions of the direct sum spac
 """
 function get_basis_indices_w_components(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
-    dof_offset_component = zeros(Int, num_components)
-    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components-1)])
+    dof_offset_component = _get_dof_offsets(space)
 
     multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
-
     for component_idx in 1:num_components
         multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
@@ -189,4 +190,28 @@ function get_max_local_dim(space::DirectSumSpace{manifold_dim, num_components, F
         max_local_dim += get_max_local_dim(space)
     end
     return max_local_dim
+end
+
+"""
+    get_component_dof_partition(space::DirectSumSpace{manifold_dim, num_components, F}, component_idx::Int) where {manifold_dim, num_components, F}
+
+Get the partition of the degrees of freedom of the direct sum space; all the indices in the partition are offsetted by the corresponding component offset.
+
+# Arguments
+- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
+- `component_idx::Int`: Index of the component space
+
+# Returns
+- `component_dof_partition::Vector{Vector{Int}}`: Partition of the degrees of freedom of the component space
+"""
+function get_component_dof_partition(space::DirectSumSpace{manifold_dim, num_components, F}, component_idx::Int) where {manifold_dim, num_components, F}
+    component_dof_partition = deepcopy(get_dof_partition(space.component_spaces[component_idx]))
+    dof_offset_component = _get_dof_offsets(space)[component_idx]
+    for i in eachindex(component_dof_partition)
+        for j in eachindex(component_dof_partition[i])
+            component_dof_partition[i][j] .+= dof_offset_component
+        end
+    end
+
+    return component_dof_partition
 end

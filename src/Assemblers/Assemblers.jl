@@ -25,5 +25,7 @@ include("WeakFormulations.jl")
 include("GlobalAssemblers.jl")
 include("ErrorComputations.jl")
 
+include("AssemblerHelpers.jl")
+
 
 end
