@@ -395,7 +395,7 @@ Compute the pushforward of the sharp of a differential 1-form over a specified e
 - `sharp_eval::Vector{Matrix{Float64}}`: Each component of the pushed-forward vector, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
 - `sharp_indices::Vector{Vector{Int}}`: Each component of the vector, stores the indices of the evaluated basis functions.
 """
-function evaluate_sharp_pushforward(form_expression::AbstractFormExpression{manifold_dim, 1, 0, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+function evaluate_sharp_pushforward(form_expression::AbstractFormExpression{manifold_dim, 1, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     sharp_eval, sharp_indices = evaluate_sharp(form_expression, element_id, xi)
     
     # dξⁱ ↦ G∘♯ (dξⁱ)
