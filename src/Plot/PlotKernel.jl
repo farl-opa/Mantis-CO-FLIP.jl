@@ -310,7 +310,8 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
             end
         end
         
-        WriteVTK.vtk_grid(vtk_filename * "_wireframe", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
+        # chop is used to remove ".vtu" from the original filename
+        WriteVTK.vtk_grid(chop(vtk_filename,tail=4) * "_wireframe.vtu", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
             vtk.version == "2.2"
         end
     end

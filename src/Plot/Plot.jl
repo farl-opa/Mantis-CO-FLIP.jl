@@ -11,6 +11,7 @@ import .. Geometry
 import .. Fields
 import .. Forms
 
+# core functionality
 include("./PlotKernel.jl")
 
 @doc raw"""
@@ -87,5 +88,8 @@ Nothing
 # function plot(field::F; kwargs...) where {F <: Function}
 #     _plot(field.geometry, field; kwargs...)
 # end
+
+# helper functions for convenience
+include("./PlotHelpers.jl")
 
 end
