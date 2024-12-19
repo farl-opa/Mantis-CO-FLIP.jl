@@ -37,23 +37,23 @@ degree elements.
 # Returns 
 Nothing
 """
-function plot(geometry::Geometry.AbstractGeometry{n}; kwargs...) where {n}
+function plot(geometry::Geometry.AbstractGeometry{manifold_dim}; kwargs...) where {manifold_dim}
     _plot(geometry; kwargs...)
 end
 
-function plot(geometry::Geometry.AbstractGeometry{n}, field::Fields.AbstractField{n,k}; kwargs...) where {n, k}
+function plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Fields.AbstractField{manifold_dim,k}; kwargs...) where {manifold_dim, k}
   _plot(geometry, field; kwargs...)
 end
 
-function plot(geometry::Geometry.AbstractGeometry{n}, field::Fields.AbstractField{n,k}, offset::Function; kwargs...) where {n, k}
+function plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Fields.AbstractField{manifold_dim,k}, offset::Function; kwargs...) where {manifold_dim, k}
   _plot(geometry, field, offset; kwargs...)
 end
 
-function plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}; kwargs...) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function plot(form::Forms.AbstractFormExpression; kwargs...)
   _plot(form; kwargs...)
 end
 
-function plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, offset::Function; kwargs...) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function plot(form::Forms.AbstractFormExpression, offset::Function; kwargs...)
   _plot(form, offset; kwargs...)
 end
 

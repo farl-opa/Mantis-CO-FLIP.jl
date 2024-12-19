@@ -1,4 +1,4 @@
-import Mantis
+module FormPlotTests
 
 import Mantis
 
@@ -72,3 +72,4 @@ two_form_file = joinpath(output_data_folder, two_form_filename)
 #Mantis.Plot.plot(ξ¹; vtk_filename = one_form_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
 Mantis.Plot.plot(β²; vtk_filename = two_form_file, n_subcells = 1, degree = out_deg, ascii = false, compress = false)
 
+end
