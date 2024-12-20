@@ -14,7 +14,7 @@ output_file = export_path(["examples", "data", "output"], "output.vtk") # "examp
 """
 function export_path(output_directory_tree::Vector{String}, filename::String)
     
-    Mantis_folder =  dirname(dirname(pathof(Mantis)))
+    Mantis_folder =  pwd()
     output_directory = joinpath(output_directory_tree...)
     output_file = joinpath(Mantis_folder, output_directory, filename)
     
@@ -27,18 +27,18 @@ function export_path(output_directory_tree::Vector{String}, filename::String)
 end
 
 """
-    visualize_geometry(geo::Mantis.Geometry.AbstractGeometry, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
+    visualize_geometry(geo::Geometry.AbstractGeometry, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
 
 Export the geometry to a VTK file.
 
 # Arguments
-- `geo::Mantis.Geometry.AbstractGeometry`: The geometry to be exported.
+- `geo::Geometry.AbstractGeometry`: The geometry to be exported.
 - `filename::String`: The name of the output file.
 - `n_subcells::Int`: The number of subcells to be used in the visualization.
 - `degree::Int`: The degree of the basis functions used in the visualization.
 - `output_directory_tree::Vector{String}`: A vector of strings representing the directory tree.
 """
-function export_geometry_to_vtk(geo::Mantis.Geometry.AbstractGeometry, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
+function export_geometry_to_vtk(geo::Geometry.AbstractGeometry, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
     
     output_file = export_path(output_directory_tree, filename)
     plot(geo; vtk_filename = output_file, n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
@@ -47,12 +47,12 @@ function export_geometry_to_vtk(geo::Mantis.Geometry.AbstractGeometry, filename:
 end
 
 """
-    export_form_fields_to_vtk(form_sols::Vector{Mantis.Forms.AbstractForm}, var_names::Vector{String}, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
+    export_form_fields_to_vtk(form_sols::Vector{Forms.AbstractForm}, var_names::Vector{String}, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
 
 Export the form solutions to VTK files.
 
 # Arguments
-- `form_sols::Vector{Mantis.Forms.AbstractForm}`: The form solutions to be exported.
+- `form_sols::Vector{Forms.AbstractForm}`: The form solutions to be exported.
 - `var_names::Vector{String}`: The names of the form solutions.
 - `filename::String`: The name of the output file.
 - `n_subcells::Int`: The number of subcells to be used in the visualization.
