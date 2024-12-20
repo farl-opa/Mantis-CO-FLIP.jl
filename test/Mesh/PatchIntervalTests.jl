@@ -1,4 +1,4 @@
-
+module PatchIntervalTests
 
 import Mantis
 
@@ -92,3 +92,4 @@ elem = Mantis.Mesh.get_element(test_patch, (3,5,4,2))
                                           Mantis.Mesh.Interval(test_brk3[4], test_brk3[5]), 
                                           Mantis.Mesh.Interval(test_brk4[2], test_brk4[3]))
 
+end
