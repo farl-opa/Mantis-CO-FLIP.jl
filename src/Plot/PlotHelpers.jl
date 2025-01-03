@@ -18,10 +18,7 @@ function export_path(output_directory_tree::Vector{String}, filename::String)
     output_directory = joinpath(output_directory_tree...)
     output_file = joinpath(Mantis_folder, output_directory, filename)
     
-    if !isdir(output_directory)
-        println("Creating new directory $output_directory ...")
-        mkdir(output_directory)
-    end
+    mkpath(output_directory)
     
     return output_file
 end
