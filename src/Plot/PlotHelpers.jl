@@ -13,7 +13,7 @@ output_file = export_path(["examples", "data", "output"], "output.vtk") # "examp
 ```
 """
 function export_path(output_directory_tree::Vector{String}, filename::String)
-    Mantis_folder = dirname(dirname(pathof(Mantis)))    
+    Mantis_folder = dirname(dirname(@__DIR__))
     output_directory = joinpath(output_directory_tree...)
     output_file = joinpath(Mantis_folder, output_directory, filename)
     
