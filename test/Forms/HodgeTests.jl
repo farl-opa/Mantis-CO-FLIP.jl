@@ -1,3 +1,5 @@
+module HodgeTests
+
 import Mantis
 
 using Test
@@ -343,3 +345,4 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
 end
 
 # -----------------------------------------------------------------------------
+end
