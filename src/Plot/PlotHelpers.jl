@@ -19,7 +19,7 @@ function export_path(output_directory_tree::Vector{String}, filename::String)
     
    if !isdir(output_directory)
         println("Creating new directory $output_directory ...")
-        mkdir(output_directory)
+        mkpath(output_directory)
     end
 
     return output_file
