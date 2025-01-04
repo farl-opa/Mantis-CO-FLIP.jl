@@ -1,4 +1,4 @@
-module FormsTests
+module FormEvaluationTests
 
 import Mantis
 
