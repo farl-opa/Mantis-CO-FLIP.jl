@@ -7,10 +7,10 @@ using Test
 @testset "UnivariateSplines" begin include("UnivariateSplineTests.jl") end
 @testset "TensorProduct" begin include("TensorProductTests.jl") end
 
-@testset "Hierarchical" begin include("Hierarchical/runtests.jl") end
+@testset verbose=true "Hierarchical" begin include("Hierarchical/runtests.jl") end
 
-@testset "Multivalued" begin include("MultivaluedSpaces/runtests.jl") end
+@testset verbose=true "Multivalued" begin include("MultivaluedSpaces/runtests.jl") end
 
-@testset "TwoScaleRelations" begin include("TwoScaleRelations/runtests.jl") end
+@testset verbose=true "TwoScaleRelations" begin include("TwoScaleRelations/runtests.jl") end
 
 end
