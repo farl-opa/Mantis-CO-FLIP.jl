@@ -1,3 +1,5 @@
+module UnstructuredTwoScaleRelationsTests
+
 import Mantis
 
 using Test
@@ -83,3 +85,5 @@ fine_dofs_discont_2 = fine_ex_op * fine_dofs_GTB
 @test(isapprox(maximum(abs.(fine_dofs_discont_1-fine_dofs_discont_2)), 0.0, atol=1e-13))
 
 # --------------------------------------------------
+#
+end

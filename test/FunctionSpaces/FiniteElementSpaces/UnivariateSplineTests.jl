@@ -1,3 +1,5 @@
+module UnivariateSplineTests
+
 """
 Tests for the univariate spline spaces. These tests are based on the 
 standard properties of Bezier curves. See 
@@ -117,4 +119,6 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)
     Nurbs_eval, _ = Mantis.FunctionSpaces.evaluate(Nurbs_univariate, el, (x,), 0)
     # Positivity of the polynomials
     @test minimum(Nurbs_eval[1][1]) >= 0.0
+end
+
 end

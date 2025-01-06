@@ -1,4 +1,4 @@
-module LagrangeCanonicalSpacesTests
+module LagrangePolynomialsTests
 
 import Mantis
 

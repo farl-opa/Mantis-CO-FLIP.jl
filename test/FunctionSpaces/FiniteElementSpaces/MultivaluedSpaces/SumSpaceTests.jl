@@ -1,3 +1,5 @@
+module SumSpaceTests
+
 import Mantis
 import LinearAlgebra
 using Test
@@ -66,3 +68,5 @@ S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)
 #  1.0    0.0  0.0  0.0    0.0    0.0
 #  0.125  0.0  0.0  0.375  0.375  0.125
 #  0.0    0.0  0.0  0.0    0.0    1.0
+#
+end

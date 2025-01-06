@@ -1,3 +1,5 @@
+module TensorProductTwoScaleRelationsTests
+
 import Mantis
 
 using Test
@@ -85,4 +87,6 @@ end
 for basis_id ∈ 1:Mantis.FunctionSpaces.get_num_basis(Mantis.FunctionSpaces.get_coarse_space(tts_1)) 
     @test Mantis.FunctionSpaces.get_basis_children(tts_1, basis_id) == Mantis.FunctionSpaces.get_basis_children(tts_2, basis_id)
     @test Mantis.FunctionSpaces.get_basis_children(tts_2, basis_id) == Mantis.FunctionSpaces.get_basis_children(tts_3, basis_id)
+end
+
 end
