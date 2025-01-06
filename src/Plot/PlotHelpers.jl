@@ -14,8 +14,8 @@ output_file = export_path(["examples", "data", "output"], "output.vtk") # "examp
 """
 function export_path(output_directory_tree::Vector{String}, filename::String)
     Mantis_folder = dirname(dirname(pathof(parentmodule(Plot))))
-    output_directory = joinpath(output_directory_tree...)
-    output_file = joinpath(Mantis_folder, output_directory, filename)
+    output_directory = joinpath(Mantis_folder, output_directory_tree...)
+    output_file = joinpath(output_directory, filename)
     
    if !isdir(output_directory)
         println("Creating new directory $output_directory ...")
