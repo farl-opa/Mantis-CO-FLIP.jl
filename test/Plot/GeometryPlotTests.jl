@@ -39,6 +39,7 @@ geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
 geom = Mantis.Geometry.FEMGeometry(S_θrϕ, geom_coeffs_θrϕ)
 # Generate the plot
 output_filename = "fem_geometry_torus_test.vtu"
+output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry (toroidal annulus) -------------------------------------------
