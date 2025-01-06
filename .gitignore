@@ -41,5 +41,10 @@ Manifest.toml
 *.jpeg
 *.svg
 
+# Ignore all Vim temporary buffer files
+*.swp
+*.swo
+*.swn
+
 # Ignore compressed files
 *.zip
