@@ -1,13 +1,9 @@
-module FiniteElementSpacesTests
+module FunctionSpacesTests
 
 using Test
 
-@testset "BezierExtraction" begin include("BezierExtractionTest.jl") end
-@testset "KnotInsertion" begin include("KnotInsertionTest.jl") end
-@testset "UnivariateSplineSpaces" begin include("UnivariateSplineTests.jl") end
-@testset "TensorProductTests" begin include("TensorProductTests.jl") end
-@testset "TensorProductTwoScaleRelations" begin include("TensorProductTwoScaleRelationsTest.jl") end
-@testset "UnstructuredTwoScaleRelations" begin include("UnstructuredTwoScaleRelationsTest.jl") end
-@testset "HierarchicalFiniteElementSpaces" begin include("HierarchicalFiniteElementSpaces/runtests.jl") end
+@testset "CanonicalSpaces" begin include("CanonicalSpaces/runtests.jl") end
+
+@testset "FiniteElementSpaces" begin include("FiniteElementSpaces/runtests.jl") end
 
 end
