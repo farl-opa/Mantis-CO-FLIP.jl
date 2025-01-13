@@ -1,3 +1,4 @@
+module TensorProductGeometryTests
 
 import Mantis
 
@@ -6,11 +7,8 @@ using Printf
 using Test
 
 # Compute base directories for data input and output
-Mantis_folder =  dirname(dirname(pathof(Mantis)))
-data_folder = joinpath(Mantis_folder, "test", "data")
-input_data_folder = joinpath(data_folder, "reference", "Geometry")
-output_data_folder = joinpath(data_folder, "output", "Geometry")
-
+reference_directory_tree = ["test", "data", "reference", "Geometry"]
+output_directory_tree = ["test", "data", "output", "Geometry"]
 
 # Test Square Tensor Product Geometry -----------------------------------------
 # Generate a tensor product geometry by combining two lines
@@ -28,12 +26,12 @@ tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
 
 # Generate the plot
 output_filename = "tensor_product_geometry.vtu"
-output_file = joinpath(output_data_folder, output_filename)
+output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(tensor_prod_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test geometry 
 # Read the cell data from the reference file
-reference_file = joinpath(input_data_folder, output_filename)
+reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
 reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
 reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
@@ -77,12 +75,12 @@ cylinder_line_geo = Mantis.Geometry.CartesianGeometry(breakpoints_cylinder_line)
 cylinder_tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(cylinder_circle_geo, cylinder_line_geo)
 # Generate the plot
 output_filename = "tensor_product_cylinder_geometry.vtu"
-output_file = joinpath(output_data_folder, output_filename)
+output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(cylinder_tensor_prod_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test geometry 
 # Read the cell data from the reference file
-reference_file = joinpath(input_data_folder, output_filename)
+reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
 reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
 reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
@@ -144,3 +142,4 @@ end
 
 # -----------------------------------------------------------------------------
 
+end

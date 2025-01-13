@@ -1,3 +1,5 @@
+module MetricTests
+
 import Mantis
 
 using Test
@@ -90,6 +92,9 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
             @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 1e-14 
+        end
+        for dim_2_idx in 1:dim
+            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 1e-14 
             @test sum(abs.(inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 2e-13 
         end
     end
@@ -160,34 +165,4 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
     @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_2_2_inh)) ≈ 0 atol = 1e-14
 end
 # -----------------------------------------------------------------------------
-#=
-# FEMGeometry (2, 3) ----------------------------------------------------------
-deg = 2
-Wt = pi/2
-b = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt))
-B = ntuple( i -> b, 4)
-GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
-b1 = Mantis.FunctionSpaces.CanonicalFiniteElementSpace(Mantis.FunctionSpaces.Bernstein(1))
-TP = Mantis.FunctionSpaces.TensorProductSpace(GB, b1, Dict())
-# control points for geometry
-geom_coeffs_0 =   [1.0  -1.0
-    1.0   1.0
-    -1.0   1.0
-    -1.0  -1.0]
-r0 = 1
-r1 = 2
-geom_coeffs = [geom_coeffs_0.*r0 -[+1.0, -1.0, +1.0, -1.0]
-               geom_coeffs_0.*r1 [+1.0, -1.0, +1.0, -1.0]]
-wavy_surface_geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
-
-# Points where to evaluate the metric
-nx_evaluate = 20
-ny_evaluate = 20
-xi_1_fem_2_2 = collect(LinRange(0.0, 1.0, nx_evaluate + 1))
-xi_2_fem_2_2 = collect(LinRange(0.0, 1.0, ny_evaluate + 1))
-n_evaluation_points = nx_evaluate * ny_evaluate
-
-g_fem, sqrt_g_fem = Mantis.Geometry.metric(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
-inv_g_fem, g_fem_2, sqrt_g_fem = Mantis.Geometry.inv_metric(wavy_surface_geom, 1, (xi_1_fem_2_2, xi_2_fem_2_2))
-
-=#
+end
