@@ -526,25 +526,3 @@ function get_greville_points(tp_space::TensorProductSpace{manifold_dim, T}) wher
 
     return tuple(greville_points...)
 end
-
-"""
-    create_bspline_space(starting_point::NTuple{manifold_dim, Float64}, box_size::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degree::NTuple{manifold_dim, Int}, regularity::NTuple{manifold_dim, Int})
-
-Create a tensor product B-spline space based on the specified parameters for each dimension.
-
-# Arguments
-- `starting_point::NTuple{manifold_dim, Float64}`: The starting point of the B-spline space in each dimension.
-- `box_size::NTuple{manifold_dim, Float64}`: The size of the box in each dimension.
-- `num_elements::NTuple{manifold_dim, Int}`: The number of elements in each dimension.
-- `degree::NTuple{manifold_dim, Int}`: The degree of the B-spline in each dimension.
-- `regularity::NTuple{manifold_dim, Int}`: The regularity of the B-spline in each dimension.
-
-# Returns
-- `::TensorProductSpace`: The resulting tensor product B-spline space.
-"""
-function create_bspline_space(starting_point::NTuple{manifold_dim, Float64}, box_size::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degree::NTuple{manifold_dim, Int}, regularity::NTuple{manifold_dim, Int}) where {manifold_dim}
-    
-    dim_wise_spaces = map(create_bspline_space, starting_point, box_size, num_elements, degree, regularity)
-
-    return TensorProductSpace(dim_wise_spaces)
-end

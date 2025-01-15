@@ -33,4 +33,13 @@ Manifest.toml
 
 # Ignore all text files
 *.txt
+*.csv
 
+# Ignore all images by default
+*.png
+*.jpg
+*.jpeg
+*.svg
+
+# Ignore compressed files
+*.zip

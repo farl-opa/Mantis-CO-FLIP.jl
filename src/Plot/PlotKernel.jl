@@ -140,7 +140,7 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
     end
 end
 
-function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int = 1, degree::Int = 1, ascii = false, compress = true, subcell_wireframe = true) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int = 1, degree::Int = 1, ascii = false, compress = true, subcell_wireframe = true) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     # This function generates points per plotted nD cell, so connectivity is lost, this is what requires less information
     # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
     # create a structured grid, each cell of this refined grid is plotted.
@@ -310,7 +310,8 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, G}, o
             end
         end
         
-        WriteVTK.vtk_grid(vtk_filename * "_wireframe", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
+        # chop is used to remove ".vtu" from the original filename
+        WriteVTK.vtk_grid(chop(vtk_filename,tail=4) * "_wireframe.vtu", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
             vtk.version == "2.2"
         end
     end

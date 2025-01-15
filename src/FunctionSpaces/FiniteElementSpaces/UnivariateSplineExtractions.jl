@@ -205,7 +205,9 @@ function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) whe
         
         # Construct smoothness constraint matrix contributions from the left and right of the breakpoint
         KL = _evaluate_all_at_point(canonical_space, 1.0, r)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)  
         KR = _evaluate_all_at_point(canonical_space, 0.0, r)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
         # element sizes where constraints are evaluated
         h_L = get_element_size(knot_vector, el)
         h_R = get_element_size(knot_vector, el+1)
@@ -284,7 +286,9 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
         
         # Smoothness constraint matrix
         KL = _evaluate_all_at_point(spline_spaces[i], bspl_nels[i], 1.0, r)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)  
         KR = _evaluate_all_at_point(spline_spaces[i+1], 1, 0.0, r)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
         # element sizes where constraints are evaluated
         h_L = get_element_size(spline_spaces[i], bspl_nels[i])
         h_R = get_element_size(spline_spaces[i+1], 1)
@@ -316,7 +320,9 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
             
             # smoothness constraints
             KL = _evaluate_all_at_point(spline_spaces[m], bspl_nels[m], 1.0, r)
+            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)  
             KR = _evaluate_all_at_point(spline_spaces[1], 1, 0.0, r)
+            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
             # element sizes where constraints are evaluated
             h_L = get_element_size(spline_spaces[m], bspl_nels[m])
             h_R = get_element_size(spline_spaces[1], 1)
@@ -389,89 +395,3 @@ function build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
 
     return SparseArrays.spdiagm(q-1, q, 0 => dd[:,1], 1 => dd[:,2])
 end
-
-# """
-#     extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}, regularity::Vector{Int}) where {m}
-
-# Compute the extraction coefficients of GTB-Spline basis functions in terms of constituent canonical basis functions.
-
-# # Arguments
-# - `canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}`: Collection of canonical spaces treated as finite element spaces.
-# - `regularity::Vector{Int}`: Smoothness to be imposed at patch interfaces.
-
-# # Returns
-# - `ExtractionOperator`: An object containing extraction coefficients, basis indices, number of elements, and total number of basis functions.
-# """
-# function extract_gtbspline_to_canonical(canonical_spaces::NTuple{m,CanonicalFiniteElementSpace}, regularity::Vector{Int}) where {m}
-#     # Construct cumulative sum of all canonical space dimensions
-#     canonical_dims = zeros(Int, m+1)
-#     for i = 2:m+1
-#         canonical_dims[i] = canonical_dims[i-1] + get_num_basis(canonical_spaces[i-1])
-#     end
-
-#     # Initialize global extraction matrix as identity
-#     H = SparseArrays.sparse(1:canonical_dims[m+1], 1:canonical_dims[m+1], ones(Float64,canonical_dims[m+1]), canonical_dims[m+1], canonical_dims[m+1])
-    
-#     # Loop over all internal patch interfaces and update extraction by imposing smoothness
-#     for i = 1:m-1
-#         # Get regularity at this interface
-#         r = regularity[i]
-        
-#         # Construct smoothness constraint matrix
-#         KL = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[i], 1, 1.0, r))
-#         KR = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[i+1], 1, 0.0, r))
-#         rows = [KL[1]; KR[1] .+ (canonical_dims[i+1] - canonical_dims[i])]
-#         cols = [KL[2]; KR[2]]
-#         vals = [-KL[3]; KR[3]]
-#         K = SparseArrays.sparse(rows,cols,vals,(canonical_dims[i+2] - canonical_dims[i]),r+1)
-        
-#         # Update local extraction matrix by building double-diagonal nullspace of constraints
-#         L = H[:, canonical_dims[i]+1:canonical_dims[i+2]] * K
-#         for j = 0:r
-#             Hbar = build_sparse_nullspace(L[:, j+1])
-#             H = Hbar * H
-#             L = Hbar * L
-#         end
-#     end
-
-#     # Impose periodicity if desired for i = m
-#     if regularity[m] > -1
-#         r = regularity[m]
-#         if size(H, 1) >= 2*(r+1)
-#             Hper = circshift(H, r+1)
-#             KL = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[m], 1, 1.0, r))
-#             KR = SparseArrays.findnz(_evaluate_all_at_point(canonical_spaces[1], 1, 0.0, r))
-#             rows = [KL[1]; KR[1] .+ (canonical_dims[m+1] - canonical_dims[m])]
-#             cols = [KL[2]; KR[2]]
-#             vals = [-KL[3]; KR[3]]
-#             K = SparseArrays.sparse(rows,cols,vals,(canonical_dims[m+1] - canonical_dims[m] + canonical_dims[2] - canonical_dims[1]),r+1)
-#             Lper = Hper[:, [canonical_dims[m]+1:canonical_dims[m+1]; canonical_dims[1]+1:canonical_dims[2]]] * K
-#             for j = 0:r
-#                 Hbar = build_sparse_nullspace(Lper[:, j+1])
-#                 Hper = Hbar * Hper
-#                 Lper = Hbar * Lper
-#             end
-#             H = Hper
-#         end
-#     end
-
-#     # Remove small values obtained as a result of round-off errors
-#     SparseArrays.fkeep!((i,j,x) -> abs(x) > 1e-14, H)
-
-#     # Convert global extraction matrix to element local extractions
-#     # (here, the matrix is transposed so that [canonical_spaces] * [extraction] = [GTB-splines])
-#     extraction_coefficients = Vector{Matrix{Float64}}(undef, m)
-#     basis_indices = Vector{Vector{Int}}(undef, m)
-#     for i = 1:m
-#         cols_i = collect(1:get_num_basis(canonical_spaces[i]))
-#         cols_i .+= canonical_dims[i]
-#         ei = SparseArrays.findnz(H[:,cols_i])
-#         # Unique indices for non-zero rows and columns
-#         basis_indices[i] = unique(ei[1])
-#         # Matrix of coefficients
-#         extraction_coefficients[i] = Array(H[basis_indices[i], cols_i])'
-#     end
-
-#     # Create and return the ExtractionOperator
-#     return ExtractionOperator(extraction_coefficients, basis_indices, m, size(H,1))
-# end

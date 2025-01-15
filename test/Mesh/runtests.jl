@@ -2,6 +2,6 @@ module MeshTests
 
 using Test
 
-@testset "MeshTest" begin include("MeshTests.jl") end
+@testset "PatchInterval" begin include("PatchIntervalTests.jl") end
 
 end

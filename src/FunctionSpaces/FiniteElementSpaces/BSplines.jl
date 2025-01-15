@@ -351,7 +351,7 @@ function assemble_global_extraction_matrix(bspline::BSplineSpace)
     # Number of elements
     nel = get_num_elements(bspline)
     # Number of local basis functions
-    num_local_basis = repeat([get_polynomial_degree(bspline.polynomials) + 1], nel, 1)
+    num_local_basis = (get_polynomial_degree(bspline.polynomials) + 1) .* ones(Int, nel)
     num_local_basis_offset = cumsum([0; num_local_basis])
     # Initialize the global extraction matrix
     global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)
@@ -384,12 +384,8 @@ Returns the derivative space of the B-spline space.
 function get_derivative_space(bspline::BSplineSpace{F}) where {F <: AbstractCanonicalSpace}
     # polynomial degree of derivative space
     p = get_polynomial_degree(bspline)
-    if F <: AbstractECTSpaces
-        dpolynomials = get_derivative_space(F)
-    else
-        dpolynomials = F(p-1)
-    end
-
+    dpolynomials = get_derivative_space(bspline.polynomials)
+    
     # modified left and right dof-partitioning
     dof_partition = get_dof_partition(bspline)
     n_left = max(0, length(dof_partition[1][1])-1)
@@ -404,75 +400,4 @@ function get_derivative_space(bspline::BSplineSpace{F}) where {F <: AbstractCano
     end
 
     return BSplineSpace(get_patch(bspline), dpolynomials, dregularity, n_left, n_right)
-end
-
-# Methods for ease of function space creation
-
-"""
-    create_bspline_space(starting_point::Float64, box_size::Float64, num_elements::Int, degree::Int, regularity::Int)
-
-Create a 1D B-spline space based on the provided starting point, box size, number of elements, degree, and regularity. It constructs a uniform distribution of breakpoints and uses them to define a `Mesh.Patch1D` object. The function then creates a regularity vector, with the first and last entries set to -1 to ensure an open knot vector, and returns the corresponding `BSplineSpace`.
-
-# Arguments
-- `starting_point::Float64`: The coordinate of the starting point of the B-spline space.
-- `box_size::Float64`: The size of the space along the single dimension.
-- `num_elements::Int`: The number of elements along the dimension.
-- `degree::Int`: The degree of the B-spline basis functions.
-- `regularity::Int`: The regularity (smoothness) between consecutive B-spline basis functions, typically between 0 and `degree - 1`.
-
-# Returns
-- `::BSplineSpace`: The generated B-spline space.
-
-# Examples
-```julia
-# Create a 1D B-spline space
-start_1d = 0.0
-size_1d = 10.0
-elements_1d = 100
-degree = 3
-regularity = 2
-bspline_space_1d = create_bspline_space(start_1d, size_1d, elements_1d, degree, regularity)
-```
-"""
-function create_bspline_space(starting_point::Float64, box_size::Float64, num_elements::Int, degree::Int, regularity::Int)
-
-    box_size > 0.0 ? nothing : throw(ArgumentError("The argumente 'box_size' must be greater than 0."))
-
-    breakpoints = collect(LinRange(starting_point, starting_point+box_size, num_elements+1))
-    patch = Mesh.Patch1D(breakpoints)
-
-    regularity_vector = fill(regularity, (num_elements+1,))
-    regularity_vector[1] = regularity_vector[end] = -1 # Open knot vector
-
-    return BSplineSpace(patch, degree, regularity_vector)
-end
-
-"""
-    create_bspline_space(starting_point::NTuple{1, Float64}, box_size::NTuple{1, Float64}, num_elements::NTuple{1, Int}, degree::NTuple{1, Int}, regularity::NTuple{1, Int})
-
-Create a 1D B-spline space based on the provided starting point, box size, number of elements, degree, and regularity. It constructs a uniform distribution of breakpoints and uses them to define a `Mesh.Patch1D` object. The function then creates a regularity vector, with the first and last entries set to -1 to ensure an open knot vector, and returns the corresponding `BSplineSpace`.
-
-# Arguments
-- `starting_point::NTuple{1, Float64}`: The coordinate of the starting point of the B-spline space.
-- `box_size::NTuple{1, Float64}`: The size of the space along the single dimension.
-- `num_elements::NTuple{1, Int}`: The number of elements along the dimension.
-- `degree::NTuple{1, Int}`: The degree of the B-spline basis functions.
-- `regularity::NTuple{1, Int}`: The regularity (smoothness) between consecutive B-spline basis functions, typically between 0 and `degree - 1`.
-
-# Returns
-- `::BSplineSpace`: The generated B-spline space.
-
-# Examples
-```julia
-# Create a 1D B-spline space
-start_1d = 0.0
-size_1d = 10.0
-elements_1d = 100
-degree = 3
-regularity = 2
-bspline_space_1d = create_bspline_space(start_1d, size_1d, elements_1d, degree, regularity)
-```
-"""
-function create_bspline_space(starting_point::NTuple{1, Float64}, box_size::NTuple{1, Float64}, num_elements::NTuple{1, Int}, degree::NTuple{1, Int}, regularity::NTuple{1, Int})
-    return create_bspline_space(starting_point[1], box_size[1], num_elements[1], degree[1], regularity[1])
 end
