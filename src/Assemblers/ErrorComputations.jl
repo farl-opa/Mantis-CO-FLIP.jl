@@ -8,7 +8,7 @@ function _compute_square_error_per_element(computed_sol::TF1, exact_sol::TF2, qu
         if norm == "L2"
             result[elem_id] = sum(Forms.evaluate_inner_product(difference, difference, elem_id, quad_rule)[3])
         elseif norm == "Linf"
-            result[elem_id] = maximum(Forms.evaluate(difference, elem_id, Quadrature.get_quadrature_nodes(quad_rule))[1][1])
+            result[elem_id] = maximum(abs.(Forms.evaluate(difference, elem_id, Quadrature.get_quadrature_nodes(quad_rule))[1][1]))
         elseif norm == "H1"
             Error("Computing the H1 norm still needs to be updated.")
             d_difference = Forms.exterior_derivative(difference)
