@@ -1,3 +1,5 @@
+module HierarchicalGeometryTests
+
 import Mantis
 
 import ReadVTK
@@ -7,23 +9,15 @@ using LinearAlgebra
 
 # Create the space
 
-ne1 = 5
-ne2 = 5
-breakpoints1 = collect(range(0,1,ne1+1))
-patch1 = Mantis.Mesh.Patch1D(breakpoints1)
-breakpoints2 = collect(range(0,1,ne2+1))
-patch2 = Mantis.Mesh.Patch1D(breakpoints2)
+ne1 = 5; ne2 = 5
+deg1 = 2; deg2 = 2
 
-deg1 = 2
-deg2 = 2
+nsub1 = 2; nsub2 = 2
 
-CB1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(deg1-1, ne1-1); -1])
-CB2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1; fill(deg2-1, ne2-1); -1])
-
-nsub1 = 2
-nsub2 = 2
-
-CTP = Mantis.FunctionSpaces.TensorProductSpace((CB1, CB2))
+CTP = Mantis.FunctionSpaces.create_bspline_space(
+      (0.0, 0.0), (1.0, 1.0), (ne1, ne2),
+      (deg1, deg2), (deg1-1, deg2-1)
+)
 CTS, FTP = Mantis.FunctionSpaces.build_two_scale_operator(CTP, (nsub1, nsub2))
 spaces = [CTP, FTP]
 
@@ -38,11 +32,11 @@ hier_geo = Mantis.Geometry.compute_parametric_geometry(hier_space)
 field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_num_basis(hier_space), Mantis.FunctionSpaces.get_num_basis(hier_space))
 tensor_field = Mantis.Fields.FEMField(hier_space, field_coeffs)
 
-# Generate the Plot
-Mantis_folder =  dirname(dirname(pathof(Mantis)))
-data_folder = joinpath(Mantis_folder, "test", "data")
-output_data_folder = joinpath(data_folder, "output", "Geometry")
+# Compute base directories for data output
+output_directory_tree = ["test", "data", "output", "Geometry"]
 
 output_filename = "fem_geometry_tensor_hbsplines.vtu"
-output_file = joinpath(output_data_folder, output_filename)
-Mantis.Plot.plot(hier_geo, tensor_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
+@test_nowarn Mantis.Plot.plot(hier_geo, tensor_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+
+end
