@@ -8,7 +8,7 @@ Manual = [
 
 Tutorials = [
     "Documentation" => [
-        "Tutorials/CreatingDocs.md",
+        "Tutorials/BuildingDocs.md",
         "Tutorials/CreatingDocsPage.md",
     ],
     "Running MANTIS" => [
