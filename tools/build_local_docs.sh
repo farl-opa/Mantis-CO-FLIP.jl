@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Make sure we are in the docs folder.
-cd ../docs
+cd docs
 
 # Build the html pages. Make sure to instantiate the correct environment.
 # Also takes care of dev-ing Mantis.
