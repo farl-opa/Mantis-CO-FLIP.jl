@@ -39,7 +39,7 @@ line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
 # Line 2
 line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 # Tensor product geometry 
-geom_cart = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
+geom_cart = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 
 # curvilinear mesh
 crazy_c = 0.2
@@ -124,7 +124,7 @@ for geom in [geom_cart, geom_crazy]
         
         # Because forms are defined on the parametric domain, the constant coefficents equal to 1 will not result 
         # in form equal to 1 evaluated on each element, therefore we need to account for it
-        element_dimensions = Mantis.Geometry.get_element_dimensions(geom, elem_id)
+        element_dimensions = [Mantis.Geometry.get_element_dimensions(geom, elem_id)...]
         
         # 1-forms
         integrated_metric_1 = zeros((2,2))
@@ -187,7 +187,7 @@ end
 # # Line 2
 # line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 # # Tensor product geometry 
-# tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
+# tensor_prod_geo = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 # geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2)) # equivalent to the above tensor-product geometry
 
 # # Crazy mesh

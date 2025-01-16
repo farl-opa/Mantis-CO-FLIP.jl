@@ -26,22 +26,6 @@ function get_num_elements(geometry::CartesianGeometry{n}) where {n}
     return prod(geometry.n_elements)
 end
 
-# function get_boundary_indices(geometry::CartesianGeometry{n}) where {n}
-#     return    
-# end
-
-# function get_num_boundary_elements(geometry::CartesianGeometry{n}) where {n}
-#     if any(geometry.n_elements) == 1
-#         return
-#     else
-#         return 2*sum(geometry.n_elements)
-#     end
-# end
-
-# function get_num_boundary_elements(geometry::CartesianGeometry{1,1})
-#     return minimum([2, geometry.n_elements])
-# end
-
 function get_domain_dim(::CartesianGeometry{n}) where {n}
     return n
 end
@@ -51,8 +35,18 @@ function get_image_dim(::CartesianGeometry{n}) where {n}
 end
 
 function evaluate(geometry::CartesianGeometry{n}, element_idx::Int, ξ::NTuple{n,Vector{Float64}}) where {n}
+
     ordered_idx = Tuple(geometry.cartesian_idxs[element_idx])
-    univariate_points = ntuple( k -> (1 .- ξ[k]) .* geometry.breakpoints[k][ordered_idx[k]] + ξ[k] .* geometry.breakpoints[k][ordered_idx[k]+1], n)
+    univariate_points = ntuple(n) do k
+        dim_points = zeros(length(ξ[k])) # initialize vector for current dimension 
+
+        for point in eachindex(dim_points)
+            dim_points[point] = (1-ξ[k][point])*geometry.breakpoints[k][ordered_idx[k]] +
+            ξ[k][point]*geometry.breakpoints[k][ordered_idx[k]+1]
+        end
+
+        return dim_points
+    end
     
     points_tensor_product_idx = CartesianIndices(size.(univariate_points, 1))  # Get the multidimensional indices for the tensor product points
 

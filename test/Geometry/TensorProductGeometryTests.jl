@@ -22,7 +22,7 @@ breakpoints_2 = (Vector(2.0:0.1:3.0),)
 line_2_geo = Mantis.Geometry.CartesianGeometry(breakpoints_2)
 
 # Tensor product geometry 
-tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
+tensor_prod_geo = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 
 # Generate the plot
 output_filename = "tensor_product_geometry.vtu"
@@ -72,7 +72,7 @@ breakpoints_cylinder_line = (Vector(LinRange(0.0, 1.0, nz_elements + 1)),)
 cylinder_line_geo = Mantis.Geometry.CartesianGeometry(breakpoints_cylinder_line)
 
 # Tensor product geometry 
-cylinder_tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(cylinder_circle_geo, cylinder_line_geo)
+cylinder_tensor_prod_geo = Mantis.Geometry.TensorProductGeometry((cylinder_circle_geo, cylinder_line_geo))
 # Generate the plot
 output_filename = "tensor_product_cylinder_geometry.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)

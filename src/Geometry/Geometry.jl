@@ -11,6 +11,8 @@ abstract type AbstractGeometry{n} end
 abstract type AbstractAnalyticalGeometry{n} <: AbstractGeometry{n} end
 abstract type AbstractFEMGeometry{n} <: AbstractGeometry{n} end
 
+get_manifold_dim(::AbstractGeometry{manifold_dim}) where {manifold_dim} = manifold_dim
+
 @doc raw"""
     get_element_size(geometry::G, element_id::Int) where {G<:AbstractGeometry{n} where {n}}
 
