@@ -4,9 +4,13 @@ only have to build the documentation. Fortunately, the heavy lifting
 will be done by `Julia` and/or `Python`.
 
 For convenience, there is a bash script in the tools folder, 
-`build_local_docs.sh`, that automates the process. If this does not work,
-or if you prefer to go through the steps yourself, you can use the
-following step-by-step guide.
+`build_local_docs.sh`, that automates the process. Make sure to run the
+script starting in the main Mantis folder. Use
+```
+bash tools/build_local_docs.sh
+```
+If this does not work, or if you prefer to go through the steps yourself, 
+you can use the following step-by-step guide.
 
 To create the docs, follow these steps:
 - Navigate to the `docs/` directory. If you open a terminal in the 
