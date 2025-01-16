@@ -1,7 +1,12 @@
 # How to locally build the MANTIS docs.
 The main file structure of the the docs has now been created, so you 
 only have to build the documentation. Fortunately, the heavy lifting 
-will be done by `Julia` and `Python`.
+will be done by `Julia` and/or `Python`.
+
+For convenience, there is a bash script in the tools folder, 
+`build_local_docs.sh`, that automates the process. If this does not work,
+or if you prefer to go through the steps yourself, you can use the
+following step-by-step guide.
 
 To create the docs, follow these steps:
 - Navigate to the `docs/` directory. If you open a terminal in the 
@@ -42,7 +47,21 @@ To create the docs, follow these steps:
   python -m http.server --bind localhost
   ``` 
   (after, in my case, activating my conda environment by executing 
-  `conda activate`) in the `docs/`-directory. 
+  `conda activate`) in the `docs/`-directory. You may have to use
+  ```
+  python3 -m http.server --bind localhost
+  ``` 
+  instead. Alternatively, you can use Julia with `LiveServer.jl`:
+  ```
+  julia -e 'using LiveServer; serve(dir="build")
+  ``` 
+  Note that the automate script tries all these options for you.
+- In my case, this will result in VScode giving me the message: `Your 
+  application running on port 8000 is available. See all forwarded ports`
+  with the options `Open in Browser` and `Preview in Editor`. Click the 
+  `Open in Browser`-option to see the html pages. You (may) have to click 
+  the `build/`-link when the browser opens. 
+- Enjoy the Mantis docs! 
 - In my case, this will result in VScode giving me the message: `Your 
   application running on port 8000 is available. See all forwarded ports`
   with the options `Open in Browser` and `Preview in Editor`. Click the 
