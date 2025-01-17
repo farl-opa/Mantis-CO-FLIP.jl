@@ -2,6 +2,8 @@ module MetricTests
 
 import Mantis
 
+include("GeometryTestsHelpers.jl")
+
 using Test
 
 # CartesianGeometry (1, 1) homogeneous grid -----------------------------------
@@ -21,31 +23,24 @@ nx_evaluate = 3
 xi_1_cart_1_1 = collect(LinRange(0.0, 1.0, nx_evaluate + 1))
 n_evaluation_points = nx_evaluate
 
-# Evaluate the metric
-for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_1_1) 
-    g, sqrt_g = Mantis.Geometry.metric(cartesian_geometry_cart_1_1, element_idx, (xi_1_cart_1_1,))
+# Evaluate the metric, its inverse and its determinant 
+for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_1_1)
+    inv_g, g, sqrt_g = Mantis.Geometry.inv_metric(
+        cartesian_geometry_cart_1_1, element_idx, (xi_1_cart_1_1,)
+    )
+    for dim_1_idx in 1:dim
+        for dim_2_idx in 1:dim
+            g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_1_1[dim_1_idx, dim_2_idx]
+            inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .-
+                inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx]
+
+            @test isapprox(sum(abs.(g_diff)), 0.0, atol = atol)
+            @test isapprox(sum(abs.(inv_g_diff)), 0.0, atol = atol)
+        end
+    end
     
-    # Test g
-    for dim_1_idx in 1:dim
-        for dim_2_idx in 1:dim
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_1_1[dim_1_idx, dim_2_idx])) ≈ 0 atol = 1e-14  
-        end
-    end
-
-    # Test det_g
-    @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_1_1)) ≈ 0 atol = 1e-14
-end
-
-# Evaluate the inverse of the metric
-for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_1_1) 
-    inv_g, g, sqrt_g = Mantis.Geometry.inv_metric(cartesian_geometry_cart_1_1, element_idx, (xi_1_cart_1_1,))
-    for dim_1_idx in 1:dim
-        for dim_2_idx in 1:dim
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_1_1[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 1e-14 
-            @test sum(abs.(inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 1e-13 
-            @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_1_1))  ≈ 0 atol = 1e-14 
-        end
-    end
+    det_g_diff = sqrt_g[:] .- det_g_ref_cart_1_1
+    @test isapprox(sum(abs.(det_g_diff)) , 0.0, atol = atol)
 end
 # -----------------------------------------------------------------------------
 
@@ -69,39 +64,25 @@ xi_1_cart_2_2 = collect(LinRange(0.0, 1.0, nx_evaluate + 1))
 xi_2_cart_2_2 = collect(LinRange(0.0, 1.0, ny_evaluate + 1))
 n_evaluation_points = nx_evaluate * ny_evaluate
 
-# Evaluate the metric
-for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_2) 
-    g, sqrt_g = Mantis.Geometry.metric(cartesian_geometry_cart_2_2, element_idx, (xi_1_cart_2_2, xi_2_cart_2_2))
-    
-    # Test g
+# Evaluate the metric, its inverse and its determinant 
+for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_2)
+    inv_g, g, sqrt_g = Mantis.Geometry.inv_metric(
+        cartesian_geometry_cart_2_2, element_idx, (xi_1_cart_2_2, xi_2_cart_2_2)
+    )
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx])) ≈ 0 atol = 1e-14  
+            g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx]
+            inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .-
+                inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx]
+
+            @test isapprox(sum(abs.(g_diff)), 0.0, atol = atol)
+            @test isapprox(sum(abs.(inv_g_diff)), 0.0, atol = atol)
         end
     end
-
-    # Test det_g
-    @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_2_2)) ≈ 0 atol = 1e-14
+    
+    det_g_diff = sqrt_g[:] .- det_g_ref_cart_2_2
+    @test isapprox(sum(abs.(det_g_diff)) , 0.0, atol = atol)
 end
-
-# Evaluate the inverse of the metric
-for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_2) 
-    inv_g, g, sqrt_g = Mantis.Geometry.inv_metric(cartesian_geometry_cart_2_2, element_idx, (xi_1_cart_2_2, xi_2_cart_2_2))
-    
-    # Test g and inv_g
-    for dim_1_idx in 1:dim
-        for dim_2_idx in 1:dim
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 1e-14 
-        end
-        for dim_2_idx in 1:dim
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 1e-14 
-            @test sum(abs.(inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx]))  ≈ 0 atol = 2e-13 
-        end
-    end
-
-    # Test det_g
-    @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_2_2))  ≈ 0 atol = 1e-14
-end 
 # -----------------------------------------------------------------------------
 
 # CartesianGeometry (2, 2) inhomogeneous grid ---------------------------------
@@ -117,52 +98,38 @@ xi_2_cart_2_2_inh = collect(LinRange(0.0, 1.0, ny_evaluate + 1))
 n_evaluation_points = nx_evaluate * ny_evaluate
 
 # Expected metric terms per element (allocation)
-dx_cart_2_2_inh = [0.25 0.75 0.25 0.75 0.25 0.75;
-      0.5  0.5  0.4  0.4  0.1  0.1]  # the dxs for each element are over the columns
+dx_cart_2_2_inh = [
+    0.25 0.75 0.25 0.75 0.25 0.75;
+    0.5  0.5  0.4  0.4  0.1  0.1
+]  # the dxs for each element are over the columns
 
-# Evaluate the metric
-for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_2_inh) 
-    g, sqrt_g = Mantis.Geometry.metric(cartesian_geometry_cart_2_2_inh, element_idx, (xi_1_cart_2_2_inh, xi_2_cart_2_2_inh))
-
-    # Test g
-    for dim_1_idx in 1:dim
-        for dim_2_idx in 1:dim
-            if dim_1_idx != dim_2_idx
-                g_ref_cart_2_2_inh = 0.0
-            else
-                g_ref_cart_2_2_inh = dx_cart_2_2_inh[dim_1_idx, element_idx]^2 
-            end
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2_inh)) ≈ 0 atol = 1e-14  
-        end
-    end
-
-    # Test det_g
-    det_g_ref_cart_2_2_inh = prod(dx_cart_2_2_inh[:, element_idx])
-    @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_2_2_inh)) ≈ 0 atol = 1e-14
-end
-
-# Evaluate the inverse of the metric
-for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_2_inh) 
-    inv_g, g, sqrt_g = Mantis.Geometry.inv_metric(cartesian_geometry_cart_2_2_inh, element_idx, (xi_1_cart_2_2_inh, xi_2_cart_2_2_inh))
-    
-    # Test g and inv_g
+# Evaluate the metric, its inverse and its determinant 
+for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_2_inh)
+    inv_g, g, sqrt_g = Mantis.Geometry.inv_metric(
+        cartesian_geometry_cart_2_2_inh, element_idx, (xi_1_cart_2_2_inh, xi_2_cart_2_2_inh)
+    )
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
             if dim_1_idx != dim_2_idx
                 g_ref_cart_2_2_inh = 0.0
                 inv_g_ref_cart_2_2_inh = 0.0
             else
-                g_ref_cart_2_2_inh = dx_cart_2_2_inh[dim_1_idx, element_idx]^2 
+                g_ref_cart_2_2_inh = dx_cart_2_2_inh[dim_1_idx, element_idx]^2
                 inv_g_ref_cart_2_2_inh = 1.0/g_ref_cart_2_2_inh
             end
-            @test sum(abs.(g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2_inh))  ≈ 0 atol = 1e-14 
-            @test sum(abs.(inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_2_2_inh))  ≈ 0 atol = 3e-12 
+
+            g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2_inh
+            inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_2_2_inh
+
+            @test isapprox(sum(abs.(g_diff)), 0.0, atol = atol)
+            @test isapprox(sum(abs.(inv_g_diff)), 0.0, atol = atol)
         end
     end
-
+     
     # Test det_g
     det_g_ref_cart_2_2_inh = prod(dx_cart_2_2_inh[:, element_idx])
-    @test sum(abs.(sqrt_g[:] .- det_g_ref_cart_2_2_inh)) ≈ 0 atol = 1e-14
+    det_g_diff = sqrt_g[:] .- det_g_ref_cart_2_2_inh
+    @test isapprox(sum(abs.(det_g_diff)) , 0.0, atol = atol)
 end
 # -----------------------------------------------------------------------------
 end
