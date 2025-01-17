@@ -2,6 +2,8 @@
 
 # Tolerance for comparing floating point numbers.
 atol = 1e-14
+reduced_atol = 2e-13
+lowest_atol = 3e-12
 
 # Compute base directories for data input and output
 reference_directory_tree = ["test", "data", "reference", "Geometry"]

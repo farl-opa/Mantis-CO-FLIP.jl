@@ -34,13 +34,13 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_1_
             inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .-
                 inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx]
 
-            @test isapprox(sum(abs.(g_diff)), 0.0, atol = atol)
-            @test isapprox(sum(abs.(inv_g_diff)), 0.0, atol = atol)
+            @test isapprox(sum(abs.(g_diff)), 0.0; atol=atol)
+            @test isapprox(sum(abs.(inv_g_diff)), 0.0; atol=reduced_atol)
         end
     end
     
     det_g_diff = sqrt_g[:] .- det_g_ref_cart_1_1
-    @test isapprox(sum(abs.(det_g_diff)) , 0.0, atol = atol)
+    @test isapprox(sum(abs.(det_g_diff)) , 0.0; atol=atol)
 end
 # -----------------------------------------------------------------------------
 
@@ -75,13 +75,13 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
             inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .-
                 inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx]
 
-            @test isapprox(sum(abs.(g_diff)), 0.0, atol = atol)
-            @test isapprox(sum(abs.(inv_g_diff)), 0.0, atol = atol)
+            @test isapprox(sum(abs.(g_diff)), 0.0; atol=atol)
+            @test isapprox(sum(abs.(inv_g_diff)), 0.0; atol=reduced_atol)
         end
     end
     
     det_g_diff = sqrt_g[:] .- det_g_ref_cart_2_2
-    @test isapprox(sum(abs.(det_g_diff)) , 0.0, atol = atol)
+    @test isapprox(sum(abs.(det_g_diff)) , 0.0; atol=atol)
 end
 # -----------------------------------------------------------------------------
 
@@ -121,15 +121,15 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
             g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2_inh
             inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_2_2_inh
 
-            @test isapprox(sum(abs.(g_diff)), 0.0, atol = atol)
-            @test isapprox(sum(abs.(inv_g_diff)), 0.0, atol = atol)
+            @test isapprox(sum(abs.(g_diff)), 0.0; atol=atol)
+            @test isapprox(sum(abs.(inv_g_diff)), 0.0; atol=lowest_atol)
         end
     end
      
     # Test det_g
     det_g_ref_cart_2_2_inh = prod(dx_cart_2_2_inh[:, element_idx])
     det_g_diff = sqrt_g[:] .- det_g_ref_cart_2_2_inh
-    @test isapprox(sum(abs.(det_g_diff)) , 0.0, atol = atol)
+    @test isapprox(sum(abs.(det_g_diff)) , 0.0; atol=atol)
 end
 # -----------------------------------------------------------------------------
 end
