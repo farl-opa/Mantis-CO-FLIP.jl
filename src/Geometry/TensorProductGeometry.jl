@@ -279,33 +279,23 @@ function evaluate(
     end
 
     image_ranges = _get_image_ranges(geometry)
-    n_points_per_space = ntuple(num_geometries) do k
+    n_points_per_geometry = ntuple(num_geometries) do k
         return prod(size.(ξ[manifold_ranges[k]], 1))
     end
-    n_points = prod(n_points_per_space) # total number of evaluation points
+    n_points = prod(n_points_per_geometry) # total number of evaluation points
     image_dim = get_image_dim(geometry)
     eval = zeros(Float64, n_points, image_dim) # evaluation storage
-
+    
+    ordered_points = CartesianIndices(n_points_per_geometry)
+    linear_points = LinearIndices(ordered_points)
     # loop over all points
-    for (lin_point, ord_point) in enumerate(CartesianIndices(n_points_per_space))
+    for (lin_point, ord_point) in zip(linear_points, ordered_points)
         for k in 1:num_geometries # loop over geometries
-            eval[lin_point, image_ranges[k]] = @view eval_per_geometry[k][ord_point[k], :]
+            eval[lin_point, image_ranges[k]] .= @view eval_per_geometry[k][ord_point[k], :]
         end
     end
 
     return eval
-end
-
-function evaluate(
-    geometry::TensorProductGeometry{manifold_dim, T}, element_idx::Int, ξ::Vector{Float64}
-) where {
-    manifold_dim, num_geometries, T<:NTuple{num_geometries, AbstractGeometry}
-}
-    if length(ξ) != manifold_dim
-        throw(ArgumentError("Length of ξ should match `manifold_dim`"))
-    end
-
-    return evaluate(geometry, element_idx, ntuple(k -> [ξ[k]], manifold_dim))
 end
 
 @doc raw"""
@@ -362,33 +352,23 @@ function jacobian(
     end
 
     image_ranges = _get_image_ranges(geometry)
-    n_points_per_space = ntuple(num_geometries) do k
+    n_points_per_geometry = ntuple(num_geometries) do k
         return prod(size.(ξ[manifold_ranges[k]], 1))
     end
-    n_points = prod(n_points_per_space) # total number of evaluation points
+    n_points = prod(n_points_per_geometry) # total number of evaluation points
     image_dim = get_image_dim(geometry)
     jacobian_eval = zeros(Float64, n_points, image_dim, manifold_dim) # evaluation storage
 
+    ordered_points = CartesianIndices(n_points_per_geometry)
+    linear_points = LinearIndices(ordered_points)
     # loop over all points
-    for (lin_point, ord_point) in enumerate(CartesianIndices(n_points_per_space))
+    for (lin_point, ord_point) in zip(linear_points, ordered_points)
         for k in 1:num_geometries # loop over geometries
-            jacobian_eval[lin_point, image_ranges[k], manifold_ranges[k]] = view(
+            jacobian_eval[lin_point, image_ranges[k], manifold_ranges[k]] .= view(
                 jacobian_per_geometry[k], ord_point[k], :, :
             )
         end
     end
 
     return jacobian_eval
-end
-
-function jacobian(
-    geometry::TensorProductGeometry{manifold_dim, T}, element_idx::Int, ξ::Vector{Float64}
-) where {
-    manifold_dim, num_geometries, T<:NTuple{num_geometries, AbstractGeometry}
-}
-    if length(ξ) != manifold_dim
-        throw(ArgumentError("Length of ξ should match `manifold_dim`"))
-    end
-
-    return jacobian(geometry, element_idx, ntuple(k -> [ξ[k]], manifold_dim))
 end
