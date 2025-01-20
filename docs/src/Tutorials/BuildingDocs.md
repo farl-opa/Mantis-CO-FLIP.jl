@@ -1,40 +1,4 @@
-# Mantis
-
-[![Build Status](https://github.com/MantisFEM/Mantis.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MantisFEM/Mantis.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/JuliaDiff/BlueStyle)
-
-
-Welcome to `MANTIS.jl`, a package for high-order structure-preserving 
-finite element methods. This package is designed around 
-structure-preserving/mimetic methods. It has extensive support for basis 
-functions; 'standard' mimetic finite elements, multi-patch splines, and
-([MIT license](https://github.com/MantisFEM/Mantis.jl/blob/main/LICENSE)).
-
-
-## Contents
-A brief description of what you can find in the `README.md`.
-- A brief description of the Authors.
-- A step-by-step guide on how to build and view the `Mantis` docs.
-- An overview of the source code organisation.
-
-
-## Authors
-The `Mantis` package was created by
-- Diogo Costa Cabanas,
-- Joey Dekker,
-- Artur Palha,
-- Deepesh Toshniwal,
-
-from TU Delft's Institute of Applied Mathematics (DIAM).
-
-## Related publications.
-One can hope.
-
-
-## How to locally build the MANTIS docs.
-As the documentation is not (yet) hosted online, you will have to build 
-and view the documentation locally. How to do this is described here.
-
+# How to locally build the MANTIS docs.
 The main file structure of the the docs has now been created, so you 
 only have to build the documentation. Fortunately, the heavy lifting 
 will be done by `Julia` and/or `Python`.
@@ -101,6 +65,12 @@ To create the docs, follow these steps:
   with the options `Open in Browser` and `Preview in Editor`. Click the 
   `Open in Browser`-option to see the html pages. You (may) have to click 
   the `build/`-link when the browser opens. 
+- Enjoy the Mantis docs! 
+- In my case, this will result in VScode giving me the message: `Your 
+  application running on port 8000 is available. See all forwarded ports`
+  with the options `Open in Browser` and `Preview in Editor`. Click the 
+  `Open in Browser`-option to see the html pages. You have to click the 
+  `build/`-link when the browser opens. 
 - Enjoy the Mantis docs!
 - When done, you can kill the local webserver by using `Ctrl+C`.
 
@@ -108,16 +78,3 @@ To create the docs, follow these steps:
     The `docs/build/`-folder should **never** be gitted. (See also the 
     warning in the [Documenter Docs](https://documenter.juliadocs.org/stable/man/guide/)). 
     The `.gitignore`-file is already setup to prevent this.
-
-
-## Source Code Organization
-
-The Mantis source code is organized as follows:
-
-| Directory          | Contents                                                |
-| -                  | -                                                       |
-| `docs/`            | Source for the user and developer manuals               |
-| `src/`             | Source for the all Mantis code                          |
-| `test/`            | Test suites                                             |
-| `test/data/output` | Empty directories for storing output files during tests. This is needed to prevent crashes over write access. |
-| `tools`            | Scripts for development (e.g. benchmark scripts, paraview macros, etc.) |
