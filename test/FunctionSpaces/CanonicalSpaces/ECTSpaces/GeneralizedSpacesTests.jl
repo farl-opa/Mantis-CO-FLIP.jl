@@ -1,3 +1,5 @@
+module GeneralizedSpacesTests
+
 import Mantis
 
 using Test
@@ -97,4 +99,6 @@ for p in degrees_to_test
         # ... and the second order derivative matches d2f/dx2.
         @test isapprox(maximum(abs.(b_eval[3][1] * coeff_b .- d2f_dx2_eval)), 0.0, atol = 2e-10)
     end
+end
+
 end

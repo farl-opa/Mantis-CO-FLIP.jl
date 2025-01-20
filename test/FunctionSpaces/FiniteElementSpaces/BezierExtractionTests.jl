@@ -1,3 +1,5 @@
+module BezierExtractionTests
+
 """
 Tests for the Bezier extraction. These tests are based on the 
 standard properties of Bezier curves. See 
@@ -53,4 +55,6 @@ for p in degrees_to_test, k in -1:p-1
         @test all(ex_coeffs .>= 0.0) # Test for non-negativity
         @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
     end
+end
+
 end

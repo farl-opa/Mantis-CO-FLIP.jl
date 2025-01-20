@@ -53,7 +53,7 @@ output_filename = "fem_geometry_annulus_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -94,7 +94,7 @@ output_filename = "fem_geometry_lagrange_square_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 1, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -133,7 +133,7 @@ output_filename = "fem_geometry_spiral_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(spiral_geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -180,7 +180,7 @@ output_filename = "fem_geometry_wavy_surface_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(wavy_surface_geom, wavy_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -218,7 +218,7 @@ output_filename = "fem_geometry_nurbs_quarter_annulus_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(quarter_annulus; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# # Test geometry 
+# # Test geometry
 # # Read the cell data from the reference file
 # reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 # vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -259,7 +259,7 @@ output_filename = "fem_geometry_nurbs_annulus_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(nurbs_annulus; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# # Test geometry 
+# # Test geometry
 # # Read the cell data from the reference file
 # reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 # vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -300,7 +300,7 @@ output_filename = "fem_geometry_nurbs_wavy_surface_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(nurbs_wavy_surface; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# # Test geometry 
+# # Test geometry
 # # Read the cell data from the reference file
 # reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 # vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
