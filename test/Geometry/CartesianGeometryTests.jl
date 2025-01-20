@@ -1,15 +1,15 @@
+module CartesianGeometryTests
 
 import Mantis
 
 import ReadVTK
 using Printf
+
 using Test
 
 # Compute base directories for data input and output
-Mantis_folder =  dirname(dirname(pathof(Mantis)))
-data_folder = joinpath(Mantis_folder, "test", "data")
-input_data_folder = joinpath(data_folder, "reference", "Geometry")
-output_data_folder = joinpath(data_folder, "output", "Geometry")
+reference_directory_tree = ["test", "data", "reference", "Geometry"]
+output_directory_tree = ["test", "data", "output", "Geometry"]
 
 # Test CartesianGeometry ------------------------------------------------------
 for nx = 1:3
@@ -19,12 +19,12 @@ for nx = 1:3
         
         # Generate the plot
         output_filename = @sprintf "cartesian_test_nx_%d_ny_%d.vtu" nx ny
-        output_file = joinpath(output_data_folder, output_filename)
+        output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
         Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 1, ascii = false, compress = false)
 
         # Test geometry 
         # Read the cell data from the reference file
-        reference_file = joinpath(input_data_folder, output_filename)
+        reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
         vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
         reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
         reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
@@ -40,3 +40,5 @@ for nx = 1:3
     end
 end
 # -----------------------------------------------------------------------------
+
+end
