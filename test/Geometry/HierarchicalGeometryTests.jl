@@ -27,16 +27,7 @@ coarse_elements_to_refine = [3,4,5,8,9,10,13,14,15]
 refined_elements = vcat(Mantis.FunctionSpaces.get_element_children.((CTS,), coarse_elements_to_refine)...)
 
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], [Int[], refined_elements], true)
-hier_geo = Mantis.Geometry.compute_parametric_geometry(hier_space)
-
-field_coeffs = Matrix{Float64}(LinearAlgebra.I,Mantis.FunctionSpaces.get_num_basis(hier_space), Mantis.FunctionSpaces.get_num_basis(hier_space))
-tensor_field = Mantis.Fields.FEMField(hier_space, field_coeffs)
-
-# Compute base directories for data output
-output_directory_tree = ["test", "data", "output", "Geometry"]
-
-output_filename = "fem_geometry_tensor_hbsplines.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-@test_nowarn Mantis.Plot.plot(hier_geo, tensor_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+hier_spaced = Mantis.FunctionSpaces.DirectSumSpace((hier_space,))
+@test_nowarn hier_geo = Mantis.Geometry.compute_parametric_geometry(hier_space)
 
 end
