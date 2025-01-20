@@ -1,3 +1,5 @@
+module KFormPolarSplinesProjectionTests
+
 import Mantis
 
 using Test
@@ -191,4 +193,6 @@ for (p_idx, p) in enumerate(p⁰)
             end
         end
     end
+end
+
 end
