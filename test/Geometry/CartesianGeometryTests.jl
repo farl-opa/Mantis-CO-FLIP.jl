@@ -33,7 +33,7 @@ for nx = 1:3
         # Read the cell data from the output file
         output_points, output_cells = get_point_cell_data(output_file_path)
         # Check if cell data is identical
-        @test all(isapprox.(reference_points, output_points; atol=atol))
+        @test all(isapprox.(reference_points, output_points; atol=low_atol))
         @test all(isequal.(reference_cells, output_cells))
     end
 end
