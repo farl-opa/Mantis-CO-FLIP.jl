@@ -1,3 +1,5 @@
+module TensorProductTHBSplineTests
+
 import Mantis
 
 using Test
@@ -68,3 +70,5 @@ output_filename = "thb-partition-of-unity-test.vtu"
 output_file = joinpath(output_data_folder, output_filename)
 Mantis.Plot.plot(hier_space_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 =#
+
+end

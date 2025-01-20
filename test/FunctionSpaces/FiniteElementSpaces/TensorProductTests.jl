@@ -1,3 +1,5 @@
+module TensorProductTests
+
 """
 Tests for tensor-product spline spaces.
 """
@@ -110,4 +112,6 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(TP)
 
     # Partition of unity
     @test all(isapprox.(sum(TP_eval[1][1], dims=2), 1.0))
+end
+
 end

@@ -1,3 +1,5 @@
+module KnotInsertionTests
+
 import Mantis
 
 using Test
@@ -41,4 +43,6 @@ for p in degrees_for_test
             @test all(isapprox.(fine_spline_eval[1][1] .- coarse_spline_eval[1][1][1+(coarse_idx-1)*nq:1+coarse_idx*nq], 0.0, atol=1e-13))
         end
     end
+end
+
 end
