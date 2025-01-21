@@ -20,7 +20,6 @@ abstract type AbstractInputs end
 abstract type AbstractBoundaryForms end
 
 
-include("BoundaryForms.jl")
 include("WeakFormulations.jl")
 include("GlobalAssemblers.jl")
 include("ErrorComputations.jl")
