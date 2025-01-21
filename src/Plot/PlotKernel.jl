@@ -1,9 +1,9 @@
-function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{Nothing, F} = nothing, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int = 1, degree::Int = 1, ascii = false, compress = true, subcell_wireframe = true) where {manifold_dim, F <: Fields.AbstractField{manifold_dim, field_dim} where {field_dim}}
+function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}; vtk_filename::String = "default", n_subcells::Int = 1, degree::Int = 1, ascii = false, compress = true, subcell_wireframe = true) where {manifold_dim}
     # This function generates points per plotted nD cell, so connectivity is lost, this is what requires less information
-    # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
+    # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples
     # create a structured grid, each cell of this refined grid is plotted.
     # Given Paraview's capabilities, the range_dim must be at most 3.
-    
+
     range_dim = Geometry.get_image_dim(geometry)
     @assert range_dim <= 3 && manifold_dim <= 3 "Paraview can only plot 3D geometries."
 
@@ -30,12 +30,6 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
 
     vertices = Array{Float64, 2}(undef, range_dim, n_vertices)
     cells = Vector{WriteVTK.MeshCell}(undef, n_total_cells)
-    if isnothing(field)
-        field_dim = 0
-    else
-        field_dim = Fields.get_image_dim(field)
-    end
-    point_data = zeros(field_dim,n_vertices)
 
     vertex_offset = 0
     dξ = 1.0/n_subcells
@@ -50,44 +44,32 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
         for subcell_idx in 1:n_subcells^manifold_dim
             ξ_shift_per_dir = dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  Tuple(ones(Int,manifold_dim)))
             ξ = Tuple(ξ_shift_per_dir[i] .+ dξ .* ξ_ref_per_dir for i in 1:manifold_dim)
-            # evaluate geometry and rearrange 
+            # evaluate geometry and rearrange
             vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
 
-            # compute data to plot 
-            if !isnothing(field)
-                point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view (Fields.evaluate(field, element_idx, ξ))'[:, I_ref]
-            end
-            # apply offset
-            if !isnothing(offset)
-                point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .-= offset(vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)]')'
-            end
-            
             # Add cell
             cell_idx = (element_idx - 1) * (n_subcells^manifold_dim) + subcell_idx
             if manifold_dim == 1
                 cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_CURVE, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell)))
             elseif manifold_dim == 2
-                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell))) 
+                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell)))
             else
-                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_HEXAHEDRON, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell))) 
+                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_HEXAHEDRON, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell)))
             end
 
             vertex_offset += (degree+1)^manifold_dim  # add the number of interior vertices added
         end
     end
 
-    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
+    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk
         vtk.version == "2.2"
-        if !isnothing(field)
-            vtk["point_data", WriteVTK.VTKPointData()] = point_data
-        end
     end
 
     ###################################
     ### EXPORT EDGE WIREFRAME
     ###################################
 
-    if manifold_dim > 1 && subcell_wireframe 
+    if manifold_dim > 1 && subcell_wireframe
 
         if manifold_dim == 2
             edge_ordering = quadrilateral_edge_ordering()
@@ -122,19 +104,19 @@ function _plot(geometry::Geometry.AbstractGeometry{manifold_dim}, field::Union{N
                 for subcell_idx in 1:n_subcells
                     ξ_shift_per_dir = dξ_edge .* (subcell_cartesian_idx[subcell_idx][1] - 1)
                     ξ = Tuple(ξ_shift_per_dir[i] .+ ξ_ref_scaled[i] for i in 1:manifold_dim)
-                    # evaluate geometry and rearrange 
+                    # evaluate geometry and rearrange
                     vertices_on_edges[:, vertex_offset .+ (1:n_vertices_per_subedge)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
 
                     # Add cell
                     cell_idx = (element_idx - 1) * (n_subcells * n_edges_per_element) + (edge_idx - 1) * n_subcells + subcell_idx
                     edges[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_CURVE, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subedge)))
-                    
+
                     vertex_offset += (degree+1)  # add the number of interior vertices added
                 end
             end
         end
-        
-        WriteVTK.vtk_grid(vtk_filename * "_wireframe", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
+
+        WriteVTK.vtk_grid(vtk_filename * "_wireframe", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk
             vtk.version == "2.2"
         end
     end
@@ -142,10 +124,10 @@ end
 
 function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}, offset::Union{Nothing, Function} = nothing; vtk_filename::String = "default", n_subcells::Int = 1, degree::Int = 1, ascii = false, compress = true, subcell_wireframe = true) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     # This function generates points per plotted nD cell, so connectivity is lost, this is what requires less information
-    # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples 
+    # from the mesh. Each computational element is sampled at n_subsamples (minimum is 2 per direction). These subsamples
     # create a structured grid, each cell of this refined grid is plotted.
-    
-    # Enforce that degree is at least 1, which is the minimum required by paraview 
+
+    # Enforce that degree is at least 1, which is the minimum required by paraview
     degree = max(degree, 1)
 
     # Given Paraview's capabilities, the range_dim must be at most 3.
@@ -177,7 +159,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
     # Check if form expression is made up of fields of contains basis functions (form space)
     # We do this by evaluating all elements and checking if the indices are all the same (form field base expression)
     _, form_indices = Forms.evaluate(form, 1, Tuple([0.0] for _ = 1:manifold_dim))  # evaluate at the [0.0, 0.0] point of the first element
-    form_index_ref = form_indices[1][1]  # use one index as reference 
+    form_index_ref = form_indices[1][1]  # use one index as reference
     is_field = true  # then check if all indices are the same
     for element_idx in 1:n_total_elements
         _, form_indices = Forms.evaluate(form, element_idx, Tuple([0.0] for _ = 1:manifold_dim))
@@ -185,7 +167,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
             is_field = is_field & all(y -> y == form_index_ref, form_component_indices)
         end
     end
-    
+
     vertices = Array{Float64, 2}(undef, range_dim, n_vertices)
     cells = Vector{WriteVTK.MeshCell}(undef, n_total_cells)
     if !is_field
@@ -202,7 +184,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
     vertex_offset = 0
     dξ = 1.0/n_subcells
     subcell_cartesian_idx = CartesianIndices(Tuple(n_subcells*ones(Int,manifold_dim)))
-    
+
     # # this is where points evaluated inside an element will be stored
     # vertices_el = zeros(n_dim, n_eval_1, n_eval_2, n_eval_3, ...)
     # el_vertex_offset += prod(n_eval)
@@ -212,18 +194,18 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
         for subcell_idx in 1:n_subcells^manifold_dim
             ξ_shift_per_dir = dξ .* (Tuple(subcell_cartesian_idx[subcell_idx]) .-  Tuple(ones(Int,manifold_dim)))
             ξ = Tuple(ξ_shift_per_dir[i] .+ dξ .* ξ_ref_per_dir for i in 1:manifold_dim)
-            
+
             # evaluate geometry and rearrange
             vertices[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
-            
-            # Compute data to plot 
+
+            # Compute data to plot
             if is_field
                 if form_rank == 0
                     point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(form, element_idx, ξ)[1]...)'[:, I_ref]
-                    
+
                 elseif form_rank == manifold_dim
                     point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)'[:, I_ref]
-                    
+
                 elseif form_rank == 1
                     if range_dim == 2
                         point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view vcat(hcat(reduce.(+,Forms.evaluate_sharp_pushforward(form, element_idx, ξ)[1], dims=2)...)', zeros(1,n_vertices_per_subcell))[:, I_ref]
@@ -243,16 +225,16 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
             if manifold_dim == 1
                 cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_CURVE, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell)))
             elseif manifold_dim == 2
-                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell))) 
+                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_QUADRILATERAL, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell)))
             else
-                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_HEXAHEDRON, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell))) 
+                cells[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_HEXAHEDRON, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subcell)))
             end
 
             vertex_offset += (degree+1)^manifold_dim  # add the number of interior vertices added
         end
     end
 
-    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
+    WriteVTK.vtk_grid(vtk_filename, vertices, cells; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk
         vtk.version == "2.2"
         if is_field
             vtk["point_data", WriteVTK.VTKPointData()] = point_data
@@ -263,7 +245,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
     ### EXPORT EDGE WIREFRAME
     ###################################
 
-    if manifold_dim > 1 && subcell_wireframe 
+    if manifold_dim > 1 && subcell_wireframe
 
         if manifold_dim == 2
             edge_ordering = quadrilateral_edge_ordering()
@@ -298,24 +280,24 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
                 for subcell_idx in 1:n_subcells
                     ξ_shift_per_dir = dξ_edge .* (subcell_cartesian_idx[subcell_idx][1] - 1)
                     ξ = Tuple(ξ_shift_per_dir[i] .+ ξ_ref_scaled[i] for i in 1:manifold_dim)
-                    # evaluate geometry and rearrange 
+                    # evaluate geometry and rearrange
                     vertices_on_edges[:, vertex_offset .+ (1:n_vertices_per_subedge)] .= @view (Geometry.evaluate(geometry, element_idx, ξ))'[:, I_ref]
 
                     # Add cell
                     cell_idx = (element_idx - 1) * (n_subcells * n_edges_per_element) + (edge_idx - 1) * n_subcells + subcell_idx
                     edges[cell_idx] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_LAGRANGE_CURVE, collect(vertex_offset+1:(vertex_offset + n_vertices_per_subedge)))
-                    
+
                     vertex_offset += (degree+1)  # add the number of interior vertices added
                 end
             end
         end
-        
+
         # chop is used to remove ".vtu" from the original filename
-        WriteVTK.vtk_grid(chop(vtk_filename,tail=4) * "_wireframe.vtu", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk 
+        WriteVTK.vtk_grid(chop(vtk_filename,tail=4) * "_wireframe.vtu", vertices_on_edges, edges; append = false, ascii = ascii, compress = compress, vtkversion = :latest) do vtk
             vtk.version == "2.2"
         end
     end
-    
+
 end
 
 function n_verts_between(n, frm, to)

@@ -21,12 +21,12 @@ b_r = Mantis.FunctionSpaces.Bernstein(deg)
 (P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ = Mantis.FunctionSpaces.create_polar_spline_space_and_geometry((4, 1), (b_θ, b_r), (1, -1), 1.0)
 geom = Mantis.Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 field_coeffs = Matrix{Float64}(LinearAlgebra.I, Mantis.FunctionSpaces.get_num_basis(P_sol), Mantis.FunctionSpaces.get_num_basis(P_sol))
-polar_surface_field = Mantis.Fields.FEMField(P_sol.component_spaces[1], field_coeffs)
+# polar_surface_field = Mantis.Fields.FEMField(P_sol.component_spaces[1], field_coeffs)
 
 # Generate the plot
 output_filename = "fem_geometry_polar_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-Mantis.Plot.plot(geom, polar_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+# Mantis.Plot.plot(geom, polar_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test FEMGeometry (Annulus) --------------------------------------------------
 deg = 2
@@ -53,7 +53,7 @@ output_filename = "fem_geometry_annulus_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -94,7 +94,7 @@ output_filename = "fem_geometry_lagrange_square_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 1, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -133,7 +133,7 @@ output_filename = "fem_geometry_spiral_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(spiral_geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -173,14 +173,15 @@ wavy_surface_geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 
 # field on the wavy surface
 field_coeffs = rand(Float64, 8, 1)
-wavy_surface_field = Mantis.Fields.FEMField(TP, field_coeffs)
+# wavy_surface_field = Mantis.Fields.FEMField(TP, field_coeffs)
 
 # Generate the plot
 output_filename = "fem_geometry_wavy_surface_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-Mantis.Plot.plot(wavy_surface_geom, wavy_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+# Mantis.Plot.plot(wavy_surface_geom, wavy_surface_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+Mantis.Plot.plot(wavy_surface_geom, vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# Test geometry 
+# Test geometry
 # Read the cell data from the reference file
 reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -218,7 +219,7 @@ output_filename = "fem_geometry_nurbs_quarter_annulus_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(quarter_annulus; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# # Test geometry 
+# # Test geometry
 # # Read the cell data from the reference file
 # reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 # vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -259,7 +260,7 @@ output_filename = "fem_geometry_nurbs_annulus_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(nurbs_annulus; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# # Test geometry 
+# # Test geometry
 # # Read the cell data from the reference file
 # reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 # vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -300,7 +301,7 @@ output_filename = "fem_geometry_nurbs_wavy_surface_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(nurbs_wavy_surface; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
-# # Test geometry 
+# # Test geometry
 # # Read the cell data from the reference file
 # reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
 # vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -349,17 +350,17 @@ gtb_annulus = Mantis.Geometry.FEMGeometry(TP_gtb, geom_coeffs)
 
 # field on the annulus
 field_coeffs = Matrix{Float64}(LinearAlgebra.I, 8, 8)
-bsp_field = Mantis.Fields.FEMField(TP_bsp, field_coeffs)
-gtb_field = Mantis.Fields.FEMField(TP_gtb, field_coeffs)
+# bsp_field = Mantis.Fields.FEMField(TP_bsp, field_coeffs)
+# gtb_field = Mantis.Fields.FEMField(TP_gtb, field_coeffs)
 
 # Generate the plot - NURBS + BSP
 output_filename = "fem_geometry_nurbs_bsp_basis_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-Mantis.Plot.plot(nurbs_annulus, bsp_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+# Mantis.Plot.plot(nurbs_annulus, bsp_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Generate the plot - GTB
 output_filename = "fem_geometry_gtb_basis_test.vtu"
 output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-Mantis.Plot.plot(gtb_annulus, gtb_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+# Mantis.Plot.plot(gtb_annulus, gtb_field; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 end

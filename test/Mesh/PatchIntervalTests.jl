@@ -67,29 +67,4 @@ for (i, elem_id) in enumerate(Mantis.Mesh.get_element_ids(test_patch))
     @test elem_id == check_ids[i]
 end
 
-# Tests for get_element. Note that the getters are the same for any 
-# dimension, so an extra test for the multi-d case simply checks the 
-# same function.
-for i in 1:1:n1-1
-    @test Mantis.Mesh.get_element(test_patch_1d, (i,)) == Mantis.Mesh.Element((Mantis.Mesh.Interval(test_brk[i], test_brk[i+1]),))
-end
-@test Mantis.Mesh.get_element(test_patch, (3,5,4,2)) == Mantis.Mesh.Element((Mantis.Mesh.Interval(test_brk[3], test_brk[4]),
-                                                                             Mantis.Mesh.Interval(test_brk2[5], test_brk2[6]), 
-                                                                             Mantis.Mesh.Interval(test_brk3[4], test_brk3[5]), 
-                                                                             Mantis.Mesh.Interval(test_brk4[2], test_brk4[3])))
-
-
-# Tests for get_intervals. Note that the getters are the same for any 
-# dimension, so an extra test for the multi-d case simply checks the 
-# same function.
-for i in 1:1:n1-1
-    elem = Mantis.Mesh.get_element(test_patch_1d, (i,))
-    @test Mantis.Mesh.get_intervals(elem) == (Mantis.Mesh.Interval(test_brk[i], test_brk[i+1]),)
-end
-elem = Mantis.Mesh.get_element(test_patch, (3,5,4,2))
-@test Mantis.Mesh.get_intervals(elem) == (Mantis.Mesh.Interval(test_brk[3], test_brk[4]),
-                                          Mantis.Mesh.Interval(test_brk2[5], test_brk2[6]), 
-                                          Mantis.Mesh.Interval(test_brk3[4], test_brk3[5]), 
-                                          Mantis.Mesh.Interval(test_brk4[2], test_brk4[3]))
-
 end

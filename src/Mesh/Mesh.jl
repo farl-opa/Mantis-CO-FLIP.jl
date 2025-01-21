@@ -9,33 +9,6 @@ without warning**, even those not preceded with an underscore.
 """
 module Mesh
 
-
-"""
-    struct Interval
-
-1-dimensional interval. Note that `left` < `right`.
-
-# Fields
-- `left::Float64`: Coordinate of the left boundary of the interval.
-- `right::Float64`: Coordinate of the right boundary of the interval.
-"""
-struct Interval 
-    left::Float64
-    right::Float64
-end
-
-"""
-    struct Element{n}
-
-n-dimensional tensor-product element.
-
-# Fields
-- `intervals::NTuple{n, Interval}`: Interval per dimension that indicate the boundaries of the element.
-"""
-struct Element{n}
-    intervals::NTuple{n, Interval}
-end
-
 """
     Patch1D
 
@@ -96,25 +69,6 @@ end
 function Patch(brk::Vector{Float64})
     return Patch((brk,))
 end
-
-
-
-# Getters (and setters) for an Element
-"""
-    get_intervals(element::Element{n}) where {n}
-
-Returns the `Intervals` per dimension.
-
-# Arguments
-- `element::Element{n}`: Element of which to get the Intervals.
-
-# Returns
-- `::NTuple{n, Interval}`: Interval per dimension.
-"""
-function get_intervals(element::Element{n}) where {n}
-    return element.intervals
-end
-
 
 # Getters (and setters) for a Patch
 """
@@ -239,25 +193,6 @@ precomputed nor stored.
 """
 function get_element_ids(patch::Patch{n}) where {n}
     return Iterators.product(NTuple{n,StepRange{Int,Int}}(1:1:nei for nei in size(patch))...)
-end
-
-"""
-    get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
-
-Returns the `Element` that is referred to by `element_id`.
-
-Note that this function creates the `Element` on-the-fly, so it is 
-neither precomputed not stored.
-
-# Arguments
-- `patch::Patch{n}`: Patch on which to look.
-- `element_id::NTuple{n, Int}`: Element which is to be returned.
-
-# Returns
-- `::Element`: Element object containing the intervals per dimension.
-"""
-function get_element(patch::Patch{n}, element_id::NTuple{n, Int}) where {n}
-    return Element(NTuple{n,Interval}(Interval(get_breakpoints(patch, d)[element_id[d]], get_breakpoints(patch, d)[element_id[d]+1]) for d in 1:1:n))
 end
 
 function get_element(patch::Patch1D, element_id::Int)

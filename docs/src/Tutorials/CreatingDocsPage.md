@@ -35,7 +35,7 @@ As you can see in the `make.jl`-file, the structure of the documentation
 is defined here. The titles in the left menu are defined here. The title 
 of a specific page, however, is defined in the file for the page. Add 
 the new file that you want to add in the right place, and (re-)build the 
-docs to see the result (See the '[How to build the MANTIS docs.](@ref)' 
+docs to see the result (See the '[How to locally build the MANTIS docs.](@ref)' 
 page on how to build the docs).
 
 ## Adding docstring to the docs.

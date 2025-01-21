@@ -1,10 +1,10 @@
+module ExteriorDerivativeTests
+
 import Mantis
 
 using Test
 
-using LinearAlgebra
-using SparseArrays
-
+using LinearAlgebra, SparseArrays
 
 # Domain
 Lleft = 0.0
@@ -194,3 +194,4 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
 end
 
 # -----------------------------------------------------------------------------
+end
