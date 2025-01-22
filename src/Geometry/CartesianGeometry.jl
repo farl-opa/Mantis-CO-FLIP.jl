@@ -19,8 +19,8 @@ struct CartesianGeometry{manifold_dim} <: AbstractAnalyticalGeometry{manifold_di
     # Returns
     A new CartesianGeometry instance.
     """
-    function CartesianGeometry(breakpoints::NTuple{manifold_dim,T}) where {
-        manifold_dim, N <: Number, T <: AbstractVector{N}
+    function CartesianGeometry(breakpoints::NTuple{manifold_dim, AbstractVector{T}}) where {
+        manifold_dim, T <: Number
     }
         n_elements = length.(breakpoints) .- 1
         ordered_indices = CartesianIndices(n_elements)
