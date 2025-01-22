@@ -12,20 +12,19 @@ include("HelperQuadratureTests.jl")
 
 
 
-# The degree used for the Newton-Cotes quadrature rule does not 
-# affect how the nodes and weights are computed. So testing with a few
-# different degrees should be enough.
+# The degree used for the Newton-Cotes quadrature rule does not affect how the nodes and
+# weights are computed. So testing with a few different degrees should be enough.
 
-# Closed rules ---------------------------------------------------------
+# Closed rules -----------------------------------------------------------------------------
 for N in range(2, 12, step=3)
     quad_rule = Mantis.Quadrature.newton_cotes(N, "closed")
 
     ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
     w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
 
-    
+
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes (closed)"
+    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Newton-Cotes (closed)"
 
 
     # Constructor tests.
@@ -39,15 +38,11 @@ for N in range(2, 12, step=3)
     @test_throws DomainError Mantis.Quadrature.newton_cotes(-1, "closed")
 
     @test_throws ArgumentError Mantis.Quadrature.newton_cotes(1, "test")
-    
+
 
     # Property tests.
-    # Test that sum of weights is one.
     @test isapprox(sum(w), 1.0, atol=atol)
-    # Test that the weights are symmetric.
     @test isapprox(w, reverse(w), atol=atol)
-
-    # Test that nodes are not outside the range [0.0, 1.0].
     @test sum((ξ .< 0.0) .& (ξ .> 1.0)) == 0
     # Test that the endpoints are included.
     @test isapprox(ξ[1], 0.0, atol = atol)
@@ -56,8 +51,8 @@ for N in range(2, 12, step=3)
 
 
     # Value tests on [0,1].
-    # Test that the quadrature rule is exact for polynomials of degree
-    # up to N-1 (with N the number of nodes).
+    # Test that the quadrature rule is exact for polynomials of degree up to N-1 (with N the
+    # number of nodes).
     for degree in 0:N-1
         f = monomial(degree, ξ)
         I_num = LinearAlgebra.dot(w, f)
@@ -70,11 +65,10 @@ for N in range(2, 12, step=3)
         @test isapprox(I_num, I, atol=atol)
     end
 
-    # Test that the quadrature rule is not exact for polynomials of
-    # degree N.
+    # Test that the quadrature rule is not exact for polynomials of degree N.
 
-    # For Newton-Cotes rules, the error for the integration of a 
-    # monomial of degree N will be zero when N is odd.
+    # For Newton-Cotes rules, the error for the integration of a monomial of degree N will
+    # be zero when N is odd.
     f = monomial(N, ξ)
     I_num = LinearAlgebra.dot(w, f)
     I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
@@ -91,16 +85,16 @@ for N in range(2, 12, step=3)
 end
 
 
-# Open rules -----------------------------------------------------------
+# Open rules -------------------------------------------------------------------------------
 for N in range(1, 10, step=3)
     quad_rule = Mantis.Quadrature.newton_cotes(N, "open")
 
     ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
     w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
 
-    
+
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Newton-Cotes (open)"
+    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Newton-Cotes (open)"
 
 
     # Constructor tests.
@@ -113,22 +107,18 @@ for N in range(1, 10, step=3)
     @test_throws DomainError Mantis.Quadrature.newton_cotes(-1, "open")
 
     @test_throws ArgumentError Mantis.Quadrature.newton_cotes(1, "test")
-    
+
 
     # Property tests.
-    # Test that sum of weights is one.
     @test isapprox(sum(w), 1.0, atol=atol)
-    # Test that the weights are symmetric.
     @test isapprox(w, reverse(w), atol=atol)
-
-    # Test that nodes are not outside the range [0.0, 1.0].
     @test sum((ξ .< 0.0) .& (ξ .> 1.0)) == 0
 
 
 
     # Value tests on [0,1].
-    # Test that the quadrature rule is exact for polynomials of degree
-    # up to N-1 (with N the number of nodes).
+    # Test that the quadrature rule is exact for polynomials of degree up to N-1 (with N
+    # the number of nodes).
     for degree in 0:N-1
         f = monomial(degree, ξ)
         I_num = LinearAlgebra.dot(w, f)
@@ -141,11 +131,10 @@ for N in range(1, 10, step=3)
         @test isapprox(I_num, I, atol=atol)
     end
 
-    # Test that the quadrature rule is not exact for polynomials of
-    # degree N.
+    # Test that the quadrature rule is not exact for polynomials of degree N.
 
-    # For Newton-Cotes rules, the error for the integration of a 
-    # monomial of degree N will be zero when N is odd.
+    # For Newton-Cotes rules, the error for the integration of a monomial of degree N will
+    # be zero when N is odd.
     f = monomial(N, ξ)
     I_num = LinearAlgebra.dot(w, f)
     I = integrated_monomial(N, 1.0) - integrated_monomial(N, 0.0)
