@@ -3,8 +3,6 @@
 # Tolerance for comparing floating point numbers.
 rtol = 10*eps(Float64)
 atol = 1e-14
-#medium_atol = 2e-13
-#high_atol = 3e-12
 
 # Compute base directories for data input and output
 reference_directory_tree = ["test", "data", "reference", "Geometry"]

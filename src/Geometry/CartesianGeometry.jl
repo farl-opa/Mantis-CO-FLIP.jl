@@ -13,8 +13,7 @@ struct CartesianGeometry{manifold_dim} <: AbstractAnalyticalGeometry{manifold_di
     Construct a new CartesianGeometry instance.
 
     # Arguments
-    - `breakpoints`: A tuple of vectors defining the grid points in each
-        dimension.
+    - `breakpoints`: A tuple of vectors defining the grid points in each dimension.
 
     # Returns
     A new CartesianGeometry instance.

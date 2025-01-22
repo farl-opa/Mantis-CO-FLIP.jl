@@ -38,7 +38,7 @@ reference_points, reference_cells = get_point_cell_data(reference_directory_tree
 # Read the cell data from the output file
 output_points, output_cells = get_point_cell_data(output_file_path)
 # Check if cell data is identical
-@test all(isapprox.(reference_points, output_points; atol=low_atol))
+@test all(isapprox.(reference_points, output_points; rtol=rtol))
 @test all(isequal.(reference_cells, output_cells))
 # -----------------------------------------------------------------------------
 
@@ -87,7 +87,7 @@ reference_points, reference_cells = get_point_cell_data(reference_directory_tree
 # Read the point and cell data from the output file
 output_points, output_cells = get_point_cell_data(output_file_path)
 # Check if point and cell data is identical
-@test all(isapprox.(reference_points, output_points; atol=low_atol))
+@test all(isapprox.(reference_points, output_points; atol=atol))
 @test all(isequal.(reference_cells, output_cells))
 
 # Test Jacobian with single point evaluation
@@ -104,7 +104,7 @@ for element_row_idx in 1:nz_elements
     J_cylinder = Mantis.Geometry.jacobian(
         cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 1, ξ
     )
-    @test isapprox(maximum(abs.(J_cylinder - J_cylinder_reference)), 0.0; atol=low_atol)
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian at x_{1} = [0.0, 1.0, 0.0]
     # This corresponds to the point with local coordinates [1.0, 0.0] on the first element
@@ -114,7 +114,7 @@ for element_row_idx in 1:nz_elements
     J_cylinder = Mantis.Geometry.jacobian(
         cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 1, ξ
     )
-    @test isapprox(maximum(abs.(J_cylinder - J_cylinder_reference)), 0.0; atol=low_atol)
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian at x_{1} = [-1.0, 0.0, 0.0]
     # This corresponds to the point with local coordinates [1.0, 0.0] on the second element
@@ -124,7 +124,7 @@ for element_row_idx in 1:nz_elements
     J_cylinder = Mantis.Geometry.jacobian(
         cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 2, ξ
     )
-    @test isapprox(maximum(abs.(J_cylinder - J_cylinder_reference)), 0.0; atol=low_atol)
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian at x_{1} = [0.0, -1.0, 0.0]
     # This corresponds to the point with local coordinates [1.0, 0.0] on the third element
@@ -134,7 +134,7 @@ for element_row_idx in 1:nz_elements
     J_cylinder = Mantis.Geometry.jacobian(
         cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 3, ξ
     )
-    @test isapprox(maximum(abs.(J_cylinder - J_cylinder_reference)), 0.0; atol=low_atol)
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian again at x_{1} = [1.0, 0.0, 0.0]
     # This corresponds to the point with local coordinates [1.0, 0.0] on the fourth element
@@ -144,7 +144,7 @@ for element_row_idx in 1:nz_elements
     J_cylinder = Mantis.Geometry.jacobian(
         cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 4, ξ
     )
-    @test isapprox(maximum(abs.(J_cylinder - J_cylinder_reference)), 0.0; atol=low_atol)
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 end
 
 # -----------------------------------------------------------------------------

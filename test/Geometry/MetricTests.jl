@@ -6,14 +6,14 @@ include("GeometryTestsHelpers.jl")
 
 using Test
 
-# CartesianGeometry (1, 1) homogeneous grid -----------------------------------
+# CartesianGeometry (1, 1) homogeneous grid ------------------------------------------------
 dim = 1
 nx = 5
-breakpoints_cart_1_1 = (collect(LinRange(0.0, 1.0, nx+1)),)
+breakpoints_cart_1_1 = (collect(LinRange(0.0, 1.0, nx + 1)),)
 cartesian_geometry_cart_1_1 = Mantis.Geometry.CartesianGeometry(breakpoints_cart_1_1)
 
 # Expected Jacobian per element (the same for all elements)
-dx_cart_1_1 = [1.0/nx]
+dx_cart_1_1 = [1.0 / nx]
 g_ref_cart_1_1 = [dx_cart_1_1[1]^2]
 inv_g_ref_cart_1_1 = [dx_cart_1_1[1]^(-2)]
 det_g_ref_cart_1_1 = sqrt(prod(dx_cart_1_1.^2))
@@ -30,21 +30,22 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_1_
     )
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
-            g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_1_1[dim_1_idx, dim_2_idx]
-            inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .-
-                inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx]
-
-            @test isapprox(sum(abs.(g_diff)), 0.0; atol=low_atol)
-            @test isapprox(sum(abs.(inv_g_diff)), 0.0; atol=medium_atol)
+            @test all(isapprox.(
+                g[:, dim_1_idx, dim_2_idx], g_ref_cart_1_1[dim_1_idx, dim_2_idx];
+                rtol=rtol
+            ))
+            @test all(isapprox.(
+                inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx];
+                rtol=rtol
+            ))
         end
     end
     
-    det_g_diff = sqrt_g[:] .- det_g_ref_cart_1_1
-    @test isapprox(sum(abs.(det_g_diff)) , 0.0; atol=low_atol)
+    @test all(isapprox.(sqrt_g[:], det_g_ref_cart_1_1; rtol=rtol))
 end
-# -----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
 
-# CartesianGeometry (2, 2) homogeneous grid -----------------------------------
+# CartesianGeometry (2, 2) homogeneous grid ------------------------------------------------
 dim = 2
 nx = 4
 ny = 5
@@ -71,24 +72,27 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
     )
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
-            g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2[dim_1_idx, dim_2_idx]
-            inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .-
-                inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx]
-
-            @test isapprox(sum(abs.(g_diff)), 0.0; atol=low_atol)
-            @test isapprox(sum(abs.(inv_g_diff)), 0.0; atol=medium_atol)
+            @test all(isapprox.(
+                g[:, dim_1_idx, dim_2_idx], g_ref_cart_2_2[dim_1_idx, dim_2_idx];
+                rtol=rtol
+            ))
+            @test all(isapprox.(
+                inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx];
+                rtol=rtol
+            ))
         end
     end
     
-    det_g_diff = sqrt_g[:] .- det_g_ref_cart_2_2
-    @test isapprox(sum(abs.(det_g_diff)) , 0.0; atol=low_atol)
+    @test all(isapprox.(sqrt_g[:], det_g_ref_cart_2_2; rtol=rtol))
 end
-# -----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
 
-# CartesianGeometry (2, 2) inhomogeneous grid ---------------------------------
+# CartesianGeometry (2, 2) inhomogeneous grid ----------------------------------------------
 dim = 2
 breakpoints_cart_2_2_inh = ([0.0, 0.25, 1.0], [0.0, 0.5, 0.9, 1.0])
-cartesian_geometry_cart_2_2_inh = Mantis.Geometry.CartesianGeometry(breakpoints_cart_2_2_inh)
+cartesian_geometry_cart_2_2_inh = Mantis.Geometry.CartesianGeometry(
+    breakpoints_cart_2_2_inh
+)
 
 # Points where to evaluate the metric
 nx_evaluate = 3
@@ -111,25 +115,24 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
             if dim_1_idx != dim_2_idx
-                g_ref_cart_2_2_inh = 0.0
-                inv_g_ref_cart_2_2_inh = 0.0
+                @test all(isapprox.(g[:, dim_1_idx, dim_2_idx], 0.0; atol=atol))
+                @test all(isapprox.(inv_g[:, dim_1_idx, dim_2_idx], 0.0; atol=atol))
             else
                 g_ref_cart_2_2_inh = dx_cart_2_2_inh[dim_1_idx, element_idx]^2
-                inv_g_ref_cart_2_2_inh = 1.0/g_ref_cart_2_2_inh
+                inv_g_ref_cart_2_2_inh = 1.0 / g_ref_cart_2_2_inh
+                @test all(isapprox.(
+                    g[:, dim_1_idx, dim_2_idx], g_ref_cart_2_2_inh; rtol=rtol)
+                )
+                @test all(isapprox.(
+                    inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_2_2_inh; rtol=rtol)
+                )
             end
-
-            g_diff = g[:, dim_1_idx, dim_2_idx] .- g_ref_cart_2_2_inh
-            inv_g_diff = inv_g[:, dim_1_idx, dim_2_idx] .- inv_g_ref_cart_2_2_inh
-
-            @test isapprox(sum(abs.(g_diff)), 0.0; atol=low_atol)
-            @test isapprox(sum(abs.(inv_g_diff)), 0.0; atol=high_atol)
         end
     end
      
     # Test det_g
     det_g_ref_cart_2_2_inh = prod(dx_cart_2_2_inh[:, element_idx])
-    det_g_diff = sqrt_g[:] .- det_g_ref_cart_2_2_inh
-    @test isapprox(sum(abs.(det_g_diff)) , 0.0; atol=low_atol)
+    @test all(isapprox.(sqrt_g[:], det_g_ref_cart_2_2_inh; rtol=rtol))
 end
-# -----------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------
 end
