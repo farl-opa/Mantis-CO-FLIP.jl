@@ -2,50 +2,45 @@ module TensorProductGeometryTests
 
 import Mantis
 
-import ReadVTK
-using Printf
-using Test
+# Refer to the following file for method and variable definitions
+include("GeometryTestsHelpers.jl")
 
-# Compute base directories for data input and output
-reference_directory_tree = ["test", "data", "reference", "Geometry"]
-output_directory_tree = ["test", "data", "output", "Geometry"]
+import ReadVTK
+using Test
 
 # Test Square Tensor Product Geometry -----------------------------------------
 # Generate a tensor product geometry by combining two lines
 
-# Line 1
-breakpoints_1 = (Vector(0.0:0.1:1.0),)
-line_1_geo = Mantis.Geometry.CartesianGeometry(breakpoints_1)
-
-# Line 2
-breakpoints_2 = (Vector(2.0:0.1:3.0),)
-line_2_geo = Mantis.Geometry.CartesianGeometry(breakpoints_2)
+# Line geometries
+line_1_geometry = Mantis.Geometry.create_cartesian_box((0.0,), (1.0,), (10,))
+line_2_geometry = Mantis.Geometry.create_cartesian_box((2.0,), (1.0,), (10,))
 
 # Tensor product geometry 
-tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
+tensor_prod_geometry = Mantis.Geometry.TensorProductGeometry(
+    (line_1_geometry, line_2_geometry)
+)
 
-# Generate the plot
-output_filename = "tensor_product_geometry.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-Mantis.Plot.plot(tensor_prod_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+# Set file name and path
+file_name = "tensor_product_geometry.vtu"
+output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+# Generate the vtk file 
+Mantis.Plot.plot(
+    tensor_prod_geometry;
+    vtk_filename = output_file_path[1:end-4],
+    n_subcells = 1,
+    degree = 4,
+    ascii = false,
+    compress = false
+)
 
-# Test geometry 
 # Read the cell data from the reference file
-reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
-vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
-reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
-reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
-
+reference_points, reference_cells = get_point_cell_data(reference_directory_tree, file_name)
 # Read the cell data from the output file
-vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
-output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
-output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-
+output_points, output_cells = get_point_cell_data(output_file_path)
 # Check if cell data is identical
-@test reference_points ≈ output_points atol = 1e-14
-@test reference_cells == output_cells
+@test all(isapprox.(reference_points, output_points; rtol=rtol))
+@test all(isequal.(reference_cells, output_cells))
 # -----------------------------------------------------------------------------
-
 
 # Test Cylinder Tensor Product Geometry ---------------------------------------
 deg = 2
@@ -59,44 +54,41 @@ GB = Mantis.FunctionSpaces.GTBSplineSpace((B,), [1])
 
 # control points for geometry
 # radius of cylinder is 1.0
-geom_coeffs_circle =   [1.0  -1.0
-1.0   1.0
--1.0   1.0
--1.0  -1.0]
-
-cylinder_circle_geo = Mantis.Geometry.FEMGeometry(GB, geom_coeffs_circle)
-
+geom_coeffs_circle = [
+    +1.0  -1.0
+    +1.0  +1.0
+    -1.0  +1.0
+    -1.0  -1.0
+]
+cylinder_circle_geometry = Mantis.Geometry.FEMGeometry(GB, geom_coeffs_circle)
 dx_cylinder_line = 0.1
 nz_elements = 10
-breakpoints_cylinder_line = (Vector(LinRange(0.0, 1.0, nz_elements + 1)),)
-cylinder_line_geo = Mantis.Geometry.CartesianGeometry(breakpoints_cylinder_line)
+cylinder_line_geometry = Mantis.Geometry.create_cartesian_box((0.0,), (1.0,), (nz_elements,))
 
 # Tensor product geometry 
-cylinder_tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(cylinder_circle_geo, cylinder_line_geo)
-# Generate the plot
-output_filename = "tensor_product_cylinder_geometry.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-Mantis.Plot.plot(cylinder_tensor_prod_geo; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+cylinder_tensor_prod_geometry = Mantis.Geometry.TensorProductGeometry(
+    (cylinder_circle_geometry, cylinder_line_geometry)
+)
 
-# Test geometry 
-# Read the cell data from the reference file
-reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
-vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
-reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
-reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
-
-# Read the cell data from the output file
-vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
-output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
-output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-
-# Check if cell data is identical
-@test reference_points ≈ output_points atol = 1e-14
-@test reference_cells == output_cells
-
-# Test evaluation with NTuple input and automatic tensor product 
-
-
+# Set file name and path
+file_name = "tensor_product_cylinder_geometry.vtu"
+output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+# Generate the vtk file 
+Mantis.Plot.plot(
+    cylinder_tensor_prod_geometry;
+    vtk_filename = output_file_path[1:end-4], #remove the file extension
+    n_subcells = 1,
+    degree = 4,
+    ascii = false, 
+    compress = false
+)
+# Read the point and cell data from the reference file
+reference_points, reference_cells = get_point_cell_data(reference_directory_tree, file_name)
+# Read the point and cell data from the output file
+output_points, output_cells = get_point_cell_data(output_file_path)
+# Check if point and cell data is identical
+@test all(isapprox.(reference_points, output_points; atol=atol))
+@test all(isequal.(reference_cells, output_cells))
 
 # Test Jacobian with single point evaluation
 # We check the Jacobian 
@@ -105,39 +97,54 @@ output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["c
 
 for element_row_idx in 1:nz_elements
     # Compute Jacobian at x_{1} = [1.0, 0.0, z]
-    # This corresponds to the point with local coordinates [0.0, 0.0] on the first element of row element_row_idx
-    ξ = [0.0, 0.0]
+    # This corresponds to the point with local coordinates [0.0, 0.0] on the first element of
+    # row element_row_idx
+    ξ = ([0.0], [0.0])
     J_cylinder_reference = [0.0 0.5*π 0.0;;; 0.0 0.0 dx_cylinder_line] 
-    J_cylinder = Mantis.Geometry.jacobian(cylinder_tensor_prod_geo, (element_row_idx - 1)*nθ_elements + 1, ξ)
-    @test maximum(abs.(J_cylinder - J_cylinder_reference)) ≈ 0.0 atol = 1e-14
+    J_cylinder = Mantis.Geometry.jacobian(
+        cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 1, ξ
+    )
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian at x_{1} = [0.0, 1.0, 0.0]
-    # This corresponds to the point with local coordinates [1.0, 0.0] on the first element of row element_row_idx
-    ξ = [1.0, 0.0]
+    # This corresponds to the point with local coordinates [1.0, 0.0] on the first element
+    # of row element_row_idx
+    ξ = ([1.0], [0.0])
     J_cylinder_reference = [-0.5*π 0.0 0.0;;; 0.0 0.0 dx_cylinder_line] 
-    J_cylinder = Mantis.Geometry.jacobian(cylinder_tensor_prod_geo, (element_row_idx - 1)*nθ_elements + 1, ξ)
-    @test maximum(abs.(J_cylinder - J_cylinder_reference)) ≈ 0.0 atol = 1e-14
+    J_cylinder = Mantis.Geometry.jacobian(
+        cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 1, ξ
+    )
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian at x_{1} = [-1.0, 0.0, 0.0]
-    # This corresponds to the point with local coordinates [1.0, 0.0] on the second element of row element_row_idx
-    ξ = [1.0, 0.0]
+    # This corresponds to the point with local coordinates [1.0, 0.0] on the second element
+    # of row element_row_idx
+    ξ = ([1.0], [0.0])
     J_cylinder_reference = [0.0 -0.5*π 0.0;;; 0.0 0.0 dx_cylinder_line] 
-    J_cylinder = Mantis.Geometry.jacobian(cylinder_tensor_prod_geo, (element_row_idx - 1)*nθ_elements + 2, ξ)
-    @test maximum(abs.(J_cylinder - J_cylinder_reference)) ≈ 0.0 atol = 1e-14
+    J_cylinder = Mantis.Geometry.jacobian(
+        cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 2, ξ
+    )
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian at x_{1} = [0.0, -1.0, 0.0]
-    # This corresponds to the point with local coordinates [1.0, 0.0] on the third element of row element_row_idx
-    ξ = [1.0, 0.0]
+    # This corresponds to the point with local coordinates [1.0, 0.0] on the third element
+    # of row element_row_idx
+    ξ = ([1.0], [0.0])
     J_cylinder_reference = [0.5*π 0.0 0.0;;; 0.0 0.0 dx_cylinder_line] 
-    J_cylinder = Mantis.Geometry.jacobian(cylinder_tensor_prod_geo, (element_row_idx - 1)*nθ_elements + 3, ξ)
-    @test maximum(abs.(J_cylinder - J_cylinder_reference)) ≈ 0.0 atol = 1e-14
+    J_cylinder = Mantis.Geometry.jacobian(
+        cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 3, ξ
+    )
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 
     # Compute Jacobian again at x_{1} = [1.0, 0.0, 0.0]
-    # This corresponds to the point with local coordinates [1.0, 0.0] on the fourth element of row element_row_idx
-    ξ = [1.0, 0.0]
+    # This corresponds to the point with local coordinates [1.0, 0.0] on the fourth element
+    # of row element_row_idx
+    ξ = ([1.0], [0.0])
     J_cylinder_reference = [0.0 0.5*π 0.0;;; 0.0 0.0 dx_cylinder_line] 
-    J_cylinder = Mantis.Geometry.jacobian(cylinder_tensor_prod_geo, (element_row_idx - 1)*nθ_elements + 4, ξ)
-    @test maximum(abs.(J_cylinder - J_cylinder_reference)) ≈ 0.0 atol = 1e-14
+    J_cylinder = Mantis.Geometry.jacobian(
+        cylinder_tensor_prod_geometry, (element_row_idx - 1)*nθ_elements + 4, ξ
+    )
+    @test all(isapprox.(J_cylinder, J_cylinder_reference; atol=atol))
 end
 
 # -----------------------------------------------------------------------------

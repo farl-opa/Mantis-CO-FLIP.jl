@@ -44,7 +44,7 @@ line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
 line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 
 # Tensor product geometry 
-tensor_prod_geo = Mantis.Geometry.TensorProductGeometry(line_1_geo, line_2_geo)
+tensor_prod_geo = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
 
 # Crazy mesh
@@ -170,12 +170,12 @@ line_geo = Mantis.Geometry.CartesianGeometry((breakpoints,))
 geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints, breakpoints))
 
 # Crazy Tensor product geometry in 2D (auxiliary) 
-tensor_prod_geo_2d = Mantis.Geometry.TensorProductGeometry(line_geo, line_geo)
+tensor_prod_geo_2d = Mantis.Geometry.TensorProductGeometry((line_geo, line_geo))
 geo_2d_cart_aux = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints))
 crazy_geo_2d_cart = Mantis.Geometry.MappedGeometry(geo_2d_cart_aux, crazy_mapping)
 
 # Crazy mesh 3D (in x and y only, z is straight) (this is also a tensor product geometry)
-crazy_geo_3d_cart = Mantis.Geometry.TensorProductGeometry(crazy_geo_2d_cart, line_geo)
+crazy_geo_3d_cart = Mantis.Geometry.TensorProductGeometry((crazy_geo_2d_cart, line_geo))
 
 
 
