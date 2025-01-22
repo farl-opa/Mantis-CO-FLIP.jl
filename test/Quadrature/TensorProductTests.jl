@@ -11,7 +11,7 @@ const Quad = Mantis.Quadrature
 
 
 # Defines test functions and tolerances for quadrature rules.
-include("HelperQuadratureTests.jl")
+include("QuadratureTestsSetup.jl")
 
 
 # The tensor product quadrature is a product of two or more 1D quadrature rules. The 1D

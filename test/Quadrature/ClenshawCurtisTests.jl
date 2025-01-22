@@ -8,7 +8,7 @@ using Test
 
 
 # Defines test functions and tolerances for quadrature rules.
-include("HelperQuadratureTests.jl")
+include("QuadratureTestsSetup.jl")
 
 
 # Clenshaw-Curtis Quadrature ---------------------------------------------------------------

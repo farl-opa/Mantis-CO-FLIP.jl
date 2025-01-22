@@ -8,7 +8,7 @@ using Test
 
 
 # Defines test functions and tolerances for quadrature rules.
-include("HelperQuadratureTests.jl")
+include("QuadratureTestsSetup.jl")
 
 # The Gauss quadrature rules use the FastGaussQuadrature.jl package, so we will focus on
 # testing our modifications. A few additional tests for the correctness of the rules are
