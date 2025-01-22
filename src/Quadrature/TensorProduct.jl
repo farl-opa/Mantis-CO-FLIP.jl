@@ -1,6 +1,7 @@
 @doc raw"""
-    tensor_product_rule(p::NTuple{manifold_dim, Int}, quad_rule::F, rule_args_1d...) where
-        {manifold_dim, F <: Function}
+    tensor_product_rule(p::NTuple{manifold_dim, Int}, quad_rule::F, rule_args_1d...) where {
+        manifold_dim, F <: Function
+    }
 
 Returns a tensor product quadrature rule of given degree and rule type.
 
@@ -42,8 +43,8 @@ end
 
 @doc raw"""
     tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}) where {
-    manifold_dim
-}
+        manifold_dim
+    }
 
 Returns a tensor product quadrature rule from the given rules.
 
@@ -81,8 +82,8 @@ end
 
 @doc raw"""
     _compute_tensor_product(weights_1d::NTuple{manifold_dim, Vector{T}}) where {
-    manifold_dim, T <: Number
-}
+        manifold_dim, T <: Number
+    }
 
 Compute the tensor product of the given 1D quadrature weights.
 

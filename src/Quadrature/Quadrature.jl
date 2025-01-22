@@ -14,7 +14,7 @@ In general, a quadrature rule can be written as:
 ```math
 \int_{0}^{1} f(x) dx \approx \sum_{i=1}^{N} w_i f(x_i)
 ```
-where `N` is the number of quadrature nodes, `w_i` are the weights, and `x_i` are the
+where ``N`` is the number of quadrature nodes, ``w_i`` are the weights, and ``x_i`` are the
 quadrature nodes. Note that the integral is computed on the interval [0, 1].
 
 The exported names are:
