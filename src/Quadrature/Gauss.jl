@@ -55,9 +55,9 @@ interval [0, 1].
 """
 function gauss_legendre(N::Int)
     if N <= 0
-        throw(DomainError("""
-            Invalid number of nodes: $N. Gauss-Legendre quadrature must have at least one
-            node.
+        throw(DomainError("""\
+            Invalid number of nodes: $N. Gauss-Legendre quadrature must have at least one \
+            node.\
             """
         ))
     end

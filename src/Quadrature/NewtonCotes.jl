@@ -20,9 +20,9 @@ function newton_cotes(num_points::Int, type::String)
     # Compute the equally spaced nodes on the interval [-1, 1].
     if type == "closed"
         if num_points <= 1
-            throw(DomainError("""
-                Invalid number of points: $num_points. A closed Newton-Cotes rule requires
-                at least 2 points.
+            throw(DomainError("""\
+                Invalid number of points: $num_points. A closed Newton-Cotes rule requires \
+                at least 2 points.\
                 """
             ))
         else
@@ -31,9 +31,9 @@ function newton_cotes(num_points::Int, type::String)
 
     elseif type == "open"
         if num_points <= 0
-            throw(DomainError("""
-                Invalid number of points: $num_points. An open Newton-Cotes
-                rule requires at least 1 point.
+            throw(DomainError("""\
+                Invalid number of points: $num_points. An open Newton-Cotes rule requires \
+                at least 1 point.\
                 """
             ))
         else
@@ -41,8 +41,8 @@ function newton_cotes(num_points::Int, type::String)
         end
 
     else
-        throw(ArgumentError("""
-            Invalid Newton-Cotes type: $type. Valid types are 'closed' and 'open'.
+        throw(ArgumentError("""\
+            Invalid Newton-Cotes type: $type. Valid types are 'closed' and 'open'.\
             """
         ))
     end

@@ -54,9 +54,9 @@ for one_d_rule in one_dim_quad_rules
         )
 
         one_d_rule_info = (
-            Quad.get_quadrature_nodes(one_d_rule),
-            Quad.get_quadrature_weights(one_d_rule),
-            Quad.get_quadrature_rule_label(one_d_rule),
+            Quad.get_quadrature_nodes(quad_rule_1d),
+            Quad.get_quadrature_weights(quad_rule_1d),
+            Quad.get_quadrature_rule_label(quad_rule_1d),
         )
 
         @test all(quad_rule_info .== one_d_rule_info)
@@ -152,9 +152,9 @@ end
 
 # Test the tensor product of different rules.
 quad_rule = Quad.tensor_product_rule(one_dim_rules)
-label = """
-    Tensor-product of (Clenshaw-Curtis, Gauss-Legendre, Gauss-Lobatto, Newton-Cotes (closed)
-    , Newton-Cotes (open)) rules
+label = """\
+    Tensor-product of (Clenshaw-Curtis, Gauss-Legendre, Gauss-Lobatto, Newton-Cotes \
+    (closed), Newton-Cotes (open)) rules\
     """
 
 w = Quad.get_quadrature_weights(quad_rule)

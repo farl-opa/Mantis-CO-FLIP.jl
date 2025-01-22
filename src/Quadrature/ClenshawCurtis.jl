@@ -19,9 +19,9 @@ used here is a direct translation from the given MATLAB code on page 201.
 """
 function clenshaw_curtis(p::Int)
     if p <= 1
-        throw(DomainError("""
-            Invalid degree: $p. The degree for Clenshaw-Curtis quadrature must be greater
-            than 1.
+        throw(DomainError("""\
+            Invalid degree: $p. The degree for Clenshaw-Curtis quadrature must be greater \
+            than 1.\
             """
         ))
     end
