@@ -4,9 +4,10 @@ on:
     branches: [main, master]
     tags: [v*]
   pull_request:
-
+    types: [opened, synchronize, reopened, ready_for_review]
 jobs:
   Documenter:
+    if: github.event.pull_request.draft == false
     permissions:
       contents: write
       statuses: write
