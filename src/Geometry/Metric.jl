@@ -1,4 +1,3 @@
-import LinearAlgebra
 
 function metric(
     geometry::AbstractGeometry{manifold_dim},
