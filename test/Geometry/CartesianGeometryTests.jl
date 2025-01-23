@@ -3,42 +3,69 @@ module CartesianGeometryTests
 import Mantis
 
 import ReadVTK
-using Printf
-
 using Test
 
-# Compute base directories for data input and output
-reference_directory_tree = ["test", "data", "reference", "Geometry"]
-output_directory_tree = ["test", "data", "output", "Geometry"]
+# Refer to the following file for method and variable definitions.
+include("GeometryTestsHelpers.jl")
 
-# Test CartesianGeometry ------------------------------------------------------
+
+# Constructor, property, and getters and setters tests -------------------------------------
+# Vector{Float64} input.
+geometry = Mantis.Geometry.CartesianGeometry(
+    ([0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75])
+)
+@test typeof(geometry) == Mantis.Geometry.CartesianGeometry{3}
+@test geometry.breakpoints == ([0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75])
+@test geometry.n_elements == (2, 2, 3)
+
+@test Mantis.Geometry.get_num_elements(geometry) == 12
+@test Mantis.Geometry.get_domain_dim(geometry) == 3
+@test Mantis.Geometry.get_image_dim(geometry) == 3
+
+# LinRange input.
+geometry = Mantis.Geometry.CartesianGeometry(
+    (LinRange(0.5, 2.5, 5), LinRange(-0.75, 0.75, 3))
+)
+@test typeof(geometry) == Mantis.Geometry.CartesianGeometry{2}
+@test geometry.breakpoints == ([0.5, 1.0, 1.5, 2.0, 2.5], [-0.75, 0.0, 0.75])
+@test geometry.n_elements == (4, 2)
+
+@test Mantis.Geometry.get_num_elements(geometry) == 8
+@test Mantis.Geometry.get_domain_dim(geometry) == 2
+@test Mantis.Geometry.get_image_dim(geometry) == 2
+
+
+
+
+# Test 2D CartesianGeometry ----------------------------------------------------------------
 for nx = 1:3
     for ny = 1:3
-        breakpoints = (collect(LinRange(0.0, 1.0, nx+1)), collect(LinRange(0.0,2.0,ny+1)))
-        geom = Mantis.Geometry.CartesianGeometry(breakpoints)
-        
-        # Generate the plot
-        output_filename = @sprintf "cartesian_test_nx_%d_ny_%d.vtu" nx ny
-        output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-        Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 1, ascii = false, compress = false)
+        geometry = Mantis.Geometry.create_cartesian_box((0.0, 0.0), (1.0, 2.0), (nx, ny))
 
-        # Test geometry 
-        # Read the cell data from the reference file
-        reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
-        vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
-        reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
-        reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
+        # Set file name and path
+        file_name = "cartesian_test_nx_$(nx)_ny_$(ny).vtu"
+        output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+        # Generate the vtk file
+        Mantis.Plot.plot(
+            geometry;
+            vtk_filename = output_file_path[1:end-4],  # Remove the file extension.
+            n_subcells = 1,
+            degree = 1,
+            ascii = false,
+            compress = false
+        )
 
-        # Read the cell data from the output file
-        vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
-        output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
-        output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-        
-        # # Check if cell data is identical
-        @test reference_points ≈ output_points atol = 1e-14
-        @test reference_cells == output_cells
+        # Read the cell data from the reference file.
+        reference_points, reference_cells = get_point_cell_data(
+            reference_directory_tree, file_name
+        )
+        # Read the cell data from the output file.
+        output_points, output_cells = get_point_cell_data(output_file_path)
+
+        # Check if cell data is point-wise identical.
+        @test all(isapprox.(reference_points, output_points; rtol=rtol))
+        @test all(isequal.(reference_cells, output_cells))
     end
 end
-# -----------------------------------------------------------------------------
 
 end

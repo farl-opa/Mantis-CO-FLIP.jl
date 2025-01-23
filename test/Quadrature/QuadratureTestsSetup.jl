@@ -24,8 +24,8 @@ end
 
 
 # Chebyshev and integrated Chebyshev functions.
-# This is a recursive function. To reduce the number of recursive calls,
-# we have hardcoded a few Chebyshev polynomials.
+# This is a recursive function. To reduce the number of recursive calls, we have hardcoded a
+# few Chebyshev polynomials.
 function chebyshev(degree::Int, x::Float64)
     if degree == 0
         return 1.0
@@ -63,9 +63,10 @@ function integrated_chebyshev(degree::Int, x::Float64)
     if degree == 0
         return x
     elseif degree == 1
-        return 0.5*x^2
+        return 0.5 * x^2
     else
-        return degree*chebyshev(degree+1, x)/(degree^2-1) - x*chebyshev(degree, x)/(degree-1)
+        return degree * chebyshev(degree+1, x) / (degree^2 - 1) -
+            x * chebyshev(degree, x) / (degree - 1)
     end
 end
 
@@ -73,9 +74,10 @@ function integrated_chebyshev(degree::Int, x::Vector{Float64})
     if degree == 0
         return x
     elseif degree == 1
-        return 0.5.*x.^2
+        return 0.5 .* x.^2
     else
-        return degree.*chebyshev(degree+1, x)./(degree^2-1) .- x.*chebyshev(degree, x)./(degree-1)
+        return degree .* chebyshev(degree+1, x) ./ (degree^2-1) .-
+            x .* chebyshev(degree, x) ./ (degree-1)
     end
 end
 
@@ -86,9 +88,13 @@ function chebyshev_nd(degrees::NTuple{N, Int}, x::NTuple{N, Vector{Float64}}) wh
     for (linear_idx, poly_all) in enumerate(Iterators.product(cheb_1d...))
         result[linear_idx] = prod(poly_all)
     end
+
     return result
 end
 
 function integrated_chebyshev_nd(degrees::NTuple{N, Int}) where {N}
-    return prod([integrated_chebyshev(degrees[i], 1.0) - integrated_chebyshev(degrees[i], 0.0) for i = 1:N])
+    return prod([
+        integrated_chebyshev(degrees[i], 1.0) -
+        integrated_chebyshev(degrees[i], 0.0) for i = 1:N
+    ])
 end

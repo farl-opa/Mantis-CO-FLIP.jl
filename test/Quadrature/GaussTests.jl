@@ -8,14 +8,13 @@ using Test
 
 
 # Defines test functions and tolerances for quadrature rules.
-include("HelperQuadratureTests.jl")
+include("QuadratureTestsSetup.jl")
 
-# The Gauss quadrature rules use the FastGaussQuadrature.jl package, so
-# we will focus on testing our modifications. A few additional tests for
-# the correctness of the rules are added in case there is a bug in the
-# FastGaussQuadrature.jl package.
+# The Gauss quadrature rules use the FastGaussQuadrature.jl package, so we will focus on
+# testing our modifications. A few additional tests for the correctness of the rules are
+# added in case there is a bug in the FastGaussQuadrature.jl package.
 
-# Gauss-Lobatto --------------------------------------------------------
+# Gauss-Lobatto ----------------------------------------------------------------------------
 for N in range(2, 17, step=3)
     quad_rule = Mantis.Quadrature.gauss_lobatto(N)
 
@@ -24,7 +23,7 @@ for N in range(2, 17, step=3)
 
 
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Gauss-Lobatto"
+    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Gauss-Lobatto"
 
 
     # Constructor tests.
@@ -36,17 +35,12 @@ for N in range(2, 17, step=3)
     @test_throws DomainError Mantis.Quadrature.gauss_lobatto(1)
     @test_throws DomainError Mantis.Quadrature.gauss_lobatto(0)
     @test_throws DomainError Mantis.Quadrature.gauss_lobatto(-1)
-    
+
 
     # Property tests.
-    # Test that sum of weights is one.
     @test isapprox(sum(w), 1.0, atol=atol)
-    # Test that all weights are positive.
     @test all(w .> 0.0)
-    # Test that the weights are symmetric.
     @test isapprox(w, reverse(w), atol=atol)
-
-    # Test that nodes are not outside the range [0.0, 1.0].
     @test sum((ξ .< 0.0) .& (ξ .> 1.0)) == 0
     # Test that the endpoints are included.
     @test isapprox(ξ[1], 0.0, atol = atol)
@@ -55,8 +49,8 @@ for N in range(2, 17, step=3)
 
 
     # Value tests on [0,1].
-    # Test that the quadrature rule is exact for polynomials of degree
-    # up to 2N-3 (with N the number of nodes).
+    # Test that the quadrature rule is exact for polynomials of degree up to 2N-3 (with N
+    # the number of nodes).
     for degree in 0:2*N-3
         f = monomial(degree, ξ)
         I_num = LinearAlgebra.dot(w, f)
@@ -69,12 +63,10 @@ for N in range(2, 17, step=3)
         @test isapprox(I_num, I, atol=atol)
     end
 
-    # Test that the quadrature rule is not exact for polynomials of
-    # degree 2N-2.
+    # Test that the quadrature rule is not exact for polynomials of degree 2N-2.
 
-    # The monomials can be exactly integrated for degrees up to 4*N-6. 
-    # This is because they have a numerical order of 0.5p, see
-    # Trefethen2022.
+    # The monomials can be exactly integrated for degrees up to 4*N-6. This is because they
+    # have a numerical order of 0.5p, see Trefethen2022.
     f = monomial(4*N-6, ξ)
     I_num = LinearAlgebra.dot(w, f)
     I = integrated_monomial(4*N-6, 1.0) - integrated_monomial(4*N-6, 0.0)
@@ -89,7 +81,7 @@ end
 
 
 
-# Gauss-Legendre -------------------------------------------------------
+# Gauss-Legendre ---------------------------------------------------------------------------
 for N in range(1, 16, step=3)
     quad_rule = Mantis.Quadrature.gauss_legendre(N)
 
@@ -98,7 +90,7 @@ for N in range(1, 16, step=3)
 
 
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_type(quad_rule) == "Gauss-Legendre"
+    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Gauss-Legendre"
 
 
     # Constructor tests.
@@ -109,24 +101,19 @@ for N in range(1, 16, step=3)
     # Test that the constructor throws an error for invalid degrees.
     @test_throws DomainError Mantis.Quadrature.gauss_legendre(0)
     @test_throws DomainError Mantis.Quadrature.gauss_legendre(-1)
-    
+
 
     # Property tests.
-    # Test that sum of weights is one.
     @test isapprox(sum(w), 1.0, atol=atol)
-    # Test that all weights are positive.
     @test all(w .> 0.0)
-    # Test that the weights are symmetric.
     @test isapprox(w, reverse(w), atol=atol)
-
-    # Test that nodes are not outside the range [0.0, 1.0].
     @test sum((ξ .< 0.0) .& (ξ .> 1.0)) == 0
 
 
 
     # Value tests on [0,1].
-    # Test that the quadrature rule is exact for polynomials of degree
-    # up to 2N-1 (with N the number of nodes).
+    # Test that the quadrature rule is exact for polynomials of degree up to 2N-1 (with N
+    # the number of nodes).
     for degree in 0:2*N-1
         f = monomial(degree, ξ)
         I_num = LinearAlgebra.dot(w, f)
@@ -142,9 +129,8 @@ for N in range(1, 16, step=3)
     # Test that the quadrature rule is not exact for polynomials of
     # degree 2N.
 
-    # The monomials can be exactly integrated for degrees up to 4*N. 
-    # This is because they have a numerical order of 0.5p, see
-    # Trefethen2022.
+    # The monomials can be exactly integrated for degrees up to 4*N. This is because they
+    # have a numerical order of 0.5p, see Trefethen2022.
     f = monomial(4*N, ξ)
     I_num = LinearAlgebra.dot(w, f)
     I = integrated_monomial(4*N, 1.0) - integrated_monomial(4*N, 0.0)
