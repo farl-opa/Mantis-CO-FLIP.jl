@@ -63,10 +63,10 @@ function inv_metric(
     # allocations by about a 1/3 factor. Still, a better solution is needed ― possibly
     # changing the way geometry evaluations are stored.
     g_permuted = permutedims(g, (2,3,1))
+    inv_g = Array{Float64, 3}(undef, size(g))
     for point in axes(g_permuted, 3)
-        g_permuted[:,:,point] .= LinearAlgebra.inv(view(g_permuted, :, :, point))
+        inv_g[point,:,:] .= LinearAlgebra.inv(view(g_permuted, :, :, point))
     end
-    inv_g = permutedims(g_permuted, (3,1,2)) # revert back to original storage order
 
     return inv_g, g, sqrt_g
 end
