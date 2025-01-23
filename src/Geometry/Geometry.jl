@@ -31,8 +31,8 @@ function get_element_size(geometry::AbstractGeometry, element_id::Int)
     return _get_element_size(geometry, element_id)
 end
 
-function get_element_size(geometry::AbstractGeometry, element_id::Int)
-    return _get_element_size(geometry, element_id)
+function get_element_dimensions(geometry::AbstractGeometry, element_id::Int)
+    return _get_element_dimensions(geometry, element_id)
 end
 
 # core functionality
