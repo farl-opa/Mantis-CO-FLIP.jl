@@ -11,7 +11,7 @@ using SparseArrays
 
 Weak form for the computation of the ``L^2``-projection on the given element. The associated weak formulation is:
 
-For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k_h \in X^k`` such that 
+For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k_h \in X^k`` such that
 ```math
 \int_{\Omega} \phi^k_h \wedge \star \varphi^k_h = -\int_{\Omega} f^k \wedge \star \varphi^k_h \quad \forall \ \varphi^k_h \in X^k\;,
 ```
@@ -25,13 +25,13 @@ function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1,
 
     # The r.h.s. is the inner product between the test and forcing functions.
     b_row_idx, _, b_elem = Forms.evaluate_inner_product(inputs.space_test[1], inputs.forcing[1], element_id, inputs.quad_rule)
-    
-    # The output should be the contribution to the left-hand-side matrix 
-    # A and right-hand-side vector b. The outputs are tuples of 
-    # row_indices, column_indices, values for the matrix part and 
+
+    # The output should be the contribution to the left-hand-side matrix
+    # A and right-hand-side vector b. The outputs are tuples of
+    # row_indices, column_indices, values for the matrix part and
     # column_indices, values for the vector part.
     return (A_row_idx, A_col_idx, A_elem), (b_row_idx, b_elem)
-    
+
 end
 
 function L2_projection(fₑ, Xᵏ, ∫)
@@ -46,7 +46,7 @@ function L2_projection(fₑ, Xᵏ, ∫)
 
     # create the form field from the solution coefficients
     fₕ = Mantis.Forms.build_form_fields(weak_form_inputs.space_trial, sol; labels=("fh",))[1]
-    
+
     # return the field
     return fₕ
 end
@@ -81,7 +81,7 @@ function sinusoidal_solution(form_rank::Int, geo::Mantis.Geometry.AbstractGeomet
     n_form_components = binomial(manifold_dim, form_rank)
     ω = 1.0
     function my_sol(x::Matrix{Float64})
-        # ∀i ∈ {1, 2, ..., n}: uᵢ = sin(ωx¹)sin(ωx²)...sin(ωxⁿ) 
+        # ∀i ∈ {1, 2, ..., n}: uᵢ = sin(ωx¹)sin(ωx²)...sin(ωxⁿ)
         y = @. sin(ω * x)
         return repeat([vec(prod(y, dims=2))], n_form_components)
     end
@@ -99,7 +99,7 @@ for (p_idx, p) in enumerate(p⁰)
 
         # section space degrees
         degree = (p, p)
-        
+
         # function space regularities
         regularities = degree .- 1
         if section_space == Mantis.FunctionSpaces.LobattoLegendre
@@ -138,7 +138,7 @@ for (p_idx, p) in enumerate(p⁰)
 
             # create (and refine) polar spline complex
             X, _, geom_coeffs_tp = Mantis.Forms.create_polar_spline_de_rham_complex(num_elements, section_spaces, regularities, R; refine = ref_lev>0, geom_coeffs_tp = geom_coeffs_tp)
-            
+
             # update number of elements
             num_elements = (num_el_θ, num_el_r) .* (2^ref_lev)
             # update ECT coefficients
@@ -158,9 +158,9 @@ for (p_idx, p) in enumerate(p⁰)
 
                 # solve the problem
                 fₕ = L2_projection(fₑ, X[form_rank+1], ∫)
-                
+
                 # compute error
-                error = Mantis.Assemblers.L2_norm(fₕ - fₑ, ∫)
+                error = Mantis.Analysis.L2_norm(fₕ - fₑ, ∫)
                 errors[ref_lev+1, p_idx, ss_idx, form_rank+1] = error
 
                 if verbose; display("   Error: $error"); end

@@ -1,4 +1,12 @@
 
+function L2_norm(u, ∫)
+    norm = 0.0
+    for el_id ∈ 1:Geometry.get_num_elements(u.geometry)
+        norm += Forms.evaluate_inner_product(u, u, el_id, ∫)[3][1]
+    end
+    return sqrt(norm)
+end
+
 function _compute_square_error_per_element(computed_sol::TF1, exact_sol::TF2, quad_rule::Q, norm="L2") where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, Q <: Quadrature.QuadratureRule{manifold_dim}}
     num_elements = Geometry.get_num_elements(Forms.get_geometry(computed_sol))
     result = Vector{Float64}(undef, num_elements)

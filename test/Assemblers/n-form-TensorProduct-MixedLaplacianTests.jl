@@ -11,7 +11,7 @@ using SparseArrays
 
 Function for assembling the weak form of the n-form Hodge Laplacian on the given element. The associated weak formulation is:
 
-Given ``f^n \in L^2 \Lambda^n (\Omega)``, find ``u^{n-1}_h \in X^{n-1}`` and ``\phi^n \in X^n`` such that 
+Given ``f^n \in L^2 \Lambda^n (\Omega)``, find ``u^{n-1}_h \in X^{n-1}`` and ``\phi^n \in X^n`` such that
 ```math
 \begin{gather}
 \langle \varepsilon^{n-1}_h, u^{n-1}_h \rangle - \langle d \varepsilon^{n-1}_h, \phi^n_h \rangle = 0 \quad \forall \ \varepsilon^{n-1}_h \in X^{n-1} \\
@@ -25,10 +25,10 @@ function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{ma
     # Left hand side.
     # <ε¹, u¹>
     A_row_idx_11, A_col_idx_11, A_elem_11 = Forms.evaluate_inner_product(inputs.space_test[1], inputs.space_trial[1], element_id, inputs.quad_rule)
-    
+
     # <dε¹, ϕ²>
     A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(Forms.exterior_derivative(inputs.space_test[1]), inputs.space_trial[2], element_id, inputs.quad_rule)
-    
+
     # <ε², du¹>
     A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(inputs.space_test[2], Forms.exterior_derivative(inputs.space_trial[1]), element_id, inputs.quad_rule)
 
@@ -49,17 +49,17 @@ function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{ma
     # <ε², f²>
     b_row_idx, _, b_elem = Forms.evaluate_inner_product(inputs.space_test[2], inputs.forcing[2], element_id, inputs.quad_rule)
     b_elem .*= -1.0
-    
+
     b_row_idx .+= Forms.get_num_basis(inputs.space_test[1])
 
-    
-    # The output should be the contribution to the left-hand-side matrix 
-    # A and right-hand-side vector b. The outputs are tuples of 
-    # row_indices, column_indices, values for the matrix part and 
-    # row_indices, values for the vector part. For this case, no shifts 
+
+    # The output should be the contribution to the left-hand-side matrix
+    # A and right-hand-side vector b. The outputs are tuples of
+    # row_indices, column_indices, values for the matrix part and
+    # row_indices, values for the vector part. For this case, no shifts
     # or offsets are needed.
     return (A_row_idx, A_col_idx, A_elem), (b_row_idx, b_elem)
-    
+
 end
 
 function volume_form_hodge_laplacian(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
@@ -78,7 +78,7 @@ function volume_form_hodge_laplacian(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
 
     # create solution as form fields and return
     uₕ, ϕₕ = Mantis.Forms.build_form_fields(V, sol; labels=("uh", "ϕh"))
-    
+
     # return the field
     return uₕ, ϕₕ
 end
@@ -132,7 +132,7 @@ function sinusoidal_solution(geo::Mantis.Geometry.AbstractGeometry)
         if size(x,2) == 1
             # (a) -> (a)
             return [w[1]]
-            
+
         elseif size(x,2) == 2
             # (a, b) -> (-b, a)
             w = [-w[2], w[1]]
@@ -157,7 +157,7 @@ function sinusoidal_solution(geo::Mantis.Geometry.AbstractGeometry)
     ϕ² = Mantis.Forms.AnalyticalFormField(2, my_sol, geo, "ϕ")
     δϕ² = Mantis.Forms.AnalyticalFormField(1, flux_my_sol, geo, "δϕ")
     f² = Mantis.Forms.AnalyticalFormField(2, laplace_my_sol, geo, "f")
-    
+
     return ϕ², δϕ², f²
 end
 
@@ -173,7 +173,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
             # section space degrees
             degree = (p, p)
-            
+
             # function space regularities
             regularities = degree .- 1
             if section_space == Mantis.FunctionSpaces.LobattoLegendre
@@ -207,10 +207,10 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                     section_spaces = map(section_space, degree)
                     dq⁰ = (2, 2)
                 end
-    
+
                 # quadrature rule
                 ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
-                
+
                 # create tensor-product B-spline complex
                 X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
 
@@ -224,10 +224,10 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
                 # solve the problem
                 uₕ, ϕₕ = volume_form_hodge_laplacian(fₑ, X[2], X[3], ∫)
-                
+
                 # compute error
-                error = Mantis.Assemblers.L2_norm(ϕₕ - ϕₑ, ∫)
-                δerror = Mantis.Assemblers.L2_norm(uₕ - δϕₑ, ∫)
+                error = Mantis.Analysis.L2_norm(ϕₕ - ϕₑ, ∫)
+                δerror = Mantis.Analysis.L2_norm(uₕ - δϕₑ, ∫)
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 1] = error
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 2] = δerror
 
