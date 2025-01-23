@@ -1,4 +1,3 @@
-import LinearAlgebra
 
 struct FEMGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
     geometry_coeffs::Array{Float64,2}

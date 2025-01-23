@@ -3,7 +3,9 @@
 
 Contains all geometry definitions.
 """
-module Geometry 
+module Geometry
+
+import LinearAlgebra
 
 using .. FunctionSpaces
 

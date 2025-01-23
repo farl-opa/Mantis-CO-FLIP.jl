@@ -1,4 +1,3 @@
-import LinearAlgebra
 
 struct CartesianGeometry{manifold_dim} <: AbstractAnalyticalGeometry{manifold_dim}
     n_elements::NTuple{manifold_dim,Int}
