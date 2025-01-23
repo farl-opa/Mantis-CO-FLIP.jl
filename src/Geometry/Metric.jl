@@ -17,25 +17,14 @@ function metric(
     n_evaluation_points = prod(size.(xi, 1))  # compute the number of nD points evaluated
     g = zeros(Float64, n_evaluation_points, manifold_dim, manifold_dim) 
 
-    ## Compute the metric 
-    #for column_idx in 1:manifold_dim 
-    #    for row_idx in 1:manifold_dim
-    #        for point in 1:n_evaluation_points
-    #            for dim in 1:manifold_dim
-    #                g[point, row_idx, column_idx] += 
-    #                    J[point, dim, row_idx] * J[point, dim, column_idx]
-    #            end
-    #        end
-    #    end
-    #end
-
-    # Here we compute: gᵢⱼ := ∑ₖᵐ ∂Φᵏ\∂ξᵢ ⋅ ∂Φᵏ\∂ξⱼ
-    # with:
-    #   - i := row 
-    #   - j := column
-    # The summation over k corresponds to the summation over the dimension 2.
+    # Compute the metric 
     for index in CartesianIndices(g)
         (point, row, column) = Tuple(index)
+        # Here we compute: gᵢⱼ := ∑ₖᵐ ∂Φᵏ\∂ξᵢ ⋅ ∂Φᵏ\∂ξⱼ
+        # with:
+        #   - i := row 
+        #   - j := column
+        # The summation over k corresponds to the summation over the second dimension.
         for k in 1:manifold_dim
             g[point, row, column] += J[point, k, row] * J[point, k, column]
         end
@@ -67,14 +56,14 @@ function inv_metric(
     g, sqrt_g = metric(geometry, element_id, xi)
 
     # Then compute the inverse of the metric
-    # inv_g = mapslices(LinearAlgebra.inv, g, dims=(2, 3))  # operate LinearAlgebra.inv over
-    # the dimension 2 and 3 of g
-
-    # this is needed because inv can't handle non-contiguous columns. This is what happens
-    # when using views in the original g storage order
+    # Permuting the dimensions of g is needed because inv can't handle non-contiguous
+    # columns, which is what happens when using views in the original g storage order.
+    # This has been compared with looping over the points of g and copying the corresponding
+    # inverse to a pre-allocated array, and it appeared to be faster and with less
+    # allocations by about a 1/3 factor. Still, a better solution is needed ― possibly
+    # changing the way geometry evaluations are stored.
     g_permuted = permutedims(g, (2,3,1))
     inv_g = LinearAlgebra.inv.(eachslice(g_permuted; dims=3))
-    
 
     return inv_g, g, sqrt_g
 end
