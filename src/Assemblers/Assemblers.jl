@@ -15,16 +15,11 @@ import .. Mesh
 import .. FunctionSpaces
 
 
-abstract type AbstractAssemblers end
 abstract type AbstractInputs end
-abstract type AbstractBoundaryForms end
 
 
 include("WeakFormulations.jl")
 include("GlobalAssemblers.jl")
-include("ErrorComputations.jl")
-
-include("AssemblerHelpers.jl")
 
 
 end

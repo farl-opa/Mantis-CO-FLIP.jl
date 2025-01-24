@@ -14,7 +14,7 @@ for p in degrees_to_test
     quad_rule = Mantis.Quadrature.gauss_legendre(q)
     x = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
     w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
-    
+
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))
 
@@ -40,7 +40,7 @@ for p in degrees_to_test
         f_eval = cos.(Wt * x) + sin.(Wt * x)
         df_dx_eval = -Wt * sin.(Wt * x) + Wt * cos.(Wt * x)
         d2f_dx2_eval = -Wt * Wt * cos.(Wt * x) - Wt * Wt * sin.(Wt * x)
-        
+
         # interpolate via collocation
         b_eval = Mantis.FunctionSpaces.evaluate(b, x, 2)
         coeff_b = b_eval[1][1] \ f_eval
@@ -61,7 +61,7 @@ for p in degrees_to_test
     quad_rule = Mantis.Quadrature.gauss_legendre(q)
     x = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
     w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
-    
+
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))
 
@@ -87,7 +87,7 @@ for p in degrees_to_test
         f_eval = exp.(Wt * x) + 2 .* exp.(-Wt * x)
         df_dx_eval = Wt .* exp.(Wt * x) - Wt .* 2 .* exp.(-Wt * x)
         d2f_dx2_eval = Wt .* Wt .* exp.(Wt * x) + Wt .* Wt .* 2 .* exp.(-Wt * x)
-        
+
         # interpolate via collocation
         b_eval = Mantis.FunctionSpaces.evaluate(b, x, 2)
         coeff_b = b_eval[1][1] \ f_eval
