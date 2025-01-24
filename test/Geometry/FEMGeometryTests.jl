@@ -29,7 +29,7 @@ field_coeffs = Matrix{Float64}(
 
 # Generate the plot
 file_name = "fem_geometry_polar_test.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, file_name)
+output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 
 # Test FEMGeometry (Annulus) --------------------------------------------------
 deg = 2
@@ -60,7 +60,7 @@ file_name = "fem_geometry_annulus_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
     geom; 
-    vtk_filename=output_file[1:end-4],
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -97,7 +97,7 @@ geom_coeffs_0 = [
     -1.0  -1.0
 ]
 r0 = 1
-r0 = 2
+r1 = 2
 geom_coeffs = [
     geom_coeffs_0.*r0
     geom_coeffs_0.*r1
@@ -108,9 +108,9 @@ file_name = "fem_geometry_lagrange_square_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
     geom; 
-    vtk_filename=output_file[1:end-4],
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
-    degree=4,
+    degree=1,
     ascii=false,
     compress=false,
 )
@@ -140,6 +140,7 @@ GB = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, 1, 1, 1, -1])
 geom_coeffs = [
     +0.0 -1.0 0.0
     +1.0 -1.0 0.25
+    +1.0 +1.0 0.5
     -1.0 +1.0 0.75
     -1.0 -1.0 1.0
     +0.0 -1.0 1.25
@@ -150,8 +151,8 @@ spiral_geom = Mantis.Geometry.FEMGeometry(GB, geom_coeffs)
 file_name = "fem_geometry_spiral_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    spiral_geom; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -200,8 +201,8 @@ wavy_surface_geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 file_name = "fem_geometry_wavy_surface_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    wavy_surface_geom; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -239,14 +240,14 @@ geom_coeffs = [
     geom_coeffs_0.*r0 zeros(3)
     geom_coeffs_0.*r1 zeros(3)
 ]
-quarter_annulus = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
+quarter_annulus_geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 
 # Generate the plot
 file_name = "fem_geometry_nurbs_quarter_annulus_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    quarter_annulus_geom; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -262,8 +263,8 @@ Mantis.Plot.plot(
 #output_points, output_cells = get_point_cell_data(output_file_path)
 
 # Check if data is point-wise identical.
-#@test all(isapprox.(reference_points, output_points; atol=atol))
-#@test all(isequal.(reference_cells, output_cells))
+@test all(isapprox.(reference_points, output_points; atol=atol))
+@test all(isequal.(reference_cells, output_cells))
 # -----------------------------------------------------------------------------
 
 # Test FEMGeometry (NURBS annulus) ---------------------------------------------
@@ -293,8 +294,8 @@ nurbs_annulus = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 file_name = "fem_geometry_nurbs_annulus_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    nurbs_annulus; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -341,8 +342,8 @@ nurbs_wavy_surface = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 file_name = "fem_geometry_nurbs_wavy_surface_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    nurbs_wavy_surface; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -402,8 +403,8 @@ gtb_annulus = Mantis.Geometry.FEMGeometry(TP_gtb, geom_coeffs)
 file_name = "fem_geometry_nurbs_bsp_basis_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    nurbs_annulus; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
@@ -414,8 +415,8 @@ Mantis.Plot.plot(
 file_name = "fem_geometry_nurbs_gtb_basis_test.vtu"
 output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 Mantis.Plot.plot(
-    geom; 
-    vtk_filename=output_file[1:end-4],
+    gtb_annulus; 
+    vtk_filename=output_file_path[1:end-4],
     n_subcells=1,
     degree=4,
     ascii=false,
