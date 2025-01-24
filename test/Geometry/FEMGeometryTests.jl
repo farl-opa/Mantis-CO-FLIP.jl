@@ -97,9 +97,11 @@ geom_coeffs_0 = [
     -1.0  -1.0
 ]
 r0 = 1
-r1 = 2
-geom_coeffs = [geom_coeffs_0.*r0
-               geom_coeffs_0.*r1]
+r0 = 2
+geom_coeffs = [
+    geom_coeffs_0.*r0
+    geom_coeffs_0.*r1
+]
 geom = Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
 # Generate the plot
 file_name = "fem_geometry_lagrange_square_test.vtu"
