@@ -1,33 +1,7 @@
-"""
-    Quadrature
-
-This module provides a collection of Quadrature rules. The quadrature rules are valid on the
-interval [0, 1].
-
-Numerical quadrature is the process of approximating the integral of a function by
-evaluating the function at specific points and combining the evaluations with weight. The
-points are called quadrature nodes and the weights are the corresponding weights for each
-node. How the nodes and weights are chosen determines the accuracy of the quadrature rule
-and varies per rule.
-
-In general, a quadrature rule can be written as:
-```math
-\\int_{0}^{1} f(x) dx \\approx \\sum_{i=1}^{N} w_i f(x_i)
-```
-where ``N`` is the number of quadrature nodes, ``w_i`` are the weights, and ``x_i`` are the
-quadrature nodes. Note that the integral is computed on the interval [0, 1].
-
-The exported names are:
-"""
 module Quadrature
-
-
 
 import FastGaussQuadrature
 import FFTW
-
-
-
 
 """
     AbstractQuadratureRule{manifold_dim}
@@ -41,8 +15,6 @@ Abstract type for a quadrature rule on a domain of dimension `manifold_dim`.
 - `QuadratureRule{manifold_dim}`: See [`QuadratureRule`](@ref).
 """
 abstract type AbstractQuadratureRule{manifold_dim} end
-
-
 
 """
     QuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim}
@@ -123,8 +95,6 @@ function get_label(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.rule_label
 end
 
-
-
 # One-dimensional quadrature rules.
 # Quadrature rules on non-equally spaced nodes.
 include("Gauss.jl")
@@ -133,11 +103,8 @@ include("ClenshawCurtis.jl")
 # Quadrature rules on equally spaced nodes.
 include("NewtonCotes.jl")
 
-
-
 # Multi-dimensional quadrature rules. The tensor product rules are made by combining one-
 # dimensional rules, so this file must be included after the one-dimensional rules.
 include("TensorProduct.jl")
-
 
 end
