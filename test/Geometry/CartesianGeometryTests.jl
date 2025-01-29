@@ -15,11 +15,13 @@ geometry = Mantis.Geometry.CartesianGeometry(
     ([0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75])
 )
 @test typeof(geometry) == Mantis.Geometry.CartesianGeometry{3}
-@test geometry.breakpoints == ([0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75])
-@test geometry.n_elements == (2, 2, 3)
+@test Mantis.Geometry.get_breakpoints(geometry) == (
+    [0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75]
+)
+@test Mantis.Geometry._get_num_elements_per_dim(geometry) == (2, 2, 3)
 
 @test Mantis.Geometry.get_num_elements(geometry) == 12
-@test Mantis.Geometry.get_domain_dim(geometry) == 3
+@test Mantis.Geometry.get_manifold_dim(geometry) == 3
 @test Mantis.Geometry.get_image_dim(geometry) == 3
 
 # LinRange input.
@@ -27,11 +29,13 @@ geometry = Mantis.Geometry.CartesianGeometry(
     (LinRange(0.5, 2.5, 5), LinRange(-0.75, 0.75, 3))
 )
 @test typeof(geometry) == Mantis.Geometry.CartesianGeometry{2}
-@test geometry.breakpoints == ([0.5, 1.0, 1.5, 2.0, 2.5], [-0.75, 0.0, 0.75])
-@test geometry.n_elements == (4, 2)
+@test Mantis.Geometry.get_breakpoints(geometry) == (
+    [0.5, 1.0, 1.5, 2.0, 2.5], [-0.75, 0.0, 0.75]
+)
+@test Mantis.Geometry._get_num_elements_per_dim(geometry) == (4, 2)
 
 @test Mantis.Geometry.get_num_elements(geometry) == 8
-@test Mantis.Geometry.get_domain_dim(geometry) == 2
+@test Mantis.Geometry.get_manifold_dim(geometry) == 2
 @test Mantis.Geometry.get_image_dim(geometry) == 2
 
 

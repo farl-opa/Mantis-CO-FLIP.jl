@@ -102,7 +102,7 @@ end
 
 #Basic getters
 
-function get_num_elements_per_geometry(
+function _get_num_elements_per_geometry(
     geometry::TensorProductGeometry{manifold_dim, T}
 ) where {
     manifold_dim, num_geometries, T<:NTuple{num_geometries, AbstractGeometry}
@@ -118,12 +118,6 @@ function get_geometry(geometry::TensorProductGeometry, geometry_id::Int)
     return geometry.geometries[geometry_id]
 end
 
-get_num_elements(geometry::TensorProductGeometry) = geometry.num_elements
-
-function get_domain_dim(::TensorProductGeometry{manifold_dim, T}) where {manifold_dim, T}
-    return manifold_dim
-end
-
 function get_ordered_indices(geometry::TensorProductGeometry)
     return geometry.ordered_indices
 end
@@ -132,19 +126,19 @@ function get_ordered_indices(geometry::TensorProductGeometry, element_id::Int)
     return get_ordered_indices(geometry)[element_id]
 end
 
-function _get_element_dimensions(
+function get_element_lengths(
     geometry::TensorProductGeometry{manifold_dim, T}, element_id::Int
 ) where {
     manifold_dim, num_geometries, T<:NTuple{num_geometries, AbstractGeometry}
 }
     ordered_index = get_ordered_indices(geometry, element_id)
-    element_dimensions_per_geometry = [get_element_dimensions(
+    element_lengths_per_geometry = [get_element_lengths(
         geometry.geometries[k], ordered_index[k]
     ) for k ∈ 1:num_geometries]
 
-    element_dimensions = Tuple(reduce(vcat, element_dimensions_per_geometry))
+    element_lengths = Tuple(reduce(vcat, element_lengths_per_geometry))
 
-    return element_dimensions
+    return element_lengths
 end
 
 function _get_manifold_dim_per_geometry(geometry::TensorProductGeometry{manifold_dim, T}
