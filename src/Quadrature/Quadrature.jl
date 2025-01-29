@@ -1,4 +1,4 @@
-@doc raw"""
+"""
     Quadrature
 
 This module provides a collection of Quadrature rules. The quadrature rules are valid on the
@@ -12,7 +12,7 @@ and varies per rule.
 
 In general, a quadrature rule can be written as:
 ```math
-\int_{0}^{1} f(x) dx \approx \sum_{i=1}^{N} w_i f(x_i)
+\\int_{0}^{1} f(x) dx \\approx \\sum_{i=1}^{N} w_i f(x_i)
 ```
 where ``N`` is the number of quadrature nodes, ``w_i`` are the weights, and ``x_i`` are the
 quadrature nodes. Note that the integral is computed on the interval [0, 1].
@@ -29,7 +29,7 @@ import FFTW
 
 
 
-@doc raw"""
+"""
     AbstractQuadratureRule{manifold_dim}
 
 Abstract type for a quadrature rule on a domain of dimension `manifold_dim`.
@@ -44,7 +44,7 @@ abstract type AbstractQuadratureRule{manifold_dim} end
 
 
 
-@doc raw"""
+"""
     QuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim}
 
 Represents a quadrature rule on a domain of dimension `manifold_dim`.
@@ -78,8 +78,8 @@ struct QuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim}
     rule_label::String
 end
 
-@doc raw"""
-    get_quadrature_nodes(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
+"""
+    get_nodes(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
 
 Returns the quadrature nodes of a quadrature rule.
 
@@ -89,12 +89,12 @@ Returns the quadrature nodes of a quadrature rule.
 # Returns
 - `nodes::NTuple{manifold_dim, Vector{Float64}}`: Nodes of the quadrature rule.
 """
-function get_quadrature_nodes(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
+function get_nodes(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.nodes
 end
 
-@doc raw"""
-    get_quadrature_weights(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
+"""
+    get_weights(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
 
 Returns the quadrature weights of a quadrature rule.
 
@@ -104,12 +104,12 @@ Returns the quadrature weights of a quadrature rule.
 # Returns
 - `weights::Vector{Float64}`: Weights of the quadrature rule.
 """
-function get_quadrature_weights(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
+function get_weights(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.weights
 end
 
-@doc raw"""
-    get_quadrature_rule_label(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
+"""
+    get_label(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
 
 Returns the label of a quadrature rule.
 
@@ -119,7 +119,7 @@ Returns the label of a quadrature rule.
 # Returns
 - `rule_label::String`: Label of the quadrature rule.
 """
-function get_quadrature_rule_label(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
+function get_label(qr::QuadratureRule{manifold_dim}) where {manifold_dim}
     return qr.rule_label
 end
 

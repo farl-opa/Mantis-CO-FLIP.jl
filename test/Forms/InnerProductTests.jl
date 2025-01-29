@@ -35,12 +35,12 @@ dTP_Space_dy = Mantis.FunctionSpaces.TensorProductSpace((B1, dB2))
 TP_Space_1 = Mantis.FunctionSpaces.DirectSumSpace((dTP_Space_dx, dTP_Space_dy))
 TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace((dB1, dB2)),))
 
-# then, the geometry 
+# then, the geometry
 # Line 1
 line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
 # Line 2
 line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
-# Tensor product geometry 
+# Tensor product geometry
 geom_cart = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 
 # curvilinear mesh
@@ -112,55 +112,55 @@ for geom in [geom_cart, geom_crazy]
     f⁰_analytic = Mantis.Forms.AnalyticalFormField(0, analytical_1valued_form_func, geom, "f")
     f¹_analytic = Mantis.Forms.AnalyticalFormField(1, analytical_2valued_form_func, geom, "f")
     f²_analytic = Mantis.Forms.AnalyticalFormField(2, analytical_1valued_form_func, geom, "f")
-    
+
     total_integrated_analytical_field_0 = 0.0
     total_integrated_analytical_field_1 = 0.0
     total_integrated_analytical_field_n = 0.0
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
         # Tests to see if the integrated metric terms are correctly recovered.
-        inv_g, g, det_g = Mantis.Geometry.inv_metric(geom, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))
+        inv_g, g, det_g = Mantis.Geometry.inv_metric(geom, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         # 0-forms
-        integrated_metric_0 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* det_g)
+        integrated_metric_0 = sum(Mantis.Quadrature.get_weights(q_rule) .* det_g)
         # @test all(isapprox.(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3], integrated_metric_0, atol=1e-12))
         @test isapprox(sum(Mantis.Forms.evaluate_inner_product(zero_form_space, zero_form_space, elem_id, q_rule)[3]), integrated_metric_0, atol=1e-12) # same as the previous, but different wat of doing it (field vs space)
-        
-        # Because forms are defined on the parametric domain, the constant coefficents equal to 1 will not result 
+
+        # Because forms are defined on the parametric domain, the constant coefficents equal to 1 will not result
         # in form equal to 1 evaluated on each element, therefore we need to account for it
         element_dimensions = [Mantis.Geometry.get_element_dimensions(geom, elem_id)...]
-        
+
         # 1-forms
         integrated_metric_1 = zeros((2,2))
 
-        for node_idx in eachindex(Mantis.Quadrature.get_quadrature_weights(q_rule))
-            integrated_metric_1 .+= Mantis.Quadrature.get_quadrature_weights(q_rule)[node_idx] .* ((inv_g[node_idx,:,:]).*det_g[node_idx])
+        for node_idx in eachindex(Mantis.Quadrature.get_weights(q_rule))
+            integrated_metric_1 .+= Mantis.Quadrature.get_weights(q_rule)[node_idx] .* ((inv_g[node_idx,:,:]).*det_g[node_idx])
         end
-        
+
         # < ζ¹, ζ¹ > with ζ¹ a form with constant coefficients all equal to α then the inner product,
-        # due to the partition of unity property over each element will be 
+        # due to the partition of unity property over each element will be
         #   < ζ¹, ζ¹ > = < α dξ¹ + α dξ²,  α dξ¹ + α dξ² > = [α α] gⁱʲ [α α]ᵗ √det(g)
         reference_result = dot(element_dimensions, integrated_metric_1*element_dimensions)
         @test isapprox(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
-        
+
         # <dα⁰, dα⁰> for α⁰ a form with constant coefficients, is
-        #   <dα⁰, dα⁰> = 0 
+        #   <dα⁰, dα⁰> = 0
         # because dα⁰ = 0
         reference_result = 0.0
         @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
-        
-        # < α₁ dξ¹, α₂ dξ² > due to the partition of unity property over each element will be 
+
+        # < α₁ dξ¹, α₂ dξ² > due to the partition of unity property over each element will be
         #   < α₁ dξ¹, α₂ dξ² > = [α₁ 0] gⁱʲ [0 α₂]ᵗ √det(g) = α₁ g¹² α₂
         reference_result = element_dimensions[1] * integrated_metric_1[1,2] * element_dimensions[2]
         @test isapprox(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
         reference_result = element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1]
         @test isapprox(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)[3][1], element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1], atol=1e-12)
-        
+
         # This test follows the same logic as the < ζ¹, ζ¹ > test above
         reference_result = dot(element_dimensions, integrated_metric_1*element_dimensions)
         @test isapprox(sum(Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]), reference_result, atol=1e-12)
-        
+
         # 2-forms
-        integrated_metric_2 = sum(Mantis.Quadrature.get_quadrature_weights(q_rule) .* (1.0./det_g))
-    
+        integrated_metric_2 = sum(Mantis.Quadrature.get_weights(q_rule) .* (1.0./det_g))
+
         reference_result = integrated_metric_2 * prod(element_dimensions.^2)
         @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], reference_result, atol=1e-12)
         @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)

@@ -21,10 +21,10 @@ function tensor_product_rule(
         quad_rule(p[k], rule_args_1d...) for k = 1:manifold_dim
     )
     points = NTuple{manifold_dim, Vector{Float64}}(
-        get_quadrature_nodes(qrules[k])[1] for k = 1:manifold_dim
+        get_nodes(qrules[k])[1] for k = 1:manifold_dim
     )
     weights_1d = NTuple{manifold_dim, Vector{Float64}}(
-        get_quadrature_weights(qrules[k]) for k = 1:manifold_dim
+        get_weights(qrules[k]) for k = 1:manifold_dim
     )
 
     weights = _compute_tensor_product(weights_1d)
@@ -32,9 +32,9 @@ function tensor_product_rule(
     # If only one rule is used, the label is the same as the label of the 1D rule. This
     # ensures that the tensor product of a 1d rule is the same as the 1d rule.
     if manifold_dim == 1
-        rule_label = get_quadrature_rule_label(qrules[1])
+        rule_label = get_label(qrules[1])
     else
-        qrule_label = get_quadrature_rule_label(qrules[1])
+        qrule_label = get_label(qrules[1])
         rule_label = "Tensor-product of $manifold_dim $(qrule_label) rules"
     end
 
@@ -58,10 +58,10 @@ function tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}})
     manifold_dim
 }
     points = NTuple{manifold_dim, Vector{Float64}}(
-        get_quadrature_nodes(qrules_1d[k])[1] for k = 1:manifold_dim
+        get_nodes(qrules_1d[k])[1] for k = 1:manifold_dim
     )
     weights_1d = NTuple{manifold_dim, Vector{Float64}}(
-        get_quadrature_weights(qrules_1d[k]) for k = 1:manifold_dim
+        get_weights(qrules_1d[k]) for k = 1:manifold_dim
     )
 
     weights = _compute_tensor_product(weights_1d)
@@ -69,11 +69,9 @@ function tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}})
     # If only one rule is used, the label is the same as the label of the 1D rule. This
     # ensures that the tensor product of a 1d rule is the same as the 1d rule.
     if manifold_dim == 1
-        rule_label = get_quadrature_rule_label(qrules_1d[1])
+        rule_label = get_label(qrules_1d[1])
     else
-        rule_labels = join(
-            [get_quadrature_rule_label(qrules_1d[i]) for i = 1:manifold_dim], ", "
-        )
+        rule_labels = join([get_label(qrules_1d[i]) for i = 1:manifold_dim], ", ")
         rule_label = "Tensor-product of ($rule_labels) rules"
     end
 

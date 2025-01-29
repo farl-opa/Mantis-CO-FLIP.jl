@@ -19,12 +19,12 @@ include("QuadratureTestsSetup.jl")
 for N in range(2, 12, step=3)
     quad_rule = Mantis.Quadrature.newton_cotes(N, "closed")
 
-    ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
-    w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
+    ξ = Mantis.Quadrature.get_nodes(quad_rule)[1]
+    w = Mantis.Quadrature.get_weights(quad_rule)
 
 
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Newton-Cotes (closed)"
+    @test Mantis.Quadrature.get_label(quad_rule) == "Newton-Cotes (closed)"
 
 
     # Constructor tests.
@@ -89,12 +89,12 @@ end
 for N in range(1, 10, step=3)
     quad_rule = Mantis.Quadrature.newton_cotes(N, "open")
 
-    ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
-    w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
+    ξ = Mantis.Quadrature.get_nodes(quad_rule)[1]
+    w = Mantis.Quadrature.get_weights(quad_rule)
 
 
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Newton-Cotes (open)"
+    @test Mantis.Quadrature.get_label(quad_rule) == "Newton-Cotes (open)"
 
 
     # Constructor tests.
