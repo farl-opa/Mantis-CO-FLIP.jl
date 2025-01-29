@@ -1,4 +1,4 @@
-@doc raw"""
+"""
     newton_cotes(num_points::Integer, type::String="closed")
 
 Computes the nodes `ξ` and weights `w` of a Newton-Cotes quadrature rule.

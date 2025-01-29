@@ -1,11 +1,11 @@
-@doc raw"""
+"""
     gauss_lobatto(N::Integer)
 
 Computes the nodes `ξ` and weights `w` of [Gauss-Lobatto
 quadrature](https://mathworld.wolfram.com/LobattoQuadrature.html).
 
-Note that here the quadrature rule is valid for the interval `ξ` ∈ [0, 1], instead of `ξ`
-∈ [-1, 1] as usual.
+Note that here the quadrature rule is valid for the interval ``\\xi \\in [0, 1]``, instead
+of ``\\xi \\in [-1, 1]`` as usual.
 
 # Arguments
 - `N::Integer`: Number of nodes used in the quadrature rule.
@@ -30,14 +30,14 @@ function gauss_lobatto(N::Integer)
     return QuadratureRule{1}((ξ,), w, "Gauss-Lobatto")
 end
 
-@doc raw"""
+"""
     gauss_legendre(N::Integer)
 
 Computes the nodes `ξ` and weights `w` of [Gauss-Legendre
 quadrature](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature).
 
-Note that here the quadrature rule is valid for the interval `ξ` ∈ [0, 1], instead of `ξ` ∈
-[-1, 1] as usual.
+Note that here the quadrature rule is valid for the interval ``\\xi \\in [0, 1]``, instead
+of ``\\xi \\in [-1, 1]`` as usual.
 
 # Arguments
 - `N::Integer`: Number of nodes used in the quadrature rule.

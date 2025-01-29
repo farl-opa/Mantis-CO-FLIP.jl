@@ -1,4 +1,4 @@
-@doc raw"""
+"""
     clenshaw_curtis(p::Integer)
 
 Find the roots and weights for Clenshaw-Curtis quadrature on the interval [0, 1]. The roots

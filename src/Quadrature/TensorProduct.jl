@@ -1,4 +1,4 @@
-@doc raw"""
+"""
     tensor_product_rule(p::NTuple{manifold_dim, Integer}, quad_rule::F, rule_args_1d...) where {
         manifold_dim, F <: Function
     }
@@ -41,7 +41,7 @@ function tensor_product_rule(
     return QuadratureRule{manifold_dim}(points, weights, rule_label)
 end
 
-@doc raw"""
+"""
     tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}) where {
         manifold_dim
     }
@@ -78,7 +78,7 @@ function tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}})
     return QuadratureRule{manifold_dim}(points, weights, rule_label)
 end
 
-@doc raw"""
+"""
     _compute_tensor_product(weights_1d::NTuple{manifold_dim, Vector{T}}) where {
         manifold_dim, T <: Number
     }
