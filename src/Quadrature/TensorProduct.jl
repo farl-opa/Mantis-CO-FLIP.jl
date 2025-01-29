@@ -1,12 +1,12 @@
 @doc raw"""
-    tensor_product_rule(p::NTuple{manifold_dim, Int}, quad_rule::F, rule_args_1d...) where {
+    tensor_product_rule(p::NTuple{manifold_dim, Integer}, quad_rule::F, rule_args_1d...) where {
         manifold_dim, F <: Function
     }
 
 Returns a tensor product quadrature rule of given degree and rule type.
 
 # Arguments
-- `p::NTuple{manifold_dim, Int}`: Degree of the quadrature rule per dimension.
+- `p::NTuple{manifold_dim, Integer}`: Degree of the quadrature rule per dimension.
 - `quad_rule::F`: The function that returns a `QuadratureRule{1}` given an integer degree.
     May take additional arguments.
 - `rule_args_1d...`: Additional arguments for the 1D quadrature rule. Optional.
@@ -15,7 +15,7 @@ Returns a tensor product quadrature rule of given degree and rule type.
 - `::QuadratureRule{manifold_dim}`: QuadratureRule of the new dimension.
 """
 function tensor_product_rule(
-    p::NTuple{manifold_dim, Int}, quad_rule::F, rule_args_1d...
+    p::NTuple{manifold_dim, Integer}, quad_rule::F, rule_args_1d...
 ) where {manifold_dim, F <: Function}
     qrules = NTuple{manifold_dim, QuadratureRule{1}}(
         quad_rule(p[k], rule_args_1d...) for k = 1:manifold_dim

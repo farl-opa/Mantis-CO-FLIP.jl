@@ -67,7 +67,7 @@ Represents a quadrature rule on a domain of dimension `manifold_dim`.
 - [`gauss_legendre`](@ref).
 - [`clenshaw_curtis`](@ref).
 - [`newton_cotes`](@ref).
-- [`tensor_product_rule(p::NTuple{manifold_dim, Int}, quad_rule::F, rule_args_1d...) where
+- [`tensor_product_rule(p::NTuple{manifold_dim, Integer}, quad_rule::F, rule_args_1d...) where
     {manifold_dim, F <: Function}`](@ref).
 - [`tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}) where
     {manifold_dim}`](@ref).

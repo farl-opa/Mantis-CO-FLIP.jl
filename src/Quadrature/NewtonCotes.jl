@@ -1,5 +1,5 @@
 @doc raw"""
-    newton_cotes(num_points::Int, type::String="closed")
+    newton_cotes(num_points::Integer, type::String="closed")
 
 Computes the nodes `ξ` and weights `w` of a Newton-Cotes quadrature rule.
 
@@ -10,13 +10,13 @@ interval, while open Newton-Cotes rules do not.
 The algorithm used to compute the weights is not the most efficient nor the most accurate.
 
 # Arguments
-- `num_points::Int`: Number of points in the quadrature rule.
+- `num_points::Integer`: Number of points in the quadrature rule.
 - `type::String`: Type of the Newton-Cotes rule. Valid types are "closed" and "open".
 
 # Returns
 - `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
 """
-function newton_cotes(num_points::Int, type::String)
+function newton_cotes(num_points::Integer, type::String)
     # Compute the equally spaced nodes on the interval [-1, 1].
     if type == "closed"
         if num_points <= 1
