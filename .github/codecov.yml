@@ -3,12 +3,8 @@ coverage:
 
     project:
       default:   # default is the status check's name, not default settings
-        target: auto
-        threshold: 1%
         informational: true
     
     patch:
       default:   # default is the status check's name, not default settings
-        target: auto
-        threshold: 1%
         informational: true
