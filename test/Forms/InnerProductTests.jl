@@ -127,7 +127,7 @@ for geom in [geom_cart, geom_crazy]
         # Because forms are defined on the parametric domain, the constant coefficents equal to 1 will not result
         # in form equal to 1 evaluated on each element, therefore we need to account for it
         element_dimensions = [Mantis.Geometry.get_element_lengths(geom, elem_id)...]
-
+    
         # 1-forms
         integrated_metric_1 = zeros((2,2))
 
