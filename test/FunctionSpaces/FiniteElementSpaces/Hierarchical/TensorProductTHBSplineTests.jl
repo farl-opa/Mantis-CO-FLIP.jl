@@ -13,7 +13,7 @@ breakpoints2 = collect(range(0,1,ne2+1))
 patch2 = Mantis.Mesh.Patch1D(breakpoints2)
 deg1 = 2
 deg2 = 2
-nsubs = (2, 2) 
+nsubs = (2, 2)
 nlevels = 3
 
 CB1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(deg1-1, ne1-1); -1])
@@ -34,11 +34,11 @@ end
 level_2_marked_elements = [child for parent in [7,8,9,12,13,14,17,18,19] for child in Mantis.FunctionSpaces.get_element_children(operators[1], parent)]
 level_3_marked_elements = [child for parent in [23, 24, 25, 33, 34, 35, 43, 44, 45] for child in Mantis.FunctionSpaces.get_element_children(operators[2], parent)]
 
-marked_elements_per_level = [Int[], level_2_marked_elements, level_3_marked_elements] 
+marked_elements_per_level = [Int[], level_2_marked_elements, level_3_marked_elements]
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, operators, marked_elements_per_level, true)
 
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
-xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
+xi = Mantis.Quadrature.get_nodes(qrule)
 
 # Tests for coefficients and evaluation
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)

@@ -19,12 +19,12 @@ include("QuadratureTestsSetup.jl")
 for p in range(2, 20, step=3)
     quad_rule = Mantis.Quadrature.clenshaw_curtis(p)
 
-    ξ = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
-    w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
+    ξ = Mantis.Quadrature.get_nodes(quad_rule)[1]
+    w = Mantis.Quadrature.get_weights(quad_rule)
 
 
     # Check that the rule type is correct.
-    @test Mantis.Quadrature.get_quadrature_rule_label(quad_rule) == "Clenshaw-Curtis"
+    @test Mantis.Quadrature.get_label(quad_rule) == "Clenshaw-Curtis"
 
 
     # Constructor tests.

@@ -14,23 +14,7 @@ on parts of the code that are not designed for public access.
     structure as the source code, while the user docs can have a 
     different structure.
 
-
-## All functions and stuff from Mantis.FunctionSpaces
-```@autodocs
-Modules = [Mantis.FunctionSpaces]
-```
-
-## All functions and stuff from Mantis.Quadrature
-```@autodocs
-Modules = [Mantis.Quadrature]
-```
-
 ## All functions and stuff from Mantis.Geometry
 ```@autodocs
 Modules = [Mantis.Geometry]
-```
-
-## All functions and stuff from Mantis.Assemblers
-```@autodocs
-Modules = [Mantis.Assemblers]
 ```

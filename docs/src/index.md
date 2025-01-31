@@ -32,7 +32,7 @@ Depth = 2
 CurrentModule = Mantis.Quadrature
 ```
 
-```@docs
+```@docs; canonical=false
 gauss_lobatto
 ```
 
