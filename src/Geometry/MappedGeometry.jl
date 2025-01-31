@@ -96,9 +96,9 @@ function jacobian(
     J_1_image_dim = get_image_dim(geometry.geometry)
 
     J = zeros(num_points, image_dim, manifold_dim)
-    for cart_id in CartesianIndices(J)
-        (point, k_im, k_mani) = Tuple(cart_id)
-        for k_im_1 in 1:J_1_image_dim
+    for k_im_1 in 1:J_1_image_dim
+        for cart_id in CartesianIndices(J)
+            (point, k_im, k_mani) = Tuple(cart_id)
             J[point, k_im, k_mani] += J_2[point, k_im, k_im_1] * J_1[point, k_im_1, k_mani]
         end
     end

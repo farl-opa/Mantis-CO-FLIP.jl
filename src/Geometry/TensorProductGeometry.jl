@@ -186,8 +186,8 @@ function evaluate(
     ordered_points = CartesianIndices(n_points_per_geometry)
     linear_points = LinearIndices(ordered_points)
     # loop over all points
-    for (lin_point, ord_point) in zip(linear_points, ordered_points)
-        for k in 1:num_geometries # loop over geometries
+    for k in 1:num_geometries # loop over geometries
+        for (lin_point, ord_point) in zip(linear_points, ordered_points)
             eval[lin_point, image_ranges[k]] .= @view eval_per_geometry[k][ord_point[k], :]
         end
     end
@@ -233,8 +233,8 @@ function jacobian(
     ordered_points = CartesianIndices(n_points_per_geometry)
     linear_points = LinearIndices(ordered_points)
     # loop over all points
-    for (lin_point, ord_point) in zip(linear_points, ordered_points)
-        for k in 1:num_geometries # loop over geometries
+    for k in 1:num_geometries # loop over geometries
+        for (lin_point, ord_point) in zip(linear_points, ordered_points)
             jacobian_eval[lin_point, image_ranges[k], manifold_ranges[k]] .= view(
                 jacobian_per_geometry[k], ord_point[k], :, :
             )

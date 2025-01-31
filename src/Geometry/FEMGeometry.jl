@@ -86,9 +86,9 @@ function evaluate(
     image_dim = get_image_dim(geometry)
     eval = zeros(Float64, num_eval_points, image_dim)
 
-    for cartesian_id in CartesianIndices(fem_basis[1][1])
-        (point, basis_id) = Tuple(cartesian_id)
-        for dim in 1:image_dim
+    for dim in 1:image_dim
+        for cartesian_id in CartesianIndices(fem_basis[1][1])
+            (point, basis_id) = Tuple(cartesian_id)
             eval[point, dim] +=
                 fem_basis[1][1][point, basis_id] *
                 geometry.geometry_coeffs[fem_basis_indices[basis_id], dim]
