@@ -33,8 +33,8 @@ for deg1 in 0:5
         # evaluation points
         qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
         qrule3 = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1, deg1+1), Mantis.Quadrature.gauss_legendre)
-        x_all = Mantis.Quadrature.get_quadrature_nodes(qrule)
-        x_all3 = Mantis.Quadrature.get_quadrature_nodes(qrule3)
+        x_all = Mantis.Quadrature.get_nodes(qrule)
+        x_all3 = Mantis.Quadrature.get_nodes(qrule3)
         for el in 1:1:Mantis.FunctionSpaces.get_num_elements(TP)
             # check B-spline evaluation
             TP_eval, _ = Mantis.FunctionSpaces.evaluate(TP, el, x_all, 0)

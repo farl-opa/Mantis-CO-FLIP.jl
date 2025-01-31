@@ -42,7 +42,7 @@ TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorP
 line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
 # Line 2
 line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
-# Tensor product geometry 
+# Tensor product geometry
 geom_cart = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 
 # curvilinear mesh
@@ -75,86 +75,86 @@ for geom in [geom_cart, geom_crazy]
     ★ϵ¹ = Mantis.Forms.hodge(ϵ¹)
     ★ϵ² = Mantis.Forms.hodge(ϵ²)
 
-    # Create the form fields 
+    # Create the form fields
     ε⁰ = Mantis.Forms.FormField(ϵ⁰, "ε⁰")
     ε¹ = Mantis.Forms.FormField(ϵ¹, "ε¹")
     ε² = Mantis.Forms.FormField(ϵ², "ε²")
-    
+
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
         # Compare the inner product
         #   <ϵ⁰, ϵ⁰>
-        # with 
+        # with
         #   ϵ⁰ ∧ ⋆ϵ⁰
 
         # Compute the inner product: <ϵ⁰, ϵ⁰>
         zero_form_rows_idx, zero_form_columns_idx, zero_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ⁰, ϵ⁰, elem_id, q_rule)
-        
+
         # Compute the wedge product: ϵ⁰ ∧ ⋆ϵ⁰
         zero_form_wedge = Mantis.Forms.wedge(ϵ⁰, ★ϵ⁰)
-        
+
         # Evaluate it at the quadrature nodes
-        ξ_quadrature_nodes = Mantis.Quadrature.get_quadrature_nodes(q_rule)
+        ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
         zero_form_wedge_evaluate, zero_form_wedge_indices = Mantis.Forms.evaluate(zero_form_wedge, elem_id, ξ_quadrature_nodes)
-        
+
         # Integrate
-        quadrature_weights = Mantis.Quadrature.get_quadrature_weights(q_rule)
+        quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
         zero_form_inner_product_from_wedge = sum(quadrature_weights .* zero_form_wedge_evaluate[1], dims=1)[:]
         a = 2
 
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(zero_form_inner_product_from_wedge - zero_form_inner_product_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(zero_form_wedge) == 2
-        
+
         # Compare the inner product
         #   <ϵⁿ, ϵⁿ>
-        # with 
+        # with
         #   ϵⁿ ∧ ⋆ϵⁿ
-        
+
         # Compute the inner product: <ϵⁿ, ϵⁿ>
         top_form_rows_idx, top_form_columns_idx, top_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ², ϵ², elem_id, q_rule)
-        
+
         # Compute the wedge product: ϵⁿ ∧ ⋆ϵⁿ
         top_form_wedge = Mantis.Forms.wedge(ϵ², ★ϵ²)
 
         # Evaluate it at the quadrature nodes
-        ξ_quadrature_nodes = Mantis.Quadrature.get_quadrature_nodes(q_rule)
+        ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
         top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(top_form_wedge, elem_id, ξ_quadrature_nodes)
-        
+
         # Integrate
-        quadrature_weights = Mantis.Quadrature.get_quadrature_weights(q_rule)
+        quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
         top_form_inner_product_from_wedge = sum(quadrature_weights .* top_form_wedge_evaluate[1], dims=1)[:]
 
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(top_form_inner_product_from_wedge - top_form_inner_product_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(top_form_wedge) == 2
 
         # Compare the inner product
         #   <ϵ¹, ϵ¹>
-        # with 
+        # with
         #   ϵ¹ ∧ ⋆ϵ¹
-        
+
         # Compute the inner product: <ϵ¹, ϵ¹>
         one_form_rows_idx, one_form_columns_idx, one_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ¹, ϵ¹, elem_id, q_rule)
-        
+
         # Compute the wedge product: ϵ¹ ∧ ⋆ϵ¹
         one_form_wedge = Mantis.Forms.wedge(ϵ¹, ★ϵ¹)
-        
+
         # Evaluate it at the quadrature nodes
-        ξ_quadrature_nodes = Mantis.Quadrature.get_quadrature_nodes(q_rule)
+        ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
         one_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(one_form_wedge, elem_id, ξ_quadrature_nodes)
-        
+
         # Integrate
-        quadrature_weights = Mantis.Quadrature.get_quadrature_weights(q_rule)
+        quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
         one_form_inner_product_from_wedge = sum(quadrature_weights .* one_form_wedge_evaluate[1], dims=1)[:]
 
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(one_form_inner_product_from_wedge - one_form_inner_product_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(one_form_wedge) == 2
 
         # Test αⁿ ∧ βⁿ (top forms) throws error
@@ -221,7 +221,7 @@ end
 
 # 3D tests --------------------------------------------------------------------
 
-# Setup the geometry 
+# Setup the geometry
 
 # Domain
 Lleft = 0.0
@@ -243,12 +243,12 @@ B = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, deg-1, -1])
 TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B, B))
 TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace((TP_Space_2d, B))
 
-# Then the geometry 
+# Then the geometry
 # Line
 line_geo = Mantis.Geometry.CartesianGeometry((breakpoints,))
 geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints, breakpoints))
 
-# Crazy Tensor product geometry in 2D (auxiliary) 
+# Crazy Tensor product geometry in 2D (auxiliary)
 tensor_prod_geo_2d = Mantis.Geometry.TensorProductGeometry((line_geo, line_geo))
 geo_2d_cart_aux = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints))
 crazy_geo_2d_cart = Mantis.Geometry.MappedGeometry(geo_2d_cart_aux, crazy_mapping)
@@ -266,7 +266,7 @@ dsTP_1_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d, TP_Space_3d,
 dsTP_2_form_3d = dsTP_1_form_3d
 dsTP_top_form_3d = dsTP_0_form_3d
 
-# Expression for analytical form fields 
+# Expression for analytical form fields
 function zero_form_expression(x::Matrix{Float64})
     return [ones(Float64, size(x))]
 end
@@ -285,8 +285,8 @@ end
 
 # Quadrature rule
 q_rule = Mantis.Quadrature.tensor_product_rule((deg, deg, deg) .+ 1, Mantis.Quadrature.gauss_legendre)
-ξ_quadrature_nodes = Mantis.Quadrature.get_quadrature_nodes(q_rule)
-quadrature_weights = Mantis.Quadrature.get_quadrature_weights(q_rule)
+ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
+quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
 
 # Test on multiple geometries. Type-wise and content/metric wise.
 for geom in [geo_3d_cart, crazy_geo_3d_cart]
@@ -308,17 +308,17 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
     ★ϵ² = Mantis.Forms.hodge(ϵ²)
     ★ϵ³ = Mantis.Forms.hodge(ϵ³)
 
-    # Create the form fields 
+    # Create the form fields
     ε⁰ = Mantis.Forms.FormField(ϵ⁰, "ε⁰")
     ε¹ = Mantis.Forms.FormField(ϵ¹, "ε¹")
     ε² = Mantis.Forms.FormField(ϵ², "ε²")
     ε³ = Mantis.Forms.FormField(ϵ³, "ε³")
-    
+
     for elem_id in 1:Mantis.Geometry.get_num_elements(geom)
-        # These tests the wedge product by checking if 
+        # These tests the wedge product by checking if
         #   Since ∫ α⁰ ∧ ⋆βᵏ = (αᵏ, βᵏ)
-        # Therefore it computes the left hand side with the wedge and the right hand side 
-        # with the inner product. 
+        # Therefore it computes the left hand side with the wedge and the right hand side
+        # with the inner product.
 
         # ϵ⁰ ∧ ⋆ϵ⁰ (0-form with top-form, both expression rank 1) -------------
 
@@ -330,9 +330,9 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         zero_form_wedge_evaluate, zero_form_wedge_indices = Mantis.Forms.evaluate(zero_form_wedge, elem_id, ξ_quadrature_nodes)
         zero_form_wedge_triple_evaluate, zero_form_wedge_triple_indices = Mantis.Forms.evaluate(zero_form_wedge_triple, elem_id, ξ_quadrature_nodes)
 
-        # Test if ϵ⁰ ∧ ⋆ϵ⁰ == ϵ⁰ ∧ ⋆ϵ⁰ ∧ α⁰ (since α⁰ = 1) 
+        # Test if ϵ⁰ ∧ ⋆ϵ⁰ == ϵ⁰ ∧ ⋆ϵ⁰ ∧ α⁰ (since α⁰ = 1)
         @test isapprox(sum(abs.(zero_form_wedge_evaluate[1] - zero_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
-        
+
         # Integrate
         zero_form_inner_product_from_wedge = sum(quadrature_weights .* zero_form_wedge_evaluate[1], dims=1)[:]
 
@@ -342,10 +342,10 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(zero_form_inner_product_from_wedge - zero_form_inner_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(zero_form_wedge) == 2
         # ---------------------------------------------------------------------
-        
+
         # ϵ¹ ∧ ⋆ϵ¹ (1-form with 2-form, both expression rank 1) ---------------
 
         # Compute the wedge product
@@ -356,7 +356,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         one_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(one_form_wedge, elem_id, ξ_quadrature_nodes)
         one_form_wedge_triple_evaluate, one_form_wedge_triple_indices = Mantis.Forms.evaluate(one_form_wedge_triple, elem_id, ξ_quadrature_nodes)
 
-        # Test if ϵ¹ ∧ ⋆ϵ¹ == ϵ¹ ∧ ⋆ϵ¹ ∧ α⁰ (since α⁰ = 1) 
+        # Test if ϵ¹ ∧ ⋆ϵ¹ == ϵ¹ ∧ ⋆ϵ¹ ∧ α⁰ (since α⁰ = 1)
         @test isapprox(sum(abs.(one_form_wedge_evaluate[1] - one_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
 
         # Integrate
@@ -368,7 +368,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(one_form_inner_product_from_wedge - one_form_inner_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(one_form_wedge) == 2
         # ---------------------------------------------------------------------
 
@@ -384,7 +384,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         two_form_wedge_triple_evaluate, two_form_wedge_triple_indices = Mantis.Forms.evaluate(two_form_wedge_triple, elem_id, ξ_quadrature_nodes)
         two_form_wedge_triple_alt_evaluate, two_form_wedge_triple_alt_indices = Mantis.Forms.evaluate(two_form_wedge_triple_alt, elem_id, ξ_quadrature_nodes)
 
-        # Test if ϵ² ∧ ⋆ϵ² == ϵ² ∧ ⋆ϵ² ∧ α⁰ == ϵ² ∧ α⁰ ∧ ⋆ϵ² (since α⁰ = 1) 
+        # Test if ϵ² ∧ ⋆ϵ² == ϵ² ∧ ⋆ϵ² ∧ α⁰ == ϵ² ∧ α⁰ ∧ ⋆ϵ² (since α⁰ = 1)
         @test isapprox(sum(abs.(two_form_wedge_evaluate[1] - two_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
         @test isapprox(sum(abs.(two_form_wedge_triple_evaluate[1] - two_form_wedge_triple_alt_evaluate[1])), 0.0, atol=1e-12) # rearrange array to match wedge product order
 
@@ -397,7 +397,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(two_form_inner_product_from_wedge - two_form_inner_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(two_form_wedge) == 2
         # ---------------------------------------------------------------------
 
@@ -411,7 +411,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(top_form_wedge, elem_id, ξ_quadrature_nodes)
         top_form_wedge_triple_evaluate, top_form_wedge_triple_indices = Mantis.Forms.evaluate(top_form_wedge_triple, elem_id, ξ_quadrature_nodes)
 
-        # Test if ϵ³ ∧ ⋆ϵ³ == ϵ³ ∧ ⋆ϵ³ ∧ α⁰ (since α⁰ = 1) 
+        # Test if ϵ³ ∧ ⋆ϵ³ == ϵ³ ∧ ⋆ϵ³ ∧ α⁰ (since α⁰ = 1)
         @test isapprox(sum(abs.(top_form_wedge_evaluate[1] - top_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
 
         # Integrate
@@ -423,7 +423,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         # Test if it is the same as the inner product
         @test isapprox(sum(abs.(top_form_inner_product_from_wedge - top_form_inner_evaluate)), 0.0, atol=1e-12)
 
-        # Test if the wedge product expression has the correct expression rank 
+        # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(top_form_wedge) == 2
 
         # Test ϵ¹ ∧ ⋆ϵ¹ ∧ ϵ¹ to check if rank 3 expressions are not allowed

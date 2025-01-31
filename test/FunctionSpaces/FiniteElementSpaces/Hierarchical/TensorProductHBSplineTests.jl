@@ -42,7 +42,7 @@ refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([collect(1:CTP_nu
 hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
 
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
-xi = Mantis.Quadrature.get_quadrature_nodes(qrule)
+xi = Mantis.Quadrature.get_nodes(qrule)
 
 # Tests for coefficients and evaluation
 for element_id in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)

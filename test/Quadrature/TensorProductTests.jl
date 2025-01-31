@@ -48,15 +48,15 @@ for one_d_rule in one_dim_quad_rules
         end
 
         quad_rule_info = (
-            Quad.get_quadrature_nodes(quad_rule),
-            Quad.get_quadrature_weights(quad_rule),
-            Quad.get_quadrature_rule_label(quad_rule),
+            Quad.get_nodes(quad_rule),
+            Quad.get_weights(quad_rule),
+            Quad.get_label(quad_rule),
         )
 
         one_d_rule_info = (
-            Quad.get_quadrature_nodes(quad_rule_1d),
-            Quad.get_quadrature_weights(quad_rule_1d),
-            Quad.get_quadrature_rule_label(quad_rule_1d),
+            Quad.get_nodes(quad_rule_1d),
+            Quad.get_weights(quad_rule_1d),
+            Quad.get_label(quad_rule_1d),
         )
 
         @test all(quad_rule_info .== one_d_rule_info)
@@ -70,20 +70,20 @@ for one_d_rule in one_dim_quad_rules
         deg = (3, 5, 7, 8)[1:dimension]
         if typeof(one_d_rule) <: Tuple
             quad_rule = Quad.tensor_product_rule(deg, one_d_rule...)
-            label_1d = Quad.get_quadrature_rule_label(one_d_rule[1](deg[1], one_d_rule[2]))
+            label_1d = Quad.get_label(one_d_rule[1](deg[1], one_d_rule[2]))
             label = """Tensor-product of $dimension $(label_1d) rules"""
         else
             quad_rule = Quad.tensor_product_rule(deg, one_d_rule)
-            label_1d = Quad.get_quadrature_rule_label(one_d_rule(deg[1]))
+            label_1d = Quad.get_label(one_d_rule(deg[1]))
             label = "Tensor-product of $dimension $(label_1d) rules"
         end
 
-        ξ = Quad.get_quadrature_nodes(quad_rule)
-        w = Quad.get_quadrature_weights(quad_rule)
+        ξ = Quad.get_nodes(quad_rule)
+        w = Quad.get_weights(quad_rule)
 
 
         # Check that the rule type is correct.
-        @test Quad.get_quadrature_rule_label(quad_rule) == label
+        @test Quad.get_label(quad_rule) == label
 
 
         # Constructor tests.
@@ -136,15 +136,15 @@ for one_d_rule in one_dim_rules
     quad_rule = Quad.tensor_product_rule((one_d_rule,))
 
     quad_rule_info = (
-        Quad.get_quadrature_nodes(quad_rule),
-        Quad.get_quadrature_weights(quad_rule),
-        Quad.get_quadrature_rule_label(quad_rule),
+        Quad.get_nodes(quad_rule),
+        Quad.get_weights(quad_rule),
+        Quad.get_label(quad_rule),
     )
 
     one_d_rule_info = (
-        Quad.get_quadrature_nodes(one_d_rule),
-        Quad.get_quadrature_weights(one_d_rule),
-        Quad.get_quadrature_rule_label(one_d_rule),
+        Quad.get_nodes(one_d_rule),
+        Quad.get_weights(one_d_rule),
+        Quad.get_label(one_d_rule),
     )
 
     @test all(quad_rule_info .== one_d_rule_info)
@@ -157,10 +157,10 @@ label = """\
     (closed), Newton-Cotes (open)) rules\
     """
 
-w = Quad.get_quadrature_weights(quad_rule)
+w = Quad.get_weights(quad_rule)
 
 # Check that the rule label is correct.
-@test Quad.get_quadrature_rule_label(quad_rule) == label
+@test Quad.get_label(quad_rule) == label
 
 # Constructor tests.
 @test typeof(quad_rule) == Quad.QuadratureRule{5}
