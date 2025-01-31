@@ -7,7 +7,7 @@ module Geometry
 
 import LinearAlgebra
 
-using .. FunctionSpaces
+using ..FunctionSpaces
 
 abstract type AbstractGeometry{manifold_dim} end
 abstract type AbstractAnalyticalGeometry{manifold_dim} <: AbstractGeometry{manifold_dim} end
@@ -30,7 +30,6 @@ latter should only be implemented explicitly if necessary.
 """
 get_manifold_dim(::AbstractGeometry{manifold_dim}) where {manifold_dim} = manifold_dim
 
-
 """
     get_image_dim(::AbstractGeometry{manifold_dim})
 
@@ -41,6 +40,7 @@ Returns the dimensions of the image manifold of a given geometry.
 
 # Returns
 - `::Int`: The image manifold dimension.
+
 # Notes
 There is no generic fallback for this method. It should be implemented for each concrete
 geometry type.
@@ -59,6 +59,7 @@ Returns the number of elements in `geometry`.
 
 # Returns
 - `::Int`: The number of elements in the geometry.
+
 # Notes
 This method is used as a fallback if there isn't a more specific method to be used. The
 latter should only be implemented explicitly if necessary.
@@ -68,21 +69,22 @@ function get_num_elements(geometry::AbstractGeometry)
 end
 
 """
-    get_element_volume(geometry::AbstractGeometry, element_id::Int)
+    get_element_measure(geometry::AbstractGeometry, element_id::Int)
 
-Computes the volume of the element given by `element_id` in `geometry`.
+Computes the measure of the element given by `element_id` in `geometry`.
 
 # Arguments
 - 'geometry::AbstractGeometry': The geometry being used.
 - 'element_id::Int': Index of the element being considered.
 
 # Returns
-- 'element_volume::Float64': The volume of the element.
+- '::Float64': The measure of the element.
+
 # Notes
 There is no generic fallback for this method. It should be implemented for each concrete
 geometry type.
 """
-function get_element_volume(geometry::AbstractGeometry, element_id::Int)
+function get_element_measure(geometry::AbstractGeometry, element_id::Int)
     throw(ArgumentError("Method not defined for geometry of type $(typeof(geometry))."))
 end
 
@@ -99,7 +101,8 @@ Computes the length, in each manifold dimension, of the element given by `elemen
 - 'element_id::Int': Index of the element being considered.
 
 # Returns
-- 'element_lenghts::NTuple{manifold_dim, Float64}': The element's lengths. 
+- '::NTuple{manifold_dim, Float64}': The element's lengths. 
+
 # Notes
 There is no generic fallback for this method. It should be implemented for each concrete
 geometry type.
@@ -131,6 +134,7 @@ the element identified by `element_id` of a given `geometry`.
     dimensions of `eval` are `(num_eval_points, image_dim)`, where `num_eval_points` is the
     product of the number of evaluation points in `xi` in each dimension, and `image_dim` is
     the image manifold dimension of `geometry`.
+
 # Notes
 There is no generic fallback for this method. It should be implemented for each concrete
 geometry type.
@@ -164,6 +168,7 @@ element identified by `element_id` of a given `geometry`.
     dimensions of `J` are `(num_eval_points, image_dim, manifold_dim)`, where
     `num_eval_points` is the product of the number of evaluation points in `xi` in each
     dimension, and `image_dim` is the image manifold dimension of `geometry`.
+
 # Notes
 There is no generic fallback for this method. It should be implemented for each concrete
 geometry type.

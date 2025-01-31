@@ -189,10 +189,10 @@ nx = 3
 ny = 2
 breakpoints = (collect(LinRange(0.0, 1.0, nx+1)), collect(LinRange(0.0,2.0,ny+1)))
 geom = Mantis.Geometry.CartesianGeometry(breakpoints)
-function mapping(x::Vector{Float64})
+function mapping(x::AbstractVector)
     return [(x[1] + 0.2)*cos(x[2]), (x[1] + 0.2)*sin(x[2])]
 end
-function dmapping(x::Vector{Float64})
+function dmapping(x::AbstractVector)
     return [cos(x[2]) -(x[1] + 0.2)*sin(x[2]); sin(x[2]) (x[1] + 0.2)*cos(x[2])]
 end
 dimension = (2, 2)

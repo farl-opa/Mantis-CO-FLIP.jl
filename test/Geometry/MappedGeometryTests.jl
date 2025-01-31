@@ -9,21 +9,23 @@ using Test
 include("GeometryTestsHelpers.jl")
 
 # Test MappedCartesianGeometry ------------------------------------------------
-for nx = 1:3
-    for ny = 1:3
-        breakpoints = (collect(LinRange(0.0, 1.0, nx+1)), collect(LinRange(0.0,2.0,ny+1)))
+for nx in 1:3
+    for ny in 1:3
+        breakpoints = (
+            collect(LinRange(0.0, 1.0, nx + 1)), collect(LinRange(0.0, 2.0, ny + 1))
+        )
         geom = Mantis.Geometry.CartesianGeometry(breakpoints)
-        
+
         # Define the mapping ϕ of the geometry and its derivative.
         # ϕ(x,y) = [(x + 0.2)*cos(y), (x + 0.2)*sin(y)\
         function mapping(x::AbstractVector)
-            return [(x[1] + 0.2)*cos(x[2]), (x[1] + 0.2)*sin(x[2])]
+            return [(x[1] + 0.2) * cos(x[2]), (x[1] + 0.2) * sin(x[2])]
         end
         function dmapping(x::AbstractVector)
             return [cos(x[2]) -(x[1] + 0.2)*sin(x[2]); sin(x[2]) (x[1] + 0.2)*cos(x[2])]
         end
         function mapping(x::AbstractArray)
-            return [(x[:,1] .+ 0.2) .* cos.(x[:,2]), (x[:,1] .+ 0.2) .* sin.(x[:,2])]
+            return [(x[:, 1] .+ 0.2) .* cos.(x[:, 2]), (x[:, 1] .+ 0.2) .* sin.(x[:, 2])]
         end
         function dmapping(x::AbstractArray)
             return [cos(x[2]) -(x[1] + 0.2)*sin(x[2]); sin(x[2]) (x[1] + 0.2)*cos(x[2])]
@@ -33,17 +35,16 @@ for nx = 1:3
         curved_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
         mapped_geometry = Mantis.Geometry.MappedGeometry(geom, curved_mapping)
 
-
         # Generate the plot
         file_name = "mapped_cartesian_test_nx_$(nx)_ny_$(ny).vtu"
         output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
         Mantis.Plot.plot(
-            mapped_geometry; 
-            vtk_filename=output_file_path[1:end-4],
+            mapped_geometry;
+            vtk_filename=output_file_path[1:(end - 4)],
             n_subcells=1,
             degree=3,
             ascii=false,
-            compress=false
+            compress=false,
         )
 
         # Test geometry 

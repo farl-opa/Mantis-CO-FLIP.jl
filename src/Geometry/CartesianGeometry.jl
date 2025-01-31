@@ -17,9 +17,9 @@ struct CartesianGeometry{manifold_dim} <: AbstractAnalyticalGeometry{manifold_di
     # Returns
     A new CartesianGeometry instance.
     """
-    function CartesianGeometry(breakpoints::NTuple{manifold_dim, AbstractVector{T}}) where {
-        manifold_dim, T <: Number
-    }
+    function CartesianGeometry(
+        breakpoints::NTuple{manifold_dim,AbstractVector{T}}
+    ) where {manifold_dim,T<:Number}
         num_elements_per_dim = length.(breakpoints) .- 1
         num_elements = prod(num_elements_per_dim)
         ordered_indices = CartesianIndices(num_elements_per_dim)
@@ -40,9 +40,9 @@ function get_breakpoints(geometry::CartesianGeometry)
     return geometry.breakpoints
 end
 
-function _get_num_elements_per_dim(geometry::CartesianGeometry{manifold_dim}) where {
-    manifold_dim
-}
+function _get_num_elements_per_dim(
+    geometry::CartesianGeometry{manifold_dim}
+) where {manifold_dim}
     num_elements_per_dim = ntuple(manifold_dim) do k
         return length(geometry.breakpoints[k]) - 1
     end
@@ -63,7 +63,7 @@ function evaluate(
     n_points_per_dim = size.(xi, 1)
     n_points = prod(n_points_per_dim)  # Total number of points to evaluate
     eval = zeros(Float64, n_points, manifold_dim)
-    
+
     # Map the evaluation points to the geometry
     ordered_id = get_ordered_indices(geometry, element_id)
     breakpoints = get_breakpoints(geometry)
@@ -71,21 +71,21 @@ function evaluate(
         dim_points = zeros(n_points_per_dim[k]) # initialize vector for current dimension
 
         for point in eachindex(dim_points)
-            dim_points[point] = (1 - xi[k][point]) * breakpoints[k][ordered_id[k]] +
-                xi[k][point] * breakpoints[k][ordered_id[k]+1]
+            dim_points[point] =
+                (1 - xi[k][point]) * breakpoints[k][ordered_id[k]] +
+                xi[k][point] * breakpoints[k][ordered_id[k] + 1]
         end
 
         return dim_points
     end
-
 
     # Get the multidimensional indices for the tensor product points
     ordered_points = CartesianIndices(n_points_per_dim)
     linear_points = LinearIndices(ordered_points)
     for (linear_point_id, ordered_point_id) in zip(linear_points, ordered_points)
         for component_id in 1:manifold_dim
-            eval[linear_point_id, component_id] = univariate_points[
-                component_id][ordered_point_id[component_id]
+            eval[linear_point_id, component_id] = univariate_points[component_id][
+                ordered_point_id[component_id]
             ]
         end
     end
@@ -96,7 +96,7 @@ end
 function jacobian(
     geometry::CartesianGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}}
+    xi::NTuple{manifold_dim,Vector{Float64}},
 ) where {manifold_dim}
     ordered_id = get_ordered_indices(geometry, element_id)
     breakpoints = get_breakpoints(geometry)
@@ -119,20 +119,20 @@ function jacobian(
     return J
 end
 
-function get_element_volume(
+function get_element_measure(
     geometry::CartesianGeometry{manifold_dim}, element_id::Int
 ) where {manifold_dim}
     ordered_id = get_ordered_indices(geometry, element_id)
     breakpoints = get_breakpoints(geometry)
 
-    element_volume = 1
+    element_measure = 1
     for k in 1:manifold_dim
-        element_volume *= abs(
-            breakpoints[k][ordered_id[k]+1] - breakpoints[k][ordered_id[k]]
+        element_measure *= abs(
+            breakpoints[k][ordered_id[k] + 1] - breakpoints[k][ordered_id[k]]
         )
     end
 
-    return element_volume
+    return element_measure
 end
 
 function get_element_lengths(
@@ -144,7 +144,7 @@ function get_element_lengths(
     element_lengths = Vector{Float64}(undef, manifold_dim)
     for k in 1:manifold_dim
         element_lengths[k] = abs(
-            breakpoints[k][ordered_id[k]+1] - breakpoints[k][ordered_id[k]]
+            breakpoints[k][ordered_id[k] + 1] - breakpoints[k][ordered_id[k]]
         )
     end
 
