@@ -11,14 +11,50 @@ struct Mapping{M, dM}
     end
 end
 
+"""
+    get_manifold_dim(mapping::Mapping)
+
+Returns the dimension of the domain manifold of the mapping.
+
+# Arguments
+- `mapping::Mapping`: The mapping structure.
+
+# Returns
+- `::Int`: The dimension of the domain manifold.
+"""
 function get_manifold_dim(mapping::Mapping)
     return mapping.dimensions[1]
 end
 
+"""
+    get_image_dim(mapping::Mapping)
+
+Returns the dimension of the image manifold of the mapping.
+
+# Arguments
+- `mapping::Mapping`: The mapping structure.
+
+# Returns
+- `::Int`: The dimension of the image manifold.
+"""
 function get_image_dim(mapping::Mapping)
     return mapping.dimensions[2]
 end
 
+"""
+    evaluate(mapping::Mapping, x::Matrix{Float64})
+
+Evaluates the mappping of the points `x` from the parametric space to physical space.
+
+# Arguments
+- `mapping::Mapping`: The mapping defining the transformation of the points `x`.
+- `x::Matrix{Float64}`: The points in parametric space to be mapped.
+
+# Returns
+- `::Matrix{Float64}`: The mapped points in physical space. The size of the matrix is
+    `(num_points, image_dim)`, where `num_points` is the number of rows in `x` and
+    `image_dim` is the dimension of the mapped points.
+"""
 function evaluate(mapping::Mapping, x::Matrix{Float64})
     image_dim = get_image_dim(mapping)
     num_points = size(x, 1)
@@ -31,6 +67,21 @@ function evaluate(mapping::Mapping, x::Matrix{Float64})
     return eval
 end
 
+"""
+    jacobian(mapping::Mapping, x::Matrix{Float64})
+
+Evaluates the jacobian at the physical points mapped from the parametric points `x`.
+
+# Arguments
+- `mapping::Mapping`: The mapping defining the transformation of the points `x`.
+- `x::Matrix{Float64}`: The points in parametric space to be mapped.
+
+# Returns
+- `::Matrix{Float64}`: The mapped points in physical space. The size of the matrix is
+    `(num_points, image_dim, manifold_dim)`, where `num_points` is the number of rows in
+    `x`, `image_dim` is the dimension of the mapped points and `manifold_dim` is the number
+    of columns in `x`.
+"""
 function jacobian(
     mapping::Mapping{M, dM}, x::Matrix{Float64}
 ) where {M <: Function, dM <: Function}
@@ -46,6 +97,7 @@ function jacobian(
 
     return J
 end
+
 
 struct MappedGeometry{manifold_dim, G, Map} <: AbstractGeometry{manifold_dim}
     geometry::G
