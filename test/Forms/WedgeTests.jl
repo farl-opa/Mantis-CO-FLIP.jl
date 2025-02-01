@@ -6,7 +6,6 @@ using Test
 
 using LinearAlgebra
 using SparseArrays
-using Profile
 
 # 2D Tests --------------------------------------------------------------------
 
