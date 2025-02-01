@@ -6,6 +6,7 @@ using Test
 
 using LinearAlgebra
 using SparseArrays
+using Profile
 
 # 2D Tests --------------------------------------------------------------------
 
@@ -25,17 +26,21 @@ patch2 = Mantis.Mesh.Patch1D(breakpoints2)
 # then the univariate FEM spaces
 deg1 = 2
 deg2 = 2
-B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, deg1-1, -1])
-B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-1, -1])
+B1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, deg1 - 1, -1])
+B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2 - 1, 1), deg2 - 1, -1])
 dB1 = Mantis.FunctionSpaces.get_derivative_space(B1)
 dB2 = Mantis.FunctionSpaces.get_derivative_space(B2)
 
 # next, tensor-product B-spline spaces
-TP_Space_0 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace((B1, B2)),))
+TP_Space_0 = Mantis.FunctionSpaces.DirectSumSpace((
+    Mantis.FunctionSpaces.TensorProductSpace((B1, B2)),
+))
 dTP_Space_dx = Mantis.FunctionSpaces.TensorProductSpace((dB1, B2))
 dTP_Space_dy = Mantis.FunctionSpaces.TensorProductSpace((B1, dB2))
 TP_Space_1 = Mantis.FunctionSpaces.DirectSumSpace((dTP_Space_dx, dTP_Space_dy))
-TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((Mantis.FunctionSpaces.TensorProductSpace((dB1, dB2)),))
+TP_Space_2 = Mantis.FunctionSpaces.DirectSumSpace((
+    Mantis.FunctionSpaces.TensorProductSpace((dB1, dB2)),
+))
 
 # then, the geometries
 # Line 1
@@ -48,14 +53,20 @@ geom_cart = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 # curvilinear mesh
 crazy_c = 0.2
 function mapping(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+    x1_new = (2.0 / (Lright - Lleft)) * x[1] - 2.0 * Lleft / (Lright - Lleft) - 1.0
+    x2_new = (2.0 / (Ltop - Lbottom)) * x[2] - 2.0 * Lbottom / (Ltop - Lbottom) - 1.0
+    return [
+        x[1] + ((Lright - Lleft) / 2.0) * crazy_c * sinpi(x1_new) * sinpi(x2_new),
+        x[2] + ((Ltop - Lbottom) / 2.0) * crazy_c * sinpi(x1_new) * sinpi(x2_new),
+    ]
 end
 function dmapping(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+    x1_new = (2.0 / (Lright - Lleft)) * x[1] - 2.0 * Lleft / (Lright - Lleft) - 1.0
+    x2_new = (2.0 / (Ltop - Lbottom)) * x[2] - 2.0 * Lbottom / (Ltop - Lbottom) - 1.0
+    return [
+        1.0+pi * crazy_c * cospi(x1_new) * sinpi(x2_new) ((Lright - Lleft)/(Ltop - Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new)
+        ((Ltop - Lbottom)/(Lright - Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0+pi * crazy_c * sinpi(x1_new) * cospi(x2_new)
+    ]
 end
 dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
@@ -63,7 +74,11 @@ geom_crazy = Mantis.Geometry.MappedGeometry(geom_cart, crazy_mapping)
 # -----------------------------------------------------------------------------
 
 # Test on multiple geometries
-q_rule = Mantis.Quadrature.tensor_product_rule((deg1+25, deg2+25), Mantis.Quadrature.gauss_legendre)
+q_rule = Mantis.Quadrature.tensor_product_rule(
+    (deg1, deg2) .+ 1, Mantis.Quadrature.gauss_legendre
+)
+ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
+quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
 for geom in [geom_cart, geom_crazy]
     # Create the form spaces
     ϵ⁰ = Mantis.Forms.FormSpace(0, geom, TP_Space_0, "ν")
@@ -87,22 +102,33 @@ for geom in [geom_cart, geom_crazy]
         #   ϵ⁰ ∧ ⋆ϵ⁰
 
         # Compute the inner product: <ϵ⁰, ϵ⁰>
-        zero_form_rows_idx, zero_form_columns_idx, zero_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ⁰, ϵ⁰, elem_id, q_rule)
+        zero_form_rows_idx, zero_form_columns_idx, zero_form_inner_product_evaluate = 
+            Mantis.Forms.evaluate_inner_product(
+                ϵ⁰, ϵ⁰, elem_id, q_rule
+            )
 
         # Compute the wedge product: ϵ⁰ ∧ ⋆ϵ⁰
         zero_form_wedge = Mantis.Forms.wedge(ϵ⁰, ★ϵ⁰)
 
         # Evaluate it at the quadrature nodes
-        ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
-        zero_form_wedge_evaluate, zero_form_wedge_indices = Mantis.Forms.evaluate(zero_form_wedge, elem_id, ξ_quadrature_nodes)
+        zero_form_wedge_evaluate, zero_form_wedge_indices = Mantis.Forms.evaluate(
+            zero_form_wedge, elem_id, ξ_quadrature_nodes
+        )
 
         # Integrate
-        quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
-        zero_form_inner_product_from_wedge = sum(quadrature_weights .* zero_form_wedge_evaluate[1], dims=1)[:]
+        zero_form_inner_product_from_wedge = sum(
+            quadrature_weights .* zero_form_wedge_evaluate[1]; dims=1
+        )[:]
         a = 2
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(zero_form_inner_product_from_wedge - zero_form_inner_product_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(
+                abs.(zero_form_inner_product_from_wedge - zero_form_inner_product_evaluate)
+            ),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(zero_form_wedge) == 2
@@ -113,21 +139,30 @@ for geom in [geom_cart, geom_crazy]
         #   ϵⁿ ∧ ⋆ϵⁿ
 
         # Compute the inner product: <ϵⁿ, ϵⁿ>
-        top_form_rows_idx, top_form_columns_idx, top_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ², ϵ², elem_id, q_rule)
+        top_form_rows_idx, top_form_columns_idx, top_form_inner_product_evaluate = 
+            Mantis.Forms.evaluate_inner_product(
+                ϵ², ϵ², elem_id, q_rule
+            )
 
         # Compute the wedge product: ϵⁿ ∧ ⋆ϵⁿ
         top_form_wedge = Mantis.Forms.wedge(ϵ², ★ϵ²)
 
         # Evaluate it at the quadrature nodes
-        ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
-        top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(top_form_wedge, elem_id, ξ_quadrature_nodes)
+        top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(
+            top_form_wedge, elem_id, ξ_quadrature_nodes
+        )
 
         # Integrate
-        quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
-        top_form_inner_product_from_wedge = sum(quadrature_weights .* top_form_wedge_evaluate[1], dims=1)[:]
+        top_form_inner_product_from_wedge = sum(
+            quadrature_weights .* top_form_wedge_evaluate[1]; dims=1
+        )[:]
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(top_form_inner_product_from_wedge - top_form_inner_product_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(top_form_inner_product_from_wedge - top_form_inner_product_evaluate)),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(top_form_wedge) == 2
@@ -138,21 +173,30 @@ for geom in [geom_cart, geom_crazy]
         #   ϵ¹ ∧ ⋆ϵ¹
 
         # Compute the inner product: <ϵ¹, ϵ¹>
-        one_form_rows_idx, one_form_columns_idx, one_form_inner_product_evaluate = Mantis.Forms.evaluate_inner_product(ϵ¹, ϵ¹, elem_id, q_rule)
+        one_form_rows_idx, one_form_columns_idx, one_form_inner_product_evaluate = 
+            Mantis.Forms.evaluate_inner_product(
+                ϵ¹, ϵ¹, elem_id, q_rule
+            )
 
         # Compute the wedge product: ϵ¹ ∧ ⋆ϵ¹
         one_form_wedge = Mantis.Forms.wedge(ϵ¹, ★ϵ¹)
 
         # Evaluate it at the quadrature nodes
-        ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
-        one_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(one_form_wedge, elem_id, ξ_quadrature_nodes)
+        one_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(
+            one_form_wedge, elem_id, ξ_quadrature_nodes
+        )
 
         # Integrate
-        quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
-        one_form_inner_product_from_wedge = sum(quadrature_weights .* one_form_wedge_evaluate[1], dims=1)[:]
+        one_form_inner_product_from_wedge = sum(
+            quadrature_weights .* one_form_wedge_evaluate[1]; dims=1
+        )[:]
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(one_form_inner_product_from_wedge - one_form_inner_product_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(one_form_inner_product_from_wedge - one_form_inner_product_evaluate)),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(one_form_wedge) == 2
@@ -162,62 +206,60 @@ for geom in [geom_cart, geom_crazy]
 
         # Test ϵ¹ ∧ ⋆ϵ¹ ∧ ϵ¹ to check if form rank 3 expressions are not allowed
         @test_throws ArgumentError Mantis.Forms.wedge(one_form_wedge, ϵ¹)
-
-        # Test if different form-/expression-rank combinations don't throw errors
-        zero_form_space_wedge       = Mantis.Forms.wedge(ϵ⁰, ϵ⁰) # 0-form space with 0-form space
-        zero_form_field_wedge       = Mantis.Forms.wedge(ε⁰, ε⁰) # 0-form field with 0-form field
-        zero_form_mixed_1_wedge     = Mantis.Forms.wedge(ϵ⁰, ε⁰) # 0-form space with 0-form field
-        zero_form_mixed_2_wedge     = Mantis.Forms.wedge(ε⁰, ϵ⁰) # 0-form field with 0-form space
-        zero_top_form_space_wedge   = Mantis.Forms.wedge(ϵ⁰, ϵ²) # 0-form space with top-form space
-        top_zero_form_space_wedge   = Mantis.Forms.wedge(ϵ², ϵ⁰) # top-form space with 0-form space
-        zero_top_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε²) # 0-form space with top-form field
-        zero_top_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ²) # 0-form field with top-form space
-        top_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ², ε⁰) # top-form space with 0-form field
-        top_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε², ϵ⁰) # top-form field with 0-form space
-        top_zero_form_field_wedge   = Mantis.Forms.wedge(ε², ε⁰) # top-form field with 0-form field
-        zero_top_form_field_wedge   = Mantis.Forms.wedge(ε⁰, ε²) # 0-form field with top-form field
-        one_form_space_wedge        = Mantis.Forms.wedge(ϵ¹, ϵ¹) # 1-form space with 1-form space
-        one_form_field_wedge        = Mantis.Forms.wedge(ε¹, ε¹) # 1-form field with 1-form field
-        one_form_mixed_1_wedge      = Mantis.Forms.wedge(ϵ¹, ε¹) # 1-form space with 1-form field
-        one_form_mixed_2_wedge      = Mantis.Forms.wedge(ε¹, ϵ¹) # 1-form field with 1-form space
-        one_zero_form_space_wedge   = Mantis.Forms.wedge(ϵ¹, ϵ⁰) # 1-form space with 0-form space
-        one_zero_form_field_wedge   = Mantis.Forms.wedge(ε¹, ε⁰) # 1-form field with 0-form field
-        one_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε⁰) # 1-form space with 0-form field
-        one_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ⁰) # 1-form field with 0-form space
-        zero_one_form_space_wedge   = Mantis.Forms.wedge(ϵ⁰, ϵ¹) # 0-form space with 1-form space
-        zero_one_form_field_wedge   = Mantis.Forms.wedge(ε⁰, ε¹) # 0-form field with 1-form field
-        zero_one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε¹) # 0-form space with 1-form field
-        zero_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ¹) # 0-form field with 1-form space
-
-        @test_nowarn Mantis.Forms.evaluate(zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
     end
+    # Test if different form-/expression-rank combinations don't throw errors
+    zero_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ⁰) # 0-form space with 0-form space
+    zero_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε⁰) # 0-form field with 0-form field
+    zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε⁰) # 0-form space with 0-form field
+    zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ⁰) # 0-form field with 0-form space
+    zero_top_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ²) # 0-form space with top-form space
+    top_zero_form_space_wedge = Mantis.Forms.wedge(ϵ², ϵ⁰) # top-form space with 0-form space
+    zero_top_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε²) # 0-form space with top-form field
+    zero_top_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ²) # 0-form field with top-form space
+    top_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ², ε⁰) # top-form space with 0-form field
+    top_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε², ϵ⁰) # top-form field with 0-form space
+    top_zero_form_field_wedge = Mantis.Forms.wedge(ε², ε⁰) # top-form field with 0-form field
+    zero_top_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε²) # 0-form field with top-form field
+    one_form_space_wedge = Mantis.Forms.wedge(ϵ¹, ϵ¹) # 1-form space with 1-form space
+    one_form_field_wedge = Mantis.Forms.wedge(ε¹, ε¹) # 1-form field with 1-form field
+    one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε¹) # 1-form space with 1-form field
+    one_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ¹) # 1-form field with 1-form space
+    one_zero_form_space_wedge = Mantis.Forms.wedge(ϵ¹, ϵ⁰) # 1-form space with 0-form space
+    one_zero_form_field_wedge = Mantis.Forms.wedge(ε¹, ε⁰) # 1-form field with 0-form field
+    one_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε⁰) # 1-form space with 0-form field
+    one_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ⁰) # 1-form field with 0-form space
+    zero_one_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ¹) # 0-form space with 1-form space
+    zero_one_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε¹) # 0-form field with 1-form field
+    zero_one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε¹) # 0-form space with 1-form field
+    zero_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ¹) # 0-form field with 1-form space
+
+    @test_nowarn Mantis.Forms.evaluate(zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
 end
 
 # -----------------------------------------------------------------------------
-
 
 # 3D tests --------------------------------------------------------------------
 
@@ -237,7 +279,7 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 
 # first B-spline patch
 deg = 2
-B = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, deg-1, -1])
+B = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, deg - 1, -1])
 
 # tensor-product B-spline patch
 TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B, B))
@@ -256,13 +298,13 @@ crazy_geo_2d_cart = Mantis.Geometry.MappedGeometry(geo_2d_cart_aux, crazy_mappin
 # Crazy mesh 3D (in x and y only, z is straight) (this is also a tensor product geometry)
 crazy_geo_3d_cart = Mantis.Geometry.TensorProductGeometry((crazy_geo_2d_cart, line_geo))
 
-
-
 # Setup the form spaces
 
 # Generate the multivalued FEMSpaces (DirectSumSpace)
 dsTP_0_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d,))  # direct sum space
-dsTP_1_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d, TP_Space_3d, TP_Space_3d))  # direct sum space
+dsTP_1_form_3d = Mantis.FunctionSpaces.DirectSumSpace((
+    TP_Space_3d, TP_Space_3d, TP_Space_3d
+))  # direct sum space
 dsTP_2_form_3d = dsTP_1_form_3d
 dsTP_top_form_3d = dsTP_0_form_3d
 
@@ -284,7 +326,9 @@ end
 # end
 
 # Quadrature rule
-q_rule = Mantis.Quadrature.tensor_product_rule((deg, deg, deg) .+ 1, Mantis.Quadrature.gauss_legendre)
+q_rule = Mantis.Quadrature.tensor_product_rule(
+    (deg, deg, deg) .+ 1, Mantis.Quadrature.gauss_legendre
+)
 ξ_quadrature_nodes = Mantis.Quadrature.get_nodes(q_rule)
 quadrature_weights = Mantis.Quadrature.get_weights(q_rule)
 
@@ -327,20 +371,38 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         zero_form_wedge_triple = Mantis.Forms.wedge(zero_form_wedge, α⁰)  # ϵ⁰ ∧ ⋆ϵ⁰ ∧ α⁰ (with α⁰ = 1, so the two expressions should be equal)
 
         # Evaluate wedge at the quadrature nodes
-        zero_form_wedge_evaluate, zero_form_wedge_indices = Mantis.Forms.evaluate(zero_form_wedge, elem_id, ξ_quadrature_nodes)
-        zero_form_wedge_triple_evaluate, zero_form_wedge_triple_indices = Mantis.Forms.evaluate(zero_form_wedge_triple, elem_id, ξ_quadrature_nodes)
+        zero_form_wedge_evaluate, zero_form_wedge_indices = Mantis.Forms.evaluate(
+            zero_form_wedge, elem_id, ξ_quadrature_nodes
+        )
+        zero_form_wedge_triple_evaluate, zero_form_wedge_triple_indices =
+            Mantis.Forms.evaluate(
+                zero_form_wedge_triple, elem_id, ξ_quadrature_nodes
+            )
 
         # Test if ϵ⁰ ∧ ⋆ϵ⁰ == ϵ⁰ ∧ ⋆ϵ⁰ ∧ α⁰ (since α⁰ = 1)
-        @test isapprox(sum(abs.(zero_form_wedge_evaluate[1] - zero_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(zero_form_wedge_evaluate[1] - zero_form_wedge_triple_evaluate[1])),
+            0.0,
+            atol=1e-12,
+        )
 
         # Integrate
-        zero_form_inner_product_from_wedge = sum(quadrature_weights .* zero_form_wedge_evaluate[1], dims=1)[:]
+        zero_form_inner_product_from_wedge = sum(
+            quadrature_weights .* zero_form_wedge_evaluate[1]; dims=1
+        )[:]
 
         # Compute inner product (reference value)
-        zero_form_inner_rows_idx, zero_form_inner_columns_idx, zero_form_inner_evaluate = Mantis.Forms.evaluate_inner_product(ϵ⁰, ϵ⁰, elem_id, q_rule)
+        zero_form_inner_rows_idx, zero_form_inner_columns_idx, zero_form_inner_evaluate = 
+            Mantis.Forms.evaluate_inner_product(
+                ϵ⁰, ϵ⁰, elem_id, q_rule
+            )
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(zero_form_inner_product_from_wedge - zero_form_inner_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(zero_form_inner_product_from_wedge - zero_form_inner_evaluate)),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(zero_form_wedge) == 2
@@ -353,20 +415,38 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         one_form_wedge_triple = Mantis.Forms.wedge(one_form_wedge, α⁰)  # ϵ¹ ∧ ⋆ϵ¹ ∧ α⁰ (with α⁰ = 1, so the two expressions should be equal)
 
         # Evaluate wedge at the quadrature nodes
-        one_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(one_form_wedge, elem_id, ξ_quadrature_nodes)
-        one_form_wedge_triple_evaluate, one_form_wedge_triple_indices = Mantis.Forms.evaluate(one_form_wedge_triple, elem_id, ξ_quadrature_nodes)
+        one_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(
+            one_form_wedge, elem_id, ξ_quadrature_nodes
+        )
+        one_form_wedge_triple_evaluate, one_form_wedge_triple_indices = 
+            Mantis.Forms.evaluate(
+                one_form_wedge_triple, elem_id, ξ_quadrature_nodes
+            )
 
         # Test if ϵ¹ ∧ ⋆ϵ¹ == ϵ¹ ∧ ⋆ϵ¹ ∧ α⁰ (since α⁰ = 1)
-        @test isapprox(sum(abs.(one_form_wedge_evaluate[1] - one_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(one_form_wedge_evaluate[1] - one_form_wedge_triple_evaluate[1])),
+            0.0,
+            atol=1e-12,
+        )
 
         # Integrate
-        one_form_inner_product_from_wedge = sum(quadrature_weights .* one_form_wedge_evaluate[1], dims=1)[:]
+        one_form_inner_product_from_wedge = sum(
+            quadrature_weights .* one_form_wedge_evaluate[1]; dims=1
+        )[:]
 
         # Compute inner product (reference value)
-        one_form_inner_rows_idx, one_form_inner_columns_idx, one_form_inner_evaluate = Mantis.Forms.evaluate_inner_product(ϵ¹, ϵ¹, elem_id, q_rule)
+        one_form_inner_rows_idx, one_form_inner_columns_idx, one_form_inner_evaluate =
+            Mantis.Forms.evaluate_inner_product(
+                ϵ¹, ϵ¹, elem_id, q_rule
+            )
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(one_form_inner_product_from_wedge - one_form_inner_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(one_form_inner_product_from_wedge - one_form_inner_evaluate)),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(one_form_wedge) == 2
@@ -380,22 +460,52 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         two_form_wedge_triple_alt = Mantis.Forms.wedge(Mantis.Forms.wedge(ϵ², α⁰), ★ϵ²)  # ϵ² ∧ α⁰ ∧ ⋆ϵ²  (with α⁰ = 1, so the three expressions should be equal)
 
         # Evaluate wedge at the quadrature nodes
-        two_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(two_form_wedge, elem_id, ξ_quadrature_nodes)
-        two_form_wedge_triple_evaluate, two_form_wedge_triple_indices = Mantis.Forms.evaluate(two_form_wedge_triple, elem_id, ξ_quadrature_nodes)
-        two_form_wedge_triple_alt_evaluate, two_form_wedge_triple_alt_indices = Mantis.Forms.evaluate(two_form_wedge_triple_alt, elem_id, ξ_quadrature_nodes)
+        two_form_wedge_evaluate, one_form_wedge_indices = Mantis.Forms.evaluate(
+            two_form_wedge, elem_id, ξ_quadrature_nodes
+        )
+        two_form_wedge_triple_evaluate, two_form_wedge_triple_indices =
+            Mantis.Forms.evaluate(
+                two_form_wedge_triple, elem_id, ξ_quadrature_nodes
+            )
+        two_form_wedge_triple_alt_evaluate, two_form_wedge_triple_alt_indices =
+            Mantis.Forms.evaluate(
+                two_form_wedge_triple_alt, elem_id, ξ_quadrature_nodes
+            )
 
         # Test if ϵ² ∧ ⋆ϵ² == ϵ² ∧ ⋆ϵ² ∧ α⁰ == ϵ² ∧ α⁰ ∧ ⋆ϵ² (since α⁰ = 1)
-        @test isapprox(sum(abs.(two_form_wedge_evaluate[1] - two_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
-        @test isapprox(sum(abs.(two_form_wedge_triple_evaluate[1] - two_form_wedge_triple_alt_evaluate[1])), 0.0, atol=1e-12) # rearrange array to match wedge product order
+        @test isapprox(
+            sum(abs.(two_form_wedge_evaluate[1] - two_form_wedge_triple_evaluate[1])),
+            0.0,
+            atol=1e-12,
+        )
+        @test isapprox(
+            sum(
+                abs.(
+                    two_form_wedge_triple_evaluate[1] -
+                    two_form_wedge_triple_alt_evaluate[1]
+                ),
+            ),
+            0.0,
+            atol=1e-12,
+        ) # rearrange array to match wedge product order
 
         # Integrate
-        two_form_inner_product_from_wedge = sum(quadrature_weights .* two_form_wedge_evaluate[1], dims=1)[:]
+        two_form_inner_product_from_wedge = sum(
+            quadrature_weights .* two_form_wedge_evaluate[1]; dims=1
+        )[:]
 
         # Compute inner product (reference value)
-        two_form_inner_rows_idx, two_form_inner_columns_idx, two_form_inner_evaluate = Mantis.Forms.evaluate_inner_product(ϵ², ϵ², elem_id, q_rule)
+        two_form_inner_rows_idx, two_form_inner_columns_idx, two_form_inner_evaluate =
+            Mantis.Forms.evaluate_inner_product(
+                ϵ², ϵ², elem_id, q_rule
+            )
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(two_form_inner_product_from_wedge - two_form_inner_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(two_form_inner_product_from_wedge - two_form_inner_evaluate)),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(two_form_wedge) == 2
@@ -408,20 +518,38 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         top_form_wedge_triple = Mantis.Forms.wedge(top_form_wedge, α⁰)  # ϵ³ ∧ ⋆ϵ³ ∧ α⁰ (with α⁰ = 1, so the two expressions should be equal)
 
         # Evaluate wedge at the quadrature nodes
-        top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(top_form_wedge, elem_id, ξ_quadrature_nodes)
-        top_form_wedge_triple_evaluate, top_form_wedge_triple_indices = Mantis.Forms.evaluate(top_form_wedge_triple, elem_id, ξ_quadrature_nodes)
+        top_form_wedge_evaluate, top_form_wedge_indices = Mantis.Forms.evaluate(
+            top_form_wedge, elem_id, ξ_quadrature_nodes
+        )
+        top_form_wedge_triple_evaluate, top_form_wedge_triple_indices =
+            Mantis.Forms.evaluate(
+                top_form_wedge_triple, elem_id, ξ_quadrature_nodes
+            )
 
         # Test if ϵ³ ∧ ⋆ϵ³ == ϵ³ ∧ ⋆ϵ³ ∧ α⁰ (since α⁰ = 1)
-        @test isapprox(sum(abs.(top_form_wedge_evaluate[1] - top_form_wedge_triple_evaluate[1])), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(top_form_wedge_evaluate[1] - top_form_wedge_triple_evaluate[1])),
+            0.0,
+            atol=1e-12,
+        )
 
         # Integrate
-        top_form_inner_product_from_wedge = sum(quadrature_weights .* top_form_wedge_evaluate[1], dims=1)[:]
+        top_form_inner_product_from_wedge = sum(
+            quadrature_weights .* top_form_wedge_evaluate[1]; dims=1
+        )[:]
 
         # Compute inner product (reference value)
-        top_form_inner_rows_idx, top_form_inner_columns_idx, top_form_inner_evaluate = Mantis.Forms.evaluate_inner_product(ϵ³, ϵ³, elem_id, q_rule)
+        top_form_inner_rows_idx, top_form_inner_columns_idx, top_form_inner_evaluate =
+            Mantis.Forms.evaluate_inner_product(
+                ϵ³, ϵ³, elem_id, q_rule
+            )
 
         # Test if it is the same as the inner product
-        @test isapprox(sum(abs.(top_form_inner_product_from_wedge - top_form_inner_evaluate)), 0.0, atol=1e-12)
+        @test isapprox(
+            sum(abs.(top_form_inner_product_from_wedge - top_form_inner_evaluate)),
+            0.0,
+            atol=1e-12,
+        )
 
         # Test if the wedge product expression has the correct expression rank
         @test Mantis.Forms.get_expression_rank(top_form_wedge) == 2
@@ -429,90 +557,90 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         # Test ϵ¹ ∧ ⋆ϵ¹ ∧ ϵ¹ to check if rank 3 expressions are not allowed
         @test_throws ArgumentError Mantis.Forms.wedge(one_form_wedge, ϵ⁰)
         # ---------------------------------------------------------------------
-
-        # Test if different form-/expression-rank combinations don't throw errors
-        zero_form_space_wedge       = Mantis.Forms.wedge(ϵ⁰, ϵ⁰) # 0-form space with 0-form space
-        zero_form_field_wedge       = Mantis.Forms.wedge(ε⁰, ε⁰) # 0-form field with 0-form field
-        zero_form_mixed_1_wedge     = Mantis.Forms.wedge(ϵ⁰, ε⁰) # 0-form space with 0-form field
-        zero_form_mixed_2_wedge     = Mantis.Forms.wedge(ε⁰, ϵ⁰) # 0-form field with 0-form space
-        zero_one_form_space_wedge   = Mantis.Forms.wedge(ϵ⁰, ϵ¹) # 0-form space with 1-form space
-        zero_one_form_field_wedge   = Mantis.Forms.wedge(ε⁰, ε¹) # 0-form field with 1-form field
-        zero_one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε¹) # 0-form space with 1-form field
-        zero_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ¹) # 0-form field with 1-form space
-        one_form_space_wedge        = Mantis.Forms.wedge(ϵ¹, ϵ¹) # 1-form space with 1-form space
-        one_form_field_wedge        = Mantis.Forms.wedge(ε¹, ε¹) # 1-form field with 1-form field
-        one_form_mixed_1_wedge      = Mantis.Forms.wedge(ϵ¹, ε¹) # 1-form space with 1-form field
-        one_form_mixed_2_wedge      = Mantis.Forms.wedge(ε¹, ϵ¹) # 1-form field with 1-form space
-        one_zero_form_space_wedge   = Mantis.Forms.wedge(ϵ¹, ϵ⁰) # 1-form space with 0-form space
-        one_zero_form_field_wedge   = Mantis.Forms.wedge(ε¹, ε⁰) # 1-form field with 0-form field
-        one_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε⁰) # 1-form space with 0-form field
-        one_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ⁰) # 1-form field with 0-form space
-        zero_two_form_space_wedge   = Mantis.Forms.wedge(ϵ⁰, ϵ²) # 0-form space with 2-form space
-        zero_two_form_field_wedge   = Mantis.Forms.wedge(ε⁰, ε²) # 0-form field with 2-form field
-        zero_two_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε²) # 0-form space with 2-form field
-        zero_two_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ²) # 0-form field with 2-form space
-        two_zero_form_space_wedge   = Mantis.Forms.wedge(ϵ², ϵ⁰) # 2-form space with 0-form space
-        two_zero_form_field_wedge   = Mantis.Forms.wedge(ε², ε⁰) # 2-form field with 0-form field
-        two_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ², ε⁰) # 2-form space with 0-form field
-        two_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε², ϵ⁰) # 2-form field with 0-form space
-        one_two_form_space_wedge    = Mantis.Forms.wedge(ϵ¹, ϵ²) # 1-form space with 2-form space
-        one_two_form_field_wedge    = Mantis.Forms.wedge(ε¹, ε²) # 1-form field with 2-form field
-        one_two_form_mixed_1_wedge  = Mantis.Forms.wedge(ϵ¹, ε²) # 1-form space with 2-form field
-        one_two_form_mixed_2_wedge  = Mantis.Forms.wedge(ε¹, ϵ²) # 1-form field with 2-form space
-        two_one_form_space_wedge    = Mantis.Forms.wedge(ϵ², ϵ¹) # 2-form space with 1-form space
-        two_one_form_field_wedge    = Mantis.Forms.wedge(ε², ε¹) # 2-form field with 1-form field
-        two_one_form_mixed_1_wedge  = Mantis.Forms.wedge(ϵ², ε¹) # 2-form space with 1-form field
-        two_one_form_mixed_2_wedge  = Mantis.Forms.wedge(ε², ϵ¹) # 2-form field with 1-form space
-        zero_top_form_space_wedge   = Mantis.Forms.wedge(ϵ⁰, ϵ³) # 0-form space with top-form space
-        zero_top_form_field_wedge   = Mantis.Forms.wedge(ε⁰, ε³) # 0-form field with top-form field
-        zero_top_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε³) # 0-form space with top-form field
-        zero_top_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ³) # 0-form field with top-form space
-        top_zero_form_space_wedge   = Mantis.Forms.wedge(ϵ³, ϵ⁰) # top-form space with 0-form space
-        top_zero_form_field_wedge   = Mantis.Forms.wedge(ε³, ε⁰) # top-form field with 0-form field
-        top_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ³, ε⁰) # top-form space with 0-form field
-        top_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε³, ϵ⁰) # top-form field with 0-form space
-
-        @test_nowarn Mantis.Forms.evaluate(zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_two_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_two_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_two_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_two_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_two_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_two_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_two_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(one_two_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_one_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_one_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_one_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(two_one_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_space_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, elem_id, ξ_quadrature_nodes)
-        @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, elem_id, ξ_quadrature_nodes)
     end
+
+    # Test if different form-/expression-rank combinations don't throw errors
+    zero_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ⁰) # 0-form space with 0-form space
+    zero_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε⁰) # 0-form field with 0-form field
+    zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε⁰) # 0-form space with 0-form field
+    zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ⁰) # 0-form field with 0-form space
+    zero_one_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ¹) # 0-form space with 1-form space
+    zero_one_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε¹) # 0-form field with 1-form field
+    zero_one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε¹) # 0-form space with 1-form field
+    zero_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ¹) # 0-form field with 1-form space
+    one_form_space_wedge = Mantis.Forms.wedge(ϵ¹, ϵ¹) # 1-form space with 1-form space
+    one_form_field_wedge = Mantis.Forms.wedge(ε¹, ε¹) # 1-form field with 1-form field
+    one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε¹) # 1-form space with 1-form field
+    one_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ¹) # 1-form field with 1-form space
+    one_zero_form_space_wedge = Mantis.Forms.wedge(ϵ¹, ϵ⁰) # 1-form space with 0-form space
+    one_zero_form_field_wedge = Mantis.Forms.wedge(ε¹, ε⁰) # 1-form field with 0-form field
+    one_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε⁰) # 1-form space with 0-form field
+    one_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ⁰) # 1-form field with 0-form space
+    zero_two_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ²) # 0-form space with 2-form space
+    zero_two_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε²) # 0-form field with 2-form field
+    zero_two_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε²) # 0-form space with 2-form field
+    zero_two_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ²) # 0-form field with 2-form space
+    two_zero_form_space_wedge = Mantis.Forms.wedge(ϵ², ϵ⁰) # 2-form space with 0-form space
+    two_zero_form_field_wedge = Mantis.Forms.wedge(ε², ε⁰) # 2-form field with 0-form field
+    two_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ², ε⁰) # 2-form space with 0-form field
+    two_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε², ϵ⁰) # 2-form field with 0-form space
+    one_two_form_space_wedge = Mantis.Forms.wedge(ϵ¹, ϵ²) # 1-form space with 2-form space
+    one_two_form_field_wedge = Mantis.Forms.wedge(ε¹, ε²) # 1-form field with 2-form field
+    one_two_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ¹, ε²) # 1-form space with 2-form field
+    one_two_form_mixed_2_wedge = Mantis.Forms.wedge(ε¹, ϵ²) # 1-form field with 2-form space
+    two_one_form_space_wedge = Mantis.Forms.wedge(ϵ², ϵ¹) # 2-form space with 1-form space
+    two_one_form_field_wedge = Mantis.Forms.wedge(ε², ε¹) # 2-form field with 1-form field
+    two_one_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ², ε¹) # 2-form space with 1-form field
+    two_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε², ϵ¹) # 2-form field with 1-form space
+    zero_top_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ³) # 0-form space with top-form space
+    zero_top_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε³) # 0-form field with top-form field
+    zero_top_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ⁰, ε³) # 0-form space with top-form field
+    zero_top_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ³) # 0-form field with top-form space
+    top_zero_form_space_wedge = Mantis.Forms.wedge(ϵ³, ϵ⁰) # top-form space with 0-form space
+    top_zero_form_field_wedge = Mantis.Forms.wedge(ε³, ε⁰) # top-form field with 0-form field
+    top_zero_form_mixed_1_wedge = Mantis.Forms.wedge(ϵ³, ε⁰) # top-form space with 0-form field
+    top_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε³, ϵ⁰) # top-form field with 0-form space
+
+    @test_nowarn Mantis.Forms.evaluate(zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_two_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_two_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_two_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_two_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_two_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_two_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_two_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(one_two_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_one_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_one_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_one_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(two_one_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_space_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, ξ_quadrature_nodes)
+    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, ξ_quadrature_nodes)
 end
 
 # -----------------------------------------------------------------------------

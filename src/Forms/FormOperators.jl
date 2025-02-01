@@ -1851,17 +1851,6 @@ function _evaluate_wedge(
 
     # Compute the wedge evaluation
     for wedge_component_idx in 1:n_components_wedge
-        for form_expression_2_basis_idx in
-            CartesianIndices(Tuple(num_basis_form_expression_2))
-            wedge_eval[wedge_component_idx][:, form_expression_2_basis_idx] .= @views form_expression_1_eval[1][
-                :, 1
-            ] .* form_expression_2_eval[wedge_component_idx][
-                :, form_expression_2_basis_idx
-            ]
-        end
-    end
-    # Compute the wedge evaluation
-    for wedge_component_idx in 1:n_components_wedge
         for cart_ind in CartesianIndices(wedge_eval[wedge_component_idx])
             (point, basis_id) = Tuple(cart_ind)
             wedge_eval[wedge_component_idx][cart_ind] = 
@@ -2129,20 +2118,6 @@ function _evaluate_wedge(
     wedge_indices = vcat(form_expression_1_indices, form_expression_2_indices)
 
     # Compute the wedge evaluation
-    wedge_component = 1 # There is only 1 because it is a 2-form in 2D
-    for form_expression_1_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_1))
-        for form_expression_2_basis_idx in
-            CartesianIndices(Tuple(num_basis_form_expression_2))
-            wedge_eval[wedge_component][:, form_expression_1_basis_idx, form_expression_2_basis_idx] .= @views (
-                form_expression_1_eval[1][:, form_expression_1_basis_idx] .*
-                form_expression_2_eval[2][:, form_expression_2_basis_idx]
-            ) .- (
-                form_expression_1_eval[2][:, form_expression_1_basis_idx] .*
-                form_expression_2_eval[1][:, form_expression_2_basis_idx]
-            )
-        end
-    end
-    # Compute the wedge evaluation
     # Only one component because it is a 2-form in 2D
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
@@ -2329,40 +2304,6 @@ function _evaluate_wedge(
     # Only the second expression has indices because the first expression has expression rank 0
     wedge_indices = form_expression_2_indices
 
-    # Compute the wedge evaluation
-    # (α₂β₃ - α₃β₂)dξ²∧dξ³
-
-    for form_expression_2_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_2))
-        wedge_eval[1][:, form_expression_2_basis_idx] .= @views (
-            form_expression_1_eval[2][:, 1] .*
-            form_expression_2_eval[3][:, form_expression_2_basis_idx]
-        ) .- (
-            form_expression_1_eval[3][:, 1] .*
-            form_expression_2_eval[2][:, form_expression_2_basis_idx]
-        )
-    end
-
-    # (α₃β₁ - α₁β₃)dξ³∧dξ¹
-    for form_expression_2_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_2))
-        wedge_eval[2][:, form_expression_2_basis_idx] .= @views (
-            form_expression_1_eval[3][:, 1] .*
-            form_expression_2_eval[1][:, form_expression_2_basis_idx]
-        ) .- (
-            form_expression_1_eval[1][:, 1] .*
-            form_expression_2_eval[3][:, form_expression_2_basis_idx]
-        )
-    end
-
-    # (α₁β₂ - α₂β₁)dξ¹∧dξ²
-    for form_expression_2_basis_idx in CartesianIndices(Tuple(num_basis_form_expression_2))
-        wedge_eval[3][:, form_expression_2_basis_idx] .= @views (
-            form_expression_1_eval[1][:, 1] .*
-            form_expression_2_eval[2][:, form_expression_2_basis_idx]
-        ) .- (
-            form_expression_1_eval[2][:, 1] .*
-            form_expression_2_eval[1][:, form_expression_2_basis_idx]
-        )
-    end
     # Compute the wedge evaluation
     # (α₂β₃ - α₃β₂)dξ²∧dξ³
     for cart_ind in CartesianIndices(wedge_eval[1])
