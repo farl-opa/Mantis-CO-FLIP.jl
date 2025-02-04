@@ -13,61 +13,70 @@ Concrete type for Generalized Exponential section space spanned by `<1, x, ..., 
 struct GeneralizedExponential <: AbstractECTSpaces
     p::Int
     w::Float64
+    l::Float64
     t::Bool
     m::Int
     C::Matrix{Float64}
     endpoint_tol::Float64
     function GeneralizedExponential(p::Int)
+        l = 1.0
         w = 1.0
         t = false
         m = 10
-        GeneralizedExponential(p, w, t, m)
+        GeneralizedExponential(p, w, l, t, m)
     end
 
     function GeneralizedExponential(p::Int, w::Float64)
-        t = abs(w) >= 3.0
+        l = 1.0
+        t = abs(w) * l >= 3.0
         m = 10
-        GeneralizedExponential(p, w, t, m)
+        GeneralizedExponential(p, w, l, t, m)
     end
 
-    function GeneralizedExponential(p::Int, w::Float64, t::Bool)
+    function GeneralizedExponential(p::Int, w::Float64, l::Float64)
+        t = abs(w) * l >= 3.0
         m = 10
-        GeneralizedExponential(p, w, t, m)
+        GeneralizedExponential(p, w, l, t, m)
     end
 
-    function GeneralizedExponential(p::Int, w::Float64, t::Bool, m::Int)
+    function GeneralizedExponential(p::Int, w::Float64, l::Float64, m::Int)
+        t = abs(w) * l >= 3.0
+        GeneralizedExponential(p, w, l, t, m)
+    end
+
+    function GeneralizedExponential(p::Int, w::Float64, l::Float64, t::Bool)
+        m = 10
+        GeneralizedExponential(p, w, l, t, m)
+    end
+
+    function GeneralizedExponential(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         endpoint_tol = 1e-12
-        new(p, w, t, m, gexp_representation(p, w, t, m),endpoint_tol)
+        new(p, w, l, t, m, gexp_representation(p, w, l, t, m),endpoint_tol)
      end
 end
 
 function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
-    tol = gexp.endpoint_tol
     M = zeros(Float64, 1, gexp.p+1, nderivatives+1)
-    j = xi >= 0.0 && xi < 1.0
-    if abs(xi-1.0) < tol
-       j = true
-    end
-    if j
-        if gexp.t
-            for r = 0:nderivatives
-                k = min(r, gexp.p-1)
-                wxl = gexp.w * xi
-                E = [1.0; cumprod((1.0 ./ (1:gexp.p-k)) * wxl)]
-                E[gexp.p-k, :] .= exp(wxl);
-                E[gexp.p+1-k, :] .= (-1)^r * exp(-wxl);
-                M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E)
-            end
-        else
-            for r = 0:nderivatives
-                k = min(r, gexp.p-1)
-                ww = [1; cumprod(repeat([gexp.w * gexp.w], gexp.m))]
-                Ef = [1.0; cumprod((1.0 ./ (1:gexp.p-k+2*gexp.m)) * xi)]
-                E = Ef[1:gexp.p+1-k]
-                E[gexp.p-k, :] = Ef[gexp.p-k:2:end, :]' * ww
-                E[gexp.p-k+1, :] = Ef[gexp.p-k+1:2:end, :]' * ww
-                M[1, :, r+1] = gexp.C[:,k+1:end] * E
-            end
+    # scale the point to lie in the interval [0, l]
+    xi = gexp.l * xi
+    if gexp.t
+        for r = 0:nderivatives
+            k = min(r, gexp.p-1)
+            wxl = gexp.w * xi
+            E = [1.0; cumprod((1.0 ./ (1:gexp.p-k)) * wxl)]
+            E[gexp.p-k, :] .= exp(wxl);
+            E[gexp.p+1-k, :] .= (-1)^r * exp(-wxl);
+            M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E) * (gexp.l^r) # rescale the derivative to map back from [0, l] -> [0, 1]
+        end
+    else
+        for r = 0:nderivatives
+            k = min(r, gexp.p-1)
+            ww = [1; cumprod(repeat([gexp.w * gexp.w], gexp.m))]
+            Ef = [1.0; cumprod((1.0 ./ (1:gexp.p-k+2*gexp.m)) * xi)]
+            E = Ef[1:gexp.p+1-k]
+            E[gexp.p-k, :] = Ef[gexp.p-k:2:end, :]' * ww
+            E[gexp.p-k+1, :] = Ef[gexp.p-k+1:2:end, :]' * ww
+            M[1, :, r+1] = gexp.C[:,k+1:end] * E * (gexp.l^r) # rescale the derivative to map back from [0, l] -> [0, 1]
         end
     end
     return M
@@ -109,25 +118,26 @@ Build representation matrix for Generalized Exponential section space of degree 
 
 import LinearAlgebra, ToeplitzMatrices
 
-function gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
+function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
     
     I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
     if t
-        ew = exp(w)
-        ewm = exp(-w)
+        wl = w * l
+        ewl = exp(wl)
+        ewlm = exp(-wl)
         M0 = I[:,:]
         M0[p, :] .= 1
         M0[p+1, 1:2:p+1] .= 1
         M0[p+1, 2:2:p+1] .= -1
-        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(w ./ (1:p))], I[:,1]))
-        M1[p, :] .= ew;
-        M1[p+1, 1:2:p+1] .= ewm;
-        M1[p+1, 2:2:p+1] .= -ewm;
+        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:,1]))
+        M1[p, :] .= ewl;
+        M1[p+1, 1:2:p+1] .= ewlm;
+        M1[p+1, 2:2:p+1] .= -ewlm;
 
     else
         M0 = I[:,:]
         ww = [1 cumprod(repeat([w * w], 1, m), dims=2)]
-        M = ToeplitzMatrices.Toeplitz([1; cumprod(1.0 ./ (1:p+2*m))], I[:,1])
+        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:p+2*m))], I[:,1])
         M1 = M[1:p+1, :]
         M1[p, :] = ww * M[p:2:end, :]
         M1[p+1, :] = ww * M[p+1:2:end, :]
@@ -158,7 +168,7 @@ Get the space of one degree lower than the input space.
 - `::GeneralizedExponential`: A ect space of one degree lower than the input space.
 """
 function get_derivative_space(ect_space::GeneralizedExponential)
-    return GeneralizedExponential(ect_space.p-1, ect_space.w, ect_space.t, ect_space.m)
+    return GeneralizedExponential(ect_space.p-1, ect_space.w, ect_space.l, ect_space.t, ect_space.m)
 end
 
 """
@@ -173,7 +183,7 @@ Bisect the canonical space by dividing the weight in half.
 - `::GeneralizedExponential`: A ect space with the weight divided by 2.
 """
 function get_bisected_canonical_space(ect_space::GeneralizedExponential)
-    return GeneralizedExponential(ect_space.p, ect_space.w/2, ect_space.t, ect_space.m)
+    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l/2, ect_space.m)
 end
 
 """
@@ -194,5 +204,5 @@ function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_el
         throw(ArgumentError("Number of subdivisions should be a power of 2 and greater than 1"))
     end
 
-    return GeneralizedExponential(ect_space.p, ect_space.w/num_sub_elements, ect_space.t, ect_space.m)
+    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l/num_sub_elements, ect_space.m)
 end
