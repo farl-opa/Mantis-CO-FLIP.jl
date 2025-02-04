@@ -256,7 +256,7 @@ const regularities_3d = (degrees_3d[1]-1, degrees_3d[2]-1, degrees_3d[3]-1)
 
 # Crazy mesh.
 const crazy_c = 0.2
-function mapping(x::Vector{Float64})
+function mapping(x::AbstractVector)
     x1_new = (2.0 / (Lright - Lleft)) * x[1] - 2.0 * Lleft / (Lright - Lleft) - 1.0
     x2_new = (2.0 / (Ltop - Lbottom)) * x[2] - 2.0 * Lbottom / (Ltop - Lbottom) - 1.0
     return [
@@ -264,7 +264,7 @@ function mapping(x::Vector{Float64})
         x[2] + ((Ltop - Lbottom) / 2.0) * crazy_c * sinpi(x1_new) * sinpi(x2_new),
     ]
 end
-function dmapping(x::Vector{Float64})
+function dmapping(x::AbstractVector)
     x1_new = (2.0 / (Lright - Lleft)) * x[1] - 2.0 * Lleft / (Lright - Lleft) - 1.0
     x2_new = (2.0 / (Ltop - Lbottom)) * x[2] - 2.0 * Lbottom / (Ltop - Lbottom) - 1.0
     return [

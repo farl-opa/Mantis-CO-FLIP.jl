@@ -2,7 +2,7 @@
 function metric(
     geometry::AbstractGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}},
+    xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
     # The metric tensor gᵢⱼ is
     #   gᵢⱼ := ∑ₖᵐ ∂Φᵏ\∂ξᵢ ⋅ ∂Φᵏ\∂ξⱼ
@@ -10,12 +10,12 @@ function metric(
     #   Jᵢⱼ = ∂Φⁱ\∂ξⱼ
     # The metric tensor can be computed as 
     #   g = Jᵗ ⋅ J 
-    
+
     # Compute the jacobian
     J = jacobian(geometry, element_id, xi)
 
     n_evaluation_points = prod(size.(xi, 1))  # compute the number of nD points evaluated
-    g = zeros(Float64, n_evaluation_points, manifold_dim, manifold_dim) 
+    g = zeros(Float64, n_evaluation_points, manifold_dim, manifold_dim)
 
     # Compute the metric 
     for index in CartesianIndices(g)
@@ -29,7 +29,7 @@ function metric(
             g[point, row, column] += J[point, k, row] * J[point, k, column]
         end
     end
-    
+
     sqrt_g = sqrt.(abs.(LinearAlgebra.det.(eachslice(g; dims=1))))
 
     return g, sqrt_g
@@ -38,7 +38,7 @@ end
 function inv_metric(
     geometry::AbstractGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}}
+    xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
     # The inverse of the metric tensor gᵢⱼ is
     #   [gⁱʲ] := [gᵢⱼ]⁻¹
@@ -62,10 +62,10 @@ function inv_metric(
     # inverse to a pre-allocated array, and it appeared to be faster and with less
     # allocations by about a 1/3 factor. Still, a better solution is needed ― possibly
     # changing the way geometry evaluations are stored.
-    g_permuted = permutedims(g, (2,3,1))
+    g_permuted = permutedims(g, (2, 3, 1))
     inv_g = Array{Float64, 3}(undef, size(g))
     for point in axes(g_permuted, 3)
-        inv_g[point,:,:] .= LinearAlgebra.inv(view(g_permuted, :, :, point))
+        inv_g[point, :, :] .= LinearAlgebra.inv(view(g_permuted, :, :, point))
     end
 
     return inv_g, g, sqrt_g
