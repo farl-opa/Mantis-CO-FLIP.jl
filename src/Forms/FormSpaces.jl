@@ -147,7 +147,7 @@ function _pullback_to_canonical_coordinates(geometry::Geometry.AbstractGeometry{
     # Pullback the evaluations to the canonical coordinates of the element
     if form_rank > 0
         # Get the element dimensions
-        element_dimensions = Geometry.get_element_dimensions(geometry, element_idx)
+        element_dimensions = Geometry.get_element_lengths(geometry, element_idx)
         for i ∈ eachindex(form_evaluations)
             for j ∈ eachindex(form_evaluations[i])
                 if form_rank == manifold_dim

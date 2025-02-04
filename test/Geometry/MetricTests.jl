@@ -16,7 +16,7 @@ cartesian_geometry_cart_1_1 = Mantis.Geometry.CartesianGeometry(breakpoints_cart
 dx_cart_1_1 = [1.0 / nx]
 g_ref_cart_1_1 = [dx_cart_1_1[1]^2]
 inv_g_ref_cart_1_1 = [dx_cart_1_1[1]^(-2)]
-det_g_ref_cart_1_1 = sqrt(prod(dx_cart_1_1.^2))
+det_g_ref_cart_1_1 = sqrt(prod(dx_cart_1_1 .^ 2))
 
 # Points where to evaluate the metric
 nx_evaluate = 3
@@ -30,17 +30,23 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_1_
     )
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
-            @test all(isapprox.(
-                g[:, dim_1_idx, dim_2_idx], g_ref_cart_1_1[dim_1_idx, dim_2_idx];
-                rtol=rtol
-            ))
-            @test all(isapprox.(
-                inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx];
-                rtol=rtol
-            ))
+            @test all(
+                isapprox.(
+                    g[:, dim_1_idx, dim_2_idx],
+                    g_ref_cart_1_1[dim_1_idx, dim_2_idx];
+                    rtol=rtol,
+                ),
+            )
+            @test all(
+                isapprox.(
+                    inv_g[:, dim_1_idx, dim_2_idx],
+                    inv_g_ref_cart_1_1[dim_1_idx, dim_2_idx];
+                    rtol=rtol,
+                ),
+            )
         end
     end
-    
+
     @test all(isapprox.(sqrt_g[:], det_g_ref_cart_1_1; rtol=rtol))
 end
 # ------------------------------------------------------------------------------------------
@@ -49,11 +55,13 @@ end
 dim = 2
 nx = 4
 ny = 5
-breakpoints_cart_2_2 = (collect(LinRange(0.0, 1.0, nx+1)), collect(LinRange(0.0,2.0,ny+1)))
+breakpoints_cart_2_2 = (
+    collect(LinRange(0.0, 1.0, nx + 1)), collect(LinRange(0.0, 2.0, ny + 1))
+)
 cartesian_geometry_cart_2_2 = Mantis.Geometry.CartesianGeometry(breakpoints_cart_2_2)
 
 # Expected Jacobian per element (the same for all elements)
-dx_cart_2_2 = [1.0/nx, 2.0/ny]
+dx_cart_2_2 = [1.0 / nx, 2.0 / ny]
 g_ref_cart_2_2 = [dx_cart_2_2[1]^2 0.0; 0.0 dx_cart_2_2[2]^2]
 inv_g_ref_cart_2_2 = [dx_cart_2_2[1]^(-2) 0.0; 0.0 dx_cart_2_2[2]^(-2)]
 det_g_ref_cart_2_2 = prod(dx_cart_2_2)
@@ -72,17 +80,23 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
     )
     for dim_1_idx in 1:dim
         for dim_2_idx in 1:dim
-            @test all(isapprox.(
-                g[:, dim_1_idx, dim_2_idx], g_ref_cart_2_2[dim_1_idx, dim_2_idx];
-                rtol=rtol
-            ))
-            @test all(isapprox.(
-                inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx];
-                rtol=rtol
-            ))
+            @test all(
+                isapprox.(
+                    g[:, dim_1_idx, dim_2_idx],
+                    g_ref_cart_2_2[dim_1_idx, dim_2_idx];
+                    rtol=rtol,
+                ),
+            )
+            @test all(
+                isapprox.(
+                    inv_g[:, dim_1_idx, dim_2_idx],
+                    inv_g_ref_cart_2_2[dim_1_idx, dim_2_idx];
+                    rtol=rtol,
+                ),
+            )
         end
     end
-    
+
     @test all(isapprox.(sqrt_g[:], det_g_ref_cart_2_2; rtol=rtol))
 end
 # ------------------------------------------------------------------------------------------
@@ -103,8 +117,8 @@ n_evaluation_points = nx_evaluate * ny_evaluate
 
 # Expected metric terms per element (allocation)
 dx_cart_2_2_inh = [
-    0.25 0.75 0.25 0.75 0.25 0.75;
-    0.5  0.5  0.4  0.4  0.1  0.1
+    0.25 0.75 0.25 0.75 0.25 0.75
+    0.5 0.5 0.4 0.4 0.1 0.1
 ]  # the dxs for each element are over the columns
 
 # Evaluate the metric, its inverse and its determinant 
@@ -120,16 +134,18 @@ for element_idx in 1:Mantis.Geometry.get_num_elements(cartesian_geometry_cart_2_
             else
                 g_ref_cart_2_2_inh = dx_cart_2_2_inh[dim_1_idx, element_idx]^2
                 inv_g_ref_cart_2_2_inh = 1.0 / g_ref_cart_2_2_inh
-                @test all(isapprox.(
-                    g[:, dim_1_idx, dim_2_idx], g_ref_cart_2_2_inh; rtol=rtol)
+                @test all(
+                    isapprox.(g[:, dim_1_idx, dim_2_idx], g_ref_cart_2_2_inh; rtol=rtol)
                 )
-                @test all(isapprox.(
-                    inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_2_2_inh; rtol=rtol)
+                @test all(
+                    isapprox.(
+                        inv_g[:, dim_1_idx, dim_2_idx], inv_g_ref_cart_2_2_inh; rtol=rtol
+                    ),
                 )
             end
         end
     end
-     
+
     # Test det_g
     det_g_ref_cart_2_2_inh = prod(dx_cart_2_2_inh[:, element_idx])
     @test all(isapprox.(sqrt_g[:], det_g_ref_cart_2_2_inh; rtol=rtol))
