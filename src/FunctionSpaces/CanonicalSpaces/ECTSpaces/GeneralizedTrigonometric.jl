@@ -118,11 +118,8 @@ Build representation matrix for Generalized Trignometric section space of degree
 # Returns:
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
-
-import LinearAlgebra, ToeplitzMatrices
-
 function gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
-    
+
     I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
     if t
         cw = cos(w)
@@ -159,7 +156,7 @@ function gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
         cc[i] = -cs' * M1[:, i]
         C[p+1-i+1, :] = [M1[:, 1:i] M0[:, 1:p+1-i]]' \ cc
     end
-    C[1, :] = [M0[:, 1] M1[:, 1:p]]' \ [1.0; zeros(p)] 
+    C[1, :] = [M0[:, 1] M1[:, 1:p]]' \ [1.0; zeros(p)]
 
     return C
 end

@@ -1,4 +1,3 @@
-using LinearAlgebra
 
 """
     UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
@@ -72,7 +71,7 @@ end
 
 Get the total number of elements for the partition over which the function space is defined.
 
-# Arguments 
+# Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
 
 # Returns
@@ -104,7 +103,7 @@ Get the polynomial degree of the specified element in the unstructured space.
 function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
     # Find the space ID and local element ID
     space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
-    
+
     # Get the polynomial degree from the corresponding function space
     return get_polynomial_degree(us_space.function_spaces[space_id], space_element_id)
 end
@@ -129,7 +128,7 @@ end
 
 Get extraction coefficients and global basis indices for the specified global element ID.
 
-# Arguments 
+# Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
 
@@ -146,7 +145,7 @@ end
 
 Get the ID of the constituent space to which the specified element belongs.
 
-# Arguments 
+# Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
 
@@ -192,7 +191,7 @@ end
 
 Evaluate the local basis functions for a given element in the unstructured space.
 
-# Arguments 
+# Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
 - `xi::NTuple{n,Vector{Float64}}`: Vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated.
@@ -250,7 +249,7 @@ end
 
 Loops over all elements and assembles the global extraction matrix for the unstructured space. The extraction matrix is a sparse matrix that maps the local basis functions to the global basis functions.
 
-# Arguments 
+# Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
 
 # Returns

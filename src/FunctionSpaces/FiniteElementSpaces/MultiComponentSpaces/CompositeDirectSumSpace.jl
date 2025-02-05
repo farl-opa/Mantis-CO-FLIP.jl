@@ -26,7 +26,7 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
         if length(unique(tmp)) != length(tmp)
             throw(ArgumentError("The component ordering must not contain duplicates."))
         end
-        
+
         new{manifold_dim, num_spaces, num_components, F}(component_spaces, component_ordering)
     end
 
@@ -72,14 +72,14 @@ Evaluate the basis functions of the composite direct sum space at the points `xi
 
 # Returns
 - `local_multivalued_basis::Vector{Vector{Vector{Array{Float64, 2}}}}`: Matrices containing the evaluations of the basis functions and its derivatives of the direct sum space.
-    `local_multivalued_basis[j][k][i][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate, 
+    `local_multivalued_basis[j][k][i][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate,
     of the m-th multivalued basis of component i evaluated at the lth-point.
-    In this case the maximum order of derivative is first order. For higher order derivatives 
+    In this case the maximum order of derivative is first order. For higher order derivatives
     we should follow a flattenned numbering using the indices of the derivatives.
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
 function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, num_components, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
-    
+
     # get the multi-valued basis indices
     multivalued_basis_indices, component_space_basis_indices = get_basis_indices_w_components(space, element_idx)
     num_basis_per_space = length.(component_space_basis_indices)
@@ -111,7 +111,7 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
             der_idx = get_derivative_idx(key) # index of derivative
-            
+
             for i in 1:num_components_per_space[space_idx]
                 component_idx = space.component_ordering[space_idx][i]
                 # the `i`-th local component is stored as the `component_idx`-th component of the multi-valued space
@@ -121,7 +121,7 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
 
         count += num_basis_per_space[space_idx]
     end
-    
+
     return local_multivalued_basis, multivalued_basis_indices
 end
 
@@ -169,7 +169,7 @@ function get_basis_indices(space::CompositeDirectSumSpace{manifold_dim, num_spac
     num_dofs_per_space = FunctionSpaces.get_num_basis.(space.component_spaces)
     dof_offset_per_space = zeros(Int, num_spaces)
     dof_offset_per_space[2:end] .= cumsum(num_dofs_per_space[1:(num_spaces-1)])
-    
+
     return vcat(map(.+, component_space_basis_indices, dof_offset_per_space)...)
 end
 
@@ -191,7 +191,7 @@ function get_basis_indices_w_components(space::CompositeDirectSumSpace{manifold_
     num_dofs_per_space = FunctionSpaces.get_num_basis.(space.component_spaces)
     dof_offset_per_space = zeros(Int, num_spaces)
     dof_offset_per_space[2:end] .= cumsum(num_dofs_per_space[1:(num_spaces-1)])
-    
+
     return vcat(map(.+, component_space_basis_indices, dof_offset_per_space)...), component_space_basis_indices
 end
 

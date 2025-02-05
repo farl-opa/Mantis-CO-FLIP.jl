@@ -106,11 +106,8 @@ Build representation matrix for Generalized Exponential section space of degree 
 # Returns:
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
-
-import LinearAlgebra, ToeplitzMatrices
-
 function gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
-    
+
     I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
     if t
         ew = exp(w)

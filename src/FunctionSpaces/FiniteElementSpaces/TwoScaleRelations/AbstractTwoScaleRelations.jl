@@ -70,11 +70,11 @@ function get_element_ancestor(two_scale_operators::Vector{TS}, child_element_id:
         ancestor_id = get_element_parent(two_scale_operators[level-1], ancestor_id)
     end
 
-    return ancestor_id 
+    return ancestor_id
 end
 
 """
-    get_finer_basis_coeffs(coarse_basis_coeffs::Vector{Float64}, twoscale_operator::AbstractTwoScaleOperator) 
+    get_finer_basis_coeffs(coarse_basis_coeffs::Vector{Float64}, twoscale_operator::AbstractTwoScaleOperator)
 
 Perform a change of basis using a two-scale operator from a coarse basis and return the resulting fine basis coefficients.
 
@@ -101,7 +101,7 @@ Retrieve and return the local subdivision matrix for a given pair of coarse and 
 
 # Returns
 - `::Matrix{Float64}`: The local subdivision matrix corresponding to the specified coarse and fine elements.
-""" 
+"""
 function get_local_subdiv_matrix(twoscale_operator::AbstractTwoScaleOperator, coarse_element_id::Int, fine_element_id::Int)
     fine_basis_indices = get_basis_indices(twoscale_operator.fine_space, fine_element_id)
     coarse_basis_indices = get_basis_indices(twoscale_operator.coarse_space, coarse_element_id)

@@ -42,14 +42,14 @@ Evaluate the basis functions of the direct sum space at the points `xi` in the e
 
 # Returns
 - `local_multivalued_basis::Vector{Vector{Vector{Array{Float64, 2}}}}`: Matrices containing the evaluations of the basis functions and its derivatives of the direct sum space.
-    `local_multivalued_basis[j][k][i][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate, 
+    `local_multivalued_basis[j][k][i][l, m]` contains the (j-1)th-order derivative, with respect to the k-th coordinate,
     of the m-th multivalued basis of component i evaluated at the lth-point.
-    In this case the maximum order of derivative is first order. For higher order derivatives 
+    In this case the maximum order of derivative is first order. For higher order derivatives
     we should follow a flattenned numbering using the indices of the derivatives.
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
 function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
-    
+
     # get the multi-valued basis indices
     multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)
     num_basis_per_component = length.(component_basis_indices)
@@ -80,13 +80,13 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
             der_idx = get_derivative_idx(key) # index of derivative
-            
+
             local_multivalued_basis[j + 1][der_idx][component_idx][:, count .+ (1:num_basis_per_component[component_idx])] .= local_component_basis[j+1][der_idx]
         end
 
         count += num_basis_per_component[component_idx]
     end
-    
+
     return local_multivalued_basis, multivalued_basis_indices
 end
 
@@ -132,12 +132,12 @@ Get the global indices of the basis functions of the direct sum space in the ele
 function get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
     dof_offset_component = _get_dof_offsets(space)
-    
+
     multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
     for component_idx in 1:num_components
         multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
-    
+
     return reduce(vcat, multivalued_basis_indices)
 end
 
@@ -169,7 +169,7 @@ function get_basis_indices_w_components(space::DirectSumSpace{manifold_dim, num_
     for component_idx in 1:num_components
         multivalued_basis_indices[component_idx] =  component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
-    
+
     return reduce(vcat, multivalued_basis_indices), component_basis_indices
 end
 

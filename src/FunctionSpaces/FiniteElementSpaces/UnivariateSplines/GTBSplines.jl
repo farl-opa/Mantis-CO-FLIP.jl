@@ -1,7 +1,8 @@
-@doc raw"""
+"""
     GTBSplineSpace(spline_spaces::NTuple{m,T}, regularity::Vector{Int}) where {m, T <: Union{BSplineSpace, RationalFiniteElementSpace}}
 
-Constructs a GTBSplineSpace from a tuple of NURBS or B-spline spaces and a vector of regularity conditions.
+Constructs a GTBSplineSpace from a tuple of NURBS or B-spline spaces and a vector of
+regularity conditions.
 
 # Arguments
 - `spline_spaces::NTuple{m,T}`: A tuple of `m` NURBS or B-spline spaces.
@@ -14,7 +15,9 @@ Constructs a GTBSplineSpace from a tuple of NURBS or B-spline spaces and a vecto
 - `ArgumentError`: If the number of regularity conditions does not match the number of interfaces.
 - `ArgumentError`: If the minimal polynomial degree of any pair of adjacent spaces is less than the corresponding regularity condition.
 """
-function GTBSplineSpace(spline_spaces::NTuple{m,T}, regularity::Vector{Int}) where {m, T <: Union{BSplineSpace, RationalFiniteElementSpace}}
+function GTBSplineSpace(spline_spaces::NTuple{m,T}, regularity::Vector{Int}) where {
+    m, T <: Union{BSplineSpace, RationalFiniteElementSpace}
+}
     # Check if the number of regularity conditions matches the number of interfaces
     if length(regularity) != m
         msg1 = "Number of regularity conditions should be equal to the number of bspline interfaces."
@@ -43,4 +46,4 @@ function GTBSplineSpace(spline_spaces::NTuple{m,T}, regularity::Vector{Int}) whe
     else
         return UnstructuredSpace(spline_spaces, extract_gtbspline_to_bspline(spline_spaces, regularity), Dict("regularity" => regularity))
     end
-end 
+end

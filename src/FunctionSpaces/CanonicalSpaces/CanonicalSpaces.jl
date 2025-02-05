@@ -1,42 +1,8 @@
-import SparseArrays, LinearAlgebra
 
-"""
-    AbstractCanonicalSpace
 
-Supertype for all element-local bases.
-"""
-abstract type AbstractCanonicalSpace <: AbstractFunctionSpace end
-
-# Listed alphabetically
 include("BernsteinPolynomials.jl")
 include("LagrangePolynomials.jl")
-include("ECTSpaces.jl")
-
-
-# # Has to be below the include statements to ensure that all evaluate 
-# # methods are visible to it!
-# @doc raw"""
-#     (elem_loc_basis::AbstractCanonicalSpace)(xi::Vector{Float64}, args...)::Matrix{Float64}
-
-# Call the `evaluate`-method for the given `elem_loc_basis`.
-
-# Wrapper for all `evaluate`-methods so that all `AbstractCanonicalSpace` can 
-# be called by calling the struct instead of explicitly calling the 
-# `evaluate`-method. Automatically throws a MethodError if the subtype 
-# does not have an evaluate function implemented. Some of these methods 
-# may have additional arguments, such as the additional derivatives to 
-# evaluate, so this version should allow that as well.
-
-# See also 
-# - [`evaluate(elem_loc_basis::AbstractLagrangePolynomials, ξ::Vector{Float64})`](@ref),
-# - [`evaluate(elem_loc_basis::Bernstein, xi::Vector{Float64}, nderivatives::Int64)`](@ref),
-# - [`evaluate(elem_loc_basis::Bernstein, xi::Vector{Float64})`](@ref),
-# - [`evaluate(elem_loc_basis::Bernstein, xi::Float64)`](@ref),
-# - [`evaluate(elem_loc_basis::Bernstein, xi::Float64, nderivatives::Int64)`](@ref).
-# """
-function (elem_loc_basis::C where {C <: AbstractCanonicalSpace})(xi::Vector{Float64}, args...)
-    return evaluate(elem_loc_basis, xi, args...)
-end
+include("ECTSpaces/ECTSpaces.jl")
 
 """
     get_polynomial_degree(elem_loc_basis::AbstractCanonicalSpace)
@@ -163,12 +129,12 @@ function build_two_scale_matrix(canonical_space::AbstractCanonicalSpace, num_sub
     # bisection matrix
     bisection_matrix =  SparseArrays.sparse([fine_eval \coarse_eval_L
                                              fine_eval \ coarse_eval_R])
-    
+
     # now, build the subdivision matrix for num_sub_elements > 2
     subdivision_matrix = SparseArrays.sparse(Matrix(LinearAlgebra.I, p+1, p+1))
     for i = 1:num_ref
         subdivision_matrix = SparseArrays.blockdiag([bisection_matrix for i = 1:2^(i-1)]...) * subdivision_matrix
     end
-    
+
     return subdivision_matrix
 end

@@ -46,16 +46,16 @@ Evaluate the basis functions of the sum space at the points `xi` in the element 
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
 function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
-        
+
     # get the multi-valued basis indices
     multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)
     # number of multivalued basis functions
-    num_multivaluedbasis = length(multivalued_basis_indices) 
+    num_multivaluedbasis = length(multivalued_basis_indices)
     # find the local column that each component contributes to
     column_indices_per_component = [indexin(component_basis_indices[i], multivalued_basis_indices) for i in 1:num_components]
     # number of evaluation points
     n_evaluation_points = prod(size.(xi, 1))
-    
+
     # Generate keys for all possible derivative combinations
     der_keys = integer_sums(nderivatives, manifold_dim+1)
     # Initialize storage of local basis functions and derivatives
@@ -79,11 +79,11 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
             der_idx = get_derivative_idx(key) # index of derivative
-            
+
             local_multivalued_basis[j + 1][der_idx][component_idx][:, column_indices_per_component[component_idx]] .= local_component_basis[j+1][der_idx]
         end
     end
-    
+
     return local_multivalued_basis, multivalued_basis_indices
 end
 

@@ -1,8 +1,10 @@
-@doc raw"""
-    BSplineSpace{F} <: AbstractFiniteElementSpace{1}
+"""
+    BSplineSpace{F} <: AbstractFESpace{1, 1}
 
-Structure containing information about a univariate B-Spline function space defined on `patch_1d::Mesh.Patch1D`,
-with given `polynomial_degree` and `regularity` per breakpoint. Note that while the section spaces on each element are the same, they don't necessarily have to be polynomials; they are just named `polynomials` for convention.
+Structure containing information about a univariate B-Spline function space defined on
+`patch_1d::Mesh.Patch1D`, with given `polynomial_degree` and `regularity` per breakpoint.
+Note that while the section spaces on each element are the same, they don't necessarily have
+to be polynomials; they are just named `polynomials` for convention.
 
 # Fields
 - `knot_vector::KnotVector`: 1-dimensional knot vector.
@@ -10,7 +12,7 @@ with given `polynomial_degree` and `regularity` per breakpoint. Note that while 
 - `polynomials::F`: local section space F, named `polynomials` just for convention.
 - `dof_partition::Vector{Vector{Vector{Int}}}`: Indices of boundary degrees of freedom.
 """
-struct BSplineSpace{F} <: AbstractFiniteElementSpace{1}
+struct BSplineSpace{F} <: AbstractFESpace{1, 1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::F
@@ -20,7 +22,7 @@ struct BSplineSpace{F} <: AbstractFiniteElementSpace{1}
         # polynomial degree
         polynomial_degree = get_polynomial_degree(polynomials)
 
-        # Check for errors in the construction 
+        # Check for errors in the construction
         if polynomial_degree <0
             msg1 = "Polynomial degree must be greater or equal than 0."
             msg2 = " The degree is $(polynomial_degree)."
@@ -65,7 +67,7 @@ struct BSplineSpace{F} <: AbstractFiniteElementSpace{1}
         dof_partition[1][2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right)
         # ... and then finally the right dofs.
         dof_partition[1][3] = collect(bspline_dim-n_dofs_right+1:bspline_dim)
-        
+
         # Initialize the BSplineSpace struct
         new{F}(knot_vector, extraction_op, polynomials, dof_partition)
     end
@@ -385,12 +387,12 @@ function get_derivative_space(bspline::BSplineSpace{F}) where {F <: AbstractCano
     # polynomial degree of derivative space
     p = get_polynomial_degree(bspline)
     dpolynomials = get_derivative_space(bspline.polynomials)
-    
+
     # modified left and right dof-partitioning
     dof_partition = get_dof_partition(bspline)
     n_left = max(0, length(dof_partition[1][1])-1)
     n_right = max(0, length(dof_partition[1][3])-1)
-    
+
     # regularity of derivative space
     dregularity = (p-1) .- get_multiplicity_vector(bspline)
     for i in eachindex(dregularity)

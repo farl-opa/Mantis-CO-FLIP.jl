@@ -70,7 +70,7 @@ function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::Abstr
 
         # number of polar dofs
         space_dim = size(E[component_idx], 1)
-        
+
         # Polar spline extraction operator
         extraction_op = ExtractionOperator(extraction_coefficients, basis_indices, num_elements, space_dim)
 
@@ -133,11 +133,9 @@ function build_standard_degenerate_control_points(n_p::Int, n_r::Int, R::Float64
         degenerate_control_points[idx[1],idx[2],1] = radii[idx[2]]*cos(theta[idx[1]])
         degenerate_control_points[idx[1],idx[2],2] = radii[idx[2]]*sin(theta[idx[1]])
     end
-    
+
     return degenerate_control_points, radii, theta
 end
-
-import LinearAlgebra, SparseArrays
 
 """
     build_polar_extraction_operators(polar_config::Int, degenerate_control_points::NTuple{2,Matrix{Float64}}, num_basis_p::Int, num_basis_r::Int)
@@ -165,12 +163,12 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
     trix, triy = build_control_triangle_(degenerate_control_points)
     # compute barycentric coordinates of the degenerate control points w.r.t. the control triangle
     baryc = barycentric_coordinates_(degenerate_control_points, trix, triy)
-    
+
     # number of degrees of freedom for all polar spline forms
     num_0_forms = num_basis_p * num_basis_r - polar_config * (2 * num_basis_p - 3)
     num_1_forms = num_basis_p * num_basis_r + num_basis_p * (num_basis_r - 1) - polar_config * (3 * num_basis_p - 2)
     num_2_forms = num_basis_p * (num_basis_r - 1) - polar_config * num_basis_p
-    
+
     build_forms = [false, false, false]
     if isnothing(form_rank)
         build_forms .= true
@@ -191,9 +189,9 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
     else
         E0 = nothing
     end
-    
+
     ## One forms
-    
+
     if build_forms[2]
         # space for one form extraction data
         E1_v_r = zeros(Int, num_1_forms * 4)
@@ -204,29 +202,29 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
         E1_h_v = zeros(Float64, num_1_forms * 4)
         ind_v = 0
         ind_h = 0
-        
+
         # near the bottom pole
         baryc = hcat(reshape(E0_1[:, 1:num_basis_p]', num_basis_p, 1, 3), reshape(E0_1[:, num_basis_p .+ (1:num_basis_p)]', num_basis_p, 1, 3))
         for k in 0:(num_basis_p - 1)
             l = 0
             kp = mod(k + 1, num_basis_p)
             r = [0, 1]
-            
+
             c = k
             v = baryc[k + 1, l + 2, 2:3] .- baryc[k + 1, l + 1, 2:3]
             E1_v_r[ind_v .+ (1:length(r))] = r .+ 1
             E1_v_c[ind_v .+ (1:length(r))] .= c + 1
             E1_v_v[ind_v .+ (1:length(r))] = v
             ind_v += length(r)
-            
+
             c = k + num_basis_p
             v = baryc[kp + 1, l + 2, 2:3] .- baryc[k + 1, l + 2, 2:3]
             E1_h_r[ind_h .+ (1:length(r))] = r .+ 1
             E1_h_c[ind_h .+ (1:length(r))] .= c + 1
-            E1_h_v[ind_h .+ (1:length(r))] = v        
+            E1_h_v[ind_h .+ (1:length(r))] = v
             ind_h += length(r)
         end
-        
+
         # intermediate vertical edges
         k = 0:(num_basis_p - 1)
         l = 2:(num_basis_r - polar_config)
@@ -250,7 +248,7 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
             E1_h_v[ind_h + 1] = 1.0
             ind_h += 1
         end
-        
+
         # near top pole
         if polar_config == 2
             baryc = hcat(reshape(E0_2[:, 1:num_basis_p]', num_basis_p, 1, 3), reshape(E0_2[:, num_basis_p .+ (1:num_basis_p)]', num_basis_p, 1, 3))
@@ -269,18 +267,18 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
                 v = baryc[kp + 1, l - num_basis_r + 3, 2:3] .- baryc[k + 1, l - num_basis_r + 3, 2:3]
                 E1_h_r[ind_h .+ (1:length(r))] = r .+ 1
                 E1_h_c[ind_h .+ (1:length(r))] .= c + 1
-                E1_h_v[ind_h .+ (1:length(r))] = v        
+                E1_h_v[ind_h .+ (1:length(r))] = v
                 ind_h += length(r)
             end
         end
-        
+
         # assembly
         E1_v_r = E1_v_r[1:ind_v]
         E1_v_c = E1_v_c[1:ind_v]
         E1_v_v = E1_v_v[1:ind_v]
         E1_v = sparse(E1_v_r, E1_v_c, E1_v_v, num_1_forms, num_basis_p * (num_basis_r - 1))
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E1_v)
-        
+
         E1_h_r = E1_h_r[1:ind_h]
         E1_h_c = E1_h_c[1:ind_h]
         E1_h_v = E1_h_v[1:ind_h]
@@ -290,7 +288,7 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
         E1_h = nothing
         E1_v = nothing
     end
-    
+
     ## Two forms
 
     if build_forms[3]
@@ -319,7 +317,7 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
     else
         E2 = nothing
     end
-    
+
     return ((E0,), (E1_h, E1_v), (E2,)), (trix, triy)
 end
 
