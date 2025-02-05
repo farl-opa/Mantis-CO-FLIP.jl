@@ -1,4 +1,4 @@
-#module WedgeTests
+module WedgeTests
 
 import Mantis
 
@@ -313,7 +313,6 @@ for geom in (geom_cart_2d, geom_crazy_2d)
     test_combinations_2d(complex_2d, q_rule_2d)
 end
 
-#=
 ############################################################################################
 ##                                       3D TESTS                                         ##
 ############################################################################################
@@ -346,4 +345,3 @@ for geom in (geom_cart_3d, geom_crazy_3d)
 end
 
 end
-=#
