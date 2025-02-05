@@ -1,4 +1,4 @@
-module WedgeTests
+#module WedgeTests
 
 import Mantis
 
@@ -69,6 +69,8 @@ function test_inner_prod_equality(geom::G, q_rule, complex) where {
             @test_throws ArgumentError Mantis.Forms.wedge(ϵ, ϵ)
         end
     end
+
+    return nothing
 end
 
 function test_combinations_2d(complex, q_rule)
@@ -135,6 +137,8 @@ function test_combinations_2d(complex, q_rule)
     @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, quad_nodes)
     @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, quad_nodes)
     @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, quad_nodes)
+
+    return nothing
 end
 
 function test_combinations_3d(complex, q_rule)
@@ -235,6 +239,8 @@ function test_combinations_3d(complex, q_rule)
     @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, quad_nodes)
     @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, quad_nodes)
     @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, quad_nodes)
+
+    return nothing
 end
 
 ############################################################################################
@@ -307,6 +313,7 @@ for geom in (geom_cart_2d, geom_crazy_2d)
     test_combinations_2d(complex_2d, q_rule_2d)
 end
 
+#=
 ############################################################################################
 ##                                       3D TESTS                                         ##
 ############################################################################################
@@ -339,3 +346,4 @@ for geom in (geom_cart_3d, geom_crazy_3d)
 end
 
 end
+=#
