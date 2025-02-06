@@ -69,6 +69,8 @@ function test_inner_prod_equality(geom::G, q_rule, complex) where {
             @test_throws ArgumentError Mantis.Forms.wedge(ϵ, ϵ)
         end
     end
+
+    return nothing
 end
 
 function test_combinations_2d(complex, q_rule)
@@ -110,31 +112,43 @@ function test_combinations_2d(complex, q_rule)
     zero_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ¹) # 0-form field with 1-form space
 
     quad_nodes = Mantis.Quadrature.get_nodes(q_rule)
+    
+    # We changed the tests to use try/catch because @test_nowarn was extremely slow, as it
+    # triggers a recompilation for every call.
+    test_const = 0
+    try
+        Mantis.Forms.evaluate(zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, quad_nodes)
+    catch e
+        test_const = 1
+        println(e)
+    end
 
-    @test_nowarn Mantis.Forms.evaluate(zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, quad_nodes)
+    @test test_const == 0
+
+    return nothing
 end
 
 function test_combinations_3d(complex, q_rule)
@@ -194,47 +208,59 @@ function test_combinations_3d(complex, q_rule)
     top_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε³, ϵ⁰) # top-form field with 0-form space
 
     quad_nodes = Mantis.Quadrature.get_nodes(q_rule)
+    
+    # We changed the tests to use try/catch because @test_nowarn was extremely slow, as it
+    # triggers a recompilation for every call.
+    test_const = 0
+    try
+        Mantis.Forms.evaluate(zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_two_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_two_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_two_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_two_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_zero_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_two_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_two_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_two_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(one_two_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_one_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_one_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_one_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(two_one_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_space_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, quad_nodes)
+        Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, quad_nodes)
+    catch e
+        test_const = 1
+        println(e)
+    end
 
-    @test_nowarn Mantis.Forms.evaluate(zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_one_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_zero_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_two_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_two_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_two_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_two_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_zero_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_two_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_two_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_two_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(one_two_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_one_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_one_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_one_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(two_one_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(zero_top_form_mixed_2_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_space_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_field_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_1_wedge, 1, quad_nodes)
-    @test_nowarn Mantis.Forms.evaluate(top_zero_form_mixed_2_wedge, 1, quad_nodes)
+    @test test_const == 0
+
+    return nothing
 end
 
 ############################################################################################
@@ -304,8 +330,8 @@ q_rule_2d = Mantis.Quadrature.tensor_product_rule(
 # Test the different geometries.
 for geom in (geom_cart_2d, geom_crazy_2d)
     test_inner_prod_equality(geom, q_rule_2d, complex_2d)
-    test_combinations_2d(complex_2d, q_rule_2d)
 end
+test_combinations_2d(complex_2d, q_rule_2d)
 
 ############################################################################################
 ##                                       3D TESTS                                         ##
@@ -335,7 +361,7 @@ q_rule_3d = Mantis.Quadrature.tensor_product_rule(
 # Test the different geometries.
 for geom in (geom_cart_3d, geom_crazy_3d)
     test_inner_prod_equality(geom, q_rule_3d, complex_3d)
-    test_combinations_3d(complex_3d, q_rule_3d)
 end
+test_combinations_3d(complex_3d, q_rule_3d)
 
 end

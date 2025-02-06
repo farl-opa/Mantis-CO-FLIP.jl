@@ -41,7 +41,8 @@ Create a tensor-product B-spline de Rham complex.
 - `geometry::G`: the geometry of the domain.
 
 # Returns
-- `Vector{AbstractFormSpace}`: the `manifold_dim+1` form spaces of the complex.
+- `::Tuple{<:AbstractFormSpace{manifold_dim, form_rank, geometry}}`: Tuple with the form
+    spaces of the complex, for each `form_rank` from `0` to `manifold_dim+1`.
 """
 function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}, geometry::G) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace, G <: Geometry.AbstractGeometry{manifold_dim}}
 
@@ -52,30 +53,43 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
     # store all univariate FEM spaces helper
     fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFiniteElementSpace{1}}}(undef, 2)
     # first, create all univariate FEM spaces corresponding to directional-zero forms
-    fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)
+    fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(
+        starting_points,
+        box_sizes,
+        num_elements,
+        section_spaces,
+        regularities,
+        n_dofs_left,
+        n_dofs_right,
+    )
     # next, create all univariate FEM spaces corresponding to directional-one forms
     fem_spaces[2] = map(FunctionSpaces.get_derivative_space, fem_spaces[1])
 
-    # allocate space for all form spaces
-    form_spaces = Vector{AbstractFormSpace}(undef, manifold_dim+1)
-    # loop over all form ranks
-    for k = 0:manifold_dim
-        # get k-form basis indices, these also inform the directional degree-deficits
+    # Build all the form spaces of the complex.
+    form_spaces = ntuple(manifold_dim + 1) do k
+        k = k - 1 # Because form ranks range from 0 to manifold_dim.
+        # Get k-form basis indices, these also inform the directional degree-deficits.
         k_form_basis_idxs = get_basis_index_combinations(manifold_dim, k)
-        n_form_components = length(k_form_basis_idxs)
-        # allocate space for storing all k-form finite element spaces
-        k_form_fem_spaces = Vector{FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}}(undef, n_form_components)
-        # loop over all k-form bases and construct the corresponding tensor-product B-spline space
-        for component_idx in 1:n_form_components
-            # by default, use direction-zero forms...
+        num_form_components = length(k_form_basis_idxs)
+        # Generate tuple with all the k-form finite element spaces.
+        k_form_fem_spaces = ntuple(num_form_components) do component
+            # By default, use direction-zero forms...
             fem_space_idxs = ones(Int, manifold_dim)
-            # ...unless the basis index is present in the k-form basis indices
-            fem_space_idxs[k_form_basis_idxs[component_idx]] .= 2
-            # build and store the corresponding tensor-product FEM space
-            k_form_fem_spaces[component_idx] = FunctionSpaces.TensorProductSpace(tuple([fem_spaces[fem_space_idxs[i]][i] for i in 1:manifold_dim]...))
+            # ...unless the basis index is present in the k-form basis indices.
+            fem_space_idxs[k_form_basis_idxs[component]] .= 2
+            # Build and store constituent spaces of the tensor-product FEM space.
+            tp_consituent_spaces = ntuple(manifold_dim) do dim
+                return fem_spaces[fem_space_idxs[dim]][dim]
+            end
+            # Build and return the corresponding tensor-product FEM space.
+            return FunctionSpaces.TensorProductSpace(tp_consituent_spaces)
         end
-        # create the form space
-        form_spaces[k+1] = FormSpace(k, geometry, FunctionSpaces.DirectSumSpace(tuple(k_form_fem_spaces...)), "ω_$k")
+
+        direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces) 
+         
+        return FormSpace(
+            k, geometry, direct_sum_space, "ω_$k"
+        )
     end
 
     return form_spaces
