@@ -1,7 +1,8 @@
 @doc raw"""
     struct GeneralizedExponential <: AbstractECTSpaces
 
-Concrete type for Generalized Exponential section space spanned by `<1, x, ..., x^(p-2), exp(wx), exp(-wx)>`, equivalently `<1, x, ..., x^(p-2), cosh(wx), sinh(wx)>`, on `[0,1]`.
+Concrete type for Generalized Exponential section space spanned by `<1, x, ..., x^(p-2),
+exp(wx), exp(-wx)>`, equivalently `<1, x, ..., x^(p-2), cosh(wx), sinh(wx)>`, on `[0,1]`.
 
 # Fields
 - `p::Int`: Degree of the space.
@@ -66,7 +67,8 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
             E = [1.0; cumprod((1.0 ./ (1:gexp.p-k)) * wxl)]
             E[gexp.p-k, :] .= exp(wxl);
             E[gexp.p+1-k, :] .= (-1)^r * exp(-wxl);
-            M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E) * (gexp.l^r) # rescale the derivative to map back from [0, l] -> [0, 1]
+            # rescale the derivative to map back from [0, l] -> [0, 1]
+            M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E) * (gexp.l^r)
         end
     else
         for r = 0:nderivatives
@@ -76,7 +78,8 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
             E = Ef[1:gexp.p+1-k]
             E[gexp.p-k, :] = Ef[gexp.p-k:2:end, :]' * ww
             E[gexp.p-k+1, :] = Ef[gexp.p-k+1:2:end, :]' * ww
-            M[1, :, r+1] = gexp.C[:,k+1:end] * E * (gexp.l^r) # rescale the derivative to map back from [0, l] -> [0, 1]
+            # rescale the derivative to map back from [0, l] -> [0, 1]
+            M[1, :, r+1] = gexp.C[:,k+1:end] * E * (gexp.l^r)
         end
     end
     return M
@@ -119,7 +122,7 @@ Build representation matrix for Generalized Exponential section space of degree 
 import LinearAlgebra, ToeplitzMatrices
 
 function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
-    
+
     I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
     if t
         wl = w * l
@@ -168,7 +171,9 @@ Get the space of one degree lower than the input space.
 - `::GeneralizedExponential`: A ect space of one degree lower than the input space.
 """
 function get_derivative_space(ect_space::GeneralizedExponential)
-    return GeneralizedExponential(ect_space.p-1, ect_space.w, ect_space.l, ect_space.t, ect_space.m)
+    return GeneralizedExponential(
+        ect_space.p-1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
+    )
 end
 
 """
@@ -201,8 +206,12 @@ For number of sub-elements which is powers of 2, bisect the canonical space by d
 function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
     num_ref = log2(num_sub_elements)
     if num_sub_elements < 2 || !isapprox(num_ref-round(num_ref), 0.0, atol=1e-12)
-        throw(ArgumentError("Number of subdivisions should be a power of 2 and greater than 1"))
+        throw(
+            ArgumentError("Number of subdivisions should be a power of 2 and greater than 1")
+        )
     end
 
-    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l/num_sub_elements, ect_space.m)
+    return GeneralizedExponential(
+        ect_space.p, ect_space.w, ect_space.l/num_sub_elements, ect_space.m
+    )
 end

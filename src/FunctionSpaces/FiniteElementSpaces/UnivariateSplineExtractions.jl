@@ -205,9 +205,9 @@ function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) whe
         
         # Construct smoothness constraint matrix contributions from the left and right of the breakpoint
         KL = _evaluate_all_at_point(canonical_space, 1.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)  
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)  
         KR = _evaluate_all_at_point(canonical_space, 0.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)
         # element sizes where constraints are evaluated
         h_L = get_element_size(knot_vector, el)
         h_R = get_element_size(knot_vector, el+1)
@@ -232,7 +232,7 @@ function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) whe
     end
 
     # Remove small values obtained as a result of round-off errors
-    SparseArrays.fkeep!((i,j,x) -> abs(x) > 1e-14, H)
+    SparseArrays.fkeep!((i,j,x) -> abs(x) > 1e-13, H)
 
     # Compute basis indices
     basis_indices = Vector{Vector{Int}}(undef, nel)
@@ -286,9 +286,9 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
         
         # Smoothness constraint matrix
         KL = _evaluate_all_at_point(spline_spaces[i], bspl_nels[i], 1.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)  
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)  
         KR = _evaluate_all_at_point(spline_spaces[i+1], 1, 0.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KR)
         # element sizes where constraints are evaluated
         h_L = get_element_size(spline_spaces[i], bspl_nels[i])
         h_R = get_element_size(spline_spaces[i+1], 1)
@@ -320,9 +320,9 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
             
             # smoothness constraints
             KL = _evaluate_all_at_point(spline_spaces[m], bspl_nels[m], 1.0, r)
-            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)  
+            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)  
             KR = _evaluate_all_at_point(spline_spaces[1], 1, 0.0, r)
-            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
+            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KR)
             # element sizes where constraints are evaluated
             h_L = get_element_size(spline_spaces[m], bspl_nels[m])
             h_R = get_element_size(spline_spaces[1], 1)
@@ -347,7 +347,7 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
     end
 
     # Remove small values obtained as a result of round-off errors
-    SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, H)
+    SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, H)
 
     # Convert global extraction matrix to element local extractions
     # (here, the matrix is transposed so that [spline_spaces] * [extraction] = [GTB-splines])

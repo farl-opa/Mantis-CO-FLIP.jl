@@ -121,4 +121,43 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)
     @test minimum(Nurbs_eval[1][1]) >= 0.0
 end
 
+# Test Ck-smooth GeneralizedExponential spline space ----------------------------------------------------
+
+deg = 5
+Wt = 10.0
+b = Mantis.FunctionSpaces.GeneralizedExponential(deg, Wt, 0.25)
+breakpoints = [0.0, 0.25, 0.5, 0.75]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, deg-1, deg-1, -1])
+nbasis = Mantis.FunctionSpaces.get_num_basis(B)
+nel = Mantis.FunctionSpaces.get_num_elements(B)
+for el in 1:1:nel
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B, el)
+    display(ex_coeffs)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
+end
+
+# interpolate an exponential
+x = collect(range(start=0.1, stop=0.9, length=deg+1))
+npts = length(x)
+LHS = zeros(nel * npts, nbasis)
+RHS_P = zeros(nel * npts)
+RHS_N = zeros(nel * npts)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B)
+    B_eval, inds = Mantis.FunctionSpaces.evaluate(B, el, (x,), 0)
+    LHS[(el-1)*npts .+ (1:npts),inds] = B_eval[1][1]
+    RHS_P[(el-1)*npts .+ (1:npts)] = exp.(Wt .* (x .+ (el - 1)) .* 0.25)
+    RHS_N[(el-1)*npts .+ (1:npts)] = exp.(-Wt .* (x .+ (el - 1)) .* 0.25)
+end
+display(LHS)
+coeffs_P = LHS \ RHS_P
+coeffs_N = LHS \ RHS_N
+display(abs.(LHS * coeffs_P - RHS_P))
+display(abs.(LHS * coeffs_N - RHS_N))
+@test all(isapprox.(abs.(LHS * coeffs_P - RHS_P), 0.0, atol=1e-12))
+@test all(isapprox.(abs.(LHS * coeffs_N - RHS_N), 0.0, atol=1e-14))
+
+
 end
