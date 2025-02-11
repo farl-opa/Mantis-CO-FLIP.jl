@@ -12,8 +12,8 @@ Wt = pi/2
 for p in degrees_to_test
     q = max(2, ceil(Int, (p+1)/2))
     quad_rule = Mantis.Quadrature.gauss_legendre(q)
-    x = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
-    w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
+    x = Mantis.Quadrature.get_nodes(quad_rule)[1]
+    w = Mantis.Quadrature.get_weights(quad_rule)
 
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))
@@ -59,8 +59,8 @@ end
 for p in degrees_to_test
     q = max(2, ceil(Int, (p+1)/2))
     quad_rule = Mantis.Quadrature.gauss_legendre(q)
-    x = Mantis.Quadrature.get_quadrature_nodes(quad_rule)[1]
-    w = Mantis.Quadrature.get_quadrature_weights(quad_rule)
+    x = Mantis.Quadrature.get_nodes(quad_rule)[1]
+    w = Mantis.Quadrature.get_weights(quad_rule)
 
     sum_all = zeros(size(x))
     sum_all2 = zeros(size(x))

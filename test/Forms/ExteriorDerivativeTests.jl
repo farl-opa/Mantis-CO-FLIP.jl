@@ -34,14 +34,14 @@ dsTP_0_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_2d,))
 dsTP_1_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_2d, TP_Space_2d))
 dsTP_2_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_2d,))
 
-# Then the geometry 
+# Then the geometry
 # Line 1
 line_1_geo = Mantis.Geometry.CartesianGeometry((breakpoints1,))
 
 # Line 2
 line_2_geo = Mantis.Geometry.CartesianGeometry((breakpoints2,))
 
-# Tensor product geometry 
+# Tensor product geometry
 tensor_prod_geo = Mantis.Geometry.TensorProductGeometry((line_1_geo, line_2_geo))
 geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
 
@@ -79,21 +79,21 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     # 1-form: constant
     ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
     ζ¹.coefficients .= 1.0
-    
+
     # Compute exterior derivatives
     dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
     dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
-    
+
     # Test exterior derivatives
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
         # 0-form
         # Exterior derivative of a unity 0-form is a zero 1-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
 
         # 1-form
         # Exterior derivative of a unity 1-form is a zero 2-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
     end
 end
 
@@ -101,7 +101,7 @@ end
 
 # 3D tests --------------------------------------------------------------------
 
-# Setup the geometry 
+# Setup the geometry
 
 # Domain
 Lleft = 0.0
@@ -123,12 +123,12 @@ B = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, deg-1, -1])
 TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B, B))
 TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace((TP_Space_2d, B))
 
-# Then the geometry 
+# Then the geometry
 # Line
 line_geo = Mantis.Geometry.CartesianGeometry((breakpoints,))
 geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints, breakpoints))
 
-# Crazy Tensor product geometry in 2D (auxiliary) 
+# Crazy Tensor product geometry in 2D (auxiliary)
 tensor_prod_geo_2d = Mantis.Geometry.TensorProductGeometry((line_geo, line_geo))
 geo_2d_cart_aux = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints))
 crazy_geo_2d_cart = Mantis.Geometry.MappedGeometry(geo_2d_cart_aux, crazy_mapping)
@@ -159,7 +159,7 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
     # 0-form: constant
     α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
     α⁰.coefficients .= 1.0
-    
+
     # 1-form: constant
     ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
     ζ¹.coefficients .= 1.0
@@ -167,28 +167,28 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
     # 2-form: constant
     β² = Mantis.Forms.FormField(two_form_space, "β")
     β².coefficients .= 1.0
-    
+
     # Exterior derivative of all forms
     dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
     dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
     dβ² = Mantis.Forms.exterior_derivative(β²)
-    
+
     for elem_id in 1:Mantis.Geometry.get_num_elements(geom)
         # 0-form
         # Exterior derivative of a unity 0-form is a zero 1-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
 
         # 1-form
         # Exterior derivative of a unity 1-form is a zero 2-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
 
         # 2-form
         # Exterior derivative of a unity 1-form is a zero 3-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dβ², elem_id, Mantis.Quadrature.get_quadrature_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dβ², elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
 
     end
 end
