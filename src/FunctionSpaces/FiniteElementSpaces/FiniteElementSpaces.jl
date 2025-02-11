@@ -2,46 +2,46 @@ include("HelperFunctions.jl")
 
 
 """
-    get_basis_indices(space::AbstractFiniteElementSpace, element_id::Int)
+    get_basis_indices(space::AbstractFESpace, element_id::Int)
 
 Get the global indices of the basis functions of the finite element space `space` for the
 element with index `element_id`.
 
 # Arguments
-- `space::AbstractFiniteElementSpace`: Finite element space
+- `space::AbstractFESpace`: Finite element space
 - `element_id::Int`: Index of the element
 
 # Returns
 - `::Vector{Int}`: Global indices of the basis functions
 """
-function get_basis_indices(space::AbstractFiniteElementSpace, element_id::Int)
+function get_basis_indices(space::AbstractFESpace, element_id::Int)
     return get_basis_indices(space.extraction_op, element_id)
 end
 
 """
-    get_num_basis(space::AbstractFiniteElementSpace, element_id::Int)
+    get_num_basis(space::AbstractFESpace, element_id::Int)
 
 Get the number of basis functions of the finite element space `space` for the element with
 index `element_id`.
 
 # Arguments
-- `space::AbstractFiniteElementSpace`: Finite element space
+- `space::AbstractFESpace`: Finite element space
 - `element_id::Int`: Index of the element
 
 # Returns
 - `::Int`: Number of basis functions
 """
-function get_num_basis(space::AbstractFiniteElementSpace, element_id::Int)
+function get_num_basis(space::AbstractFESpace, element_id::Int)
     return get_num_basis(space.extraction_op, element_id)
 end
 
 """
     evaluate(
-        space::AbstractFESpace{manifold_dim, image_dim},
+        space::AbstractFESpace{manifold_dim, num_components},
         element_id::Int,
         xi::NTuple{manifold_dim,Vector{Float64}},
         nderivatives::Int=0
-    ) where {manifold_dim, image_dim}
+    ) where {manifold_dim, num_components}
 
 Evaluate the basis functions of the finite element space `space` at the point `xi` on the
 element with identifier `element_id` up to order `nderivatives`.
@@ -63,7 +63,7 @@ See [`_get_derivative_idx(der_key::Vector{Int})`](@ref) for more details on the 
 which all the mixed derivatives of order `i-1` are stored.
 
 # Arguments
-- `space::AbstractFESpace{manifold_dim, image_dim}`: Finite element space
+- `space::AbstractFESpace{manifold_dim, num_components}`: Finite element space
 - `element_id::Int`: Index of the element
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: Point on the element
 - `nderivatives::Int=0`: Order of the derivatives. Default is 0 (i.e., function evaluation).
@@ -73,11 +73,11 @@ which all the mixed derivatives of order `i-1` are stored.
 - `basis_indices::Vector{Int}`: Global indices of the basis functions.
 """
 function evaluate(
-    space::AbstractFESpace{manifold_dim, image_dim},
+    space::AbstractFESpace{manifold_dim, num_components},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int=0,
-) where {manifold_dim, image_dim}
+) where {manifold_dim, num_components}
     extraction_coefficients, basis_indices = get_extraction(space, element_id)
     local_basis = get_local_basis(space, element_id, xi, nderivatives)
     evaluation = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
@@ -98,12 +98,12 @@ function evaluate(
 end
 
 function evaluate(
-    space::AbstractFESpace{manifold_dim, image_dim},
+    space::AbstractFESpace{manifold_dim, num_components},
     element_id::Int,
     xi::NTuple{manifold_dim,Vector{Float64}},
     nderivatives::Int,
     coeffs::Vector{Float64},
-) where {manifold_dim, image_dim}
+) where {manifold_dim, num_components}
     basis_eval, basis_indices = evaluate(space, element_id, xi, nderivatives)
     evaluation = Vector{Vector{Vector{Float64}}}(undef, nderivatives + 1)
     for j = 0:nderivatives
@@ -124,17 +124,17 @@ end
 
 """
     _evaluate_all_at_point(
-        fem_space::AbstractFiniteElementSpace{1, image_dim},
+        fem_space::AbstractFESpace{1, num_components},
         element_id::Int,
         xi::Float64,
         nderivatives::Int,
-    ) where {image_dim}
+    ) where {num_components}
 
 Evaluates all derivatives up to order `nderivatives` for all basis functions of `fem_space`
 at a given point `xi` in the element `element_id`.
 
 # Arguments
-- `fem_space::AbstractFiniteElementSpace{1, image_dim}`: A univariate FEM space.
+- `fem_space::AbstractFESpace{1, num_components}`: A univariate FEM space.
 - `element_id::Int`: The id of the element.
 - `xi::Float64`: The point where all global basis functiuons are evaluated.
 - `nderivatives::Int`: The order upto which derivatives need to be computed.
@@ -143,11 +143,11 @@ at a given point `xi` in the element `element_id`.
 - `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
 """
 function _evaluate_all_at_point(
-    fem_space::AbstractFiniteElementSpace{1, image_dim},
+    fem_space::AbstractFESpace{1, num_components},
     element_id::Int,
     xi::Float64,
     nderivatives::Int,
-) where {image_dim}
+) where {num_components}
     basis_eval, basis_indices = evaluate(fem_space, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
     ndofs = get_num_basis(fem_space)
@@ -169,7 +169,9 @@ end
 
 """
     _compute_parametric_geometry_coeffs(fem_space::F) where {
-        manifold_dim, image_dim, F<:FunctionSpaces.AbstractFESpace{manifold_dim, image_dim}
+        manifold_dim,
+        num_components,
+        F<:FunctionSpaces.AbstractFESpace{manifold_dim, num_components}
     }
 
 Compute the parametric geometry coefficients for a given finite element space.
@@ -186,7 +188,7 @@ of a finite element space.
     geometry. The size of the matrix is (num_basis x manifold_dim).
 """
 function _compute_parametric_geometry_coeffs(fem_space::F) where {
-    manifold_dim, image_dim, F<:AbstractFESpace{manifold_dim, image_dim}
+    manifold_dim, num_components, F<:AbstractFESpace{manifold_dim, num_components}
 }
 
     function _compute_element_xi(xi_canonical_prod, element_vertices)
@@ -231,8 +233,8 @@ function _compute_parametric_geometry_coeffs(fem_space::F) where {
 end
 
 
-# AbstractFiniteElementSpace: Common functionality accross FEM spaces
-#include("AbstractFiniteElementSpace.jl")
+# AbstractFESpace: Common functionality accross FEM spaces
+#include("AbstractFESpace.jl")
 # Extraction operator: functionaly for extraction operator
 include("ExtractionOperator.jl")
 # rational version of finite element spaces
@@ -247,4 +249,4 @@ include("TwoScaleRelations/AbstractTwoScaleRelations.jl")
 # hierarchical function spaces
 include("Hierarchical/Hierarchical.jl")
 # multi-valued function spaces
-include("MultiComponentSpaces/AbstractMultiValuedFiniteElementSpace.jl")
+include("MultiComponentSpaces/MultiComponentSpaces.jl")

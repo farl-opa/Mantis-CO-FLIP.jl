@@ -6,7 +6,7 @@ A multi-valued space that is the direct sum of `num_spaces` multi-valued functio
 # Fields
 - `component_spaces::F`: Tuple of `num_components` scalar function spaces
 """
-struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: AbstractMultiValuedFiniteElementSpace{manifold_dim, num_components}
+struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: AbstractFESpace{manifold_dim, num_components}
     component_spaces::F
     component_ordering::NTuple{num_spaces, Vector{Int}}
 

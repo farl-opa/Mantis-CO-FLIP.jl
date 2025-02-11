@@ -6,17 +6,17 @@ A multi-valued space that is the sum of `num_components` input scalar function s
 # Fields
 - `component_spaces::F`: Tuple of `num_components` scalar function spaces
 """
-struct SumSpace{manifold_dim, num_components, F} <: AbstractMultiValuedFiniteElementSpace{manifold_dim, num_components}
+struct SumSpace{manifold_dim, num_components, F} <: AbstractFESpace{manifold_dim, num_components}
     component_spaces::F
     space_dim::Int
 
-    function SumSpace(component_spaces::F, space_dim::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
+    function SumSpace(component_spaces::F, space_dim::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}}}
         new{manifold_dim, num_components, F}(component_spaces, space_dim)
     end
 end
 
 """
-    get_component_spaces(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    get_component_spaces(space::SumSpace)
 
 Get the component spaces of the sum space.
 
@@ -26,7 +26,7 @@ Get the component spaces of the sum space.
 # Returns
 - `component_spaces::F`: Tuple of component spaces
 """
-function get_component_spaces(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+function get_component_spaces(space::SumSpace)
     return space.component_spaces
 end
 
@@ -45,7 +45,7 @@ Evaluate the basis functions of the sum space at the points `xi` in the element 
 - `local_multivalued_basis::Vector{Matrix{Float64}}`: Vector of matrices containing the evaluations of the basis functions of the sum space
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
-function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
+function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}}}
 
     # get the multi-valued basis indices
     multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)
@@ -88,71 +88,71 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
 end
 
 """
-    get_basis_indices(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+    get_basis_indices(space::SumSpace, element_idx::Int)
 
 Get the global indices of the basis functions of the sum space in the element with index `element_idx`.
 
 # Arguments
-- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `space::SumSpace`: Sum space
 - `element_idx::Int`: Index of the element
 
 # Returns
 - `basis_indices::Vector{Int}`: Global indices of the basis functions
 """
-function get_basis_indices(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+function get_basis_indices(space::SumSpace, element_idx::Int)
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
 
     return union(component_basis_indices...)
 end
 
 """
-    get_basis_indices_w_components(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+    get_basis_indices_w_components(space::SumSpace, element_idx::Int)
 
 Get the global indices of the multivalued basis functions of the sum space as well as the component spaces for the element with index `element_idx`.
 
 # Arguments
-- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `space::SumSpace`: Sum space
 - `element_idx::Int`: Index of the element
 
 # Returns
 - `multivalued_basis_indices::Vector{Int}`: Global indices of the multivalued basis functions
 - `component_basis_indices::Vector{Vector{Int}}`: Global indices of the basis functions of the component spaces
 """
-function get_basis_indices_w_components(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
+function get_basis_indices_w_components(space::SumSpace, element_idx::Int)
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
 
     return union(component_basis_indices...), component_basis_indices
 end
 
 """
-    get_num_basis(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    get_num_basis(space::SumSpace)
 
 Get the number of basis functions of the sum space.
 
 # Arguments
-- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `space::SumSpace`: Sum space
 
 # Returns
 - `num_basis::Int`: Number of basis functions
 """
-get_num_basis(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F} = space.space_dim
+get_num_basis(space::SumSpace) = space.space_dim
 
 """
-    get_num_basis(space::SumSpace{manifold_dim, num_components, F}, element_id::Int) where {manifold_dim, num_components, F}
+    get_num_basis(space::SumSpace, element_id::Int)
 
 Get the number of basis functions of the sum space in the element with index `element_id`.
 
 # Arguments
-- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
+- `space::SumSpace`: Sum space
 - `element_id::Int`: Index of the element
 
 # Returns
 - `num_basis::Int`: Number of basis functions
 """
-get_num_basis(space::SumSpace{manifold_dim, num_components, F}, element_id::Int) where {manifold_dim, num_components, F} = length(get_basis_indices(space, element_id))
+get_num_basis(space::SumSpace, element_id::Int) = length(get_basis_indices(space, element_id))
 
 """
-    get_max_local_dim(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    get_max_local_dim(space::SumSpace)
 
 Get the maximum local dimension of the sum space.
 
@@ -162,7 +162,7 @@ Get the maximum local dimension of the sum space.
 # Returns
 - `max_local_dim::Int`: Maximum local dimension
 """
-function get_max_local_dim(space::SumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+function get_max_local_dim(space::SumSpace)
     max_local_dim = 0
     # a very conservative estimate, because otherwise we need to loop over all elements, check the unions of all active basis functions, and return the length of the largest union
     for space in space.component_spaces

@@ -1,33 +1,33 @@
 
 """
-    UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
+    UnstructuredSpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, num_components}
 
-An `n`-variate multi-patch space with `m` patches, representing an unstructured finite element space.
+An `manifold_dim`-variate multi-patch space with `m` patches, representing an unstructured finite element space.
 
 # Fields
-- `function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}`: Collection of `m` (uni or multivariate) function spaces.
+- `function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}`: Collection of `m` (uni or multivariate) function spaces.
 - `extraction_op::ExtractionOperator`: Extraction operator that specifies how to combine functions from the `m` spaces into functions for the unstructured space.
 - `dof_partition::Vector{Vector{Int}}`: Partition of degrees of freedom.
 - `us_config::Dict`: Dictionary that stores helper functionality (e.g., connectivity) for the unstructured space.
 - `data::Dict`: Any auxiliary data that the user wants to store for this unstructured space.
 """
-struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
-    function_spaces::NTuple{m, AbstractFiniteElementSpace{n}}
+struct UnstructuredSpace{manifold_dim, num_components, m} <: AbstractFESpace{manifold_dim, num_components}
+    function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
     us_config::Dict
     data::Dict
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{n}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Vector{Int}}}, us_config::Dict, data::Dict) where {n,m}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{manifold_dim, num_components}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Vector{Int}}}, us_config::Dict, data::Dict) where {manifold_dim, num_components, m}
         # Initialize with empty dof partitioning
-        new{n,m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        new{manifold_dim, num_components, m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
         UnstructuredSpace(function_spaces, extraction_op, 1, 1, data)
     end
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFiniteElementSpace{1}}, extraction_op::ExtractionOperator, n_dofs_left::Int, n_dofs_right::Int, data::Dict) where {m}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1, num_components}}, extraction_op::ExtractionOperator, n_dofs_left::Int, n_dofs_right::Int, data::Dict) where {m, num_components}
         # Build 1D topology
         patch_neighbours = [-1 (1:m-1)...
                             (2:m)... -1]
@@ -47,7 +47,7 @@ struct UnstructuredSpace{n,m} <: AbstractFiniteElementSpace{n}
         # ... and then finally the right dofs.
         dof_partition[1][3] = collect(get_num_basis(extraction_op)-n_dofs_right+1:get_num_basis(extraction_op))
 
-        new{1,m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        new{1, num_components, m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 end
 
@@ -187,21 +187,21 @@ function get_dof_partition(us_space::UnstructuredSpace{1,m}) where {m}
 end
 
 """
-    get_local_basis(us_space::UnstructuredSpace{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,m}
+    get_local_basis(us_space::UnstructuredSpace{manifold_dim, num_components, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim,m}
 
 Evaluate the local basis functions for a given element in the unstructured space.
 
 # Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
-- `xi::NTuple{n,Vector{Float64}}`: Vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated.
+- `xi::NTuple{manifold_dim,Vector{Float64}}`: Vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated.
 - `nderivatives::Int`: Number of derivatives to evaluate.
 
 # Returns
 - `::Matrix{Float64}`: Array of evaluated local basis (size: num_eval_points × num_funcs × (nderivatives+1)).
 - `::Vector{Int}`: Vector of local basis indices (size: num_funcs).
 """
-function get_local_basis(us_space::UnstructuredSpace{n,m}, element_id::Int, xi::NTuple{n,Vector{Float64}}, nderivatives::Int) where {n,m}
+function get_local_basis(us_space::UnstructuredSpace{manifold_dim, num_components, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, m}
     # Find the space ID and local element ID
     space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
 
@@ -245,7 +245,7 @@ function get_global_element_id(us_space::UnstructuredSpace, space_id::Int, space
 end
 
 """
-    assemble_global_extraction_matrix(us_space::UnstructuredSpace{n,m})
+    assemble_global_extraction_matrix(us_space::UnstructuredSpace)
 
 Loops over all elements and assembles the global extraction matrix for the unstructured space. The extraction matrix is a sparse matrix that maps the local basis functions to the global basis functions.
 
@@ -255,7 +255,7 @@ Loops over all elements and assembles the global extraction matrix for the unstr
 # Returns
 - `::Array{Float64,2}`: Global extraction matrix.
 """
-function assemble_global_extraction_matrix(us_space::UnstructuredSpace{n,m}) where {n,m}
+function assemble_global_extraction_matrix(us_space::UnstructuredSpace)
     # Initialize the global extraction matrix
     num_global_basis = get_num_basis(us_space)
     num_local_basis = get_num_basis.(us_space.function_spaces)

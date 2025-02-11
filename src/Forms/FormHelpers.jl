@@ -50,7 +50,7 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
     n_dofs_right = tuple((1 for _ in 1:manifold_dim)...)
 
     # store all univariate FEM spaces helper
-    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFiniteElementSpace{1}}}(undef, 2)
+    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFESpace{1, 1}}}(undef, 2)
     # first, create all univariate FEM spaces corresponding to directional-zero forms
     fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(starting_points, box_sizes, num_elements, section_spaces, regularities, n_dofs_left, n_dofs_right)
     # next, create all univariate FEM spaces corresponding to directional-one forms
@@ -64,7 +64,7 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
         k_form_basis_idxs = get_basis_index_combinations(manifold_dim, k)
         n_form_components = length(k_form_basis_idxs)
         # allocate space for storing all k-form finite element spaces
-        k_form_fem_spaces = Vector{FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}}(undef, n_form_components)
+        k_form_fem_spaces = Vector{FunctionSpaces.AbstractFESpace{manifold_dim, 1}}(undef, n_form_components)
         # loop over all k-form bases and construct the corresponding tensor-product B-spline space
         for component_idx in 1:n_form_components
             # by default, use direction-zero forms...

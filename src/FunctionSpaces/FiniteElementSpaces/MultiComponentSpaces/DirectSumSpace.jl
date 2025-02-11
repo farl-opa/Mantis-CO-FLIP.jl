@@ -6,10 +6,10 @@ A multi-valued space that is the direct sum of `num_components` scalar function 
 # Fields
 - `component_spaces::F`: Tuple of `num_components` scalar function spaces
 """
-struct DirectSumSpace{manifold_dim, num_components, F} <: AbstractMultiValuedFiniteElementSpace{manifold_dim, num_components}
+struct DirectSumSpace{manifold_dim, num_components, F} <: AbstractFESpace{manifold_dim, num_components}
     component_spaces::F
 
-    function DirectSumSpace(component_spaces::F) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
+    function DirectSumSpace(component_spaces::F) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}}}
         new{manifold_dim, num_components, F}(component_spaces)
     end
 end
@@ -48,7 +48,7 @@ Evaluate the basis functions of the direct sum space at the points `xi` in the e
     we should follow a flattenned numbering using the indices of the derivatives.
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
-function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFiniteElementSpace{manifold_dim}}}
+function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}}}
 
     # get the multi-valued basis indices
     multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)

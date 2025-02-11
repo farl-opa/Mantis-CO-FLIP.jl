@@ -1,6 +1,8 @@
 
 """
-    RationalFiniteElementSpace{manifold_dim,F} <: AbstractFiniteElementSpace{manifold_dim}
+    RationalFiniteElementSpace{manifold_dim, num_components, F} <: AbstractFESpace{
+        manifold_dim, num_components
+    }
 
 A rational finite element space obtained by dividing all elements of a given function space
 by a fixed element from the same function space. The latter is defined with the help of
@@ -11,19 +13,19 @@ specified weights.
 - `weights::Vector{Float64}`: The weights associated with the basis functions of the
     function space.
 """
-struct RationalFiniteElementSpace{manifold_dim, image_dim, F} <: AbstractFESpace{
-    manifold_dim, image_dim
+struct RationalFiniteElementSpace{manifold_dim, num_components, F} <: AbstractFESpace{
+    manifold_dim, num_components
 }
     function_space::F
     weights::Vector{Float64}
 
     function RationalFiniteElementSpace(function_space::F, weights::Vector{Float64}) where {
-        manifold_dim, F <: AbstractFESpace{manifold_dim, image_dim}
+        manifold_dim, F <: AbstractFESpace{manifold_dim, num_components}
     }
         # Ensure that the dimension of the function space matches the length of the weights
         # vector
         @assert get_num_basis(function_space) == length(weights) "Dimension mismatch"
-        new{manifold_dim, image_dim, F}(function_space, weights)
+        new{manifold_dim, num_components, F}(function_space, weights)
     end
 end
 
@@ -127,18 +129,18 @@ end
 
 """
     evaluate(
-        rat_space::RationalFiniteElementSpace{manifold_dim, image_dim, F},
+        rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
         element_id::Int,
         xi::NTuple{manifold_dim, Vector{Float64}},
         nderivatives::Int
     ) where {
-        manifold_dim, image_dim, F <: AbstractFiniteElementSpace{manifold_dim, image_dim}
+        manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}
     }
 
 Evaluates the basis functions and their derivatives for the rational finite element space.
 
 # Arguments
-- `rat_space::RationalFiniteElementSpace{manifold_dim, image_dim, F}`: The rational finite
+- `rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F}`: The rational finite
     element space.
 - `element_id::Int`: The index of the element.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
@@ -151,12 +153,12 @@ A tuple containing:
 - The basis indices.
 """
 function evaluate(
-    rat_space::RationalFiniteElementSpace{manifold_dim, image_dim, F},
+    rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int
 ) where {
-    manifold_dim, image_dim, F <: AbstractFESpace{manifold_dim, image_dim}
+    manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}
 }
     # Evaluate the basis functions and their derivatives for the underlying function space
     homog_basis, basis_indices = evaluate(
@@ -209,7 +211,12 @@ function get_max_local_dim(rat_space::RationalFiniteElementSpace)
 end
 
 """
-    get_local_basis(rat_space::RationalFiniteElementSpace{manifold_dim, image_dim, F}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, image_dim, F <: AbstractFiniteElementSpace{manifold_dim}}
+    get_local_basis(
+        rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
+        element_id::Int,
+        xi::NTuple{manifold_dim,Vector{Float64}},
+        nderivatives::Int) where {
+        manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}}
 
 Returns the local basis functions for the rational finite element space.
 
@@ -223,12 +230,12 @@ Returns the local basis functions for the rational finite element space.
 The local basis functions and their derivatives evaluated at the specified coordinates.
 """
 function get_local_basis(
-    rat_space::RationalFiniteElementSpace{manifold_dim, image_dim, F},
+    rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
     element_id::Int,
     xi::NTuple{manifold_dim,Vector{Float64}},
     nderivatives::Int
 ) where {
-    manifold_dim, image_dim, F <: AbstractFESpace{manifold_dim, image_dim}
+    manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}
 }
 
     return evaluate(rat_space, element_id, xi, nderivatives)[1]

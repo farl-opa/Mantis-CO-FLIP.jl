@@ -1,22 +1,22 @@
 """
-    PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1})
+    PolarSplineSpace(space_p::AbstractFESpace{1,1}, space_r::AbstractFESpace{1,1})
 
 Create a polar spline space from the given poloidal and radial finite element spaces.
 
 # Arguments
-- `space_p::AbstractFiniteElementSpace{1}`: The poloidal finite element space.
-- `space_r::AbstractFiniteElementSpace{1}`: The radial finite element space.
+- `space_p::AbstractFESpace{1,1}`: The poloidal finite element space.
+- `space_r::AbstractFESpace{1,1}`: The radial finite element space.
 - `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
 - `singularity_type::Int=1`: The type of singularity in the polar spline space.
 - `form_rank::Int=0`: The rank of the form for which the polar spline space is to be built.
-- `dspace_p::AbstractFiniteElementSpace{1}=nothing`: The derivative space for the poloidal space.
-- `dspace_r::AbstractFiniteElementSpace{1}=nothing`: The derivative space for the radial space.
+- `dspace_p::AbstractFESpace{1,1}=nothing`: The derivative space for the poloidal space.
+- `dspace_r::AbstractFESpace{1,1}=nothing`: The derivative space for the radial space.
 
 # Returns
 - `polar_splines::SumSpace`: The (unstructured) polar spline space returned as a SumSpace.
 - `E::SparseMatrixCSC{Float64,Int}`: The extraction operator.
 """
-function PolarSplineSpace(space_p::AbstractFiniteElementSpace{1}, space_r::AbstractFiniteElementSpace{1}, degenerate_control_points::NTuple{2,Matrix{Float64}}; singularity_type::Int=1, form_rank::Int=0, dspace_p::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing, dspace_r::Union{Nothing,AbstractFiniteElementSpace{1}}=nothing)
+function PolarSplineSpace(space_p::AbstractFESpace{1,1}, space_r::AbstractFESpace{1,1}, degenerate_control_points::NTuple{2,Matrix{Float64}}; singularity_type::Int=1, form_rank::Int=0, dspace_p::Union{Nothing,AbstractFESpace{1,1}}=nothing, dspace_r::Union{Nothing,AbstractFESpace{1,1}}=nothing)
 
     # number of dofs for the poloidal and radial spaces
     n_p = get_num_basis(space_p)
