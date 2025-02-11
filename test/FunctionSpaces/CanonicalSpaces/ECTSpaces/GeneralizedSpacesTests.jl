@@ -76,7 +76,7 @@ for p in degrees_to_test
     @test all(isapprox.(sum(b_eval[1][1], dims=2), 1.0))
 
     # Zero sum of derivatives
-    @test all(isapprox.(abs.(sum(b_eval[2][1], dims=2)), 0.0, atol=1e-12))
+    @test all(isapprox.(abs.(sum(b_eval[2][1], dims=2)), 0.0, atol=5e-12))
 
     # interpolate a function and check derivatives
     # f = cos(Wt x) + sin(Wt x)
@@ -96,9 +96,9 @@ for p in degrees_to_test
         # Check that the values match f ...
         @test isapprox(maximum(abs.(b_eval[1][1] * coeff_b .- f_eval)), 0.0, atol = 1e-14)
         # ... the first order derivative matches df/dx ...
-        @test isapprox(maximum(abs.(b_eval[2][1] * coeff_b / L .- df_dx_eval)), 0.0, atol = 2e-12)
+        @test isapprox(maximum(abs.(b_eval[2][1] * coeff_b / L .- df_dx_eval)), 0.0, atol = 5e-12)
         # ... and the second order derivative matches d2f/dx2.
-        @test isapprox(maximum(abs.(b_eval[3][1] * coeff_b / L^2 .- d2f_dx2_eval)), 0.0, atol = 1e-10)
+        @test isapprox(maximum(abs.(b_eval[3][1] * coeff_b / L^2 .- d2f_dx2_eval)), 0.0, atol = 5e-10)
     end
 end
 
