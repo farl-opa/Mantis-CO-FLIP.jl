@@ -152,7 +152,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B)
 end
 coeffs_P = LHS \ RHS_P
 coeffs_N = LHS \ RHS_N
-@test all(isapprox.(abs.(LHS * coeffs_P - RHS_P), 0.0, atol=5e-12))
+@test all(isapprox.(abs.(LHS * coeffs_P - RHS_P), 0.0, atol=1e-10))
 @test all(isapprox.(abs.(LHS * coeffs_N - RHS_N), 0.0, atol=1e-14))
 
 

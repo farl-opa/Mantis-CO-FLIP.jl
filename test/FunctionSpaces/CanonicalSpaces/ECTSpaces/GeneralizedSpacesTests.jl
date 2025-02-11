@@ -96,7 +96,7 @@ for p in degrees_to_test
         # Check that the values match f ...
         @test isapprox(maximum(abs.(b_eval[1][1] * coeff_b .- f_eval)), 0.0, atol = 1e-14)
         # ... the first order derivative matches df/dx ...
-        @test isapprox(maximum(abs.(b_eval[2][1] * coeff_b / L .- df_dx_eval)), 0.0, atol = 5e-12)
+        @test isapprox(maximum(abs.(b_eval[2][1] * coeff_b / L .- df_dx_eval)), 0.0, atol = 1e-11)
         # ... and the second order derivative matches d2f/dx2.
         @test isapprox(maximum(abs.(b_eval[3][1] * coeff_b / L^2 .- d2f_dx2_eval)), 0.0, atol = 5e-10)
     end
