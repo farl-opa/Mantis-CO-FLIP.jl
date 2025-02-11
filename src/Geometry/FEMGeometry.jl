@@ -17,8 +17,8 @@ coefficients `geometry_coeffs`.
 
 # Type parameters
 - `manifold_dim`: Dimension of the domain in `fem_space`.
-- `F<:FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}`: Underlying finite element
-    space of the geometry.
+- `F <: FunctionSpaces.AbstractFESpace{manifold_dim, 1}`: Underlying finite element space of
+    the geometry.
 
 # Inner Constructors
 - `FEMGeometry(fem_space::F, geometry_coeffs::Matrix{Float64})`: Constructs the FEMGeometry
@@ -35,7 +35,7 @@ struct FEMGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
 
     function FEMGeometry(
         fem_space::F, geometry_coeffs::Matrix{Float64}
-    ) where {manifold_dim, F <: FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}}
+    ) where {manifold_dim, F <: FunctionSpaces.AbstractFESpace{manifold_dim, 1}}
         num_elements = FunctionSpaces.get_num_elements(fem_space)
 
         return new{manifold_dim, F}(geometry_coeffs, fem_space, num_elements)
@@ -43,19 +43,19 @@ struct FEMGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
 end
 
 """
-    compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFiniteElementSpace)
+    compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFESpace)
 
 Returns the parametric geometry associated with `fem_space` by computing the geometry
 coefficients of the space.
 
 # Arguments
-- `fem_space::FunctionSpaces.AbstractFiniteElementSpace{manifold_dim}`: Finite element space
+- `fem_space::FunctionSpaces.AbstractFESpace`: Finite element space
     for which to compute the geometry.
 
 # Returns
 - `::FEMGeometry{manifold_dim, F}`: structure of the finite element geometry.
 """
-function compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFiniteElementSpace)
+function compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFESpace)
     geometry_coefficients = FunctionSpaces._compute_parametric_geometry_coeffs(fem_space)
 
     return FEMGeometry(fem_space, geometry_coefficients)

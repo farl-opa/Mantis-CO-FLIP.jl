@@ -177,7 +177,7 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
     end
 
     ## Zero forms
-    E0_1 = SparseArrays.sparse(hcat(baryc[1]', baryc[2]'))
+    E0_1 = SparseArrays.SparseArrays.sparse(hcat(baryc[1]', baryc[2]'))
     if polar_config == 2
         E0_2 = reverse(E0_1, dims=2)
     else
@@ -276,13 +276,13 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
         E1_v_r = E1_v_r[1:ind_v]
         E1_v_c = E1_v_c[1:ind_v]
         E1_v_v = E1_v_v[1:ind_v]
-        E1_v = sparse(E1_v_r, E1_v_c, E1_v_v, num_1_forms, num_basis_p * (num_basis_r - 1))
+        E1_v = SparseArrays.sparse(E1_v_r, E1_v_c, E1_v_v, num_1_forms, num_basis_p * (num_basis_r - 1))
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E1_v)
 
         E1_h_r = E1_h_r[1:ind_h]
         E1_h_c = E1_h_c[1:ind_h]
         E1_h_v = E1_h_v[1:ind_h]
-        E1_h = sparse(E1_h_r, E1_h_c, E1_h_v, num_1_forms, num_basis_p * num_basis_r)
+        E1_h = SparseArrays.sparse(E1_h_r, E1_h_c, E1_h_v, num_1_forms, num_basis_p * num_basis_r)
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E1_h)
     else
         E1_h = nothing
@@ -310,7 +310,7 @@ function build_polar_extraction_operators(polar_config::Int, degenerate_control_
             ind += 1
         end
         # assembly
-        E2 = sparse(E2_r, E2_c, E2_v, num_2_forms, num_basis_p * (num_basis_r - 1))
+        E2 = SparseArrays.sparse(E2_r, E2_c, E2_v, num_2_forms, num_basis_p * (num_basis_r - 1))
         # Remove small values obtained as a result of round-off errors
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E2)
 

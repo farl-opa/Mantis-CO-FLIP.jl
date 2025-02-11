@@ -21,7 +21,7 @@ struct TwoScaleOperator{manifold_dim, S} <: AbstractTwoScaleOperator{manifold_di
     coarse_to_fine_functions::Vector{Vector{Int}}
     fine_to_coarse_functions::Vector{Vector{Int}}
 
-    function TwoScaleOperator(coarse_space::AbstractFiniteElementSpace{manifold_dim}, fine_space::AbstractFiniteElementSpace{manifold_dim}, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}, coarse_to_fine_elements::Vector{Vector{Int}}, fine_to_coarse_elements::Vector{Int}) where {manifold_dim}
+    function TwoScaleOperator(coarse_space::AbstractFESpace{manifold_dim, 1}, fine_space::AbstractFESpace{manifold_dim, 1}, global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}, coarse_to_fine_elements::Vector{Vector{Int}}, fine_to_coarse_elements::Vector{Int}) where {manifold_dim}
         if typeof(coarse_space) != typeof(fine_space)
             throw(ArgumentError("The coarse and fine spaces must be of the same type."))
         end
@@ -83,7 +83,7 @@ Retrieve and return the parent element ID for a given element ID within a two-sc
 # Returns
 - `::Int`: The identifier of the parent element.
 """
-get_element_parent(twoscale_operator::TwoScaleOperator, el_id::Int) = twoscale_operator.fine_to_coarse_elements[el_id]  
+get_element_parent(twoscale_operator::TwoScaleOperator, el_id::Int) = twoscale_operator.fine_to_coarse_elements[el_id]
 
 """
     get_basis_parents(twoscale_operator::TwoScaleOperator, basis_id::Int)

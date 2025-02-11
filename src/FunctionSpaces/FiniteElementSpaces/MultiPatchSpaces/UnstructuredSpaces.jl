@@ -1,6 +1,6 @@
 
 """
-    UnstructuredSpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, num_components}
+    UnstructuredSpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, 1}
 
 An `manifold_dim`-variate multi-patch space with `m` patches, representing an unstructured finite element space.
 
@@ -11,23 +11,23 @@ An `manifold_dim`-variate multi-patch space with `m` patches, representing an un
 - `us_config::Dict`: Dictionary that stores helper functionality (e.g., connectivity) for the unstructured space.
 - `data::Dict`: Any auxiliary data that the user wants to store for this unstructured space.
 """
-struct UnstructuredSpace{manifold_dim, num_components, m} <: AbstractFESpace{manifold_dim, num_components}
+struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
     function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
     us_config::Dict
     data::Dict
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{manifold_dim, num_components}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Vector{Int}}}, us_config::Dict, data::Dict) where {manifold_dim, num_components, m}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{manifold_dim, 1}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Vector{Int}}}, us_config::Dict, data::Dict) where {manifold_dim, m}
         # Initialize with empty dof partitioning
-        new{manifold_dim, num_components, m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        new{manifold_dim, m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 
     function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
         UnstructuredSpace(function_spaces, extraction_op, 1, 1, data)
     end
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1, num_components}}, extraction_op::ExtractionOperator, n_dofs_left::Int, n_dofs_right::Int, data::Dict) where {m, num_components}
+    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1, 1}}, extraction_op::ExtractionOperator, n_dofs_left::Int, n_dofs_right::Int, data::Dict) where {m}
         # Build 1D topology
         patch_neighbours = [-1 (1:m-1)...
                             (2:m)... -1]
@@ -47,7 +47,7 @@ struct UnstructuredSpace{manifold_dim, num_components, m} <: AbstractFESpace{man
         # ... and then finally the right dofs.
         dof_partition[1][3] = collect(get_num_basis(extraction_op)-n_dofs_right+1:get_num_basis(extraction_op))
 
-        new{1, num_components, m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        new{1, m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 end
 
@@ -187,7 +187,7 @@ function get_dof_partition(us_space::UnstructuredSpace{1,m}) where {m}
 end
 
 """
-    get_local_basis(us_space::UnstructuredSpace{manifold_dim, num_components, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim,m}
+    get_local_basis(us_space::UnstructuredSpace{manifold_dim, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim,m}
 
 Evaluate the local basis functions for a given element in the unstructured space.
 
@@ -201,7 +201,7 @@ Evaluate the local basis functions for a given element in the unstructured space
 - `::Matrix{Float64}`: Array of evaluated local basis (size: num_eval_points × num_funcs × (nderivatives+1)).
 - `::Vector{Int}`: Vector of local basis indices (size: num_funcs).
 """
-function get_local_basis(us_space::UnstructuredSpace{manifold_dim, num_components, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, m}
+function get_local_basis(us_space::UnstructuredSpace{manifold_dim, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, m}
     # Find the space ID and local element ID
     space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
 

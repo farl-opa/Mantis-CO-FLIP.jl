@@ -15,10 +15,10 @@ struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <: AbstractTwoScaleOp
     global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}
     twoscale_operators::TS
 
-    function TensorProductTwoScaleOperator(coarse_space::TensorProductSpace{manifold_dim, T}, fine_space::TensorProductSpace{manifold_dim, T}, twoscale_operators::TS) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}, TS <: NTuple{num_spaces, AbstractTwoScaleOperator}}
+    function TensorProductTwoScaleOperator(coarse_space::TensorProductSpace{manifold_dim, T}, fine_space::TensorProductSpace{manifold_dim, T}, twoscale_operators::TS) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}, TS <: NTuple{num_spaces, AbstractTwoScaleOperator}}
         #=
         # Does not work because equality of structures is not straightforward
-        
+
         for space_id ∈ 1:num_spaces
             if get_space(coarse_space, space_id) != twoscale_operators[space_id].coarse_space
                 throw(ArgumentError("The coarse space in the two-scale operator does not match the space in the coarse tensor product space at space index $space_id."))
@@ -178,7 +178,7 @@ Subdivide the finite element spaces within a tensor product space and return the
 # Returns
 - `::TensorProductSpace`: The resulting finer tensor product space after subdivision.
 """
-function subdivide_space(space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
+function subdivide_space(space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
     new_spaces = map(subdivide_space, space.fem_spaces, nsubdivisions)
 
     return TensorProductSpace(new_spaces)
@@ -197,8 +197,8 @@ Build a two-scale operator for a tensor product space by subdividing each consti
 - `::TensorProductTwoScaleOperator`: The two-scale operator.
 - `::TensorProductSpace`: The resulting finer tensor product space after subdivision.
 """
-function build_two_scale_operator(space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFiniteElementSpace}}
-    fine_spaces = Vector{AbstractFiniteElementSpace}(undef, num_spaces)
+function build_two_scale_operator(space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+    fine_spaces = Vector{AbstractFESpace}(undef, num_spaces)
     twoscale_operators = Vector{AbstractTwoScaleOperator}(undef, num_spaces)
     for space_id ∈ 1:num_spaces
         twoscale_operators[space_id], fine_spaces[space_id] = build_two_scale_operator(get_space(space, space_id), nsubdivisions[space_id])

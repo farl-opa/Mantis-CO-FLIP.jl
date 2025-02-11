@@ -34,7 +34,7 @@ Retrieve and return the coarse space associated with a two-scale operator.
 - `twoscale_operator::TwoScaleOperator`: The two-scale operator from which to retrieve the coarse space.
 
 # Returns
-- `::AbstractFiniteElementSpace`: The coarse space associated with the two-scale operator.
+- `::AbstractFESpace`: The coarse space associated with the two-scale operator.
 """
 get_coarse_space(twoscale_operator::AbstractTwoScaleOperator) =  twoscale_operator.coarse_space
 
@@ -46,7 +46,7 @@ Retrieve and return the fine space associated with a two-scale operator.
 - `twoscale_operator::TwoScaleOperator`: The two-scale operator from which to retrieve the fine space.
 
 # Returns
-- `::AbstractFiniteElementSpace`: The fine space associated with the two-scale operator.
+- `::AbstractFESpace`: The fine space associated with the two-scale operator.
 """
 get_fine_space(twoscale_operator::AbstractTwoScaleOperator) =  twoscale_operator.fine_space
 

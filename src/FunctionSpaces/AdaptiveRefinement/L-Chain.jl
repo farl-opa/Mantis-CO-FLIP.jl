@@ -146,7 +146,7 @@ function check_nl_intersection(hier_space::HierarchicalFiniteElementSpace{manifo
 end
 
 @doc raw"""
-    _get_basis_pair_graph(max_id_basis, basis_per_dim, diff_basis_per_dim, inactive_basis, n::Int)
+    _get_basis_pair_graph(max_id_basis, basis_per_dim, diff_basis_per_dim, inactive_basis, manifold_dim::Int)
 
 Creates a local graph of active basis functions in the grid determined by pair of basis functions.
 
@@ -156,14 +156,14 @@ Creates a local graph of active basis functions in the grid determined by pair o
 - `basis_per_dim::`: dimension wise indices of the basis function pair.
 - `diff_basis_per_dim::`: dimension wise difference of indices of basis functions pair.
 - `inactive_basis::`: the indices of all deactivated basis in `level`.
-- `n::Int`: dimension of the finite element space.
+- `manifold_dim::Int`: dimension of the finite element space.
 
 # Returns
 
 - `basis_pair_graph::`:  graph of active basis functions.
 """
-function _get_basis_pair_graph(max_id_basis, basis_per_dim, diff_basis_per_dim, inactive_basis, n::Int)
-    basis_between_pair_per_dim = [ordered_range(basis_per_dim[1][k], basis_per_dim[2][k]) for k ∈ 1:n]
+function _get_basis_pair_graph(max_id_basis, basis_per_dim, diff_basis_per_dim, inactive_basis, manifold_dim::Int)
+    basis_between_pair_per_dim = [ordered_range(basis_per_dim[1][k], basis_per_dim[2][k]) for k ∈ 1:manifold_dim]
 
     basis_pair_graph = Graphs.SimpleGraphs.grid(abs.(diff_basis_per_dim) .+ 1)
 

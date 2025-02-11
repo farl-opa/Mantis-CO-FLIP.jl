@@ -1,8 +1,6 @@
 
 """
-    RationalFiniteElementSpace{manifold_dim, num_components, F} <: AbstractFESpace{
-        manifold_dim, num_components
-    }
+    RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
 
 A rational finite element space obtained by dividing all elements of a given function space
 by a fixed element from the same function space. The latter is defined with the help of
@@ -13,19 +11,17 @@ specified weights.
 - `weights::Vector{Float64}`: The weights associated with the basis functions of the
     function space.
 """
-struct RationalFiniteElementSpace{manifold_dim, num_components, F} <: AbstractFESpace{
-    manifold_dim, num_components
-}
+struct RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
     function_space::F
     weights::Vector{Float64}
 
     function RationalFiniteElementSpace(function_space::F, weights::Vector{Float64}) where {
-        manifold_dim, F <: AbstractFESpace{manifold_dim, num_components}
+        manifold_dim, F <: AbstractFESpace{manifold_dim, 1}
     }
         # Ensure that the dimension of the function space matches the length of the weights
         # vector
         @assert get_num_basis(function_space) == length(weights) "Dimension mismatch"
-        new{manifold_dim, num_components, F}(function_space, weights)
+        new{manifold_dim, F}(function_space, weights)
     end
 end
 
@@ -45,7 +41,7 @@ function get_num_basis(rat_space::RationalFiniteElementSpace)
 end
 
 """
-    get_num_basis(rat_space::RationalFiniteElementSpace)
+    get_num_basis(rat_space::RationalFiniteElementSpace, element_id::Int)
 
 Get the number of basis functions of the finite element space `rat_space` for the element
 with index `element_id`.
@@ -57,7 +53,7 @@ with index `element_id`.
 # Returns
 - `::Int`: Number of basis functions
 """
-function get_num_basis(rat_space::RationalFiniteElementSpace)
+function get_num_basis(rat_space::RationalFiniteElementSpace, element_id::Int)
     return get_num_basis(rat_space.function_space, element_id)
 end
 
@@ -129,18 +125,16 @@ end
 
 """
     evaluate(
-        rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
+        rat_space::RationalFiniteElementSpace{manifold_dim, F},
         element_id::Int,
         xi::NTuple{manifold_dim, Vector{Float64}},
         nderivatives::Int
-    ) where {
-        manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}
-    }
+    ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
 
 Evaluates the basis functions and their derivatives for the rational finite element space.
 
 # Arguments
-- `rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F}`: The rational finite
+- `rat_space::RationalFiniteElementSpace{manifold_dim, F}`: The rational finite
     element space.
 - `element_id::Int`: The index of the element.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
@@ -153,13 +147,11 @@ A tuple containing:
 - The basis indices.
 """
 function evaluate(
-    rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
+    rat_space::RationalFiniteElementSpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int
-) where {
-    manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}
-}
+) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
     # Evaluate the basis functions and their derivatives for the underlying function space
     homog_basis, basis_indices = evaluate(
         rat_space.function_space, element_id, xi, nderivatives
@@ -212,11 +204,11 @@ end
 
 """
     get_local_basis(
-        rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
+        rat_space::RationalFiniteElementSpace{manifold_dim, F},
         element_id::Int,
         xi::NTuple{manifold_dim,Vector{Float64}},
         nderivatives::Int) where {
-        manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}}
+        manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
 
 Returns the local basis functions for the rational finite element space.
 
@@ -230,12 +222,12 @@ Returns the local basis functions for the rational finite element space.
 The local basis functions and their derivatives evaluated at the specified coordinates.
 """
 function get_local_basis(
-    rat_space::RationalFiniteElementSpace{manifold_dim, num_components, F},
+    rat_space::RationalFiniteElementSpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim,Vector{Float64}},
     nderivatives::Int
 ) where {
-    manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}
+    manifold_dim, F <: AbstractFESpace{manifold_dim, 1}
 }
 
     return evaluate(rat_space, element_id, xi, nderivatives)[1]

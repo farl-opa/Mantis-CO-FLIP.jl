@@ -10,7 +10,7 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
     component_spaces::F
     component_ordering::NTuple{num_spaces, Vector{Int}}
 
-    function CompositeDirectSumSpace(component_spaces::F, component_ordering::NTuple{num_spaces, Vector{Int}}) where {num_spaces, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
+    function CompositeDirectSumSpace(component_spaces::F, component_ordering::NTuple{num_spaces, Vector{Int}}) where {num_spaces, F <: NTuple{num_spaces, AbstractFESpace}}
         manifold_dim = get_manifold_dim(component_spaces[1])
         num_components = 0
         for space in component_spaces
@@ -30,7 +30,7 @@ struct CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F} <: A
         new{manifold_dim, num_spaces, num_components, F}(component_spaces, component_ordering)
     end
 
-    function CompositeDirectSumSpace(component_spaces::F) where {num_spaces, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
+    function CompositeDirectSumSpace(component_spaces::F) where {num_spaces, F <: NTuple{num_spaces, AbstractFESpace}}
         # number of components per space
         num_components_per_space = zeros(Int, num_spaces)
         for i in eachindex(component_spaces)
@@ -78,7 +78,7 @@ Evaluate the basis functions of the composite direct sum space at the points `xi
     we should follow a flattenned numbering using the indices of the derivatives.
 - `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
 """
-function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, num_components, F <: NTuple{num_spaces, AbstractMultiValuedFiniteElementSpace}}
+function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, num_components, F <: NTuple{num_spaces, AbstractFESpace}}
 
     # get the multi-valued basis indices
     multivalued_basis_indices, component_space_basis_indices = get_basis_indices_w_components(space, element_idx)
