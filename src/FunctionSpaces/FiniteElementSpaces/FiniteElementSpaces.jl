@@ -1,36 +1,90 @@
 
 """
-    get_basis_indices(space::AbstractFESpace, element_id::Int)
+    get_extraction_operator(space::AbstractFESpace)
 
-Get the global indices of the basis functions of the finite element space `space` for the
-element with index `element_id`.
+Returns the extraction operator of the given space.
+
+!!! warning "Not all AbstractFESpaces have an extraction operator."
+    Having an explicitly defined extraction operator in not required for building a finite
+    element space. If such no extraction operator is defined, an error is thrown saying
+    that the type does not have field 'extraction_op'.
 
 # Arguments
-- `space::AbstractFESpace`: Finite element space
-- `element_id::Int`: Index of the element
+- `space::AbstractFESpace`: A finite element space.
 
 # Returns
-- `::Vector{Int}`: Global indices of the basis functions
+- `::ExtractionOperator`: The extraction operator.
+"""
+function get_extraction_operator(space::AbstractFESpace)
+    return space.extraction_op
+end
+
+"""
+    get_extraction(space::AbstractFESpace, element_id::Int)
+
+Returns the extraction coefficients and indices of the supported basis functions on the
+given element. If no extraction operator is defined for `space`, and there is no specific
+`get_extraction` method for `space`, an error is thrown saying that the type does not have
+field 'extraction_op'.
+
+# Arguments
+- `space::AbstractFESpace`: A finite element space.
+- `element_id::Int`: The identifier of the element.
+
+# Returns
+- `::Matrix{Float64}`: The extraction coefficients.
+- `::Vector{Int}`: The (global) basis functions supported on this element.
+"""
+function get_extraction(space::AbstractFESpace, element_id::Int)
+    return get_extraction(get_extraction_operator(space), element_id)
+end
+
+"""
+    get_basis_indices(space::AbstractFESpace, element_id::Int)
+
+Get the global indices of the basis functions of `space` on element `element_id`.
+
+# Arguments
+- `space::AbstractFESpace`: Finite element space.
+- `element_id::Int`: Indendifier of the element.
+
+# Returns
+- `::Vector{Int}`: Global indices of the basis functions.
 """
 function get_basis_indices(space::AbstractFESpace, element_id::Int)
-    return get_basis_indices(space.extraction_op, element_id)
+    return get_basis_indices(get_extraction_operator(space), element_id)
+end
+
+"""
+    get_num_basis(space::AbstractFESpace)
+
+Returns the number of basis functions of the finite element space `space`.
+
+# Arguments
+- `space::AbstractFESpace`: Finite element space.
+
+# Returns
+- `::Int`: Number of basis functions spanning the finite element space.
+"""
+function get_num_basis(space::AbstractFESpace)
+    return get_num_basis(get_extraction_operator(space))
 end
 
 """
     get_num_basis(space::AbstractFESpace, element_id::Int)
 
-Get the number of basis functions of the finite element space `space` for the element with
-index `element_id`.
+Get the number of basis functions of the finite element space `space` supported on element
+`element_id`.
 
 # Arguments
-- `space::AbstractFESpace`: Finite element space
-- `element_id::Int`: Index of the element
+- `space::AbstractFESpace`: Finite element space.
+- `element_id::Int`: Indentifier of the element.
 
 # Returns
-- `::Int`: Number of basis functions
+- `::Int`: Number of basis functions supported on the given element.
 """
 function get_num_basis(space::AbstractFESpace, element_id::Int)
-    return get_num_basis(space.extraction_op, element_id)
+    return get_num_basis(get_extraction_operator(space), element_id)
 end
 
 """
@@ -57,7 +111,7 @@ the evaluation of:
 - of the `k`-th component ...
 - at the `a`-th evaluation point ...
 - for `f₀`.
-See [`_get_derivative_idx(der_key::Vector{Int})`](@ref) for more details on the order in
+See [`get_derivative_idx(der_key::Vector{Int})`](@ref) for more details on the order in
 which all the mixed derivatives of order `i-1` are stored.
 
 # Arguments

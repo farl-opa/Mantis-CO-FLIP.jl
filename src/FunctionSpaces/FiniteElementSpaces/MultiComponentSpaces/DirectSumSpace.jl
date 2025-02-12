@@ -15,17 +15,17 @@ struct DirectSumSpace{manifold_dim, num_components, F} <: AbstractFESpace{manifo
 end
 
 """
-    get_component_spaces(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+    get_component_spaces(space::DirectSumSpace)
 
 Get the component spaces of the direct sum space.
 
 # Arguments
-- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct-sum space
+- `space::DirectSumSpace`: Direct-sum space
 
 # Returns
 - `component_spaces::F`: Tuple of component spaces
 """
-function get_component_spaces(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+function get_component_spaces(space::DirectSumSpace)
     return space.component_spaces
 end
 
@@ -90,45 +90,11 @@ function evaluate(space::DirectSumSpace{manifold_dim, num_components, F}, elemen
     return local_multivalued_basis, multivalued_basis_indices
 end
 
-"""
-    get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F}
+get_num_basis(space::DirectSumSpace) = sum(get_num_basis.(space.component_spaces))
+function get_num_basis(space::DirectSumSpace, element_id::Int)
+    return sum(get_num_basis.(get_component_spaces(space), element_id))
+end
 
-Get the number of basis functions of the direct sum space.
-
-# Arguments
-- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
-
-# Returns
-- `num_basis::Int`: Number of basis functions
-"""
-get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces))
-
-"""
-    get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
-
-Get the number of active basis functions of the direct sum space in element `element_idx`.
-
-# Arguments
-- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
-- `element_idx::Int`: The element where to get the number of active basis.
-
-# Returns
-- `num_basis::Int`: Number of active basis functions in element `element_idx`
-"""
-get_num_basis(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F} = sum(get_num_basis.(space.component_spaces, element_idx))
-
-"""
-    get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
-
-Get the global indices of the basis functions of the direct sum space in the element with index `element_idx`.
-
-# Arguments
-- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
-- `element_idx::Int`: Index of the element
-
-# Returns
-- `basis_indices::Vector{Int}`: Global indices of the basis functions
-"""
 function get_basis_indices(space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int) where {manifold_dim, num_components, F}
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
     dof_offset_component = _get_dof_offsets(space)

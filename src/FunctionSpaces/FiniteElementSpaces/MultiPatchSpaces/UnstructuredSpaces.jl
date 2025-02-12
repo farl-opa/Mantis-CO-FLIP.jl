@@ -52,21 +52,6 @@ struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
 end
 
 """
-    get_num_basis(us_space::UnstructuredSpace)
-
-Get the dimension of the unstructured function space.
-
-# Arguments
-- `us_space::UnstructuredSpace`: The unstructured function space.
-
-# Returns
-- `::Int`: The dimension of the space.
-"""
-function get_num_basis(us_space::UnstructuredSpace)
-    return get_num_basis(us_space.extraction_op)
-end
-
-"""
     get_num_elements(us_space::UnstructuredSpace)
 
 Get the total number of elements for the partition over which the function space is defined.
@@ -121,23 +106,6 @@ Get the degree of freedom partitioning for the unstructured space.
 """
 function get_dof_partition(us_space::UnstructuredSpace)
     return us_space.dof_partition
-end
-
-"""
-    get_extraction(us_space::UnstructuredSpace, element_id::Int)
-
-Get extraction coefficients and global basis indices for the specified global element ID.
-
-# Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
-- `element_id::Int`: The global element ID.
-
-# Returns
-- `extraction_coefficients::Matrix{Float64}`: Extraction coefficients.
-- `basis_indices::Vector{Int}`: Indices of global basis functions.
-"""
-function get_extraction(us_space::UnstructuredSpace, element_id::Int)
-    return get_extraction(us_space.extraction_op, element_id)
 end
 
 """

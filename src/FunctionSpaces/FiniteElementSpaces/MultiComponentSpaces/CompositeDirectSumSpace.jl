@@ -125,45 +125,9 @@ function evaluate(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_c
     return local_multivalued_basis, multivalued_basis_indices
 end
 
-"""
-    get_num_basis(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}) where {manifold_dim, num_spaces, num_components, F}
+get_num_basis(space::CompositeDirectSumSpace) = sum(get_num_basis.(space.component_spaces))
+get_num_basis(space::CompositeDirectSumSpace, element_id::Int) = sum(get_num_basis.(space.component_spaces, element_id))
 
-Get the number of basis functions of the composite direct sum space.
-
-# Arguments
-- `space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}`: Direct sum space
-
-# Returns
-- `num_basis::Int`: Number of basis functions
-"""
-get_num_basis(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}) where {manifold_dim, num_spaces, num_components, F} = sum(get_num_basis.(space.component_spaces))
-
-"""
-    get_num_basis(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int) where {manifold_dim, num_spaces, num_components, F}
-
-Get the number of active basis functions of the composite direct sum space in element `element_idx`.
-
-# Arguments
-- `space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}`: Direct sum space
-- `element_idx::Int`: The element where to get the number of active basis.
-
-# Returns
-- `num_basis::Int`: Number of active basis functions in element `element_idx`
-"""
-get_num_basis(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int) where {manifold_dim, num_spaces, num_components, F} = sum(get_num_basis.(space.component_spaces, element_idx))
-
-"""
-    get_basis_indices(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int) where {manifold_dim, num_spaces, num_components, F}
-
-Get the global indices of the basis functions of the composite direct sum space in the element with index `element_idx`.
-
-# Arguments
-- `space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}`: Direct sum space
-- `element_idx::Int`: Index of the element
-
-# Returns
-- `basis_indices::Vector{Int}`: Global indices of the basis functions for each component space
-"""
 function get_basis_indices(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}, element_idx::Int) where {manifold_dim, num_spaces, num_components, F}
     component_space_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
     num_dofs_per_space = FunctionSpaces.get_num_basis.(space.component_spaces)

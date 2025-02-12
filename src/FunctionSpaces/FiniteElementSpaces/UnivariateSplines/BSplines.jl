@@ -18,47 +18,70 @@ struct BSplineSpace{F} <: AbstractFESpace{1, 1}
     polynomials::F
     dof_partition::Vector{Vector{Vector{Int}}}
 
-    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::F, regularity::Vector{Int}, n_dofs_left::Int, n_dofs_right::Int) where {F <: AbstractCanonicalSpace}
-        # polynomial degree
+    function BSplineSpace(
+        patch_1d::Mesh.Patch1D,
+        polynomials::F,
+        regularity::Vector{Int},
+        n_dofs_left::Int = 1,
+        n_dofs_right::Int = 1,
+    ) where {F <: AbstractCanonicalSpace}
+
         polynomial_degree = get_polynomial_degree(polynomials)
 
-        # Check for errors in the construction
-        if polynomial_degree <0
-            msg1 = "Polynomial degree must be greater or equal than 0."
-            msg2 = " The degree is $(polynomial_degree)."
-            throw(ArgumentError(msg1*msg2))
+        if polynomial_degree < 0
+            throw(ArgumentError("""\
+                The polynomial degree must be greater than or equal to 0, but is \
+                $polynomial_degree.\
+                """
+            ))
         end
 
-        if (size(patch_1d) + 1) != length(regularity)
-            msg1 = "Number of regularity conditions should be equal to the number of breakpoints."
-            msg2 = " You have $(size(patch_1d) + 1) breakpoints and $(length(regularity)) regularity conditions."
-            throw(ArgumentError(msg1 * msg2))
+        num_breakpoints = size(patch_1d) + 1
+        if num_breakpoints != length(regularity)
+            throw(ArgumentError("""\
+                The number of regularity conditions should be equal to the number of \
+                breakpoints, but there are $(num_breakpoints) breakpoints and \
+                $(length(regularity)) regularity conditions.\
+                """
+            ))
         end
 
         for i in eachindex(regularity)
             if polynomial_degree <= regularity[i]
-                msg1 = "Polynomial degree must be greater than regularity."
-                msg2 = " The degree is $polynomial_degree and there is regularity $regularity[i] in index $i."
-                throw(ArgumentError(msg1 * msg2))
+                throw(ArgumentError("""\
+                    The polynomial degree must be greater than the regularity, but the \
+                    polynomial degree is $polynomial_degree and the regularity at index $i \
+                    is $(regularity[i]).\
+                    """
+                ))
+            end
+        end
+
+        for i in eachindex(regularity)
+            if regularity[i] < -1
+                throw(ArgumentError("""\
+                    The minimum regularity is -1 (element-wise discontinuous), but the \
+                    regularity at index $i is $(regularity[i]).\
+                    """
+                ))
             end
         end
 
         if F <: AbstractLagrangePolynomials
             if maximum(regularity) > 0
-                throw(ArgumentError("Smoothness for a piecewise-Lagrange space must be at most C^0."))
+                throw(ArgumentError("""\
+                    The regularity conditions for Lagrange polynomials must be -1 \
+                    (discontinuous) or 0 (C^0 continuous). You have regularity conditions \
+                    $(regularity), which has maximum $(maximum(regularity)).\
+                    """
+                ))
             end
         end
 
-        # Create the knot vector
         knot_vector = create_knot_vector(patch_1d, polynomial_degree, regularity, "regularity")
-
-        # Extract B-spline to local section space
         extraction_op = extract_bspline_to_section_space(knot_vector, polynomials)
-
-        # Get the dimension of the B-spline space
         bspline_dim = get_num_basis(extraction_op)
 
-        # Allocate memory for degree of freedom partitioning for this single patch
         dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
         dof_partition[1] = Vector{Vector{Int}}(undef,3)
         # First, store the left dofs ...
@@ -68,46 +91,22 @@ struct BSplineSpace{F} <: AbstractFESpace{1, 1}
         # ... and then finally the right dofs.
         dof_partition[1][3] = collect(bspline_dim-n_dofs_right+1:bspline_dim)
 
-        # Initialize the BSplineSpace struct
         new{F}(knot_vector, extraction_op, polynomials, dof_partition)
     end
-
-    # constructor with default dof_partitioning
-    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::F, regularity::Vector{Int}) where {F <: AbstractCanonicalSpace}
-        BSplineSpace(patch_1d, polynomials, regularity, 1, 1)
-    end
-
-    # constructor with default polynomials
-    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
-        BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity, 1, 1)
-    end
-
-    # constructor with default internal regularity and dof_partitioning
-    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::F, regularity::Int) where {F <: AbstractCanonicalSpace}
-        BSplineSpace(patch_1d, polynomials, [-1; repeat([regularity],size(patch_1d)-1); -1], 1, 1)
-    end
-
-    # constructor with default internal regularity, polynomials, and dof_partitioning
-    function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Int)
-        BSplineSpace(patch_1d, Bernstein(polynomial_degree), [-1; repeat([regularity],size(patch_1d)-1); -1], 1, 1)
-    end
-
 end
 
-"""
-    get_extraction(bspline::BSplineSpace, element_id::Int)
-
-Returns the supported basis functions of `bspline` on the element specified by `element_id` and their extraction coefficients.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-
-# Returns
-- `::Tuple{Matrix{Float64}, Vector{Int}}`: The extraction coefficients and supported bases.
-"""
-function get_extraction(bspline::BSplineSpace, element_id::Int)
-    return get_extraction(bspline.extraction_op, element_id)
+# Helper functions with classical choices for defaults.
+function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
+    BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity)
+end
+function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::AbstractCanonicalSpace, regularity::Int)
+    # Open knot vector (-1 regularity at the endpoints), given internal regularity.
+    regularity = [-1; repeat([regularity], size(patch_1d)-1); -1]
+    BSplineSpace(patch_1d, polynomials, regularity)
+end
+function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Int)
+    regularity = [-1; repeat([regularity], size(patch_1d)-1); -1]
+    BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity)
 end
 
 """
@@ -177,22 +176,6 @@ Returns the degree of B-splines.
 """
 function get_polynomial_degree(bspline::BSplineSpace, elem_id::Int = 0)
     return get_polynomial_degree(bspline.polynomials)
-end
-
-"""
-    get_num_basis(bspline::BSplineSpace)
-
-Returns the dimension of the univariate function space `bspline`.
-
-# Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
-
-# Returns
-- `::Int`: The dimension of the B-Spline space.
-"""
-function get_num_basis(bspline::BSplineSpace)
-    @assert get_num_basis(bspline.extraction_op) == size(bspline.knot_vector.patch_1d) * (bspline.knot_vector.polynomial_degree + 1) + sum(bspline.knot_vector.multiplicity .- (bspline.knot_vector.polynomial_degree + 1)) "B-spline dimension incorrect."
-    return get_num_basis(bspline.extraction_op)
 end
 
 

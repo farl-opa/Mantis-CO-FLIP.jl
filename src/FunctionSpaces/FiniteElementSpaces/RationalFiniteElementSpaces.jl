@@ -25,51 +25,13 @@ struct RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_d
     end
 end
 
-"""
-    get_num_basis(rat_space::RationalFiniteElementSpace)
-
-Returns the dimension of the rational finite element space.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
-
-# Returns
-The dimension of the rational finite element space.
-"""
 function get_num_basis(rat_space::RationalFiniteElementSpace)
     return get_num_basis(rat_space.function_space)
 end
-
-"""
-    get_num_basis(rat_space::RationalFiniteElementSpace, element_id::Int)
-
-Get the number of basis functions of the finite element space `rat_space` for the element
-with index `element_id`.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace`: Finite element space
-- `element_id::Int`: Index of the element
-
-# Returns
-- `::Int`: Number of basis functions
-"""
 function get_num_basis(rat_space::RationalFiniteElementSpace, element_id::Int)
     return get_num_basis(rat_space.function_space, element_id)
 end
 
-"""
-    get_basis_indices(rat_space::RationalFiniteElementSpace, element_id::Int)
-
-Returns the basis indices supported on the given element for the rational finite element
-space.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
-- `element_id::Int`: The index of the element.
-
-# Returns
-The basis indices supported on the given element for the rational finite element space.
-"""
 function get_basis_indices(rat_space::RationalFiniteElementSpace, element_id::Int)
     return get_basis_indices(rat_space.function_space, element_id)
 end
@@ -233,25 +195,11 @@ function get_local_basis(
     return evaluate(rat_space, element_id, xi, nderivatives)[1]
 end
 
-"""
-    get_extraction(rat_space::RationalFiniteElementSpace, element_id::Int)
-
-Returns the extraction matrix and basis indices for the rational finite element space.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
-- `element_id::Int`: The index of the element.
-
-# Returns
-A tuple containing:
-- The extraction matrix, which is an identity matrix.
-- The basis indices.
-"""
 function get_extraction(rat_space::RationalFiniteElementSpace, element_id::Int)
     # Get the basis indices for the underlying function space
     _, basis_indices = get_extraction(rat_space.function_space, element_id)
     n_supp = length(basis_indices)
-    # Return the extraction matrix and basis indices
+
     return Matrix{Float64}(LinearAlgebra.I, n_supp, n_supp), basis_indices
 end
 

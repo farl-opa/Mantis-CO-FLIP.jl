@@ -87,18 +87,6 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
     return local_multivalued_basis, multivalued_basis_indices
 end
 
-"""
-    get_basis_indices(space::SumSpace, element_idx::Int)
-
-Get the global indices of the basis functions of the sum space in the element with index `element_idx`.
-
-# Arguments
-- `space::SumSpace`: Sum space
-- `element_idx::Int`: Index of the element
-
-# Returns
-- `basis_indices::Vector{Int}`: Global indices of the basis functions
-"""
 function get_basis_indices(space::SumSpace, element_idx::Int)
     component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
 
@@ -124,32 +112,10 @@ function get_basis_indices_w_components(space::SumSpace, element_idx::Int)
     return union(component_basis_indices...), component_basis_indices
 end
 
-"""
-    get_num_basis(space::SumSpace)
-
-Get the number of basis functions of the sum space.
-
-# Arguments
-- `space::SumSpace`: Sum space
-
-# Returns
-- `num_basis::Int`: Number of basis functions
-"""
 get_num_basis(space::SumSpace) = space.space_dim
-
-"""
-    get_num_basis(space::SumSpace, element_id::Int)
-
-Get the number of basis functions of the sum space in the element with index `element_id`.
-
-# Arguments
-- `space::SumSpace`: Sum space
-- `element_id::Int`: Index of the element
-
-# Returns
-- `num_basis::Int`: Number of basis functions
-"""
-get_num_basis(space::SumSpace, element_id::Int) = length(get_basis_indices(space, element_id))
+function get_num_basis(space::SumSpace, element_id::Int)
+    return length(get_basis_indices(space, element_id))
+end
 
 """
     get_max_local_dim(space::SumSpace)

@@ -48,7 +48,7 @@ Creates a uniform knot vector corresponding to B-splines basis functions of poly
 - `breakpoint_condition::Vector{Int}`: Either the regularity or multiplicity of each breakpoint.
 - `condition_type::String`: Determines whether `breakpoint_condition` determines the regularity or multiplicity.
 
-# Returns 
+# Returns
 - `::KnotVector`: Knot vector.
 """
 function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
@@ -63,11 +63,26 @@ function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition
         return KnotVector(patch_1d, p, multiplicity)
     elseif condition_type == "multiplicity"
         return KnotVector(patch_1d, p, breakpoint_condition)
-    else 
+    else
         msg1 = "Allowed breakpoint conditions are `regularity` or `multiplicity`."
         msg2 = " The given condition is $condition_type."
         throw(ArgumentError(msg1*msg2))
     end
+end
+
+"""
+    get_multiplicity(knot_vector::KnotVector)
+
+Returns the multiplicity of each knot in `knot_vector`.
+
+# Arguments
+- `knot_vector::KnotVector`.
+
+# Returns
+- `::Vector{Int}`: Multiplicity of each knot.
+"""
+function get_multiplicity(knot_vector::KnotVector)
+    return knot_vector.multiplicity
 end
 
 """
@@ -152,7 +167,7 @@ end
 """
     get_knot_value(knot_vector::KnotVector, knot_index::Int)
 
-Retrieves the breakpoint corresponding to `knot_vector` at `knot_index`, i.e., the index 
+Retrieves the breakpoint corresponding to `knot_vector` at `knot_index`, i.e., the index
 of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
 
 # Arguments
@@ -170,7 +185,7 @@ end
 """
     get_knot_multiplicity(knot_vector::KnotVector, knot_index::Int)
 
-Retrieves the multiplicity of the breakpoint corresponding to `knot_vector` at `knot_index`, i.e., the index 
+Retrieves the multiplicity of the breakpoint corresponding to `knot_vector` at `knot_index`, i.e., the index
 of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
 
 # Arguments

@@ -174,18 +174,6 @@ function get_space(tp_space::TensorProductSpace, space_id::Int)
     return tp_space.fem_spaces[space_id]
 end
 
-"""
-    get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
-
-Compute and return the basis indices for a specified element within a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace`: The tensor-product space.
-- `element_id::Int`: ID of the element.
-
-# Returns
-- `::Vector{Int}`: Basis indices for the element.
-"""
 function get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
     max_ind_basis = _get_num_basis_per_space(tp_space)
     indices_per_space = _get_basis_indices_per_space(tp_space, element_id)
@@ -201,19 +189,10 @@ function get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
     return basis_indices
 end
 
-"""
-    get_num_basis(tp_space::TensorProductSpace, element_id::Int)
-
-Compute and return the total number of basis functions for a specific element within a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace`: The tensor product space.
-- `element_id::Int`: The identifier of the element.
-
-# Returns
-- `::Int`: The total number of basis functions for the specified element.
-"""
-get_num_basis(tp_space::TensorProductSpace, element_id::Int) = prod(_get_num_basis_per_space(tp_space, element_id))
+get_num_basis(tp_space::TensorProductSpace) = prod(_get_num_basis_per_space(tp_space))
+function get_num_basis(tp_space::TensorProductSpace, element_id::Int)
+    return prod(_get_num_basis_per_space(tp_space, element_id))
+end
 
 """
     get_num_elements(tp_space::TensorProductSpace)
@@ -286,18 +265,6 @@ function get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, e
 end
 
 """
-    get_num_basis(tp_space::TensorProductSpace)
-Compute and return the total number of basis functions in a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace`: The tensor-product space.
-
-# Returns
-- `::Int`: The total number of basis functions in the tensor-product space.
-"""
-get_num_basis(tp_space::TensorProductSpace) = prod(_get_num_basis_per_space(tp_space))
-
-"""
     get_dof_partition(tp_space::TensorProductSpace)
 
 Retrieve and return a copy of the degrees of freedom (DOF) partition for a `TensorProductSpace`.
@@ -349,19 +316,10 @@ function get_support(tp_space::TensorProductSpace, basis_id::Int)
     return support
 end
 
-"""
-    get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int)
-
-Compute and return the extraction coefficients and basis indices for a given element within a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace{manifold_dim, T}`: The tensor-product space.
-- `element_id::Int`: The identifier of the element.
-
-# Returns
-- `::Tuple{Matrix{Float64}, Vector{Int}}`: A tuple containing the extraction coefficients matrix and a vector of basis indices.
-"""
-function get_extraction(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+function get_extraction(
+    tp_space::TensorProductSpace{manifold_dim, T},
+    element_id::Int
+) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
     max_ind_basis = _get_num_basis_per_space(tp_space)
     extraction_per_space = _get_extraction_per_space(tp_space, element_id)
 
@@ -437,7 +395,7 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_
     return local_basis
 end
 
-@doc raw"""
+"""
     evaluate(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
 
 For given global element id `element_id` for a tensor product finite element space, evaluate the local basis functions and return.
@@ -452,7 +410,8 @@ For given global element id `element_id` for a tensor product finite element spa
 - `::Vector{Vector{Matrix{Float64}}}`: array of evaluated global basis and derivatives.
 - `::Vector{Int}`: vector of global basis indices (size: num_funcs).
 
-# See also [`get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
+# Notes
+See also [`get_derivative_idx(der_key::Vector{Int})`] to understand how evaluations are stored
 """
 function evaluate(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
     # Get basis indices for the current element
