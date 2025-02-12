@@ -1,0 +1,64 @@
+
+# TODO Is the pushforward supposed to work for expressions with expression_rank higher than 0? If not, then enforce it.
+#      There should be a vector expression and a vector field.
+@doc raw"""
+    evaluate_pushforward(vfield::Vector{Matrix{Float64}},
+                         jacobian::Array{Float64,3})
+
+Evaluate the pushforward of the vector field at the discrete points where it has been evaluated. The pushforward is the action of the Jacobian of the field on the field itself.
+
+# Arguments
+- `vfield::Vector{Matrix{Float64}}`: The pointwise evaluated vector field to evaluate the pushforward for.
+- `jacobian::Array{Float64,3}`: The Jacobian of the vector field evaluated at the discrete points.
+- `manifold_dim::Int`: The dimension of the embedding manifold.
+
+# Returns
+- `::Vector{Matrix{Float64}}`: The evaluated pushforward of the vector field at the discrete points.
+"""
+function evaluate_pushforward(
+    vfield::Vector{Matrix{Float64}}, jacobian::Array{Float64,3}, manifold_dim::Int
+)
+    image_dim = size(jacobian, 2)
+
+    # Gᵢ: v ↦ Gᵢ(v) = Jᵢⱼvʲ
+    evaluated_pushforward = Vector{Matrix{Float64}}(undef, image_dim)
+    for component in 1:image_dim
+        evaluated_pushforward[component] = @views reduce(
+            +, [vfield[i] .* jacobian[:, component, i] for i in 1:manifold_dim]
+        )
+    end
+
+    return evaluated_pushforward
+end
+
+# TODO Similar thing here. This is a concrete expression. If we make general expressions and combine them, everything becomes simpler.
+"""
+    evaluate_sharp_pushforward(form_expression::AbstractFormExpression{manifold_dim, 1, G},
+                                element_id::Int,
+                                xi::NTuple{manifold_dim, Vector{Float64}})
+                                where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Compute the pushforward of the sharp of a differential 1-form over a specified element of a manifold, converting the form into a vector field. Note that the output vector-field is defined in physical coordinates.
+
+# Arguments
+- `form_expression::AbstractFormExpression{manifold_dim, 1, G}`: An expression representing the 1-form on the manifold.
+- `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point numbers representing the coordinates at which the 1-form is evaluated. Each vector within the tuple corresponds to a dimension of the manifold.
+
+# Returns
+- `sharp_eval::Vector{Matrix{Float64}}`: Each component of the pushed-forward vector, stores the sharp evaluation. The size of each matrix is (number of evaluation points)x(number of basis functions).
+- `sharp_indices::Vector{Vector{Int}}`: Each component of the vector, stores the indices of the evaluated basis functions.
+"""
+function evaluate_sharp_pushforward(
+    form_expression::AbstractFormExpression{manifold_dim,1,expression_rank,G},
+    element_id::Int,
+    xi::NTuple{manifold_dim,Vector{Float64}},
+) where {manifold_dim,expression_rank,G<:Geometry.AbstractGeometry{manifold_dim}}
+    sharp_eval, sharp_indices = evaluate_sharp(form_expression, element_id, xi)
+
+    # dξⁱ ↦ G∘♯ (dξⁱ)
+    jacobian = Geometry.jacobian(form_expression.geometry, element_id, xi)
+    evaluated_pushforward = evaluate_pushforward(sharp_eval, jacobian, manifold_dim)
+
+    return evaluated_pushforward, sharp_indices
+end
