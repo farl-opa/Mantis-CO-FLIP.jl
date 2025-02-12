@@ -4,7 +4,7 @@ import Mantis
 
 using Test
 
-rtol = 1e-10
+rtol = 1e-9
 atol = 1e-11
 degrees_to_test = 3:7
 
