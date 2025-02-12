@@ -1,3 +1,5 @@
+import LinearAlgebra, ToeplitzMatrices
+
 @doc raw"""
     struct GeneralizedTrigonometric <: AbstractECTSpaces
 
@@ -58,6 +60,15 @@ end
 
 function _evaluate(gtrig::GeneralizedTrigonometric, xi::Float64, nderivatives::Int)
     M = zeros(Float64, 1, gtrig.p+1, nderivatives+1)
+
+    left = false
+    right = false
+    if xi < gtrig.endpoint_tol
+        left = true
+    elseif xi > 1.0 - gtrig.endpoint_tol
+        right = true
+    end
+
     # scale the point to lie in the interval [0, l]
     xi = gtrig.l * xi
     if gtrig.t
@@ -93,6 +104,13 @@ function _evaluate(gtrig::GeneralizedTrigonometric, xi::Float64, nderivatives::I
             M[1, :, r+1] = gtrig.C[:,k+1:end] * E * (gtrig.l^r)
         end
     end
+
+    if left
+        M[1, :, :] = LinearAlgebra.triu(M[1, :, :])
+    elseif right
+        M[1, :, :] = LinearAlgebra.triu!(M[1, end:-1:1, :])[end:-1:1, :]
+    end
+
     return M
 end
 
@@ -130,8 +148,6 @@ Build representation matrix for Generalized Trignometric section space of degree
 # Returns:
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
-
-import LinearAlgebra, ToeplitzMatrices
 
 function gtrig_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
 

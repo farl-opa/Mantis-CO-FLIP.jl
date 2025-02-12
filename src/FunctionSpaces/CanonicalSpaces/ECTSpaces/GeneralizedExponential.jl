@@ -58,6 +58,15 @@ end
 
 function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
     M = zeros(Float64, 1, gexp.p+1, nderivatives+1)
+
+    left = false
+    right = false
+    if xi < gexp.endpoint_tol
+        left = true
+    elseif xi > 1.0 - gexp.endpoint_tol
+        right = true
+    end
+
     # scale the point to lie in the interval [0, l]
     xi = gexp.l * xi
     if gexp.t
@@ -82,6 +91,13 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
             M[1, :, r+1] = gexp.C[:,k+1:end] * E * (gexp.l^r)
         end
     end
+
+    if left
+        M[1, :, :] = LinearAlgebra.triu(M[1, :, :])
+    elseif right
+        M[1, :, :] = LinearAlgebra.triu!(M[1, end:-1:1, :])[end:-1:1, :]
+    end
+
     return M
 end
 
