@@ -1,5 +1,3 @@
-include("HelperFunctions.jl")
-
 
 """
     get_basis_indices(space::AbstractFESpace, element_id::Int)
@@ -233,8 +231,7 @@ function _compute_parametric_geometry_coeffs(fem_space::F) where {
 end
 
 
-# AbstractFESpace: Common functionality accross FEM spaces
-#include("AbstractFESpace.jl")
+include("FiniteElementSpacesHelpers.jl")
 # Extraction operator: functionaly for extraction operator
 include("ExtractionOperator.jl")
 # rational version of finite element spaces

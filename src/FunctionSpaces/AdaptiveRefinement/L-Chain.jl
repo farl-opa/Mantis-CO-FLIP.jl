@@ -3,9 +3,6 @@ Algorithms related with L-chain creation.
 
 """
 
-using Combinatorics
-using Graphs
-
 function proper_range(start::Int, finish::Int)
     if start>finish
         return range(start, finish, step=:(-1))

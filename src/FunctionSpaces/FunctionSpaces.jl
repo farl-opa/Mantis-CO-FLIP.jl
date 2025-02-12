@@ -7,6 +7,7 @@ module FunctionSpaces
 import .. Mesh
 
 import Combinatorics
+import Graphs
 import LinearAlgebra
 import Memoization
 import PolynomialBases
