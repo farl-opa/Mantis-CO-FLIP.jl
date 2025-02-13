@@ -108,10 +108,6 @@ function get_max_local_dim(hier_space::HierarchicalFiniteElementSpace)
     return get_max_local_dim(hier_space.spaces[1])*2
 end
 
-function get_dof_partition(hier_space::HierarchicalFiniteElementSpace)
-    return hier_space.dof_partition
-end
-
 function get_element_level(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
     return get_level(hier_space.active_elements, hier_id)
 end

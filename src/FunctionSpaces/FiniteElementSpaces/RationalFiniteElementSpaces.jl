@@ -70,17 +70,6 @@ function get_polynomial_degree(rat_space::RationalFiniteElementSpace, element_id
     return get_polynomial_degree(rat_space.function_space, element_id)
 end
 
-"""
-    get_dof_partition(space::RationalFiniteElementSpace)
-
-Get the partition of degrees of freedom for the rational finite element space.
-
-# Arguments
-- `space::RationalFiniteElementSpace`: The rational finite element space.
-
-# Returns
-The partition of degrees of freedom.
-"""
 function get_dof_partition(space::RationalFiniteElementSpace)
     return get_dof_partition(space.function_space)
 end

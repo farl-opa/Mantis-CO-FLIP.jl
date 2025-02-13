@@ -94,21 +94,6 @@ function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
 end
 
 """
-    get_dof_partition(us_space::UnstructuredSpace)
-
-Get the degree of freedom partitioning for the unstructured space.
-
-# Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
-
-# Returns
-- `::Vector{Vector{Vector{Int}}}`: The degree of freedom partitioning.
-"""
-function get_dof_partition(us_space::UnstructuredSpace)
-    return us_space.dof_partition
-end
-
-"""
     get_space_id(us_space::UnstructuredSpace, element_id::Int)
 
 Get the ID of the constituent space to which the specified element belongs.
@@ -137,21 +122,6 @@ Get the maximum local dimension across all constituent function spaces.
 """
 function get_max_local_dim(us_space::UnstructuredSpace)
     return maximum(get_max_local_dim.(us_space.function_spaces))
-end
-
-"""
-    get_dof_partition(us_space::UnstructuredSpace{1,m}) where {m}
-
-Get the dof partitioning for a 1D unstructured space.
-
-# Arguments
-- `us_space::UnstructuredSpace{1,m}`: The 1D unstructured space.
-
-# Returns
-- `::Vector{Vector{Int}}`: The dof partition.
-"""
-function get_dof_partition(us_space::UnstructuredSpace{1,m}) where {m}
-    return us_space.dof_partition
 end
 
 """

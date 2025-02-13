@@ -305,21 +305,6 @@ function get_greville_points(bspline::BSplineSpace)
 end
 
 """
-    get_dof_partition(bspline::BSplineSpace)
-
-Get the partition of degrees of freedom for the B-spline space
-
-# Arguments
-- `bspline::BSplineSpace`: The B-spline space.
-
-# Returns
-The partition of degrees of freedom.
-"""
-function get_dof_partition(bspline::BSplineSpace)
-    return bspline.dof_partition
-end
-
-"""
     assemble_global_extraction_matrix(bsplines::BSplineSpace)
 
 Loops over all elements and assembles the global extraction matrix for the B-spline space. The extraction matrix is a sparse matrix that maps the local basis functions to the global basis functions.

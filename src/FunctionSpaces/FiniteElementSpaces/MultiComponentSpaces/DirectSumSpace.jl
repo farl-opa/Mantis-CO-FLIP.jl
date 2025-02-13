@@ -159,18 +159,20 @@ function get_max_local_dim(space::DirectSumSpace{manifold_dim, num_components, F
 end
 
 """
-    get_component_dof_partition(space::DirectSumSpace{manifold_dim, num_components, F}, component_idx::Int) where {manifold_dim, num_components, F}
+    get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
 
-Get the partition of the degrees of freedom of the direct sum space; all the indices in the partition are offsetted by the corresponding component offset.
+Get the d.o.f. partition the component of `space` with `component_idx`. The d.o.f.s are
+offsetted by the (cumulative) dimension(s) of preceding section spaces.
 
 # Arguments
-- `space::DirectSumSpace{manifold_dim, num_components, F}`: Direct sum space
-- `component_idx::Int`: Index of the component space
+- `space::DirectSumSpace`: Direct sum space.
+- `component_idx::Int`: Index of the component space.
 
 # Returns
-- `component_dof_partition::Vector{Vector{Int}}`: Partition of the degrees of freedom of the component space
+- `component_dof_partition::Vector{Vector{Vector{Int}}}`: D.o.f. Partition the component
+    space.
 """
-function get_component_dof_partition(space::DirectSumSpace{manifold_dim, num_components, F}, component_idx::Int) where {manifold_dim, num_components, F}
+function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
     component_dof_partition = deepcopy(get_dof_partition(space.component_spaces[component_idx]))
     dof_offset_component = _get_dof_offsets(space)[component_idx]
     for i in eachindex(component_dof_partition)

@@ -88,6 +88,23 @@ function get_num_basis(space::AbstractFESpace, element_id::Int)
 end
 
 """
+    get_dof_partition(space::AbstractFESpace{manifold_dim, 1}) where {manifold_dim}
+
+Retrieve and return the degrees of freedom (d.o.f.s) partition for `space`.
+
+# Arguments
+- `space::AbstractFESpace{manifold_dim, 1}`: Single-component finite element space.
+
+# Returns
+- `::Vector{Vector{Vector{Int}}}`: Nested d.o.f. partition. The first level of nesting
+    corresponds to the patch. The second level corresponds to the division (see ... for its
+    definition). The third level corresponds to the individual d.o.f.s.
+"""
+function get_dof_partition(space::AbstractFESpace{manifold_dim, 1}) where {manifold_dim}
+    return space.dof_partition
+end
+
+"""
     evaluate(
         space::AbstractFESpace{manifold_dim, num_components},
         element_id::Int,

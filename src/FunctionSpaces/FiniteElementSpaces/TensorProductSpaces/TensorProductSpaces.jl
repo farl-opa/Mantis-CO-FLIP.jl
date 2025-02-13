@@ -265,19 +265,6 @@ function get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, e
 end
 
 """
-    get_dof_partition(tp_space::TensorProductSpace)
-
-Retrieve and return a copy of the degrees of freedom (DOF) partition for a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace`: The tensor-product space.
-
-# Returns
-- `::Vector{Vector{Vector{Int}}}`: A nested vector structure containing the DOF partition of the tensor-product space.
-"""
-get_dof_partition(tp_space::TensorProductSpace) = copy(tp_space.dof_partition)
-
-"""
     get_max_local_dim(tp_space::TensorProductSpace)
 
 Compute and return an estimate of the maximum local dimension for a `TensorProductSpace`.
