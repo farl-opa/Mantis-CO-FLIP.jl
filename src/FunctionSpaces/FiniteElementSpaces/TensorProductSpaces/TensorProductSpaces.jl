@@ -174,9 +174,9 @@ function get_space(tp_space::TensorProductSpace, space_id::Int)
     return tp_space.fem_spaces[space_id]
 end
 
-function get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
-    max_ind_basis = _get_num_basis_per_space(tp_space)
-    indices_per_space = _get_basis_indices_per_space(tp_space, element_id)
+function get_basis_indices(space::TensorProductSpace, element_id::Int)
+    max_ind_basis = _get_num_basis_per_space(space)
+    indices_per_space = _get_basis_indices_per_space(space, element_id)
 
     # Compute basis indices
     basis_indices = Vector{Int}(undef, prod(map(length, indices_per_space)))
@@ -189,9 +189,9 @@ function get_basis_indices(tp_space::TensorProductSpace, element_id::Int)
     return basis_indices
 end
 
-get_num_basis(tp_space::TensorProductSpace) = prod(_get_num_basis_per_space(tp_space))
-function get_num_basis(tp_space::TensorProductSpace, element_id::Int)
-    return prod(_get_num_basis_per_space(tp_space, element_id))
+get_num_basis(space::TensorProductSpace) = prod(_get_num_basis_per_space(space))
+function get_num_basis(space::TensorProductSpace, element_id::Int)
+    return prod(_get_num_basis_per_space(space, element_id))
 end
 
 """
@@ -304,11 +304,11 @@ function get_support(tp_space::TensorProductSpace, basis_id::Int)
 end
 
 function get_extraction(
-    tp_space::TensorProductSpace{manifold_dim, T},
+    space::TensorProductSpace{manifold_dim, T},
     element_id::Int
 ) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
-    max_ind_basis = _get_num_basis_per_space(tp_space)
-    extraction_per_space = _get_extraction_per_space(tp_space, element_id)
+    max_ind_basis = _get_num_basis_per_space(space)
+    extraction_per_space = _get_extraction_per_space(space, element_id)
 
     # Compute Kronecker product of extraction coefficients
     extraction_coeffs = kron((extraction_per_space[num_spaces-i+1][1] for i ∈ 1:num_spaces)...)

@@ -25,15 +25,15 @@ struct RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_d
     end
 end
 
-function get_num_basis(rat_space::RationalFiniteElementSpace)
-    return get_num_basis(rat_space.function_space)
+function get_num_basis(space::RationalFiniteElementSpace)
+    return get_num_basis(space.function_space)
 end
-function get_num_basis(rat_space::RationalFiniteElementSpace, element_id::Int)
-    return get_num_basis(rat_space.function_space, element_id)
+function get_num_basis(space::RationalFiniteElementSpace, element_id::Int)
+    return get_num_basis(space.function_space, element_id)
 end
 
-function get_basis_indices(rat_space::RationalFiniteElementSpace, element_id::Int)
-    return get_basis_indices(rat_space.function_space, element_id)
+function get_basis_indices(space::RationalFiniteElementSpace, element_id::Int)
+    return get_basis_indices(space.function_space, element_id)
 end
 
 """
@@ -184,9 +184,9 @@ function get_local_basis(
     return evaluate(rat_space, element_id, xi, nderivatives)[1]
 end
 
-function get_extraction(rat_space::RationalFiniteElementSpace, element_id::Int)
+function get_extraction(space::RationalFiniteElementSpace, element_id::Int)
     # Get the basis indices for the underlying function space
-    _, basis_indices = get_extraction(rat_space.function_space, element_id)
+    _, basis_indices = get_extraction(space.function_space, element_id)
     n_supp = length(basis_indices)
 
     return Matrix{Float64}(LinearAlgebra.I, n_supp, n_supp), basis_indices

@@ -100,8 +100,8 @@ function get_num_elements(hier_space::HierarchicalFiniteElementSpace)
     return get_num_objects(hier_space.active_elements)
 end
 
-function get_num_basis(hier_space::HierarchicalFiniteElementSpace)
-    return get_num_objects(hier_space.active_basis)
+function get_num_basis(space::HierarchicalFiniteElementSpace)
+    return get_num_objects(space.active_basis)
 end
 
 function get_max_local_dim(hier_space::HierarchicalFiniteElementSpace)
@@ -480,17 +480,17 @@ function get_local_basis(hier_space::HierarchicalFiniteElementSpace{manifold_dim
     return get_local_basis(get_space(hier_space, element_level), element_level_id, xi, nderivatives)
 end
 
-function get_extraction(hier_space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int) where {manifold_dim, S<:AbstractFESpace{manifold_dim, 1}, T<:AbstractTwoScaleOperator}
-    if hier_space.multilevel_elements[hier_id] == 0
-        element_level, element_level_id = convert_to_element_level_and_level_id(hier_space, hier_id)
-        coeffs, basis_level_ids = get_extraction(get_space(hier_space, element_level), element_level_id)
+function get_extraction(space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int) where {manifold_dim, S<:AbstractFESpace{manifold_dim, 1}, T<:AbstractTwoScaleOperator}
+    if space.multilevel_elements[hier_id] == 0
+        element_level, element_level_id = convert_to_element_level_and_level_id(space, hier_id)
+        coeffs, basis_level_ids = get_extraction(get_space(space, element_level), element_level_id)
 
         # Convert level space basis indices to hierarchical space basis indices
-        basis_indices = convert_to_basis_hier_id.(Ref(hier_space), Ref(element_level), basis_level_ids)
+        basis_indices = convert_to_basis_hier_id.(Ref(space), Ref(element_level), basis_level_ids)
     else
-        multilevel_id = hier_space.multilevel_elements[hier_id]
-        coeffs = hier_space.multilevel_extraction_coeffs[multilevel_id]
-        basis_indices = hier_space.multilevel_basis_indices[multilevel_id]
+        multilevel_id = space.multilevel_elements[hier_id]
+        coeffs = space.multilevel_extraction_coeffs[multilevel_id]
+        basis_indices = space.multilevel_basis_indices[multilevel_id]
     end
 
     return coeffs, basis_indices
