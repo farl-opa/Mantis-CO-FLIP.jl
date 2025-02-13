@@ -1,9 +1,43 @@
 using Documenter
 using DocumenterCitations
 using Mantis
+using Literate
+
+# Generate the notebooks and example pages based on the .jl files in Mantis/examples/src.
+# This generation ensures that the examples are up-to-date with the latest version of
+# MANTIS.
+mantis_dir = dirname(dirname(pathof(Mantis)))
+examples_dir = joinpath(mantis_dir, "examples", "src")
+
+example_names = String[]
+for example in readdir(examples_dir)
+
+    if endswith(example, ".jl")
+        path_to_example = joinpath(examples_dir, example)
+
+        push!(example_names, example[1:end-3])  # Remove the file extension from the name.
+
+        Literate.notebook(
+            path_to_example,
+            joinpath(mantis_dir, "examples", "notebooks"),
+        )
+
+        Literate.markdown(
+            path_to_example,
+            joinpath(mantis_dir, "docs", "src", "Examples"),
+            flavor = Literate.DocumenterFlavor(),
+        )
+    end
+end
+
 
 Manual = [
     "Manual/InstallGuide.md",
+]
+
+Examples = [
+    "Examples/Introduction.md",
+    map(example_name -> "Examples/$example_name.md", example_names)...,
 ]
 
 Tutorials = [
@@ -33,6 +67,7 @@ DevelDocs = [
 Pages = [
     "index.md",
     "Manual" => Manual,
+    "Examples" => Examples,
     "Tutorials" => Tutorials,
     "Developer Documentation" => DevelDocs,
 ]
