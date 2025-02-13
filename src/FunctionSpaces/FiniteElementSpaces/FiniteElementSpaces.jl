@@ -105,6 +105,22 @@ function get_dof_partition(space::AbstractFESpace{manifold_dim, 1}) where {manif
 end
 
 """
+    get_max_local_dim(space::AbstractFESpace)
+
+Compute an upper bound of the element-local dimension of `space`. Note that this is not
+necessarily a tight upper bound.
+
+# Arguments
+- `space::AbstractFESpace`: A finite element space.
+
+# Returns
+- `::Int`: The element-local upper bound.
+"""
+function get_max_local_dim(space::AbstractFESpace)
+    error("get_max_local_dim not implemented for $(typeof(space))")
+end
+
+"""
     evaluate(
         space::AbstractFESpace{manifold_dim, num_components},
         element_id::Int,

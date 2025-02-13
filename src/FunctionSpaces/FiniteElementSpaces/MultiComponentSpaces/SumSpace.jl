@@ -117,20 +117,11 @@ function get_num_basis(space::SumSpace, element_id::Int)
     return length(get_basis_indices(space, element_id))
 end
 
-"""
-    get_max_local_dim(space::SumSpace)
-
-Get the maximum local dimension of the sum space.
-
-# Arguments
-- `space::SumSpace{manifold_dim, num_components, F}`: Sum space
-
-# Returns
-- `max_local_dim::Int`: Maximum local dimension
-"""
 function get_max_local_dim(space::SumSpace)
     max_local_dim = 0
-    # a very conservative estimate, because otherwise we need to loop over all elements, check the unions of all active basis functions, and return the length of the largest union
+    # A very conservative estimate, because otherwise we need to loop over all elements,
+    # check the unions of all active basis functions, and return the length of the largest
+    # union.
     for space in space.component_spaces
         max_local_dim += max(max_local_dim, get_max_local_dim(space))
     end

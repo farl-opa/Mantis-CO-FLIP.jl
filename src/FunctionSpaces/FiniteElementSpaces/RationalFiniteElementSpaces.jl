@@ -138,19 +138,8 @@ function evaluate(
     return homog_basis, basis_indices
 end
 
-"""
-    get_max_local_dim(rat_space::RationalFiniteElementSpace)
-
-Returns the maximum local dimension of the rational finite element space.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
-
-# Returns
-The maximum local dimension of the rational finite element space.
-"""
-function get_max_local_dim(rat_space::RationalFiniteElementSpace)
-    return get_max_local_dim(rat_space.function_space)
+function get_max_local_dim(space::RationalFiniteElementSpace)
+    return get_max_local_dim(space.function_space)
 end
 
 """

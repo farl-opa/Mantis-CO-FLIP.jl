@@ -264,18 +264,9 @@ function get_element_dimensions(tp_space::TensorProductSpace{manifold_dim, T}, e
     return tuple(element_dimensions...)::NTuple{manifold_dim, Float64}
 end
 
-"""
-    get_max_local_dim(tp_space::TensorProductSpace)
-
-Compute and return an estimate of the maximum local dimension for a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace`: The tensor-product space.
-
-# Returns
-- `::Int`: The estimate of the maximum local dimension of the tensor-product space.
-"""
-get_max_local_dim(tp_space::TensorProductSpace) = prod(map(get_max_local_dim, tp_space.fem_spaces))
+function get_max_local_dim(space::TensorProductSpace)
+    return prod(map(get_max_local_dim, space.fem_spaces))
+end
 
 """
     get_support(tp_space::TensorProductSpace, basis_id::Int) -> Vector{Int}

@@ -104,8 +104,8 @@ function get_num_basis(space::HierarchicalFiniteElementSpace)
     return get_num_objects(space.active_basis)
 end
 
-function get_max_local_dim(hier_space::HierarchicalFiniteElementSpace)
-    return get_max_local_dim(hier_space.spaces[1])*2
+function get_max_local_dim(space::HierarchicalFiniteElementSpace)
+    return get_max_local_dim(space.spaces[1])*2
 end
 
 function get_element_level(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)

@@ -159,18 +159,7 @@ function get_basis_indices_w_components(space::CompositeDirectSumSpace{manifold_
     return vcat(map(.+, component_space_basis_indices, dof_offset_per_space)...), component_space_basis_indices
 end
 
-"""
-    get_max_local_dim(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}) where {manifold_dim, num_spaces, num_components, F}
-
-Get the maximum local dimension of the composite direct sum space.
-
-# Arguments
-- `space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}`: composite direct sum space.
-
-# Returns
-- `max_local_dim::Int`: Maximum local dimension
-"""
-function get_max_local_dim(space::CompositeDirectSumSpace{manifold_dim, num_spaces, num_components, F}) where {manifold_dim, num_spaces, num_components, F}
+function get_max_local_dim(space::CompositeDirectSumSpace)
     max_local_dim = 0
     for space in space.component_spaces
         max_local_dim += get_max_local_dim(space)

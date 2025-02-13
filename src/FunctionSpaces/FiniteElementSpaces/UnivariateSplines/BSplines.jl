@@ -296,8 +296,8 @@ function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)
     return KnotVector(Mesh.Patch1D(breakpoints), deg, multiplicity)
 end
 
-function get_max_local_dim(bspline::BSplineSpace)
-    return bspline.knot_vector.polynomial_degree + 1
+function get_max_local_dim(space::BSplineSpace)
+    return space.knot_vector.polynomial_degree + 1
 end
 
 function get_greville_points(bspline::BSplineSpace)

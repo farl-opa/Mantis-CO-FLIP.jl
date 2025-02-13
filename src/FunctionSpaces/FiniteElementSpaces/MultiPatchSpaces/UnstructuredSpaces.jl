@@ -109,19 +109,8 @@ function get_space_id(us_space::UnstructuredSpace, element_id::Int)
     return findlast(us_space.us_config["patch_nels"] .< element_id)
 end
 
-"""
-    get_max_local_dim(us_space::UnstructuredSpace)
-
-Get the maximum local dimension across all constituent function spaces.
-
-# Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
-
-# Returns
-- `::Int`: The maximum local dimension.
-"""
-function get_max_local_dim(us_space::UnstructuredSpace)
-    return maximum(get_max_local_dim.(us_space.function_spaces))
+function get_max_local_dim(space::UnstructuredSpace)
+    return maximum(get_max_local_dim.(space.function_spaces))
 end
 
 """
