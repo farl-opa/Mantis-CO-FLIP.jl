@@ -2,11 +2,12 @@
     struct GeneralizedExponential <: AbstractECTSpaces
 
 Concrete type for Generalized Exponential section space spanned by `<1, x, ..., x^(p-2),
-exp(wx), exp(-wx)>`, equivalently `<1, x, ..., x^(p-2), cosh(wx), sinh(wx)>`, on `[0,1]`.
+exp(wx), exp(-wx)>`, equivalently `<1, x, ..., x^(p-2), cosh(wx), sinh(wx)>`, on `[0,l]`.
 
 # Fields
 - `p::Int`: Degree of the space.
 - `w::Float64`: Weight parameter for the space.
+- `l::Float64`: Length of the interval. GExp space is not scale-invariant.
 - `t::Bool`: flag to indicate if critical length is exceeded.
 - `m::Int`: number of terms from the infinite sum used to build the basis.
 - `C::Matrix{Float64}`: representation matrix for the local basis.
@@ -109,8 +110,6 @@ Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
 # Arguments
 - `gexp::GeneralizedExponential`:  Generalized Exponential section space.
 - `xi::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
-
-See also [`evaluate(gexp::GeneralizedExponential, xi::Vector{Float64}, nderivatives::Int64)`](@ref).
 """
 function evaluate(gexp::GeneralizedExponential, xi::Vector{Float64})
     return evaluate(gexp, xi, 0)
@@ -123,7 +122,8 @@ end
 @doc raw"""
     gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
 
-Build representation matrix for Generalized Exponential section space of degree `p`, weight `w` and `m` terms.
+Build representation matrix for Generalized Exponential section space of degree `p`, weight
+`w`, and length `l`.
 
 # Arguments
 - `p::Int`: Degree of the space.
@@ -210,14 +210,15 @@ end
 """
     get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
 
-For number of sub-elements which is powers of 2, bisect the canonical space by dividing the weight in half for each power.
+For number of sub-elements which is powers of 2, bisect the canonical space by dividing the
+length in half for each power.
 
 # Arguments
 - `ect_space::GeneralizedExponential`: A ect space.
 - `num_sub_elements::Int`: Number of sub-elements to be created.
 
 # Returns
-- `::GeneralizedExponential`: A ect space with the subdivided weight.
+- `::GeneralizedExponential`: A ect space with the subdivided length.
 """
 function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
     num_ref = log2(num_sub_elements)
