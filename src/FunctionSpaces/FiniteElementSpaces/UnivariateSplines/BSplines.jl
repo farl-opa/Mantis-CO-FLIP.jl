@@ -124,40 +124,13 @@ function get_polynomials(bspline::BSplineSpace)
     return bspline.polynomials
 end
 
-"""
-    get_local_basis(bspline::BSplineSpace, element_id::Int, xi::Vector{Float64}, nderivatives::Int)
 
-Compute the local basis functions and their derivatives for a B-spline element.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::Vector{Float64}`: Evaluation points.
-- `nderivatives::Int`: Number of derivatives to compute.
-
-# Returns
-- `::Matrix{Float64}`: Local basis functions and their derivatives.
-"""
-function get_local_basis(bspline::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
-    return evaluate(bspline.polynomials, xi, nderivatives)
+function get_local_basis(space::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
+    return evaluate(get_polynomials(space), xi, nderivatives)
 end
 
-"""
-    get_local_basis(bspline::BSplineSpace, element_id::Int, xi::NTuple{1, Vector{Float64}}, nderivatives::Int)
-
-Compute the local basis functions and their derivatives for a B-spline element.
-
-# Arguments
-- `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `element_id::Int`: The id of the element.
-- `xi::NTuple{1, Vector{Float64}}`: Evaluation points.
-- `nderivatives::Int`: Number of derivatives to compute.
-
-# Returns
-- `::Matrix{Float64}`: Local basis functions and their derivatives.
-"""
-function get_local_basis(bspline::BSplineSpace, element_id::Int, xi::NTuple{1, Vector{Float64}}, nderivatives::Int)
-    return get_local_basis(bspline, element_id, xi[1], nderivatives)
+function get_local_basis(space::BSplineSpace, element_id::Int, xi::NTuple{1, Vector{Float64}}, nderivatives::Int)
+    return get_local_basis(space, element_id, xi[1], nderivatives)
 end
 
 
@@ -175,7 +148,7 @@ Returns the degree of B-splines.
 - `polynomial_degree`: Polynomial degree.
 """
 function get_polynomial_degree(bspline::BSplineSpace, elem_id::Int = 0)
-    return get_polynomial_degree(bspline.polynomials)
+    return get_polynomial_degree(get_polynomials(bspline))
 end
 
 
@@ -209,17 +182,6 @@ function get_multiplicity_vector(bspline::BSplineSpace)
     return bspline.knot_vector.multiplicity
 end
 
-"""
-    get_num_elements(bspline::BSplineSpace)
-
-Returns the number of elements in the underlying partition.
-
-# Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
-
-# Returns
-- `::Int`: The number of elements.
-"""
 function get_num_elements(bspline::BSplineSpace)
     return size(bspline.knot_vector.patch_1d)
 end
@@ -321,7 +283,7 @@ function assemble_global_extraction_matrix(bspline::BSplineSpace)
     # Number of elements
     nel = get_num_elements(bspline)
     # Number of local basis functions
-    num_local_basis = (get_polynomial_degree(bspline.polynomials) + 1) .* ones(Int, nel)
+    num_local_basis = (get_polynomial_degree(get_polynomials(bspline)) + 1) .* ones(Int, nel)
     num_local_basis_offset = cumsum([0; num_local_basis])
     # Initialize the global extraction matrix
     global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)
@@ -341,20 +303,20 @@ function assemble_global_extraction_matrix(bspline::BSplineSpace)
 end
 
 """
-    get_derivative_space(bspline::BSplineSpace{F}) where {F <: AbstractCanonicalSpace}
+    get_derivative_space(bspline::BSplineSpace)
 
 Returns the derivative space of the B-spline space.
 
 # Arguments
-- `bspline::BSplineSpace{F}`: The B-spline space.
+- `bspline::BSplineSpace`: The B-spline space.
 
 # Returns
-- `::BSplineSpace{F}`: The derivative space.
+- `::BSplineSpace`: The derivative space.
 """
-function get_derivative_space(bspline::BSplineSpace{F}) where {F <: AbstractCanonicalSpace}
+function get_derivative_space(bspline::BSplineSpace)
     # polynomial degree of derivative space
     p = get_polynomial_degree(bspline)
-    dpolynomials = get_derivative_space(bspline.polynomials)
+    dpolynomials = get_derivative_space(get_polynomials(bspline))
 
     # modified left and right dof-partitioning
     dof_partition = get_dof_partition(bspline)

@@ -474,10 +474,10 @@ end
 
 # Extraction method for hierarchical space
 
-function get_local_basis(hier_space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, S<:AbstractFESpace{manifold_dim, 1}, T<:AbstractTwoScaleOperator}
-    element_level, element_level_id = convert_to_element_level_and_level_id(hier_space, hier_id)
+function get_local_basis(space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, S<:AbstractFESpace{manifold_dim, 1}, T<:AbstractTwoScaleOperator}
+    element_level, element_level_id = convert_to_element_level_and_level_id(space, hier_id)
 
-    return get_local_basis(get_space(hier_space, element_level), element_level_id, xi, nderivatives)
+    return get_local_basis(get_space(space, element_level), element_level_id, xi, nderivatives)
 end
 
 function get_extraction(space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int) where {manifold_dim, S<:AbstractFESpace{manifold_dim, 1}, T<:AbstractTwoScaleOperator}

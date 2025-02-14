@@ -51,21 +51,6 @@ struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
     end
 end
 
-"""
-    get_num_elements(us_space::UnstructuredSpace)
-
-Get the total number of elements for the partition over which the function space is defined.
-
-# Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
-
-# Returns
-- `::Int`: Total number of elements.
-"""
-function get_num_elements(us_space::UnstructuredSpace)
-    return get_num_elements(us_space.extraction_op)
-end
-
 function get_element_dimensions(us_space::UnstructuredSpace, element_id::Int)
     # Find the space ID and local element ID
     space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
@@ -113,27 +98,11 @@ function get_max_local_dim(space::UnstructuredSpace)
     return maximum(get_max_local_dim.(space.function_spaces))
 end
 
-"""
-    get_local_basis(us_space::UnstructuredSpace{manifold_dim, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim,m}
+function get_local_basis(space::UnstructuredSpace{manifold_dim, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, m}
+    # We need space ID and local element ID to know which function space to evaluate.
+    space_id, space_element_id = get_local_space_and_element_id(space, element_id)
 
-Evaluate the local basis functions for a given element in the unstructured space.
-
-# Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
-- `element_id::Int`: The global element ID.
-- `xi::NTuple{manifold_dim,Vector{Float64}}`: Vector of element-normalized points (i.e., in [0,1]) where basis needs to be evaluated.
-- `nderivatives::Int`: Number of derivatives to evaluate.
-
-# Returns
-- `::Matrix{Float64}`: Array of evaluated local basis (size: num_eval_points × num_funcs × (nderivatives+1)).
-- `::Vector{Int}`: Vector of local basis indices (size: num_funcs).
-"""
-function get_local_basis(us_space::UnstructuredSpace{manifold_dim, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, m}
-    # Find the space ID and local element ID
-    space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
-
-    # Evaluate the basis functions in the corresponding function space
-    return evaluate(us_space.function_spaces[space_id], space_element_id, xi, nderivatives)[1]
+    return evaluate(space.function_spaces[space_id], space_element_id, xi, nderivatives)[1]
 end
 
 """

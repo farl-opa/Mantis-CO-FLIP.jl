@@ -36,18 +36,6 @@ function get_basis_indices(space::RationalFiniteElementSpace, element_id::Int)
     return get_basis_indices(space.function_space, element_id)
 end
 
-"""
-    get_num_elements(rat_space::RationalFiniteElementSpace)
-
-Returns the number of elements in the partition on which the rational finite element space
-is defined.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
-
-# Returns
-The number of elements in the rational finite element space.
-"""
 function get_num_elements(rat_space::RationalFiniteElementSpace)
     return get_num_elements(rat_space.function_space)
 end
@@ -142,35 +130,13 @@ function get_max_local_dim(space::RationalFiniteElementSpace)
     return get_max_local_dim(space.function_space)
 end
 
-"""
-    get_local_basis(
-        rat_space::RationalFiniteElementSpace{manifold_dim, F},
-        element_id::Int,
-        xi::NTuple{manifold_dim,Vector{Float64}},
-        nderivatives::Int) where {
-        manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
-
-Returns the local basis functions for the rational finite element space.
-
-# Arguments
-- `rat_space::RationalFiniteElementSpace{manifold_dim,F}`: The rational finite element space.
-- `element_id::Int`: The index of the element.
-- `xi::NTuple{manifold_dim,Vector{Float64}}`: The coordinates at which to evaluate the basis functions.
-- `nderivatives::Int`: The number of derivatives to compute.
-
-# Returns
-The local basis functions and their derivatives evaluated at the specified coordinates.
-"""
 function get_local_basis(
-    rat_space::RationalFiniteElementSpace{manifold_dim, F},
+    space::RationalFiniteElementSpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim,Vector{Float64}},
     nderivatives::Int
-) where {
-    manifold_dim, F <: AbstractFESpace{manifold_dim, 1}
-}
-
-    return evaluate(rat_space, element_id, xi, nderivatives)[1]
+) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
+    return evaluate(space, element_id, xi, nderivatives)[1]
 end
 
 function get_extraction(space::RationalFiniteElementSpace, element_id::Int)

@@ -77,15 +77,4 @@ function get_extraction(extraction_op::ExtractionOperator, element_id::Int)
     )
 end
 
-"""
-    get_num_elements(extraction_op::ExtractionOperator)
-
-Returns the number of elements in the `ExtractionOperator`.
-
-# Arguments
-- `extraction_op::ExtractionOperator`: The `ExtractionOperator` object.
-
-# Returns
-- `::Int`: The number of elements.
-"""
 get_num_elements(extraction_op::ExtractionOperator) = extraction_op.num_elements

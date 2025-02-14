@@ -194,17 +194,6 @@ function get_num_basis(space::TensorProductSpace, element_id::Int)
     return prod(_get_num_basis_per_space(space, element_id))
 end
 
-"""
-    get_num_elements(tp_space::TensorProductSpace)
-
-Compute and return the total number of elements in a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace`: The tensor-product space.
-
-# Returns
-- `::Int`: The total number of elements in the tensor-product space.
-"""
 get_num_elements(tp_space::TensorProductSpace) = prod(_get_num_elements_per_space(tp_space))
 
 """
@@ -315,23 +304,9 @@ function get_extraction(
     return extraction_coeffs, basis_indices
 end
 
-"""
-    get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int)
-
-Compute and return the local basis functions and their derivatives for a given element within a `TensorProductSpace`.
-
-# Arguments
-- `tp_space::TensorProductSpace{manifold_dim, T}`: The tensor-product space.
-- `element_id::Int`: The identifier of the element.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: The evaluation points in each dimension.
-- `nderivatives::Int`: The number of derivatives to compute.
-
-# Returns
-- `::Vector{Vector{Matrix{Float64}}}`: A nested vector structure containing the local basis functions and their derivatives.
-"""
-function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+function get_local_basis(space::TensorProductSpace{manifold_dim, T}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
     # Compute local basis for each constituent space
-    local_basis_per_space = _get_local_basis_per_space(tp_space, element_id, xi, nderivatives)
+    local_basis_per_space = _get_local_basis_per_space(space, element_id, xi, nderivatives)
 
     # Generate keys for all possible derivative combinations
     der_keys = integer_sums(nderivatives, manifold_dim+1)
@@ -342,7 +317,7 @@ function get_local_basis(tp_space::TensorProductSpace{manifold_dim, T}, element_
         local_basis[j + 1] = Vector{Matrix{Float64}}(undef, num_j_ders)
     end
 
-    manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
+    manifold_dim_per_space = map(get_manifold_dim, space.fem_spaces)
     cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
     # Split manifold dimensions for each constituent space
     keys_idx = Vector{UnitRange{Int}}(undef, num_spaces)

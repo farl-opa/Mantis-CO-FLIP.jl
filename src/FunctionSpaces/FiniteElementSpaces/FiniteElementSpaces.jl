@@ -121,6 +121,56 @@ function get_max_local_dim(space::AbstractFESpace)
 end
 
 """
+    get_num_elements(space::AbstractFESpace)
+
+Returns the number of elements in the underlying partition.
+
+# Arguments
+- `bspline::BSplineSpace`: A finite element space.
+
+# Returns
+- `::Int`: The number of elements.
+"""
+function get_num_elements(space::AbstractFESpace)
+    return get_num_elements(get_extraction_operator(space))
+end
+
+"""
+    get_local_basis(
+        space::AbstractFESpace{manifold_dim, num_components},
+        element_id::Int,
+        xi::NTuple{manifold_dim,Vector{Float64}},
+        nderivatives::Int,
+    ) where {manifold_dim, num_components}
+
+Evaluates the local basis functions used to construct the finite element space `space`.
+
+# Arguments
+- `space::AbstractFESpace{manifold_dim, num_components}`: A finite element space.
+- `element_id::Int`: The indentifier of the element.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
+    basis functions. These coordinates are in the **canonical** domain, and thus always lie
+    in the interval `[0, 1]`. The coordinates have to be given per dimension. Multi-
+    dimensional spaces are evaluated on the tensor product of the given coordinates.
+- `nderivatives::Int`: The number of derivatives to compute.
+
+# Returns
+- `::Vector{Vector{Matrix{Float64}}}`: A nested vector structure containing the local basis
+    functions and their derivatives. The first level of nesting corresponds to the order of
+    the derivatives. The second level corresponds to a specific derivative. The matrix
+    contains the actual evaluations. See [`get_derivative_idx(der_key::Vector{Int})`](@ref)
+    for more details on the order in which the derivatives are stored.
+"""
+function get_local_basis(
+    space::AbstractFESpace{manifold_dim, num_components},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+    nderivatives::Int,
+) where {manifold_dim, num_components}
+    error("get_local_basis not implemented for $(typeof(space))")
+end
+
+"""
     evaluate(
         space::AbstractFESpace{manifold_dim, num_components},
         element_id::Int,
