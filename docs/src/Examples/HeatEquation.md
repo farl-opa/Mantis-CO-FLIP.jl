@@ -4,9 +4,11 @@ EditURL = "../../../examples/src/HeatEquation.jl"
 
 # Heat Equation
 
-## A. The Heat Equation in 1D
+## Background knowledge
 
-### 1. The differential equation
+### A. The Heat Equation in 1D
+
+#### 1. The differential equation
 
 The heat equation in one dimension is given by:
 ```math
@@ -21,7 +23,7 @@ where:
 - ``u(x, t)`` is the temperature distribution function,
 - ``f(x, t)`` is a time dependent and spatially varying heat source.
 
-### 2. Initial and boundary conditions
+#### 2. Initial and boundary conditions
 
 To solve the heat equation, we must specify initial and boundary conditions:
 1. **Initial Condition**: This refers to the temperature distribution at the initial time
@@ -45,7 +47,7 @@ To solve the heat equation, we must specify initial and boundary conditions:
      \frac{\partial u}{\partial x}(L, t) = g_L
      ```
 
-### 3. Applications
+#### 3. Applications
 
 A simplified example where the heat equation can be used is to find out how the
 temperature is distributed through the outside, insulating walls of your apartment. Look
@@ -60,9 +62,9 @@ boundary conditions for the heat equation. Given an initial temperature distribu
 through the insulation wall, you could use the heat equation to find out how the
 temperature varies inside the insulation wall.
 
-## B. Solving the Heat Equation
+### B. Solving the Heat Equation
 
-### 1. Disadvantages of the above formulation
+#### 1. Disadvantages of the above formulation
 
 Now, if we want to compute the solution of the heat equation as stated above, we run into
 two difficulties:
@@ -84,7 +86,7 @@ own thermal diffusivity which is completely unrelated to the diffusivities of th
 materials. As a result, ``\alpha(x)`` is a discontinuous function and its first
 derivatives do not make sense.
 
-### 2. Tackling the above disadvantages using a discrete & weaker formulation
+#### 2. Tackling the above disadvantages using a discrete & weaker formulation
 
 The above disadvantages are the reason why, in practice, the above *strong* formulation
 of the heat equation is not useful. Instead, we formulate a *discrete, weak* version of
@@ -125,7 +127,125 @@ Note the following important things:
    where the function space ``W_n`` consists of spatially-varying functions in ``V_n``
    that satisfy homogeneous (or, equivalently, zero) boundary conditions.
 
-## C. The finite element method
+## The finite element method
+
+Now we are at a stage where, if we make a choice for ``V_n``, we can convert the discrete
+weak problem into a system of ODEs. This section will explain how.
+
+### A. How to choose ``V_n``?
+
+#### 1. Choosing ``V_n``
+
+In *the finite element method*, we choose ``V_n`` as the space of piecewise-polynomial
+functions of degree ``p`` on a mesh of the domain ``(0, L)``.
+
+##### Meshing the domain
+We choose a set of ``N+1`` points, ``0 = x_1 < x_1 < x_2 < \cdots < x_{N+1} = L``, and
+these points divide the domain ``(0, L)`` into smaller subdomains, ``(x_{i}, x_{i+1})``
+with ``x_{i}\in (0, L)``, called *elements*. That is, we assume that there are ``N``
+elements in our mesh.
+
+> **_ASSUMPTION:_** In the following code, we will always assume that the mesh is
+> *uniform*. In other words, ``x_{i+1}-x_i`` is equal to ``L/N`` for all ``i``.
+
+##### Defining ``V_n``
+
+The space ``V_n`` is defined as the space of functions ``v_n`` such that:
+* on any element (i.e., on the interval ``(x_{i}, x_{i+1})`` ``with i = 1, \dots, N``) it
+  is a polynomial of degree ``p``,
+* at each ``x_i``, ``i = 2, \dots, N``, the function ``v_n`` is ``C^k`` smooth for some
+  ``k \geq 0``.
+
+Once we do this, the vector-space dimension of ``V_n`` can be related to the parameters
+``N, p, k`` as follows:
+```math
+ n = (p+1)N - (k+1)(N-1)\;.
+```
+In other words, there are ``n`` basis functions ``\phi_{i}(x)``, ``i = 1, \dots, n``,
+such that any arbitrary ``v_n \in V_n`` can be represented as:
+```math
+v_n(x) = \sum_{i=1}^n c_i \phi_{i}(x)\;,
+```
+for some numbers ``c_i \in \mathbb{R}``.
+
+> **EXAMPLE:** ``V_n`` with ``(N,p,k) = (4, 1, 0)``.
+> Consider the space of functions that are linear polynomials over each mesh element, and
+> which are ``C^0`` smooth (or, equivalently, continuous) at the interfaces ``x_i``
+> between the elements. This space of functions has dimension:
+> ```math
+> n = (p+1)N - (k+1)(N-1) = 2\times 4 - 1 \times 3 = 5\;.
+> ```
+So, we can find 5 basis functions, ``\phi_{1}, \phi_{2}, \dots \phi_{5}``, that span the
+space ``V_n``. Run the code below to create such a ``V_n`` and look at one such choice of
+the basis functions called *hat functions*. Convince yourself that linear combinations of
+these functions can be used to represent any piecewise-linear polynomial function on the
+mesh. (Each function is plotted in a different color.)
+
+````@example HeatEquation
+import Mantis
+import DisplayAs
+using CairoMakie
+
+# The size of the domain where to solve our problem
+L = 1.0
+
+# The degree of the piecewise-polynomial basis functions
+p = 1
+# The number of elements in the mesh
+N = 4
+# The smoothness of the basis functions (must be smaller than the polynomial degree, and
+# larger than -1)
+k = 0
+
+# The number of basis functions in the piecewise-polynomial function space
+n = N * (p + 1) - (k + 1) * (N - 1)
+
+# Create the mesh and the function space
+breakpoints = collect(LinRange(0.0, L, N+1))
+patch = Mantis.Mesh.Patch1D(breakpoints)
+B = Mantis.FunctionSpaces.BSplineSpace(patch, p, k)
+line_geo = Mantis.Geometry.CartesianGeometry((breakpoints,))
+
+# Create a Form Space.
+BF = Mantis.Forms.FormSpace(0, line_geo, Mantis.FunctionSpaces.DirectSumSpace((B,)), "b")
+
+# Plot the basis functions.
+n_plot_points_per_element = 25
+
+fig = Figure()
+ax = Axis(fig[1, 1],
+    title = "Basis functions of V_n",
+    xlabel = "x",
+    ylabel = "b_i(x)",
+)
+
+n_elements = Mantis.Geometry.get_num_elements(Mantis.Forms.get_geometry(BF))
+xi = collect(LinRange(0.0, 1.0, n_plot_points_per_element))
+BFF = Mantis.Forms.FormField(BF, " ")
+
+dim_V = Mantis.Forms.get_num_basis(BF)
+colors = [:blue, :green, :red, :purple, :orange]
+for basis_idx in 1:dim_V
+
+    BFF.coefficients[basis_idx] = 1.0
+    if basis_idx > 1
+        BFF.coefficients[basis_idx - 1] = 0.0
+    end
+
+    color_i = colors[basis_idx]
+
+    for element_idx in 1:n_elements
+        form_eval, _ = Mantis.Forms.evaluate(BFF, element_idx, (xi,))
+        x = Mantis.Geometry.evaluate(Mantis.Forms.get_geometry(BF), element_idx, (xi,))
+
+        lines!(ax, x[:], form_eval[1], color=color_i)
+
+        scatter!(ax, x[:][[1, end]], [0.0, 0.0], color=:tomato)
+    end
+end
+
+fig = DisplayAs.Text(DisplayAs.PNG(fig))
+````
 
 ---
 
