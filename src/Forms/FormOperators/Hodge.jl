@@ -1,46 +1,61 @@
 ############################################################################################
-#                                 Hodge star operator ★                                    #
+#                                     Abstract method                                      #
 ############################################################################################
 
-# ωⁿ = √det(gᵢⱼ) dx¹∧…∧dxⁿ denotes the volume form of a Riemannian manifold.
-# αⱼᵏ denotes the j-th component of a k-form αᵏ.
+"""
+    evaluate_hodge_star(
+        form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+        element_id::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+    ) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry}
 
-# 0-forms (n dimensions)
-@doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}})
-
-Evaluates the Hodge star operator ⋆ of a 0-form in n dimensions.
+Returns the hodge star of a `form` at the element given by `element_id`, and
+canonical points `xi`.
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G}`: The differential 0-form expression. It represents a form on a manifold.
-- `element_idx::Int`: Index of the element to evaluate,
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
-        Points are the tensor product of the coordinates per dimension, therefore there will be
-        ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+- `form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The form
+    being evaluated.
+- `element_id::Int`: The element idenfier.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: The set of canonical points.
 
 # Returns
-- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
-- `form_indices`: Vector of vectors containing indices of the basis functions.
+- `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated hodge star. The number of
+    entries in the `Vector` is `binomial(manifold_dim, manifold_dim - form_rank)`. The size
+    of the `Array` is `(num_eval_points, num_basis)`, where `num_eval_points =
+    prod(length.(xi))` and `num_basis` is the number of basis functions used to represent
+    the `form` on `element_id` ― for `expression_rank = 0` the inner `Array` is equivalent
+    to a `Vector`.
 """
 function evaluate_hodge_star(
-    form_expression::AbstractFormExpression{manifold_dim,0,expression_rank,G},
+    form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}},
-) where {manifold_dim,expression_rank,G<:Geometry.AbstractGeometry{manifold_dim}}
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry}
+    throw(ArgumentError("Method not implement for type $(typeof(form))."))
+end
+
+############################################################################################
+#                                       Combinations                                       #
+############################################################################################
+
+# 0-forms (manifold_dim)
+function evaluate_hodge_star(
+    form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     if expression_rank > 1
-        throw(
-            ArgumentError(
-                "Hodge-star only valid for expressions with expression rank < 2, got: $expression_rank",
-            ),
-        )
+        msg_1 = "Hodge-star only valid for expressions with expression rank < 2. "
+        msg_2 = "Expression rank $(expression_rank) was given."
+        throw(ArgumentError(msg_1 * msg_2))
     end
 
     _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
-    # We restrict the evaluation of hodge-star to expression of rank 1 and lower, therefore we can
-    # select just the first index of the vector of indices, for higher rank expression we will
-    # need to change this
+    # We restrict the evaluation of hodge-star to expression of rank 1 and lower, therefore
+    # we can select just the first index of the vector of indices, for higher rank
+    # expression we will need to change this
     n_indices = length(form_indices[1])
 
     hodge_eval = Vector{Matrix{Float64}}(undef, 1)
@@ -51,36 +66,17 @@ function evaluate_hodge_star(
     return hodge_eval, form_indices
 end
 
-# n-forms (n dimensions)
-@doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-
-Evaluates the Hodge star operator ⋆ of a n-form in n dimensions.
-
-# Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G}`: The differential n-form expression. It represents a form on a manifold.
-- `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
-        Points are the tensor product of the coordinates per dimension, therefore there will be
-        ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
-
-# Returns
-- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions.
-- `form_indices`: Vector of vectors containing indices of the basis functions.
-"""
+# n-forms (manifold_dim)
 function evaluate_hodge_star(
-    form_expression::AbstractFormExpression{manifold_dim,manifold_dim,expression_rank,G},
+    form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}},
-) where {manifold_dim,expression_rank,G<:Geometry.AbstractGeometry{manifold_dim}}
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     if expression_rank > 1
-        throw(
-            ArgumentError(
-                "Hodge-star only valid for expressions with expression rank < 2, got: $expression_rank",
-            ),
-        )
+        msg_1 = "Hodge-star only valid for expressions with expression rank < 2. "
+        msg_2 = "Expression rank $(expression_rank) was given."
+        throw(ArgumentError(msg_1 * msg_2))
     end
-
     _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
@@ -98,33 +94,15 @@ function evaluate_hodge_star(
 end
 
 # 1-forms (2 dimensions)
-@doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{2, 1, expression_rank, G}, element_id::Int, xi::NTuple{2, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{2}}
-
-Evaluates the Hodge star operator ⋆ of a 1-form in 2 dimensions.
-
-# Arguments
-- `form_expression::form_expression::AbstractFormExpression{2, 1, expression_rank, G}`: The differential 1-form expression. It represents a form on a manifold.
-- `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{2, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
-    Points are the tensor product of the coordinates per dimension, therefore there will be
-    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
-
-# Returns
-- `hodge_eval::Vector{Matrix{Float64}}`: Vector of arrays containing evaluated hodge star of the basis functions.
-- `hodge_indices`: Vector of vectors containing indices of the basis functions.
-"""
 function evaluate_hodge_star(
-    form_expression::AbstractFormExpression{2,1,expression_rank,G},
+    form_expression::AbstractFormExpression{2, 1, expression_rank, G},
     element_id::Int,
-    xi::NTuple{2,Vector{Float64}},
-) where {expression_rank,G<:Geometry.AbstractGeometry{2}}
+    xi::NTuple{2, Vector{Float64}},
+) where {expression_rank, G <: Geometry.AbstractGeometry{2}}
     if expression_rank > 1
-        throw(
-            ArgumentError(
-                "Hodge-star only valid for expressions with expression rank < 2, got: $expression_rank",
-            ),
-        )
+        msg_1 = "Hodge-star only valid for expressions with expression rank < 2. "
+        msg_2 = "Expression rank $(expression_rank) was given."
+        throw(ArgumentError(msg_1 * msg_2))
     end
 
     inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
@@ -155,33 +133,15 @@ function evaluate_hodge_star(
 end
 
 # 1-forms (3 dimensions)
-@doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 1, expression_rank, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
-
-Evaluates the Hodge star operator ⋆ of a 1-form in 3 dimensions.
-
-# Arguments
-- `form_expression::form_expression::AbstractFormExpression{3, 1, expression_rank, G}`: The differential 1-form expression. It represents a form on a manifold.
-- `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{3, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
-    Points are the tensor product of the coordinates per dimension, therefore there will be
-    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
-
-# Returns
-- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions for each of the components.
-- `hodge_indices`: Vector of containing the indices of the basis functions.
-"""
 function evaluate_hodge_star(
-    form_expression::AbstractFormExpression{3,1,expression_rank,G},
+    form_expression::AbstractFormExpression{3, 1, expression_rank, G},
     element_id::Int,
-    xi::NTuple{3,Vector{Float64}},
-) where {expression_rank,G<:Geometry.AbstractGeometry{3}}
+    xi::NTuple{3, Vector{Float64}},
+) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
     if expression_rank > 1
-        throw(
-            ArgumentError(
-                "Hodge-star only valid for expressions with expression rank < 2, got: $expression_rank",
-            ),
-        )
+        msg_1 = "Hodge-star only valid for expressions with expression rank < 2. "
+        msg_2 = "Expression rank $(expression_rank) was given."
+        throw(ArgumentError(msg_1 * msg_2))
     end
 
     # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
@@ -226,33 +186,15 @@ function evaluate_hodge_star(
 end
 
 # 2-forms (3 dimensions)
-@doc raw"""
-    evaluate_hodge_star(form_expression::AbstractFormExpression{3, 2, expression_rank, G}, element_id::Int, xi::NTuple{3, Vector{Float64}}) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
-
-Evaluates the Hodge star operator ⋆ of a 2-form in 3 dimensions.
-
-# Arguments
-- `form_expression::form_expression::AbstractFormExpression{3, 2, G}`: The differential 2-form expression. It represents a form on a manifold.
-- `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{3, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
-    Points are the tensor product of the coordinates per dimension, therefore there will be
-    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
-
-# Returns
-- `hodge_eval`: Vector of arrays containing evaluated hodge star of the basis functions for each of the components.
-- `hodge_indices`: Vector of containing the indices of the basis functions.
-"""
 function evaluate_hodge_star(
-    form_expression::AbstractFormExpression{3,2,expression_rank,G},
+    form_expression::AbstractFormExpression{3, 2, expression_rank, G},
     element_id::Int,
-    xi::NTuple{3,Vector{Float64}},
-) where {expression_rank,G<:Geometry.AbstractGeometry{3}}
+    xi::NTuple{3, Vector{Float64}},
+) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
     if expression_rank > 1
-        throw(
-            ArgumentError(
-                "Hodge-star only valid for expressions with expression rank < 2, got: $expression_rank",
-            ),
-        )
+        msg_1 = "Hodge-star only valid for expressions with expression rank < 2. "
+        msg_2 = "Expression rank $(expression_rank) was given."
+        throw(ArgumentError(msg_1 * msg_2))
     end
 
     # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)

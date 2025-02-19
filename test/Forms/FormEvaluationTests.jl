@@ -272,6 +272,6 @@ n_active_basis_two_form = Mantis.FunctionSpaces.get_num_basis(dsTP_2_form_3d, el
 @test isapprox(sum(sum.(d_two_form_space_eval)), 0.0, atol=1e-12)
 
 # top-forms
-@test_throws ArgumentError d_top_form_space_eval, d_top_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(top_form_space_2d, element_idx, ξ_evaluation)
+@test_throws ArgumentError d_top_form_space_eval, d_top_form_space_idx = Mantis.Forms.evaluate_exterior_derivative(top_form_space_3d, element_idx, ξ_evaluation)
 
 end
