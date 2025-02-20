@@ -22,10 +22,9 @@ struct BSplineSpace{F} <: AbstractFESpace{1, 1}
         patch_1d::Mesh.Patch1D,
         polynomials::F,
         regularity::Vector{Int},
-        n_dofs_left::Int = 1,
-        n_dofs_right::Int = 1,
+        n_dofs_left::Int=1,
+        n_dofs_right::Int=1,
     ) where {F <: AbstractCanonicalSpace}
-
         polynomial_degree = get_polynomial_degree(polynomials)
 
         if polynomial_degree < 0
@@ -78,35 +77,41 @@ struct BSplineSpace{F} <: AbstractFESpace{1, 1}
             end
         end
 
-        knot_vector = create_knot_vector(patch_1d, polynomial_degree, regularity, "regularity")
+        knot_vector = create_knot_vector(
+            patch_1d, polynomial_degree, regularity, "regularity"
+        )
         extraction_op = extract_bspline_to_section_space(knot_vector, polynomials)
         bspline_dim = get_num_basis(extraction_op)
 
-        dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
-        dof_partition[1] = Vector{Vector{Int}}(undef,3)
+        dof_partition = Vector{Vector{Vector{Int}}}(undef, 1)
+        dof_partition[1] = Vector{Vector{Int}}(undef, 3)
         # First, store the left dofs ...
         dof_partition[1][1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[1][2] = collect(n_dofs_left+1:bspline_dim-n_dofs_right)
+        dof_partition[1][2] = collect((n_dofs_left + 1):(bspline_dim - n_dofs_right))
         # ... and then finally the right dofs.
-        dof_partition[1][3] = collect(bspline_dim-n_dofs_right+1:bspline_dim)
+        dof_partition[1][3] = collect((bspline_dim - n_dofs_right + 1):bspline_dim)
 
-        new{F}(knot_vector, extraction_op, polynomials, dof_partition)
+        return new{F}(knot_vector, extraction_op, polynomials, dof_partition)
     end
 end
 
 # Helper functions with classical choices for defaults.
-function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int})
-    BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity)
+function BSplineSpace(
+    patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Vector{Int}
+)
+    return BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity)
 end
-function BSplineSpace(patch_1d::Mesh.Patch1D, polynomials::AbstractCanonicalSpace, regularity::Int)
+function BSplineSpace(
+    patch_1d::Mesh.Patch1D, polynomials::AbstractCanonicalSpace, regularity::Int
+)
     # Open knot vector (-1 regularity at the endpoints), given internal regularity.
-    regularity = [-1; repeat([regularity], size(patch_1d)-1); -1]
-    BSplineSpace(patch_1d, polynomials, regularity)
+    regularity = [-1; repeat([regularity], size(patch_1d) - 1); -1]
+    return BSplineSpace(patch_1d, polynomials, regularity)
 end
 function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity::Int)
-    regularity = [-1; repeat([regularity], size(patch_1d)-1); -1]
-    BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity)
+    regularity = [-1; repeat([regularity], size(patch_1d) - 1); -1]
+    return BSplineSpace(patch_1d, Bernstein(polynomial_degree), regularity)
 end
 
 """
@@ -124,16 +129,15 @@ function get_polynomials(bspline::BSplineSpace)
     return bspline.polynomials
 end
 
-
 function get_local_basis(space::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
     return evaluate(get_polynomials(space), xi, nderivatives)
 end
 
-function get_local_basis(space::BSplineSpace, element_id::Int, xi::NTuple{1, Vector{Float64}}, nderivatives::Int)
+function get_local_basis(
+    space::BSplineSpace, element_id::Int, xi::NTuple{1, Vector{Float64}}, nderivatives::Int
+)
     return get_local_basis(space, element_id, xi[1], nderivatives)
 end
-
-
 
 """
     get_polynomial_degree(bspline::BSplineSpace)
@@ -142,15 +146,15 @@ Returns the degree of B-splines.
 
 # Arguments
 - `bspline::BSplineSpace`: A univariate B-Spline function space.
-- `elem_id::Int`: An optional dummy argument for uniformity with other spaces (dummy because the degree is the same for all elements for B-splines).
+- `elem_id::Int`: An optional dummy argument for uniformity with other spaces (dummy because
+    the degree is the same for all elements for B-splines).
 
 # Returns
 - `polynomial_degree`: Polynomial degree.
 """
-function get_polynomial_degree(bspline::BSplineSpace, elem_id::Int = 0)
+function get_polynomial_degree(bspline::BSplineSpace, elem_id::Int=0)
     return get_polynomial_degree(get_polynomials(bspline))
 end
-
 
 """
     get_patch(bspline::BSplineSpace)
@@ -170,7 +174,8 @@ end
 """
     get_multiplicity_vector(bspline::BSplineSpace)
 
-Returns the multiplicities of the knot vector associated with the univariate function space `bspline`.
+Returns the multiplicities of the knot vector associated with the univariate function space
+`bspline`.
 
 # Arguments
 - `bspline::BSplineSpace`: The B-Spline function space.
@@ -236,7 +241,9 @@ Returns the elements where the B-spline given by `basis_id` is supported.
 """
 function get_support(bspline::BSplineSpace, basis_id::Int)
     first_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id)
-    last_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id + bspline.knot_vector.polynomial_degree + 1) - 1
+    last_element = convert_knot_to_breakpoint_idx(
+            bspline.knot_vector, basis_id + bspline.knot_vector.polynomial_degree + 1
+        ) - 1
     return collect(first_element:last_element)
 end
 
@@ -253,7 +260,11 @@ function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)
     last_knot_mult = basis_idx + deg + 1 - knot_cum_sum[last_breakpoint_idx - 1]
 
     breakpoints = get_patch(bspline).breakpoints[first_breakpoint_idx:last_breakpoint_idx]
-    multiplicity = vcat(first_knot_mult, get_multiplicity_vector(bspline)[first_breakpoint_idx+1:last_breakpoint_idx-1], last_knot_mult)
+    multiplicity = vcat(
+        first_knot_mult,
+        get_multiplicity_vector(bspline)[(first_breakpoint_idx + 1):(last_breakpoint_idx - 1)],
+        last_knot_mult,
+    )
 
     return KnotVector(Mesh.Patch1D(breakpoints), deg, multiplicity)
 end
@@ -269,7 +280,9 @@ end
 """
     assemble_global_extraction_matrix(bsplines::BSplineSpace)
 
-Loops over all elements and assembles the global extraction matrix for the B-spline space. The extraction matrix is a sparse matrix that maps the local basis functions to the global basis functions.
+Loops over all elements and assembles the global extraction matrix for the B-spline space.
+The extraction matrix is a sparse matrix that maps the local basis functions to the global
+basis functions.
 
 # Arguments
 - `bspline::BSplineSpace`: The B-spline space.
@@ -289,14 +302,16 @@ function assemble_global_extraction_matrix(bspline::BSplineSpace)
     global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)
 
     # Loop over all elements
-    for el_id ∈ 1:nel
+    for el_id in 1:nel
         # get extraction on this element
         extraction_coefficients, global_basis_indices = get_extraction(bspline, el_id)
         # get local basis indices
-        local_basis_indices = num_local_basis_offset[el_id]+ 1:num_local_basis_offset[el_id + 1]
+        local_basis_indices =
+            (num_local_basis_offset[el_id] + 1):num_local_basis_offset[el_id + 1]
 
         # Assemble the global extraction matrix
-        global_extraction_matrix[local_basis_indices, global_basis_indices] = extraction_coefficients
+        global_extraction_matrix[local_basis_indices, global_basis_indices] =
+            extraction_coefficients
     end
 
     return SparseArrays.sparse(global_extraction_matrix)
@@ -320,11 +335,11 @@ function get_derivative_space(bspline::BSplineSpace)
 
     # modified left and right dof-partitioning
     dof_partition = get_dof_partition(bspline)
-    n_left = max(0, length(dof_partition[1][1])-1)
-    n_right = max(0, length(dof_partition[1][3])-1)
+    n_left = max(0, length(dof_partition[1][1]) - 1)
+    n_right = max(0, length(dof_partition[1][3]) - 1)
 
     # regularity of derivative space
-    dregularity = (p-1) .- get_multiplicity_vector(bspline)
+    dregularity = (p - 1) .- get_multiplicity_vector(bspline)
     for i in eachindex(dregularity)
         if dregularity[i] < -1
             dregularity[i] = -1

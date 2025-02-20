@@ -25,7 +25,7 @@ at `ξ` for ``\\xi \\in [0.0, 1.0]``.
 
 See also [`evaluate(polynomial::Bernstein, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-@Memoization.memoize function evaluate(
+Memoization.@memoize function evaluate(
     polynomials::Bernstein, ξ::Vector{Float64}, nderivatives::Int
 )
     # store the values and derivatives here
@@ -34,15 +34,15 @@ See also [`evaluate(polynomial::Bernstein, ξ::Float64, nderivatives::Int64)`](@
     # allocate space for derivatives
     # - ders[j+1][1] contains the matrix of evaluations of the j-th derivative
     ders = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
-    for j = 0:nderivatives
-        ders[j+1] = Vector{Matrix{Float64}}(undef, 1)
-        ders[j+1][1] = zeros(Float64, neval, polynomials.p + 1)
+    for j in 0:nderivatives
+        ders[j + 1] = Vector{Matrix{Float64}}(undef, 1)
+        ders[j + 1][1] = zeros(Float64, neval, polynomials.p + 1)
     end
     # loop over the evaluation points and evaluate all derivatives at each point
-    for i = 1:neval
+    for i in 1:neval
         tmp = _evaluate(polynomials, ξ[i], nderivatives)
-        for j = 0:nderivatives
-            ders[j+1][1][i,:] .= tmp[1,:,j+1]
+        for j in 0:nderivatives
+            ders[j + 1][1][i, :] .= tmp[1, :, j + 1]
         end
     end
 
@@ -63,7 +63,6 @@ See also [`evaluate(polynomial::Bernstein, ξ::Vector{Float64}, nderivatives::In
 function evaluate(polynomial::Bernstein, ξ::Vector{Float64})
     return evaluate(polynomial, ξ, 0)
 end
-
 
 """
     evaluate(polynomial::Bernstein, xi::Float64)
@@ -109,75 +108,80 @@ function _evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)
     end
 
     # compute upper and lower triangular values that combine to form values and derivatives
-    ndu = zeros(Float64, p+1, p+1)
-    left = zeros(Float64, p+1)
-    right = zeros(Float64, p+1)
-    ndu[1,1] = 1
-    for j=1:p
-        left[j+1] = xi
-        right[j+1] = 1.0 - xi
+    ndu = zeros(Float64, p + 1, p + 1)
+    left = zeros(Float64, p + 1)
+    right = zeros(Float64, p + 1)
+    ndu[1, 1] = 1
+    for j in 1:p
+        left[j + 1] = xi
+        right[j + 1] = 1.0 - xi
         saved = 0.0
-        for r = 0:j-1
+        for r in 0:(j - 1)
             #lower trinagle
-            ndu[j+1,r+1] = right[r+2]+ left[j-r+1]
-            temp = ndu[r+1,j] / ndu[j+1,r+1]
+            ndu[j + 1, r + 1] = right[r + 2] + left[j - r + 1]
+            temp = ndu[r + 1, j] / ndu[j + 1, r + 1]
 
             # upper triangle
-            ndu[r+1,j+1] = saved + right[r+2] * temp
-            saved = left[j-r+1]*temp
+            ndu[r + 1, j + 1] = saved + right[r + 2] * temp
+            saved = left[j - r + 1] * temp
         end
-        ndu[j+1,j+1] = saved
+        ndu[j + 1, j + 1] = saved
     end
 
     # store the values and derivatives here
-    ders = zeros(Float64, 1, p+1, nderivatives+1)
+    ders = zeros(Float64, 1, p + 1, nderivatives + 1)
     # values are contained in the last column of ndu
-    ders[1,:,1] = ndu[:,p+1]
+    ders[1, :, 1] = ndu[:, p + 1]
 
     # if nderivatves>0, the next section computes the derivatives
-    if nderivatives>0
-        a = zeros(Int64, 2, nderivatives+1)
-        for r=0:p
-            s1=0; s2=1
-            a[1,1] = 1
+    if nderivatives > 0
+        a = zeros(Int64, 2, nderivatives + 1)
+        for r in 0:p
+            s1 = 0
+            s2 = 1
+            a[1, 1] = 1
             # loop to compute kth derivative
-            for k=1:nderivatives
-                d=0
-                rk=r-k; pk = p-k
+            for k in 1:nderivatives
+                d = 0
+                rk = r - k
+                pk = p - k
                 if (r >= k)
-                    a[s2+1,1] = a[s1+1,1] / ndu[pk+2,rk+1]
-                    d = a[s2+1,1] * ndu[rk+1,pk+1]
+                    a[s2 + 1, 1] = a[s1 + 1, 1] / ndu[pk + 2, rk + 1]
+                    d = a[s2 + 1, 1] * ndu[rk + 1, pk + 1]
                 end
                 if (rk >= -1)
                     j1 = 1
                 else
                     j1 = -rk
                 end
-                if (r-1 <= pk)
-                    j2 = k-1
+                if (r - 1 <= pk)
+                    j2 = k - 1
                 else
-                    j2 = p-r
+                    j2 = p - r
                 end
 
-                for j=j1:j2
-                    a[s2+1,j+1] = (a[s1+1,j+1] - a[s1+1,j]) / ndu[pk+2,rk+j+1]
-                    d = d + a[s2+1,j+1] * ndu[rk+j+1,pk+1]
+                for j in j1:j2
+                    a[s2 + 1, j + 1] =
+                        (a[s1 + 1, j + 1] - a[s1 + 1, j]) / ndu[pk + 2, rk + j + 1]
+                    d = d + a[s2 + 1, j + 1] * ndu[rk + j + 1, pk + 1]
                 end
 
                 if (r <= pk)
-                    a[s2+1,k+1] = - a[s1+1,k] / ndu[pk+2,r+1]
-                    d = d + a[s2+1,k+1] * ndu[r+1,pk+1]
+                    a[s2 + 1, k + 1] = -a[s1 + 1, k] / ndu[pk + 2, r + 1]
+                    d = d + a[s2 + 1, k + 1] * ndu[r + 1, pk + 1]
                 end
-                ders[1, r+1, k+1] = d
-                j = s1; s1 = s2; s2 = j
+                ders[1, r + 1, k + 1] = d
+                j = s1
+                s1 = s2
+                s2 = j
             end
         end
 
         # multiply by the correct factors
         r = p
-        for k=1:nderivatives
-            ders[1,:,k+1] *= r
-            r = r*(p-k)
+        for k in 1:nderivatives
+            ders[1, :, k + 1] *= r
+            r = r * (p - k)
         end
     end
 
@@ -206,12 +210,12 @@ function extract_monomial_to_bernstein(polynomial::Bernstein)
 
     # build transformation matrix for mapping coefficients of a polynomial in monomial basis
     # to that of Bernstein
-    T = zeros(Float64, p+1, p+1)
-	for i = 0:p
-		for j = 0:i
-			T[i+1,j+1] = binomial(i, j) / binomial(p, j)
-		end
-	end
+    T = zeros(Float64, p + 1, p + 1)
+    for i in 0:p
+        for j in 0:i
+            T[i + 1, j + 1] = binomial(i, j) / binomial(p, j)
+        end
+    end
 
     return T
 end

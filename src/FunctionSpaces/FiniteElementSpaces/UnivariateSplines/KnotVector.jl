@@ -14,46 +14,61 @@ struct KnotVector
     polynomial_degree::Int
     multiplicity::Vector{Int}
 
-    function KnotVector(patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Vector{Int})
+    function KnotVector(
+        patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Vector{Int}
+    )
         # Ensure the number of knots and multiplicity are consistent
-        if (size(patch_1d)+1) != length(multiplicity)
-            msg1 = "Number of knots and multiplicity must be the same."
-            msg2 = " Knots has length $(size(patch_1d)+1) and multiplicity has length $(length(multiplicity))."
-            throw(ArgumentError(msg1*msg2))
+        if (size(patch_1d) + 1) != length(multiplicity)
+            throw(ArgumentError("""\
+                The number of knots and multiplicities must be the same. There are \
+                $(size(patch_1d) + 1) knots and $(length(multiplicity)) multiplicities.\
+                """
+            ))
         end
 
         # Ensure all multiplicities are greater than 0
         if any(multiplicity .<= 0)
             error_index = findfirst(multiplicity .<= 0)
-            msg1 = "Multiplicity must be greater or equal to 1."
-            msg2 = " At index $error_index, the multiplicity is $(multiplicity[error_index])."
-            throw(ArgumentError(msg1*msg2))
+            throw(ArgumentError("""\
+                The multiplicity must be greater than or equal to 1. However, at index \
+                $(error_index), the multiplicity is $(multiplicity[error_index]).\
+                """
+            ))
         end
 
-        new(patch_1d, polynomial_degree, multiplicity)
+        return new(patch_1d, polynomial_degree, multiplicity)
     end
-    function KnotVector(patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Int)
-       return KnotVector(patch_1d, polynomial_degree, [multiplicity])
-    end
+end
+
+function KnotVector(patch_1d::Mesh.Patch1D, polynomial_degree::Int, multiplicity::Int)
+    return KnotVector(patch_1d, polynomial_degree, [multiplicity])
 end
 
 """
     create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
 
-Creates a uniform knot vector corresponding to B-splines basis functions of polynomial degree `p` and continuity `regularity[i]` on `patch_1d.breakpoint[i]`.
+Creates a uniform knot vector corresponding to B-splines basis functions of polynomial
+degree `p` and continuity `regularity[i]` on `patch_1d.breakpoint[i]`.
 
 # Arguments
 - `patch_1d::Mesh.Patch1D`: Location of each breakpoint.
 - `p::Int`: Degree of the polynomial (``p ≥ 0``).
-- `breakpoint_condition::Vector{Int}`: Either the regularity or multiplicity of each breakpoint.
-- `condition_type::String`: Determines whether `breakpoint_condition` determines the regularity or multiplicity.
+- `breakpoint_condition::Vector{Int}`: Either the regularity or multiplicity of each
+    breakpoint.
+- `condition_type::String`: Determines whether `breakpoint_condition` determines the
+    regularity or multiplicity.
 
 # Returns
 - `::KnotVector`: Knot vector.
 """
-function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition::Vector{Int}, condition_type::String)
+function create_knot_vector(
+    patch_1d::Mesh.Patch1D,
+    p::Int,
+    breakpoint_condition::Vector{Int},
+    condition_type::String,
+)
     if condition_type == "regularity"
-        multiplicity = ones(Int, size(patch_1d)+1)
+        multiplicity = ones(Int, size(patch_1d) + 1)
 
         # Calculate multiplicity based on regularity
         for i in eachindex(breakpoint_condition)
@@ -61,12 +76,16 @@ function create_knot_vector(patch_1d::Mesh.Patch1D, p::Int, breakpoint_condition
         end
 
         return KnotVector(patch_1d, p, multiplicity)
+
     elseif condition_type == "multiplicity"
         return KnotVector(patch_1d, p, breakpoint_condition)
+
     else
-        msg1 = "Allowed breakpoint conditions are `regularity` or `multiplicity`."
-        msg2 = " The given condition is $condition_type."
-        throw(ArgumentError(msg1*msg2))
+        throw(ArgumentError("""\
+            Allowed breakpoint conditions are `regularity` or `multiplicity`. The given \
+            condition is $(condition_type).\
+            """
+        ))
     end
 end
 
@@ -119,7 +138,8 @@ end
 """
     convert_knot_to_breakpoint_idx(knot_vector::KnotVector, knot_index::Int)
 
-Retrieves the breakpoint index corresponding to `knot_vector` at `knot_index`, i.e., the index of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
+Retrieves the breakpoint index corresponding to `knot_vector` at `knot_index`, i.e., the
+index of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
 
 # Arguments
 - `knot_vector::KnotVector`: Knot vector for length calculation.
@@ -145,7 +165,8 @@ Get the index of the first knot corresponding to a given breakpoint.
 - `::Int`: Index of the first knot for the given breakpoint.
 """
 function get_first_knot_index(knot_vector::KnotVector, breakpoint_index::Int)
-    return cumsum(knot_vector.multiplicity)[breakpoint_index] - knot_vector.multiplicity[breakpoint_index] + 1
+    return cumsum(knot_vector.multiplicity)[breakpoint_index] -
+           knot_vector.multiplicity[breakpoint_index] + 1
 end
 
 """
@@ -185,8 +206,9 @@ end
 """
     get_knot_multiplicity(knot_vector::KnotVector, knot_index::Int)
 
-Retrieves the multiplicity of the breakpoint corresponding to `knot_vector` at `knot_index`, i.e., the index
-of the vector where every `breakpoint[i]` appears `knot_vector.multiplicity[i]`-times.
+Retrieves the multiplicity of the breakpoint corresponding to `knot_vector` at
+`knot_index`, i.e., the index of the vector where every `breakpoint[i]` appears
+`knot_vector.multiplicity[i]`-times.
 
 # Arguments
 - `knot_vector::KnotVector`: Knot vector for length calculation.
@@ -203,7 +225,8 @@ end
 """
     get_local_knot_vector(knot_vector::KnotVector, basis_id::Int)
 
-Returns the local knot vector necessary to characterize the B-spline identified by `basis_id`.
+Returns the local knot vector necessary to characterize the B-spline identified by
+`basis_id`.
 
 # Arguments
 - `knot_vector::KnotVector`: The knot vector of the full B-spline basis.
@@ -213,7 +236,10 @@ Returns the local knot vector necessary to characterize the B-spline identified 
 - `::KnotVector`: The knot vector of the B-spline identified by `basis_id`.
 """
 function get_local_knot_vector(knot_vector::KnotVector, basis_id::Int)
-    local_idx = get_breakpoint_index(knot_vector, basis_id):get_breakpoint_index(knot_vector, basis_id+knot_vector.polynomial_degree+1)
+    local_idx =
+        get_breakpoint_index(knot_vector, basis_id):get_breakpoint_index(
+            knot_vector, basis_id + knot_vector.polynomial_degree + 1
+        )
 
     local_patch = Mesh.Patch1D(Mesh.get_breakpoints(knot_vector.patch_1d)[local_idx])
     local_multiplicity = knot_vector.multiplicity[local_idx]
@@ -239,14 +265,14 @@ function get_greville_points(knot_vector::KnotVector)
     greville_points = zeros(n)
     for i in 1:n
         # Starting breakpoint index
-        id0 = findfirst(cm .>= i+1)
-        id1 = findfirst(cm .>= i+p)
+        id0 = findfirst(cm .>= i + 1)
+        id1 = findfirst(cm .>= i + p)
         if id1 > id0
             pt = knot_vector.patch_1d.breakpoints[id0] * (cm[id0] - i)
-            for j = id0+1:id1-1
+            for j in (id0 + 1):(id1 - 1)
                 pt += knot_vector.patch_1d.breakpoints[j] * knot_vector.multiplicity[j]
             end
-            pt += knot_vector.patch_1d.breakpoints[id1] * (i + p - cm[id1-1])
+            pt += knot_vector.patch_1d.breakpoints[id1] * (i + p - cm[id1 - 1])
         else
             pt = knot_vector.patch_1d.breakpoints[id0] * p
         end

@@ -15,13 +15,14 @@ struct RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_d
     function_space::F
     weights::Vector{Float64}
 
-    function RationalFiniteElementSpace(function_space::F, weights::Vector{Float64}) where {
-        manifold_dim, F <: AbstractFESpace{manifold_dim, 1}
-    }
-        # Ensure that the dimension of the function space matches the length of the weights
-        # vector
-        @assert get_num_basis(function_space) == length(weights) "Dimension mismatch"
-        new{manifold_dim, F}(function_space, weights)
+    function RationalFiniteElementSpace(
+        function_space::F, weights::Vector{Float64}
+    ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
+        if get_num_basis(function_space) != length(weights)
+            error("Dimension mismatch")
+        end
+
+        return new{manifold_dim, F}(function_space, weights)
     end
 end
 
@@ -89,7 +90,7 @@ function evaluate(
     rat_space::RationalFiniteElementSpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
-    nderivatives::Int
+    nderivatives::Int,
 ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
     # Evaluate the basis functions and their derivatives for the underlying function space
     homog_basis, basis_indices = evaluate(
@@ -101,8 +102,9 @@ function evaluate(
     for j in 0:nderivatives
         if j == 0
             # Compute the weight
-            temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-            weight = reshape(sum(temp, dims=2), n_eval)
+            temp = homog_basis[1][1] *
+                LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+            weight = reshape(sum(temp; dims=2), n_eval)
             # Rationalize with the weights
             homog_basis[1][1] .= LinearAlgebra.Diagonal(weight) \ temp
         elseif j == 1
@@ -111,12 +113,15 @@ function evaluate(
                 # Get the location where the derivative is stored
                 der_idx = get_derivative_idx(key)
                 # Compute the weight and its derivative
-                temp = homog_basis[1][1] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-                dtemp = homog_basis[j+1][der_idx] * LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
-                weight = reshape(sum(temp, dims=2), n_eval)
-                dweight = reshape(sum(dtemp, dims=2), n_eval)
+                temp = homog_basis[1][1] *
+                    LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                dtemp = homog_basis[j + 1][der_idx] *
+                    LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                weight = reshape(sum(temp; dims=2), n_eval)
+                dweight = reshape(sum(dtemp; dims=2), n_eval)
                 # Compute the derivative of the rational basis functions
-                homog_basis[j+1][der_idx] .= LinearAlgebra.Diagonal(weight) \ dtemp - LinearAlgebra.Diagonal(dweight ./ weight.^2) * temp
+                homog_basis[j + 1][der_idx] .= LinearAlgebra.Diagonal(weight) \ dtemp -
+                    LinearAlgebra.Diagonal(dweight ./ weight .^ 2) * temp
             end
         elseif j > 1
             error("Derivatives of rational spaces of order not implemented")
@@ -133,8 +138,8 @@ end
 function get_local_basis(
     space::RationalFiniteElementSpace{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}},
-    nderivatives::Int
+    xi::NTuple{manifold_dim, Vector{Float64}},
+    nderivatives::Int,
 ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
     return evaluate(space, element_id, xi, nderivatives)[1]
 end

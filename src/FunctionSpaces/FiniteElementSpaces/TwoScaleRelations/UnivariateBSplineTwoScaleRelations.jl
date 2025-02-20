@@ -16,7 +16,6 @@ function get_fine_to_coarse(bspline_space::BSplineSpace, nsubdivisions::Int)
     return fine_to_coarse
 end
 
-
 # Helper functions for knot insertion
 
 """
@@ -31,15 +30,18 @@ Subdivides `coarse_breakpoints` by uniformly subdiving each element 'nsubdivisio
 - `fine_breakpoints::Vector{Float64}`: Fine set of breakpoints.
 """
 function subdivide_breakpoints(coarse_breakpoints::Vector{Float64}, nsubdivisions::Int)
-    num_points = length(coarse_breakpoints) + (length(coarse_breakpoints) - 1)* (nsubdivisions - 1)
+    num_points =
+        length(coarse_breakpoints) + (length(coarse_breakpoints) - 1) * (nsubdivisions - 1)
 
     fine_breakpoints = Vector{Float64}(undef, num_points)
 
     step_size = 1 / nsubdivisions
 
-    for i in 1:length(coarse_breakpoints)-1, j in 0:nsubdivisions-1
-        index = (i-1) * nsubdivisions + j + 1
-        fine_breakpoints[index] = coarse_breakpoints[i] + j * step_size * (coarse_breakpoints[i+1] - coarse_breakpoints[i])
+    for i in 1:(length(coarse_breakpoints) - 1), j in 0:(nsubdivisions - 1)
+        index = (i - 1) * nsubdivisions + j + 1
+        fine_breakpoints[index] =
+            coarse_breakpoints[i] +
+            j * step_size * (coarse_breakpoints[i + 1] - coarse_breakpoints[i])
     end
 
     fine_breakpoints[end] = coarse_breakpoints[end]
@@ -48,7 +50,10 @@ function subdivide_breakpoints(coarse_breakpoints::Vector{Float64}, nsubdivision
 end
 
 """
-    subdivide_breakpoints(coarse_breakpoints::NTuple{manifold_dim, Vector{Float64}}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
+    subdivide_breakpoints(
+        coarse_breakpoints::NTuple{manifold_dim, Vector{Float64}},
+        nsubdivisions::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
 
 Subdivides `coarse_breakpoints` by uniformly subdiving each element 'nsubdivisions' times,
 across each dimension.
@@ -56,11 +61,17 @@ across each dimension.
 # Arguments
 - `coarse_breakpoints::NTuple{manifold_dim, Vector{Float64}}`: Coarse set of breakpoints.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
+
 # Returns
 - `::NTuple{manifold_dim, Vector{Float64}}`: Fine set of breakpoints.
 """
-function subdivide_breakpoints(coarse_breakpoints::NTuple{manifold_dim, Vector{Float64}}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
-    return ntuple(d -> subdivide_breakpoints(coarse_breakpoints[d], nsubdivisions[d]), manifold_dim)
+function subdivide_breakpoints(
+    coarse_breakpoints::NTuple{manifold_dim, Vector{Float64}},
+    nsubdivisions::NTuple{manifold_dim, Int},
+) where {manifold_dim}
+    return ntuple(
+        d -> subdivide_breakpoints(coarse_breakpoints[d], nsubdivisions[d]), manifold_dim
+    )
 end
 
 """
@@ -71,16 +82,21 @@ Subdivides `coarse_patch` by uniformly subdiving each element 'nsubdivisions' ti
 # Arguments
 - `coarse_patch::Mesh.Patch1D`: Coarse patch.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
+
 # Returns
 - `fine_patch::Mesh.Patch1D`: Fine patch.
 """
 function subdivide_patch(coarse_patch::Mesh.Patch1D, nsubdivisions::Int)
-    fine_breakpoints = subdivide_breakpoints(Mesh.get_breakpoints(coarse_patch), nsubdivisions)
+    fine_breakpoints = subdivide_breakpoints(
+        Mesh.get_breakpoints(coarse_patch), nsubdivisions
+    )
     return Mesh.Patch1D(fine_breakpoints)
 end
 
 """
-    subdivide_patch(coarse_patch::Mesh.Patch, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
+    subdivide_patch(
+        coarse_patch::Mesh.Patch, nsubdivisions::NTuple{manifold_dim, Int}
+    ) where {manifold_dim}
 
 Subdivides `coarse_patch` by uniformly subdiving each element 'nsubdivisions' times,
 across each dimension.
@@ -88,36 +104,46 @@ across each dimension.
 # Arguments
 - `coarse_patch::Mesh.Patch`: Coarse patch.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
+
 # Returns
 - `::Mesh.Patch`: Fine patch.
 """
-function subdivide_patch(coarse_patch::Mesh.Patch, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
-    fine_breakpoints = subdivide_breakpoints(Mesh.get_breakpoints(coarse_patch), nsubdivisions)
+function subdivide_patch(
+    coarse_patch::Mesh.Patch, nsubdivisions::NTuple{manifold_dim, Int}
+) where {manifold_dim}
+    fine_breakpoints = subdivide_breakpoints(
+        Mesh.get_breakpoints(coarse_patch), nsubdivisions
+    )
     return Mesh.Patch(fine_breakpoints)
 end
 
 """
-    subdivide_multiplicity_vector(coarse_multiplicity::Vector{Int}, nsubdivisions::Int, fine_multiplicity::Int)
+    subdivide_multiplicity_vector(
+        coarse_multiplicity::Vector{Int}, nsubdivisions::Int, fine_multiplicity::Int
+    )
 
 Subdivides `coarse_multiplicity` by uniformly subdiving each element 'nsubdivisions' times.
-The coarse multiplicities are preserved in the `fine_multiplicity_vector`, and newly inserted ones
-are given multiplicity `fine_multiplicity`.
+The coarse multiplicities are preserved in the `fine_multiplicity_vector`, and newly
+inserted ones are given multiplicity `fine_multiplicity`.
 
 # Arguments
 - `coarse_multiplicity::Vector{Int}`: Coarse multiplicity vector.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 - `fine_multiplicity::Int`: Multiplicity of each new knot.
+
 # Returns
 - `fine_multiplicity_vector::Vector{Int}`: Fine multiplicity vector.
 """
-function subdivide_multiplicity_vector(coarse_multiplicity::Vector{Int}, nsubdivisions::Int, fine_multiplicity::Int)
-    mult_length = 1 + length(coarse_multiplicity)*(nsubdivisions) - nsubdivisions
+function subdivide_multiplicity_vector(
+    coarse_multiplicity::Vector{Int}, nsubdivisions::Int, fine_multiplicity::Int
+)
+    mult_length = 1 + length(coarse_multiplicity) * (nsubdivisions) - nsubdivisions
 
     fine_multiplicity_vector = fill(fine_multiplicity, mult_length)
 
     coarse_idx = 1
     for k in eachindex(fine_multiplicity_vector)
-        if (k-1)%nsubdivisions + 1 == 1
+        if (k - 1) % nsubdivisions + 1 == 1
             if fine_multiplicity_vector[k] < coarse_multiplicity[coarse_idx]
                 fine_multiplicity_vector[k] = coarse_multiplicity[coarse_idx]
             end
@@ -132,11 +158,13 @@ end
     subdivide_multiplicity_vector(coarse_multiplicity::Vector{Int}, nsubdivisions::Int)
 
 Subdivides `coarse_multiplicity` by uniformly subdiving each element 'nsubdivisions' times.
-The coarse multiplicities are preserved in the final multiplicity vector, and newly inserted ones are given multiplicity 1.
+The coarse multiplicities are preserved in the final multiplicity vector, and newly
+inserted ones are given multiplicity 1.
 
 # Arguments
 - `coarse_multiplicity::Vector{Int}`: Coarse multiplicity vector.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
+
 # Returns
 - `::Vector{Int}`: Fine multiplicity vector.
 """
@@ -145,109 +173,159 @@ function subdivide_multiplicity_vector(coarse_multiplicity::Vector{Int}, nsubdiv
 end
 
 """
-    subdivide_multiplicity_vector(coarse_multiplicity::NTuple{manifold_dim, Vector{Int}}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
+    subdivide_multiplicity_vector(
+        coarse_multiplicity::NTuple{manifold_dim, Vector{Int}},
+        nsubdivisions::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
 
 Subdivides `coarse_multiplicity` by uniformly subdiving each element 'nsubdivisions' times,
-across each dimension.
-The coarse multiplicities are preserved in the final multiplicity vector, and newly inserted ones are given multiplicity 1.
+across each dimension. The coarse multiplicities are preserved in the final multiplicity
+vector, and newly inserted ones are given multiplicity 1.
 
 # Arguments
 - `coarse_multiplicity::NTuple{manifold_dim, Vector{Int}}`: Coarse multiplicity vector.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
+
 # Returns
 - `::NTuple{manifold_dim, Vector{Int}}`: Fine multiplicity vectors.
 """
-function subdivide_multiplicity_vector(coarse_multiplicity::NTuple{manifold_dim, Vector{Int}}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
-    return ntuple(d -> subdivide_multiplicity_vector(coarse_multiplicity[d], nsubdivisions[d]), manifold_dim)
+function subdivide_multiplicity_vector(
+    coarse_multiplicity::NTuple{manifold_dim, Vector{Int}},
+    nsubdivisions::NTuple{manifold_dim, Int},
+) where {manifold_dim}
+    return ntuple(
+        d -> subdivide_multiplicity_vector(coarse_multiplicity[d], nsubdivisions[d]),
+        manifold_dim,
+    )
 end
 
 """
-    subdivide_multiplicity_vector(coarse_multiplicity::NTuple{manifold_dim, Vector{Int}}, nsubdivisions::NTuple{manifold_dim, Int}, fine_multiplicity::NTuple{manifold_dim, Int}) where {manifold_dim}
+    subdivide_multiplicity_vector(
+        coarse_multiplicity::NTuple{manifold_dim, Vector{Int}},
+        nsubdivisions::NTuple{manifold_dim, Int},
+        fine_multiplicity::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
 
 Subdivides `coarse_multiplicity` by uniformly subdiving each element 'nsubdivisions' times,
-across each dimension.
-The coarse multiplicities are preserved in the final multiplicity vector, and newly inserted ones are given multiplicity `fine_multiplicity`.
+across each dimension. The coarse multiplicities are preserved in the final multiplicity
+vector, and newly inserted ones are given multiplicity `fine_multiplicity`.
 
 # Arguments
 - `coarse_multiplicity::NTuple{manifold_dim, Vector{Int}}`: Coarse multiplicity vector.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
 - `fine_multiplicity::NTuple{manifold_dim, Vector{Int}}`: Multiplicity of each new knot.
+
 # Returns
 - `::NTuple{manifold_dim, Vector{Int}}`: Fine multiplicity vectors.
 """
-function subdivide_multiplicity_vector(coarse_multiplicity::NTuple{manifold_dim, Vector{Int}}, nsubdivisions::NTuple{manifold_dim, Int}, fine_multiplicity::NTuple{manifold_dim, Int}) where {manifold_dim}
-    return ntuple(d -> subdivide_multiplicity_vector(coarse_multiplicity[d], nsubdivisions[d], fine_multiplicity[d]), manifold_dim)
+function subdivide_multiplicity_vector(
+    coarse_multiplicity::NTuple{manifold_dim, Vector{Int}},
+    nsubdivisions::NTuple{manifold_dim, Int},
+    fine_multiplicity::NTuple{manifold_dim, Int},
+) where {manifold_dim}
+    return ntuple(
+        d -> subdivide_multiplicity_vector(
+            coarse_multiplicity[d], nsubdivisions[d], fine_multiplicity[d]
+        ),
+        manifold_dim,
+    )
 end
 
 """
     subdivide_knot_vector(coarse_knot_vector::KnotVector, nsubdivisions::Int)
 
 Subdivides `coarse_knot_vector` by uniformly subdiving each element 'nsubdivisions' times.
-The coarse multiplicities are preserved in the `fine_multiplicity`, and newly inserted ones are given multiplicity 1.
+The coarse multiplicities are preserved in the `fine_multiplicity`, and newly inserted ones
+are given multiplicity 1.
 
 # Arguments
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
+
 # Returns
 - `::KnotVector`: Fine knot vector.
 """
 function subdivide_knot_vector(coarse_knot_vector::KnotVector, nsubdivisions::Int)
     fine_patch = subdivide_patch(coarse_knot_vector.patch_1d, nsubdivisions)
-    fine_multiplicity = subdivide_multiplicity_vector(coarse_knot_vector.multiplicity, nsubdivisions)
+    fine_multiplicity = subdivide_multiplicity_vector(
+        coarse_knot_vector.multiplicity, nsubdivisions
+    )
 
     return KnotVector(fine_patch, coarse_knot_vector.polynomial_degree, fine_multiplicity)
 end
 
 """
-    subdivide_knot_vector(coarse_knot_vector::KnotVector, nsubdivisions::Int, fine_multiplicity::Int)
+    subdivide_knot_vector(
+        coarse_knot_vector::KnotVector, nsubdivisions::Int, fine_multiplicity::Int
+    )
 
 Subdivides `coarse_knot_vector` by uniformly subdiving each element 'nsubdivisions' times.
-The coarse multiplicities are preserved in the `fine_multiplicity_vector`, and newly inserted ones are given multiplicity `fine_multiplicity`.
+The coarse multiplicities are preserved in the `fine_multiplicity_vector`, and newly
+inserted ones are given multiplicity `fine_multiplicity`.
 
 # Arguments
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 - `fine_multiplicity::Int`: Multiplicity of each new knot.
+
 # Returns
 - `::KnotVector`: Fine knot vector.
 """
-function subdivide_knot_vector(coarse_knot_vector::KnotVector, nsubdivisions::Int, fine_multiplicity::Int)
+function subdivide_knot_vector(
+    coarse_knot_vector::KnotVector, nsubdivisions::Int, fine_multiplicity::Int
+)
     fine_patch = subdivide_patch(coarse_knot_vector.patch_1d, nsubdivisions)
-    fine_multiplicity_vector = subdivide_multiplicity_vector(coarse_knot_vector.multiplicity, nsubdivisions, fine_multiplicity)
+    fine_multiplicity_vector = subdivide_multiplicity_vector(
+        coarse_knot_vector.multiplicity, nsubdivisions, fine_multiplicity
+    )
 
-    return KnotVector(fine_patch, coarse_knot_vector.polynomial_degree, fine_multiplicity_vector)
+    return KnotVector(
+        fine_patch, coarse_knot_vector.polynomial_degree, fine_multiplicity_vector
+    )
 end
 
 """
-    subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
+    subdivide_space(
+        coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int
+    )
 
-Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times. The coarse multiplicities
-are preserved in the final multiplicity vector, and newly inserted ones are given multiplicity `fine_multiplicity`.
+Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times. The
+coarse multiplicities are preserved in the final multiplicity vector, and newly inserted
+ones are given multiplicity `fine_multiplicity`.
 
 # Arguments
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 - `fine_multiplicity::Int`: Multiplicity of each new knot.
+
 # Returns
 - `::BSplineSpace`: Refined B-spline space.
 """
-function subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
-    fine_knot_vector = subdivide_knot_vector(coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity)
+function subdivide_space(
+    coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int
+)
+    fine_knot_vector = subdivide_knot_vector(
+        coarse_bspline.knot_vector, nsubdivisions, fine_multiplicity
+    )
     p = coarse_bspline.knot_vector.polynomial_degree
     fine_polynomials = get_finer_canonical_space(coarse_bspline.polynomials, nsubdivisions)
 
-    return BSplineSpace(fine_knot_vector.patch_1d, fine_polynomials, p .- fine_knot_vector.multiplicity)
+    return BSplineSpace(
+        fine_knot_vector.patch_1d, fine_polynomials, p .- fine_knot_vector.multiplicity
+    )
 end
 
 """
     subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int)
 
-Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times. The coarse multiplicities
-are preserved in the `fine_multiplicity`, and newly inserted ones are given multiplicity 1.
+Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times. The
+coarse multiplicities are preserved in the `fine_multiplicity`, and newly inserted ones are
+given multiplicity 1.
 
 # Arguments
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
+
 # Returns
 - `::BSplineSpace`: Refined B-spline space.
 """
@@ -256,73 +334,98 @@ function subdivide_space(coarse_bspline::BSplineSpace, nsubdivisions::Int)
 end
 
 """
-    subdivide_space(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
+    subdivide_space(
+        coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+        nsubdivisions::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
 
 Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times,
-across each dimentions.
-The coarse multiplicities are preserved in the `fine_multiplicity`, and newly inserted ones
-are given multiplicity 1.
+across each dimentions. The coarse multiplicities are preserved in the `fine_multiplicity`,
+and newly inserted ones are given multiplicity 1.
 
 # Arguments
 - `coarse_bspline::NTuple{manifold_dim, BSplineSpace}`: Coarse B-spline.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
+
 # Returns
 - `::NTuple{manifold_dim, BSplineSpace}`: Fine B-spline.
 """
-function subdivide_space(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
+function subdivide_space(
+    coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+    nsubdivisions::NTuple{manifold_dim, Int},
+) where {manifold_dim}
     return ntuple(d -> subdivide_space(coarse_bspline[d], nsubdivisions[d]), manifold_dim)
 end
 
 """
-    subdivide_space(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, nsubdivisions::NTuple{manifold_dim, Int}, fine_multiplicity::NTuple{manifold_dim, Vector{Int}}) where {manifold_dim}
+    subdivide_space(
+        coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+        nsubdivisions::NTuple{manifold_dim, Int},
+        fine_multiplicity::NTuple{manifold_dim, Vector{Int}},
+    ) where {manifold_dim}
 
 Subdivides `coarse_bspline` by uniformly subdiving each element 'nsubdivisions' times,
-across each dimentions.
-The coarse multiplicities are preserved in the final multiplicity vectors, and newly inserted ones
-are given multiplicity `fine_multiplicity`.
+across each dimentions. The coarse multiplicities are preserved in the final multiplicity
+vectors, and newly inserted ones are given multiplicity `fine_multiplicity`.
 
 # Arguments
 - `coarse_bspline::NTuple{manifold_dim, BSplineSpace}`: Coarse B-spline.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
 - `fine_multiplicity::NTuple{manifold_dim, Vector{Int}}`: Multiplicity of each new knot.
+
 # Returns
 - `::NTuple{manifold_dim, BSplineSpace}`: Fine B-spline.
 """
-function subdivide_space(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, nsubdivisions::NTuple{manifold_dim, Int}, fine_multiplicity::NTuple{manifold_dim, Vector{Int}}) where {manifold_dim}
-    return ntuple(d -> subdivide_space(coarse_bspline[d], nsubdivisions[d], fine_multiplicity[d]), manifold_dim)
+function subdivide_space(
+    coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+    nsubdivisions::NTuple{manifold_dim, Int},
+    fine_multiplicity::NTuple{manifold_dim, Vector{Int}},
+) where {manifold_dim}
+    return ntuple(
+        d -> subdivide_space(coarse_bspline[d], nsubdivisions[d], fine_multiplicity[d]),
+        manifold_dim,
+    )
 end
 
 # Oslo knot insertion algorithms
 
 """
-    single_knot_insertion_oslo(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector, cf::Int, rf::Int)
+    single_knot_insertion_oslo(
+        coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector, cf::Int, rf::Int
+    )
 
-Algorithm for the coefficients of a change of B-spline representation for a single knot insertion.
-The coarse knot vector is `coarse_knot_vector` and the inserted knot is given by `fine_knot_vector`.
+Algorithm for the coefficients of a change of B-spline representation for a single knot
+insertion. The coarse knot vector is `coarse_knot_vector` and the inserted knot is given by
+`fine_knot_vector`.
 
-For more information, see [A note on the Oslo Algorithm](https://collections.lib.utah.edu/dl_files/66/d4/66d493df0f5c97cce67e0bc1294363d64dde7f06.pdf).
+For more information, see
+[A note on the Oslo Algorithm](https://collections.lib.utah.edu/dl_files/66/d4/66d493df0f5c97cce67e0bc1294363d64dde7f06.pdf).
 
 # Arguments
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knot.
 - `cf::Int`: Index of the coarse knot vector.
-- `rf::Int`: Index of the fine knot vector such that `get_knot_value(coarse_knot_vector,cf) <= get_knot_value(fine_knot_vector,rf) < get_knot_value(coarse_knot_vector,cf+1)`.
+- `rf::Int`: Index of the fine knot vector such that
+    `get_knot_value(coarse_knot_vector,cf) <= get_knot_value(fine_knot_vector,rf) <
+    get_knot_value(coarse_knot_vector,cf+1)`.
+
 # Returns
 - `b::Vector{Float64}`: Coefficients for the change of basis.
 """
-function single_knot_insertion_oslo(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector, cf::Int, rf::Int)
+function single_knot_insertion_oslo(
+    coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector, cf::Int, rf::Int
+)
     b = [1.0]
 
-    for k in 1:coarse_knot_vector.polynomial_degree
-        t1 = get_knot_value.((coarse_knot_vector,), cf+1-k:cf)
-        t2 = get_knot_value.((coarse_knot_vector,), cf+1:cf+k)
-        x = get_knot_value(fine_knot_vector, rf+k)
+    for k in 1:(coarse_knot_vector.polynomial_degree)
+        t1 = get_knot_value.((coarse_knot_vector,), (cf + 1 - k):cf)
+        t2 = get_knot_value.((coarse_knot_vector,), (cf + 1):(cf + k))
+        x = get_knot_value(fine_knot_vector, rf + k)
 
-        w =  (x .- t1) ./ (t2 .- t1)
+        w = (x .- t1) ./ (t2 .- t1)
 
         b = push!((1 .- w) .* b, 0) .+ pushfirst!(w .* b, 0)
     end
-
 
     return b
 end
@@ -331,33 +434,36 @@ end
     build_two_scale_matrix(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
-of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_knot_vector` and the inserted knots are given by `fine_knot_vector`.
+of multiple knots, recursively using `single_knot_insertion_oslo()`. The coarse knot vector
+is `coarse_knot_vector` and the inserted knots are given by `fine_knot_vector`.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_knot_vector::KnotVector`: Coarse knot vector.
 - `fine_knot_vector::KnotVector`: Fine knot vector, with the extra knots.
+
 # Returns
 - `global_extraction_matrix`: Global subdivision matrix
 """
-function build_two_scale_matrix(coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector)
+function build_two_scale_matrix(
+    coarse_knot_vector::KnotVector, fine_knot_vector::KnotVector
+)
     m = get_knot_vector_length(fine_knot_vector)
     nel = size(fine_knot_vector.patch_1d)
     p = coarse_knot_vector.polynomial_degree
-    nfine = m-p-1
+    nfine = m - p - 1
 
-    gm_values = zeros(Float64, nfine*(p+1))
-    gm_rows = zeros(Int, nfine*(p+1))
+    gm_values = zeros(Float64, nfine * (p + 1))
+    gm_rows = zeros(Int, nfine * (p + 1))
     gm_columns = similar(gm_rows)
-    sparse_idx = zeros(Int, p+1)
+    sparse_idx = zeros(Int, p + 1)
 
     cf = p + 1
     rf = 1
     e = 1
 
-    local_subdiv_matrix = create_identity(nel, p+1)
+    local_subdiv_matrix = create_identity(nel, p + 1)
 
     offs = 0
 
@@ -365,21 +471,26 @@ function build_two_scale_matrix(coarse_knot_vector::KnotVector, fine_knot_vector
         mult = get_knot_multiplicity(fine_knot_vector, rf)
 
         lastcf = cf
-        while get_knot_value(coarse_knot_vector, cf+1) <= get_knot_value(fine_knot_vector, rf)
+        while get_knot_value(coarse_knot_vector, cf + 1) <=
+              get_knot_value(fine_knot_vector, rf)
             cf += 1
         end
 
         if e > 1
             offs = cf - lastcf
-            local_subdiv_matrix[e][1:p+1-offs, 1:p+1-mult] .= local_subdiv_matrix[e-1][1+offs:p+1, 1+mult:p+1]
+            local_subdiv_matrix[e][1:(p + 1 - offs), 1:(p + 1 - mult)] .= local_subdiv_matrix[e - 1][
+                (1 + offs):(p + 1), (1 + mult):(p + 1)
+            ]
         end
 
-        for t in p+2-mult:p+1
-            sparse_idx .= (rf-1)*(p+1)+1:rf*(p+1)
-            gm_columns[sparse_idx] .= cf-p:cf
+        for t in (p + 2 - mult):(p + 1)
+            sparse_idx .= ((rf - 1) * (p + 1) + 1):(rf * (p + 1))
+            gm_columns[sparse_idx] .= (cf - p):cf
             gm_rows[sparse_idx] .= rf
 
-            local_subdiv_matrix[e][:, t] = single_knot_insertion_oslo(coarse_knot_vector, fine_knot_vector, cf, rf)
+            local_subdiv_matrix[e][:, t] = single_knot_insertion_oslo(
+                coarse_knot_vector, fine_knot_vector, cf, rf
+            )
             gm_values[sparse_idx] .= local_subdiv_matrix[e][:, t]
 
             rf += 1
@@ -388,19 +499,24 @@ function build_two_scale_matrix(coarse_knot_vector::KnotVector, fine_knot_vector
         e += 1
     end
 
-    global_extraction_matrix = SparseArrays.dropzeros(SparseArrays.sparse(gm_rows, gm_columns, gm_values, rf-1, cf))
+    global_extraction_matrix = SparseArrays.dropzeros(
+        SparseArrays.sparse(gm_rows, gm_columns, gm_values, rf - 1, cf)
+    )
 
     return global_extraction_matrix
 end
 
 """
-    build_two_scale_operator(coarse_bspline::BSplineSpace, fine_bspline::BSplineSpace, nsubdivisions::Int)
+    build_two_scale_operator(
+        coarse_bspline::BSplineSpace{F}, fine_bspline::BSplineSpace{F}, nsubdivisions::Int
+    ) where {F <: AbstractCanonicalSpace}
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
-of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by `fine_bspline.knot_vector`.
+of multiple knots, recursively using `single_knot_insertion_oslo()`. The coarse knot vector
+is `coarse_bspline.knot_vector` and the inserted knots are given by
+`fine_bspline.knot_vector`.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
@@ -408,55 +524,77 @@ For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
 - `nsubdivisions::Int`: Number of times each element is subdivided.
 
 # Returns
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
-and finer B-spline space.
+- `::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a
+    twoscale_operator and finer B-spline space.
 """
-function build_two_scale_operator(coarse_bspline::BSplineSpace{F}, fine_bspline::BSplineSpace{F}, nsubdivisions::Int) where {F <: AbstractCanonicalSpace}
+function build_two_scale_operator(
+    coarse_bspline::BSplineSpace{F}, fine_bspline::BSplineSpace{F}, nsubdivisions::Int
+) where {F <: AbstractCanonicalSpace}
     if F <: Bernstein
         gm = build_two_scale_matrix(coarse_bspline.knot_vector, fine_bspline.knot_vector)
 
     else
         # build the element subdivision matrix
-        el_subdivision_mat = build_two_scale_matrix(coarse_bspline.polynomials, nsubdivisions)
+        el_subdivision_mat = build_two_scale_matrix(
+            coarse_bspline.polynomials, nsubdivisions
+        )
 
         # assemble the global extraction operators for the coarse and fine spaces
         coarse_extraction_mat = assemble_global_extraction_matrix(coarse_bspline)
         fine_extraction_mat = assemble_global_extraction_matrix(fine_bspline)
 
         # concatenate the two_scale_operator subdivision matrices in a block diagonal format
-        discont_subdivision_mat = SparseArrays.blockdiag([el_subdivision_mat for i = 1:get_num_elements(coarse_bspline)]...)
+        discont_subdivision_mat = SparseArrays.blockdiag(
+            [el_subdivision_mat for i in 1:get_num_elements(coarse_bspline)]...
+        )
 
         # compute the two-scale matrix by solving a least-squares problem
-        gm = SparseArrays.sparse(fine_extraction_mat \ Array(discont_subdivision_mat * coarse_extraction_mat))
+        gm = SparseArrays.sparse(
+            fine_extraction_mat \ Array(discont_subdivision_mat * coarse_extraction_mat)
+        )
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, gm)
     end
 
     coarse_to_fine_elements = get_coarse_to_fine(coarse_bspline, nsubdivisions)
     fine_to_coarse_elements = get_fine_to_coarse(fine_bspline, nsubdivisions)
 
-    return TwoScaleOperator(coarse_bspline, fine_bspline, gm, coarse_to_fine_elements, fine_to_coarse_elements), fine_bspline
+    return TwoScaleOperator(
+        coarse_bspline, fine_bspline, gm, coarse_to_fine_elements, fine_to_coarse_elements
+    ),
+    fine_bspline
 end
 
 """
-    build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
-
+    build_two_scale_operator(
+        coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int
+    )
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
-of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by `nsubdivisions`, meaning `nsubdivisions-1` uniformly spaced knots are inserted, between coarse breakpoints, with multiplicity 1.
+of multiple knots, recursively using `single_knot_insertion_oslo()`. The coarse knot vector
+is `coarse_bspline.knot_vector` and the inserted knots are given by `nsubdivisions`,
+meaning `nsubdivisions-1` uniformly spaced knots are inserted, between coarse breakpoints,
+with multiplicity 1.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
-- `fine_multiplicity::Int`: Multiplicity of each new knot in refined knot vector.
+- `fine_multiplicity::Int`: Multiplicity of each new knot in refined knot vector.\
+
 # Returns
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
-and finer B-spline space.
+- `::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a
+    twoscale_operator and finer B-spline space.
 """
-function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int)
-    nsubdivisions > 0 || throw(ArgumentError("Number of subdivions must be greater than 0.
-    nsubdivisions=$nsubdivisions was given."))
+function build_two_scale_operator(
+    coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int
+)
+    if nsubdivisions <= 0
+        throw(ArgumentError("""\
+            Number of subdivions must be greater than 0. nsubdivisions=$nsubdivisions was \
+            given.\
+            """
+        ))
+    end
 
     fine_bspline = subdivide_space(coarse_bspline, nsubdivisions, fine_multiplicity)
 
@@ -468,89 +606,128 @@ end
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
 of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by `nsubdivisions`, meaning `nsubdivisions-1` uniformly spaced knots are inserted, between coarse breakpoints, with multiplicity 1.
+The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by
+`nsubdivisions`, meaning `nsubdivisions-1` uniformly spaced knots are inserted, between
+coarse breakpoints, with multiplicity 1.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_bspline::BSplineSpace`: Coarse B-spline.
 - `nsubdivisions::Int`: Number of times each element is subdivided.
+
 # Returns
-- `(::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a twoscale_operator
-and finer B-spline space.
+- `::FiniteElementSpaces.TwoScaleOperator, fine_bspline::BSplineSpace`: Tuple with a
+    twoscale_operator and finer B-spline space.
 """
 function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::Int)
     return build_two_scale_operator(coarse_bspline, nsubdivisions, 1)
 end
 
-function build_two_scale_operator(coarse_bspline::BSplineSpace, nsubdivisions::NTuple{1,Int})
+function build_two_scale_operator(
+    coarse_bspline::BSplineSpace, nsubdivisions::NTuple{1, Int}
+)
     return build_two_scale_operator(coarse_bspline, nsubdivisions[1])
 end
 
 """
-    build_two_scale_operator(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
+    build_two_scale_operator(
+        coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+        nsubdivisions::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
-of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by `nsubdivisions`, meaning `nsubdivisions-1` uniformly spaced knots are inserted, between coarse breakpoints, with multiplicity 1,
-across each dimension.
+of multiple knots, recursively using `single_knot_insertion_oslo()`. The coarse knot vector
+is `coarse_bspline.knot_vector` and the inserted knots are given by `nsubdivisions`,
+meaning `nsubdivisions-1` uniformly spaced knots are inserted, between coarse breakpoints,
+with multiplicity 1, across each dimension.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_bspline::NTuple{manifold_dim, BSplineSpace}`: Coarse B-spline.
 - `nsubdivisions::NTuple{manifold_dim, Int}`: Number of times each element is subdivided.
 # Returns
-- `::NTuple{manifold_dim, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
+- `::NTuple{manifold_dim, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer
+    B-spline spaces.
 """
-function build_two_scale_operator(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, nsubdivisions::NTuple{manifold_dim, Int}) where {manifold_dim}
-    return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], nsubdivisions[d]), manifold_dim)
+function build_two_scale_operator(
+    coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+    nsubdivisions::NTuple{manifold_dim, Int},
+) where {manifold_dim}
+    return ntuple(
+        d -> build_two_scale_operator(coarse_bspline.knot_vector[d], nsubdivisions[d]),
+        manifold_dim,
+    )
 end
 
 """
-    build_two_scale_operator(coarse_bspline::NTuple{manifold_dim, BSplineSpace}) where {manifold_dim}
+    build_two_scale_operator(
+        coarse_bspline::NTuple{manifold_dim, BSplineSpace}
+    ) where {manifold_dim}
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
-of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by bisection,
-with multiplicity 1, across each dimension.
+of multiple knots, recursively using `single_knot_insertion_oslo()`. The coarse knot vector
+is `coarse_bspline.knot_vector` and the inserted knots are given by bisection, with
+multiplicity 1, across each dimension.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_bspline::NTuple{manifold_dim, BSplineSpace}`: Coarse B-spline.
+
 # Returns
-- `::NTuple{manifold_dim, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
+- `::NTuple{manifold_dim, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer
+    B-spline spaces.
 """
-function build_two_scale_operator(coarse_bspline::NTuple{manifold_dim, BSplineSpace}) where {manifold_dim}
+function build_two_scale_operator(
+    coarse_bspline::NTuple{manifold_dim, BSplineSpace}
+) where {manifold_dim}
     return build_two_scale_operator(coarse_bspline, ntuple(d -> 2, manifold_dim))
 end
 
 """
-    build_two_scale_operator(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, fine_bspline::NTuple{manifold_dim, BSplineSpace}) where {manifold_dim}
+    build_two_scale_operator(
+        coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+        fine_bspline::NTuple{manifold_dim, BSplineSpace},
+    ) where {manifold_dim}
 
 Algorithm for the coefficients of a change of B-spline representation for knot insertion
-of multiple knots, recursively using `single_knot_insertion_oslo()`.
-The coarse knot vector is `coarse_bspline.knot_vector` and the inserted knots are given by `fine_bspline.knot_vector`,
-across each dimension.
+of multiple knots, recursively using `single_knot_insertion_oslo()`. The coarse knot vector
+is `coarse_bspline.knot_vector` and the inserted knots are given by
+`fine_bspline.knot_vector`, across each dimension.
 
-For more information, see [Paper](https://doi.org/10.1016/j.cma.2017.08.017).
+For more information, see [Dangella2018](@cite).
 
 # Arguments
 - `coarse_bspline::NTuple{manifold_dim, BSplineSpace}`: Coarse B-splines.
 - `fine_bspline::NTuple{manifold_dim, BSplineSpace}`: Fine B-splines, with extra knots.
+
 # Returns
-- `::NTuple{manifold_dim, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer B-spline spaces.
+- `::NTuple{manifold_dim, Vector{Matrix{Float64}}}`: Two-scale relation operators and finer
+    B-spline spaces.
 """
-function build_two_scale_operator(coarse_bspline::NTuple{manifold_dim, BSplineSpace}, fine_bspline::NTuple{manifold_dim, BSplineSpace}) where {manifold_dim}
-    return ntuple(d -> build_two_scale_operator(coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]), manifold_dim)
+function build_two_scale_operator(
+    coarse_bspline::NTuple{manifold_dim, BSplineSpace},
+    fine_bspline::NTuple{manifold_dim, BSplineSpace},
+) where {manifold_dim}
+    return ntuple(
+        d -> build_two_scale_operator(
+            coarse_bspline.knot_vector[d], fine_bspline.knot_vector[d]
+        ),
+        manifold_dim,
+    )
 end
 
-
 """
-    get_contained_knot_vector(first_element_id, last_element_id, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
+    get_contained_knot_vector(
+        first_element_id::Int, last_element_id::Int, ts::T, fine_space::BSplineSpace
+    ) where {T <: AbstractTwoScaleOperator}
 
-Compute and return the subset of the knot vector of level l+1, corresponding to `fine_space`, contained within the interval of elements defined by `first_element_id` and `last_element_id`. Note that 'first_element_id' should be less or equal than 'last_element_id'.
+Compute and return the subset of the knot vector of level l+1, corresponding to
+`fine_space`, contained within the interval of elements defined by `first_element_id`
+and `last_element_id`. Note that 'first_element_id' should be less or equal than
+'last_element_id'.
 
 # Arguments
 - `first_element_id::Int`: The first element index of the interval.
@@ -559,16 +736,30 @@ Compute and return the subset of the knot vector of level l+1, corresponding to 
 - `fine_space::BSplineSpace`: The level l+1 B-spline space.
 
 # Returns
-- `::KnotVector`: The level l+1 knot vector contained within the specified range of level l elements.
+- `::KnotVector`: The level l+1 knot vector contained within the specified range of level
+    l elements.
 """
-function get_contained_knot_vector(first_element_id::Int, last_element_id::Int, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
-    first_element_id<=last_element_id ? nothing : throw(ArgumentError("'first_element_id' should be less or equal than 'last_element_id'"))
+function get_contained_knot_vector(
+    first_element_id::Int, last_element_id::Int, ts::T, fine_space::BSplineSpace
+) where {T <: AbstractTwoScaleOperator}
+    if first_element_id <= last_element_id
+        nothing
+    else
+        throw(
+        ArgumentError("'first_element_id' should be less or equal than 'last_element_id'")
+    )
+    end
 
-    finer_element_indices = [child for element in first_element_id:last_element_id for child in get_element_children(ts, element)]
-    breakpoint_indices = minimum(finer_element_indices):(maximum(finer_element_indices)+1)
+    finer_element_indices = [
+        child for element in first_element_id:last_element_id for
+        child in get_element_children(ts, element)
+    ]
+    breakpoint_indices = minimum(finer_element_indices):(maximum(finer_element_indices) + 1)
 
     breakpoints = get_breakpoints(get_patch(fine_space))[breakpoint_indices]
     multiplicity = get_multiplicity_vector(fine_space)[breakpoint_indices]
 
-    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity)
+    return KnotVector(
+        Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity
+    )
 end

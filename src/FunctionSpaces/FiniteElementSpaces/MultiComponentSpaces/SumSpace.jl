@@ -1,17 +1,25 @@
 """
     SumSpace{manifold_dim, num_components, F}
 
-A multi-valued space that is the sum of `num_components` input scalar function spaces. Each scalar function space contributes to each component of the multi-valued space.
+A multi-valued space that is the sum of `num_components` input scalar function spaces.
+Each scalar function space contributes to each component of the multi-valued space.
 
 # Fields
 - `component_spaces::F`: Tuple of `num_components` scalar function spaces
 """
-struct SumSpace{manifold_dim, num_components, F} <: AbstractFESpace{manifold_dim, num_components}
+struct SumSpace{manifold_dim, num_components, F} <:
+       AbstractFESpace{manifold_dim, num_components}
     component_spaces::F
     space_dim::Int
 
-    function SumSpace(component_spaces::F, space_dim::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}}}
-        new{manifold_dim, num_components, F}(component_spaces, space_dim)
+    function SumSpace(
+        component_spaces::F, space_dim::Int
+    ) where {
+        manifold_dim,
+        num_components,
+        F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}},
+    }
+        return new{manifold_dim, num_components, F}(component_spaces, space_dim)
     end
 end
 
@@ -31,9 +39,20 @@ function get_component_spaces(space::SumSpace)
 end
 
 """
-    evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components}
+    evaluate(
+        space::SumSpace{manifold_dim, num_components, F},
+        element_idx::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+        nderivatives::Int,
+    ) where {
+        manifold_dim,
+        num_components,
+        F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}},
+    }
 
-Evaluate the basis functions of the sum space at the points `xi` in the element with index `element_idx`. The function returns a tuple of `num_components` arrays, each containing the evaluations of the basis functions of the component spaces.
+Evaluate the basis functions of the sum space at the points `xi` in the element with index
+`element_idx`. The function returns a tuple of `num_components` arrays, each containing the
+evaluations of the basis functions of the component spaces.
 
 # Arguments
 - `space::SumSpace{manifold_dim,num_components,F}`: Sum space
@@ -42,45 +61,67 @@ Evaluate the basis functions of the sum space at the points `xi` in the element 
 - `nderivatives::Int`: Number of derivatives to evaluate
 
 # Returns
-- `local_multivalued_basis::Vector{Matrix{Float64}}`: Vector of matrices containing the evaluations of the basis functions of the sum space
-- `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the basis functions
+- `local_multivalued_basis::Vector{Matrix{Float64}}`: Vector of matrices containing the
+    evaluations of the basis functions of the sum space.
+- `multivalued_basis_indices::Vector{Int}`: Array containing the global indices of the
+    basis functions.
 """
-function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, num_components, F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}}}
+function evaluate(
+    space::SumSpace{manifold_dim, num_components, F},
+    element_idx::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+    nderivatives::Int,
+) where {
+    manifold_dim,
+    num_components,
+    F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}},
+}
 
     # get the multi-valued basis indices
-    multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(space, element_idx)
+    multivalued_basis_indices, component_basis_indices = get_basis_indices_w_components(
+        space, element_idx
+    )
     # number of multivalued basis functions
     num_multivaluedbasis = length(multivalued_basis_indices)
     # find the local column that each component contributes to
-    column_indices_per_component = [indexin(component_basis_indices[i], multivalued_basis_indices) for i in 1:num_components]
+    column_indices_per_component = [
+        indexin(component_basis_indices[i], multivalued_basis_indices) for
+        i in 1:num_components
+    ]
     # number of evaluation points
     n_evaluation_points = prod(size.(xi, 1))
 
     # Generate keys for all possible derivative combinations
-    der_keys = integer_sums(nderivatives, manifold_dim+1)
+    der_keys = integer_sums(nderivatives, manifold_dim + 1)
     # Initialize storage of local basis functions and derivatives
-    local_multivalued_basis = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
+    local_multivalued_basis = Vector{Vector{Vector{Matrix{Float64}}}}(
+        undef, nderivatives + 1
+    )
     for j in 0:nderivatives
         # number of derivatives of order j
         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
         # allocate space
         local_multivalued_basis[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
         for der_idx in 1:num_j_ders
-            local_multivalued_basis[j + 1][der_idx] = [zeros(n_evaluation_points,num_multivaluedbasis) for _ in 1:num_components]
+            local_multivalued_basis[j + 1][der_idx] = [
+                zeros(n_evaluation_points, num_multivaluedbasis) for _ in 1:num_components
+            ]
         end
     end
 
     # loop over all components...
     for component_idx in 1:num_components
         # ... evaluate component spaces ...
-        local_component_basis, _ = FunctionSpaces.evaluate(space.component_spaces[component_idx], element_idx, xi, nderivatives)
+        local_component_basis, _ = FunctionSpaces.evaluate(
+            space.component_spaces[component_idx], element_idx, xi, nderivatives
+        )
         # ... then store the derivatives in the right places ...
         for key in der_keys
             key = key[1:manifold_dim]
             j = sum(key) # order of derivative
             der_idx = get_derivative_idx(key) # index of derivative
 
-            local_multivalued_basis[j + 1][der_idx][component_idx][:, column_indices_per_component[component_idx]] .= local_component_basis[j+1][der_idx]
+            local_multivalued_basis[j + 1][der_idx][component_idx][:, column_indices_per_component[component_idx]] .= local_component_basis[j + 1][der_idx]
         end
     end
 
@@ -88,7 +129,8 @@ function evaluate(space::SumSpace{manifold_dim, num_components, F}, element_idx:
 end
 
 function get_basis_indices(space::SumSpace, element_idx::Int)
-    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+    component_basis_indices =
+        FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
 
     return union(component_basis_indices...)
 end
@@ -96,18 +138,22 @@ end
 """
     get_basis_indices_w_components(space::SumSpace, element_idx::Int)
 
-Get the global indices of the multivalued basis functions of the sum space as well as the component spaces for the element with index `element_idx`.
+Get the global indices of the multivalued basis functions of the sum space as well as the
+component spaces for the element with index `element_idx`.
 
 # Arguments
 - `space::SumSpace`: Sum space
 - `element_idx::Int`: Index of the element
 
 # Returns
-- `multivalued_basis_indices::Vector{Int}`: Global indices of the multivalued basis functions
-- `component_basis_indices::Vector{Vector{Int}}`: Global indices of the basis functions of the component spaces
+- `multivalued_basis_indices::Vector{Int}`: Global indices of the multivalued basis
+    functions.
+- `component_basis_indices::Vector{Vector{Int}}`: Global indices of the basis functions of
+    the component spaces.
 """
 function get_basis_indices_w_components(space::SumSpace, element_idx::Int)
-    component_basis_indices = FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
+    component_basis_indices =
+        FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
 
     return union(component_basis_indices...), component_basis_indices
 end

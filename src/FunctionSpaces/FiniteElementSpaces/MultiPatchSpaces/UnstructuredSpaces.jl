@@ -2,13 +2,17 @@
 """
     UnstructuredSpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, 1}
 
-An `manifold_dim`-variate multi-patch space with `m` patches, representing an unstructured finite element space.
+An `manifold_dim`-variate multi-patch space with `m` patches, representing an unstructured
+finite element space.
 
 # Fields
-- `function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}`: Collection of `m` (uni or multivariate) function spaces.
-- `extraction_op::ExtractionOperator`: Extraction operator that specifies how to combine functions from the `m` spaces into functions for the unstructured space.
+- `function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}`: Collection of `m` (uni or
+    multivariate) function spaces.
+- `extraction_op::ExtractionOperator`: Extraction operator that specifies how to combine
+    functions from the `m` spaces into functions for the unstructured space.
 - `dof_partition::Vector{Vector{Int}}`: Partition of degrees of freedom.
-- `us_config::Dict`: Dictionary that stores helper functionality (e.g., connectivity) for the unstructured space.
+- `us_config::Dict`: Dictionary that stores helper functionality (e.g., connectivity) for
+    the unstructured space.
 - `data::Dict`: Any auxiliary data that the user wants to store for this unstructured space.
 """
 struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
@@ -18,36 +22,61 @@ struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
     us_config::Dict
     data::Dict
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{manifold_dim, 1}}, extraction_op::ExtractionOperator, dof_partition::Vector{Vector{Vector{Int}}}, us_config::Dict, data::Dict) where {manifold_dim, m}
+    function UnstructuredSpace(
+        function_spaces::NTuple{m, AbstractFESpace{manifold_dim, 1}},
+        extraction_op::ExtractionOperator,
+        dof_partition::Vector{Vector{Vector{Int}}},
+        us_config::Dict,
+        data::Dict,
+    ) where {manifold_dim, m}
         # Initialize with empty dof partitioning
-        new{manifold_dim, m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        return new{manifold_dim, m}(
+            function_spaces, extraction_op, dof_partition, us_config, data
+        )
     end
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1}}, extraction_op::ExtractionOperator, data::Dict) where {m}
-        UnstructuredSpace(function_spaces, extraction_op, 1, 1, data)
+    function UnstructuredSpace(
+        function_spaces::NTuple{m, AbstractFESpace{1}},
+        extraction_op::ExtractionOperator,
+        data::Dict,
+    ) where {m}
+        return UnstructuredSpace(function_spaces, extraction_op, 1, 1, data)
     end
 
-    function UnstructuredSpace(function_spaces::NTuple{m,AbstractFESpace{1, 1}}, extraction_op::ExtractionOperator, n_dofs_left::Int, n_dofs_right::Int, data::Dict) where {m}
+    function UnstructuredSpace(
+        function_spaces::NTuple{m, AbstractFESpace{1, 1}},
+        extraction_op::ExtractionOperator,
+        n_dofs_left::Int,
+        n_dofs_right::Int,
+        data::Dict,
+    ) where {m}
         # Build 1D topology
-        patch_neighbours = [-1 (1:m-1)...
-                            (2:m)... -1]
+        patch_neighbours = [
+            -1 (1:(m - 1))...
+            (2:m)... -1
+        ]
         # Number of elements per patch
-        patch_nels = [0; cumsum([get_num_elements(function_spaces[i]) for i = 1:m])]
+        patch_nels = [0; cumsum([get_num_elements(function_spaces[i]) for i in 1:m])]
 
         # Assemble patch config in a dictionary
         us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
 
-        # Allocate memory for degree of freedom partitioning: note, even if the 1D space is implemented as a multipatch object, the dof partition treats it as a single patch!
-        dof_partition = Vector{Vector{Vector{Int}}}(undef,1)
-        dof_partition[1] = Vector{Vector{Int}}(undef,3)
+        # Allocate memory for degree of freedom partitioning: note, even if the 1D space is
+        # implemented as a multipatch object, the dof partition treats it as a single patch!
+        dof_partition = Vector{Vector{Vector{Int}}}(undef, 1)
+        dof_partition[1] = Vector{Vector{Int}}(undef, 3)
         # First, store the left dofs ...
         dof_partition[1][1] = collect(1:n_dofs_left)
         # ... then the interior dofs ...
-        dof_partition[1][2] = collect(n_dofs_left+1:get_num_basis(extraction_op)-n_dofs_right)
+        dof_partition[1][2] = collect(
+            (n_dofs_left + 1):(get_num_basis(extraction_op) - n_dofs_right)
+        )
         # ... and then finally the right dofs.
-        dof_partition[1][3] = collect(get_num_basis(extraction_op)-n_dofs_right+1:get_num_basis(extraction_op))
+        dof_partition[1][3] = collect(
+            (get_num_basis(extraction_op) - n_dofs_right + 1):get_num_basis(extraction_op)
+        )
 
-        new{1, m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        return new{1, m}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 end
 
@@ -98,7 +127,12 @@ function get_max_local_dim(space::UnstructuredSpace)
     return maximum(get_max_local_dim.(space.function_spaces))
 end
 
-function get_local_basis(space::UnstructuredSpace{manifold_dim, m}, element_id::Int, xi::NTuple{manifold_dim,Vector{Float64}}, nderivatives::Int) where {manifold_dim, m}
+function get_local_basis(
+    space::UnstructuredSpace{manifold_dim, m},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+    nderivatives::Int,
+) where {manifold_dim, m}
     # We need space ID and local element ID to know which function space to evaluate.
     space_id, space_element_id = get_local_space_and_element_id(space, element_id)
 
@@ -136,14 +170,18 @@ Get the global element ID for the specified constituent space ID and local eleme
 # Returns
 - `::Int`: The global element ID.
 """
-function get_global_element_id(us_space::UnstructuredSpace, space_id::Int, space_element_id::Int)
+function get_global_element_id(
+    us_space::UnstructuredSpace, space_id::Int, space_element_id::Int
+)
     return us_space.us_config["patch_nels"][space_id] + space_element_id
 end
 
 """
     assemble_global_extraction_matrix(us_space::UnstructuredSpace)
 
-Loops over all elements and assembles the global extraction matrix for the unstructured space. The extraction matrix is a sparse matrix that maps the local basis functions to the global basis functions.
+Loops over all elements and assembles the global extraction matrix for the unstructured
+space. The extraction matrix is a sparse matrix that maps the local basis functions to the
+global basis functions.
 
 # Arguments
 - `us_space::UnstructuredSpace`: The unstructured space.
@@ -159,7 +197,7 @@ function assemble_global_extraction_matrix(us_space::UnstructuredSpace)
     global_extraction_matrix = zeros(Float64, local_basis_offset[end], num_global_basis)
 
     # Loop over all elements
-    for element_id = 1:get_num_elements(us_space)
+    for element_id in 1:get_num_elements(us_space)
         # Get the extraction coefficients and global basis indices
         extraction_coefficients, global_basis_indices = get_extraction(us_space, element_id)
 
@@ -167,10 +205,14 @@ function assemble_global_extraction_matrix(us_space::UnstructuredSpace)
         space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
 
         # Get the (offsetted) local basis indices
-        _, local_basis_indices = get_extraction(us_space.function_spaces[space_id], space_element_id)
+        _, local_basis_indices = get_extraction(
+            us_space.function_spaces[space_id], space_element_id
+        )
 
         # Assemble the global extraction matrix
-        global_extraction_matrix[local_basis_indices .+ local_basis_offset[space_id], global_basis_indices] = extraction_coefficients
+        global_extraction_matrix[
+            local_basis_indices .+ local_basis_offset[space_id], global_basis_indices
+        ] = extraction_coefficients
     end
 
     return SparseArrays.sparse(global_extraction_matrix)

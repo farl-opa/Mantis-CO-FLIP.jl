@@ -117,7 +117,7 @@ necessarily a tight upper bound.
 - `::Int`: The element-local upper bound.
 """
 function get_max_local_dim(space::AbstractFESpace)
-    error("get_max_local_dim not implemented for $(typeof(space))")
+    return error("get_max_local_dim not implemented for $(typeof(space))")
 end
 
 """
@@ -167,7 +167,7 @@ function get_local_basis(
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
 ) where {manifold_dim, num_components}
-    error("get_local_basis not implemented for $(typeof(space))")
+    return error("get_local_basis not implemented for $(typeof(space))")
 end
 
 """
@@ -217,14 +217,15 @@ function evaluate(
     local_basis = get_local_basis(space, element_id, xi, nderivatives)
     evaluation = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
-        n_ders = length(local_basis[j+1])
-        evaluation[j+1] = Vector{Matrix{Float64}}(undef, n_ders)
+        n_ders = length(local_basis[j + 1])
+        evaluation[j + 1] = Vector{Matrix{Float64}}(undef, n_ders)
     end
 
     for j in 0:nderivatives
-        for k in 1:length(local_basis[j+1])
-            if isassigned(local_basis[j+1],k)
-                evaluation[j+1][k] = @views local_basis[j+1][k] * extraction_coefficients
+        for k in 1:length(local_basis[j + 1])
+            if isassigned(local_basis[j + 1], k)
+                evaluation[j + 1][k] = @views local_basis[j + 1][k] *
+                    extraction_coefficients
             end
         end
     end
@@ -235,21 +236,21 @@ end
 function evaluate(
     space::AbstractFESpace{manifold_dim, num_components},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}},
+    xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
     coeffs::Vector{Float64},
 ) where {manifold_dim, num_components}
     basis_eval, basis_indices = evaluate(space, element_id, xi, nderivatives)
     evaluation = Vector{Vector{Vector{Float64}}}(undef, nderivatives + 1)
-    for j = 0:nderivatives
-        n_ders = length(basis_eval[j+1])
-        evaluation[j+1] = Vector{Vector{Float64}}(undef, n_ders)
+    for j in 0:nderivatives
+        n_ders = length(basis_eval[j + 1])
+        evaluation[j + 1] = Vector{Vector{Float64}}(undef, n_ders)
     end
 
-    for j = 0:nderivatives
-        for k = 1:length(basis_eval[j+1])
-            if isassigned(basis_eval[j+1],k)
-                evaluation[j+1][k] = @views basis_eval[j+1][k] * coeffs[basis_indices]
+    for j in 0:nderivatives
+        for k in 1:length(basis_eval[j + 1])
+            if isassigned(basis_eval[j + 1], k)
+                evaluation[j + 1][k] = @views basis_eval[j + 1][k] * coeffs[basis_indices]
             end
         end
     end
@@ -290,16 +291,16 @@ function _evaluate_all_at_point(
     J = zeros(Int, nloc * (nderivatives + 1))
     V = zeros(Float64, nloc * (nderivatives + 1))
     count = 0
-    for r = 0:nderivatives
-        for i = 1:nloc
-            I[count+1] = basis_indices[i]
-            J[count+1] = r+1
-            V[count+1] = basis_eval[r+1][1][1, i]
+    for r in 0:nderivatives
+        for i in 1:nloc
+            I[count + 1] = basis_indices[i]
+            J[count + 1] = r + 1
+            V[count + 1] = basis_eval[r + 1][1][1, i]
             count += 1
         end
     end
 
-    return SparseArrays.sparse(I, J, V, ndofs, nderivatives+1)
+    return SparseArrays.sparse(I, J, V, ndofs, nderivatives + 1)
 end
 
 """
@@ -322,16 +323,17 @@ of a finite element space.
 - `coeffs::Matrix{Float64}`: The coefficients necessary for representing the parametric
     geometry. The size of the matrix is (num_basis x manifold_dim).
 """
-function _compute_parametric_geometry_coeffs(fem_space::F) where {
-    manifold_dim, num_components, F<:AbstractFESpace{manifold_dim, num_components}
-}
-
+function _compute_parametric_geometry_coeffs(
+    fem_space::F
+) where {manifold_dim, num_components, F <: AbstractFESpace{manifold_dim, num_components}}
     function _compute_element_xi(xi_canonical_prod, element_vertices)
         element_xi = Matrix{Float64}(undef, size(xi_canonical_prod))
 
         # affine transformation x ↦ a+x(b-a)
-        for dim ∈ axes(xi_canonical_prod, 2)
-            element_xi[:,dim] = @. element_vertices[dim][1] + xi_canonical_prod[:,dim] * (element_vertices[dim][2] - element_vertices[dim][1])
+        for dim in axes(xi_canonical_prod, 2)
+            element_xi[:, dim] = @. element_vertices[dim][1] +
+                xi_canonical_prod[:, dim] *
+                                    (element_vertices[dim][2] - element_vertices[dim][1])
         end
 
         return element_xi
@@ -341,23 +343,23 @@ function _compute_parametric_geometry_coeffs(fem_space::F) where {
     num_xi_per_dim = degrees .+ 1
     num_xi = prod(num_xi_per_dim)
 
-    xi_canonical = tuple(collect.(range(0,1, num_xi_per_dim[i]) for i ∈ 1:manifold_dim)...)
+    xi_canonical = tuple(collect.(range(0, 1, num_xi_per_dim[i]) for i in 1:manifold_dim)...)
     xi_canonical_prod = Matrix{Float64}(undef, num_xi, manifold_dim)
-    for (id, point) ∈ enumerate(Iterators.product(xi_canonical...))
+    for (id, point) in enumerate(Iterators.product(xi_canonical...))
         xi_canonical_prod[id, :] .= point
     end
 
     num_elements = get_num_elements(fem_space)
 
-    points = Matrix{Float64}(undef, num_elements*num_xi, manifold_dim)
+    points = Matrix{Float64}(undef, num_elements * num_xi, manifold_dim)
     A = zeros(size(points, 1), get_num_basis(fem_space))
 
-    for element_id ∈ 1:num_elements
+    for element_id in 1:num_elements
         element_vertices = get_element_vertices(fem_space, element_id)
         element_xi = _compute_element_xi(xi_canonical_prod, element_vertices)
 
-        curr_points_ids = (element_id-1)*num_xi+1 : element_id*num_xi
-        points[curr_points_ids,:] = element_xi
+        curr_points_ids = ((element_id - 1) * num_xi + 1):(element_id * num_xi)
+        points[curr_points_ids, :] = element_xi
         eval = evaluate(fem_space, element_id, xi_canonical)
         A[curr_points_ids, eval[2]] .= eval[1][1][1]
     end
@@ -366,7 +368,6 @@ function _compute_parametric_geometry_coeffs(fem_space::F) where {
 
     return coeffs
 end
-
 
 include("FiniteElementSpacesHelpers.jl")
 # Extraction operator: functionaly for extraction operator

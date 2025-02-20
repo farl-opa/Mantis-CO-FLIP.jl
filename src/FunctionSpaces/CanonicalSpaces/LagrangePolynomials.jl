@@ -7,7 +7,7 @@ end
 
 function LobattoLegendre(p::Int)
     ll_polynomials = PolynomialBases.LobattoLegendre(p)
-    nodes = (ll_polynomials.nodes .+ 1.0)./2.0
+    nodes = (ll_polynomials.nodes .+ 1.0) ./ 2.0
     return LobattoLegendre(p, nodes, ll_polynomials)
 end
 
@@ -19,7 +19,7 @@ end
 
 function GaussLegendre(p::Int)
     gl_polynomials = PolynomialBases.GaussLegendre(p)
-    nodes = (gl_polynomials.nodes .+ 1.0)./2.0
+    nodes = (gl_polynomials.nodes .+ 1.0) ./ 2.0
     return GaussLegendre(p, nodes, gl_polynomials)
 end
 
@@ -45,10 +45,10 @@ i.e., they satisfy an integral Kronecker-``\delta`` property.
 
 # Fields
 - `p::Int`: polynomial degree.
-- `nodes::Vector{Float64}`: the nodes of the Gauss-Lobatto-Legendre Lagrange polynomials associated to it.
+- `nodes::Vector{Float64}`: the nodes of the Gauss-Lobatto-Legendre Lagrange polynomials
+    associated to it.
 
-[1] Gerritsma, M.: Edge functions for spectral element methods.
-    Submitted to the proceedings of ICOSAHOM 2009
+See [Gerritsma2011](@cite) for more details.
 """
 struct EdgeLobattoLegendre <: AbstractEdgePolynomials
     p::Int  # Polynomial degree
@@ -57,7 +57,7 @@ struct EdgeLobattoLegendre <: AbstractEdgePolynomials
 end
 
 function EdgeLobattoLegendre(p::Int)
-    ll_polynomials = LobattoLegendre(p+1)
+    ll_polynomials = LobattoLegendre(p + 1)
     nodes = ll_polynomials.nodes  # no need to rescale because they are already rescaled
     return EdgeLobattoLegendre(p, nodes, ll_polynomials)
 end
@@ -81,7 +81,9 @@ up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \f
 
 See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-@Memoization.memoize function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64)
+Memoization.@memoize function evaluate(
+    polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64
+)
     # Get information from inputs on size of computation
     n_points = size(ξ, 1)  # the number of points where to evaluate the polynomials and their derivatives
     p = polynomials.p # the degree of the polynomials, the number of polynomials is p + 1
@@ -90,18 +92,22 @@ See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderiv
     # uses the attribute `_core_polynomials` in the `polynomial` struct. This
     # allows every Lagrange polynomial to be evaluated by calling the same
     # method from `PolynomialBases`.
-    ξ_scaled = 2.0*ξ .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
+    ξ_scaled = 2.0 * ξ .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
 
     # Allocate memory space for the result, derivatives are the third dimension
     d_polynomials = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
-    for j = 0:nderivatives
-        d_polynomials[j+1] = Vector{Matrix{Float64}}(undef, 1)
-        d_polynomials[j+1][1] = zeros(Float64, n_points, polynomials.p + 1)
+    for j in 0:nderivatives
+        d_polynomials[j + 1] = Vector{Matrix{Float64}}(undef, 1)
+        d_polynomials[j + 1][1] = zeros(Float64, n_points, polynomials.p + 1)
     end
 
     # Evaluate the polynomials at the points ξ
     # PolynomialBases.interpolation_matrix!(view(d_polynomials, :, :, 1), ξ, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
-    d_polynomials[1][1] .= PolynomialBases.interpolation_matrix(ξ_scaled, polynomials._core_polynomials.nodes, polynomials._core_polynomials.baryweights)
+    d_polynomials[1][1] .= PolynomialBases.interpolation_matrix(
+        ξ_scaled,
+        polynomials._core_polynomials.nodes,
+        polynomials._core_polynomials.baryweights,
+    )
 
     # Evaluate the derivatives at the points ξ
     if nderivatives > 0
@@ -141,29 +147,30 @@ See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderiv
         # Compute the first derivative
         # mul!(view(d_polynomials, :, :, derivative_idx + 1), view(d_polynomials, :, :, derivative_idx), D)
         derivative_idx = 1
-        d_polynomials[derivative_idx+1][1] .= d_polynomials[derivative_idx][1] * D
+        d_polynomials[derivative_idx + 1][1] .= d_polynomials[derivative_idx][1] * D
 
         # Loop over the remaining derivatives and compute them
         if nderivatives > 1
             D_n = copy(D)  # we use a recursive formula, so we need the previous D^{n} derivative
-                           # to compute the current one, which will be stored in the same matrix
+            # to compute the current one, which will be stored in the same matrix
             for derivative_idx in 2:nderivatives
                 # In this way we reuse previously computed values of D^{n-1}, so we just need to update in each step
                 # mul!(view(d_polynomials, :, :, derivative_idx + 1), view(d_polynomials, :, :, derivative_idx), D)
                 D_n = _derivative_matrix_next!(D_n, derivative_idx, D, polynomials.nodes)
-                d_polynomials[derivative_idx + 1][1] .= d_polynomials[derivative_idx][1] * D_n
+                d_polynomials[derivative_idx + 1][1] .=
+                    d_polynomials[derivative_idx][1] * D_n
             end
         end
     end
 
     return d_polynomials
-
 end
 
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)::Matrix{Float64}
+function evaluate(
+    polynomials::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64
+)::Matrix{Float64}
     return evaluate(polynomials, [ξ], nderivatives)
 end
-
 
 @doc raw"""
     evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})
@@ -206,7 +213,9 @@ up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \f
 
 See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-@Memoization.memoize function evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int64)
+Memoization.@memoize function evaluate(
+    polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int64
+)
     # The edge basis functions are given by, see documentation of EdgeLobattoLegendre:
     #
     #   edge_{i}(x) = -\sum_{j=1}^{i} dh_{j}(x)/dx, i=1,...,p
@@ -217,14 +226,14 @@ See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderiv
     #
 
     # Compute nderivatives+1 of the Lagrange polynomials over Gauss-Lobatto-Legendre nodes
-    ll_polynomials_eval = evaluate(polynomials._core_polynomials, ξ, nderivatives+1)
-    for i = 0:nderivatives
-        ll_polynomials_eval[i+1][1] = -cumsum(ll_polynomials_eval[i+2][1][:,1:(end-1)],dims=2)
+    ll_polynomials_eval = evaluate(polynomials._core_polynomials, ξ, nderivatives + 1)
+    for i in 0:nderivatives
+        ll_polynomials_eval[i + 1][1] =
+            -cumsum(ll_polynomials_eval[i + 2][1][:, 1:(end - 1)]; dims=2)
     end
 
-    return ll_polynomials_eval[1:nderivatives+1]
+    return ll_polynomials_eval[1:(nderivatives + 1)]
 end
-
 
 @doc raw"""
     evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64})
@@ -246,7 +255,6 @@ See also [`evaluate(polynomial::EdgeLobattoLegendre, ξ::Float64, nderivatives::
 function evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64})
     return evaluate(polynomials, ξ, 0)
 end
-
 
 @doc raw"""
     _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
@@ -321,7 +329,7 @@ function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
     # of the matrix D to minimize roundoff errors. Here we implement the different algorithms for
     # generality and for later comparison.
 
-    D = zeros(Float64, p+1, p+1)  # allocate memory space for the differentiation matrix
+    D = zeros(Float64, p + 1, p + 1)  # allocate memory space for the differentiation matrix
 
     # Compute the differences ξ_{i} - ξ_{j}
     Δξ = broadcast(-, nodes, transpose(nodes))
@@ -341,14 +349,15 @@ function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
 
         # The ratio c_{i} / c_{j} is computed with logs and exponentials to transform products into sums
         # c = reshape(prod(Δξ, dims=1), :, 1) from Eq. (4) (direct computation)
-        b = mapreduce(u->log(abs(u)), +, Δξ, dims=1)
+        b = mapreduce(u -> log(abs(u)), +, Δξ; dims=1)
         b .-= 1.0  # subtract the diagonal term that was added in the line above
 
         # Off diagonal elements
         for D_idx in CartesianIndices(D)
             # We also compute the diagonal terms, but with a wrong expression, for speed,
             # we compute them correctly in the following loop
-            D[D_idx] = ((-1.0)^(D_idx[1] + D_idx[2])) * exp(b[D_idx[1]] - b[D_idx[2]]) / Δξ[D_idx]
+            D[D_idx] =
+                ((-1.0)^(D_idx[1] + D_idx[2])) * exp(b[D_idx[1]] - b[D_idx[2]]) / Δξ[D_idx]
         end
 
         # Diagonal elements
@@ -358,7 +367,7 @@ function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
         Δξ[LinearAlgebra.diagind(Δξ)] .= 1.0
 
         # Now compute the diagonal terms of the differentiation matrix D
-        D[LinearAlgebra.diagind(D)] .-= sum(D, dims=2) #-transpose(mapreduce(inv, +, Δξ, dims=1)) .+ 1.0  # remove the 1.0 in the diagonal, since we have the - sign in the matrix we need to add a + sign to remove the diagonal 1.0
+        D[LinearAlgebra.diagind(D)] .-= sum(D; dims=2) #-transpose(mapreduce(inv, +, Δξ, dims=1)) .+ 1.0  # remove the 1.0 in the diagonal, since we have the - sign in the matrix we need to add a + sign to remove the diagonal 1.0
 
     elseif algorithm == 2
         # Algorithm 2 (direct computation) Eq. (4)
@@ -369,7 +378,7 @@ function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
         Δξ[LinearAlgebra.diagind(Δξ)] = 1.0
 
         # Compute c_{i}
-        c = reshape(prod(Δξ, dims=1), :, 1)  # just reshape it to be a column vector
+        c = reshape(prod(Δξ; dims=1), :, 1)  # just reshape it to be a column vector
 
         # Off diagonal elements
         for D_idx in CartesianIndices(D)
@@ -385,7 +394,7 @@ function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
         Δξ[LinearAlgebra.diagind(Δξ)] .= 0.0
 
         # Now compute the diagonal terms of the differentiation matrix D
-        D[LinearAlgebra.diagind(D)] .= mapreduce(inv, +, Δξ, dims=1)
+        D[LinearAlgebra.diagind(D)] .= mapreduce(inv, +, Δξ; dims=1)
     end
 
     return D
@@ -417,7 +426,9 @@ We follow the algorithm proposed in section 4 of [Costa2000](@cite).
    (size: [p+1, p+1])
 
 """
-function _derivative_matrix_next!(D_m::Array{Float64, 2}, m::Int64, D::Array{Float64, 2}, nodes::Vector{Float64})
+function _derivative_matrix_next!(
+    D_m::Array{Float64, 2}, m::Int64, D::Array{Float64, 2}, nodes::Vector{Float64}
+)
     # Compute the differences ξ_{i} - ξ_{j}
     Δξ = broadcast(-, nodes, transpose(nodes))
 
@@ -432,11 +443,12 @@ function _derivative_matrix_next!(D_m::Array{Float64, 2}, m::Int64, D::Array{Flo
 
     # Compute the off diagonal elements Eq. (13) from [1]
     for D_m_idx in CartesianIndices(D_m)
-        D_m[D_m_idx] = m * (D_m_diag[D_m_idx[1]] * D[D_m_idx] - (D_m[D_m_idx] / Δξ[D_m_idx]))
+        D_m[D_m_idx] =
+            m * (D_m_diag[D_m_idx[1]] * D[D_m_idx] - (D_m[D_m_idx] / Δξ[D_m_idx]))
     end
 
     # The diagonal terms are computed by the row sum formula (9) of [1]
-    D_m[LinearAlgebra.diagind(D_m)] .-= sum(D_m, dims=2)  # this replaces the current value of the diagonal by the row sum without the diagonal
+    D_m[LinearAlgebra.diagind(D_m)] .-= sum(D_m; dims=2)  # this replaces the current value of the diagonal by the row sum without the diagonal
 
     return D_m
 end
@@ -444,23 +456,30 @@ end
 """
     build_two_scale_matrix(ect_space::AbstractECTSpaces, num_sub_elements::Int)
 
-Uniformly subdivides the ECT space into `num_sub_elements` sub-elements. It is assumed that `num_sub_elements` is a power of 2, else the method throws an argument error. It returns a global subdivision matrix that maps the global basis functions of the ECT space to the global basis functions of the subspaces.
+Uniformly subdivides the ECT space into `num_sub_elements` sub-elements. It is assumed that
+`num_sub_elements` is a power of 2, else the method throws an argument error. It returns a
+global subdivision matrix that maps the global basis functions of the ECT space to the
+global basis functions of the subspaces.
 
 # Arguments
 - `ect_space::AbstractECTSpaces`: A ect space.
 - `num_sub_elements::Int`: The number of subspaces to divide the EC T space into.
 
 # Returns
-- `::SparseMatrixCSC{Float64}`: A global subdivision matrix that maps the global basis functions of the ECT space to the global basis functions of the subspaces.
+- `::SparseMatrixCSC{Float64}`: A global subdivision matrix that maps the global basis
+functions of the ECT space to the global basis functions of the subspaces.
 """
-function build_two_scale_matrix(polynomials::AbstractLagrangePolynomials, num_sub_elements::Int)
+function build_two_scale_matrix(
+    polynomials::AbstractLagrangePolynomials, num_sub_elements::Int
+)
     p = get_polynomial_degree(polynomials)
     nodes = polynomials.nodes
 
     # build the global set of nodes on all sub-elements by scaling and translating the original nodes
-    global_nodes = zeros(Float64, num_sub_elements*(p+1))
-    for i = 1:num_sub_elements
-        global_nodes[(i-1)*(p+1)+1:i*(p+1)] .= ((i-1) .+ nodes)./num_sub_elements
+    global_nodes = zeros(Float64, num_sub_elements * (p + 1))
+    for i in 1:num_sub_elements
+        global_nodes[((i - 1) * (p + 1) + 1):(i * (p + 1))] .=
+            ((i - 1) .+ nodes) ./ num_sub_elements
     end
 
     # subdivision matrix is the evaluation of lagrange polynomials at the global nodes

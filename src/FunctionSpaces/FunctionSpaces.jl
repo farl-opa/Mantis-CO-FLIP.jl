@@ -4,7 +4,7 @@ The exported names are:
 """
 module FunctionSpaces
 
-import .. Mesh
+import ..Mesh
 
 import Combinatorics
 import Graphs
@@ -21,7 +21,6 @@ Supertype for all function spaces.
 """
 abstract type AbstractFunctionSpace end
 
-
 """
     AbstractCanonicalSpace <: AbstractFunctionSpace
 
@@ -36,7 +35,6 @@ abstract type AbstractEdgePolynomials <: AbstractCanonicalSpace end
 
 include("CanonicalSpaces/CanonicalSpaces.jl")
 
-
 """
     AbstractFESpace{manifold_dim, num_components} <: AbstractFunctionSpace
 
@@ -48,17 +46,16 @@ Supertype for all scalar finite element spaces.
 """
 abstract type AbstractFESpace{manifold_dim, num_components} <: AbstractFunctionSpace end
 
-function get_manifold_dim(::AbstractFESpace{manifold_dim, num_components}) where {
-    manifold_dim, num_components
-}
+function get_manifold_dim(
+    ::AbstractFESpace{manifold_dim, num_components}
+) where {manifold_dim, num_components}
     return manifold_dim
 end
-function get_num_components(::AbstractFESpace{manifold_dim, num_components}) where {
-    manifold_dim, num_components
-}
+function get_num_components(
+    ::AbstractFESpace{manifold_dim, num_components}
+) where {manifold_dim, num_components}
     return num_components
 end
-
 
 include("FiniteElementSpaces/FiniteElementSpaces.jl")
 #include("AdaptiveRefinement/AdaptiveRefinement.jl")
