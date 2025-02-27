@@ -1,4 +1,131 @@
 ############################################################################################
+#                                        Structure                                         #
+############################################################################################
+
+
+"""
+    ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
+    AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+
+Represents the exterior derivative of an `AbstractFormExpression`.
+
+# Fields
+- `form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The form to
+    which the exterior derivative is applied.
+- `label::String`: The exterior derivative label. This is a concatenation of `"d"` with the
+    label of `form`.
+
+# Type parameters
+- `manifold_dim`: Dimension of the manifold. 
+- `form_rank`: The form rank of the exterior derivative. If the form rank of `form` is `k`
+    then `form_rank` is `k+1`.
+- `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0,
+    with one single set of basis forms have rank 1, with two sets of basis forms have rank
+    2. Higher ranks are not possible.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
+- `F <: Forms.AbstractFormExpression{manifold_dim, form_rank - 1, expression_rank, G}`: The
+    type of `form`.
+
+# Inner Constructors
+- `ExteriorDerivative(form::F)`: General constructor.
+"""
+struct ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
+       AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+    form::F
+    label::String
+
+    function ExteriorDerivative(
+        form::F
+    ) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    }
+        if form_rank == manifold_dim
+            throw(ArgumentError("""\
+                Tried to compute the exterior derivative of a volume form. The manifold \
+                dimension is $(manifold_dim) and the form rank is $(form_rank). \
+                """))
+        end
+
+        return new{manifold_dim, form_rank + 1, expression_rank, G}(
+            form, "d" * get_label(form)
+        )
+    end
+end
+
+"""
+    get_form(ext_der::ExteriorDerivative)
+
+Returns the form to which the exterior derivative is applied.
+
+# Arguments
+- `ext_der::ExteriorDerivative`: The exterior derivative.
+
+# Returns
+- `<:AbstractFormExpression`: The form to which the exterior derivative is applied.
+"""
+get_form(ext_der::ExteriorDerivative) = ext_der.form
+
+"""
+    get_geometry(ext_der::ExteriorDerivative)
+
+Returns the geometry of the form associated with the exterior derivative.
+
+# Arguments
+- `ext_der::ExteriorDerivative`: The exterior derivative.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the form.
+"""
+get_geometry(ext_der::ExteriorDerivative) = get_geometry(get_form(ext_der))
+
+"""
+    evaluate(
+        ext_der::ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F},
+        element_id::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+    ) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    }
+
+Function description
+
+# Arguments
+- `ext_der::ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F}`: The
+    exterior derivative structure.
+- `element_id::Int`: The element idenfier.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: The set of canonical points.
+
+# Returns
+- `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated exterior derivative. The
+    number of entries in the `Vector` is `binomial(manifold_dim, form_rank + 1)`. The size
+    of the `Array` is `(num_eval_points, num_basis)`, where `num_eval_points =
+    prod(length.(xi))` and `num_basis` is the number of basis functions used to represent
+    the `form` on `element_id` ― for `expression_rank = 0` the inner `Array` is equivalent
+    to a `Vector`.
+"""
+function evaluate(
+    ext_der::ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {
+    manifold_dim,
+    form_rank,
+    expression_rank,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+}
+    return evaluate_exterior_derivative(get_form(ext_der), element_id, xi)
+end
+
+############################################################################################
 #                                     Abstract method                                      #
 ############################################################################################
 

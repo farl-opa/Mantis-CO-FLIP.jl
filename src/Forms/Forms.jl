@@ -27,7 +27,7 @@ Supertype for all form expressions representing differential forms.
 - `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0,
     with one single set of basis forms have rank 1, with two sets of basis forms have rank
     2. Higher ranks are not possible.
-- `G`: Type of the underlying geometry.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
 """
 abstract type AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
 
@@ -40,7 +40,7 @@ Supertype for all form fields.
 # Type parameters
 - `manifold_dim`: Dimension of the manifold
 - `form_rank`: Rank of the differential form
-- `G`: Type of the underlying geometry
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry
 """
 abstract type AbstractFormField{manifold_dim, form_rank, G} <:
               AbstractFormExpression{manifold_dim, form_rank, 0, G} end
@@ -55,7 +55,7 @@ of basis functions.
 # Type parameters
 - `manifold_dim`: Dimension of the manifold.
 - `form_rank`: Rank of the differential form.
-- `G`: Type of the underlying geometry.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
 """
 abstract type AbstractFormSpace{manifold_dim, form_rank, G} <:
               AbstractFormExpression{manifold_dim, form_rank, 1, G} end
@@ -69,7 +69,7 @@ abstract type AbstractFormSpace{manifold_dim, form_rank, G} <:
         manifold_dim,
         form_rank,
         expression_rank,
-        G <: Geometry.AbstractGeometry,
+        G <: Geometry.AbstractGeometry{manifold_dim},
         FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
     }
 
@@ -85,7 +85,7 @@ function get_form_rank(::FE) where {
     manifold_dim,
     form_rank,
     expression_rank,
-    G <: Geometry.AbstractGeometry,
+    G <: Geometry.AbstractGeometry{manifold_dim},
     FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
 }
     return form_rank
@@ -96,7 +96,7 @@ end
         manifold_dim,
         form_rank,
         expression_rank,
-        G <: Geometry.AbstractGeometry,
+        G <: Geometry.AbstractGeometry{manifold_dim},
         FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
     }
 
@@ -112,7 +112,7 @@ function get_expression_rank(::FE) where {
     manifold_dim,
     form_rank,
     expression_rank,
-    G <: Geometry.AbstractGeometry,
+    G <: Geometry.AbstractGeometry{manifold_dim},
     FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
 }
     return expression_rank
