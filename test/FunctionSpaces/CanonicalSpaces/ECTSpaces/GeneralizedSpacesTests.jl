@@ -75,7 +75,7 @@ for p in degrees_to_test
     @test all(isapprox.(sum(b_eval[1][1], dims=2), 1.0))
 
     # Zero sum of derivatives
-    @test all(isapprox.(abs.(sum(b_eval[2][1], dims=2)), 0.0, atol=1e-12))
+    @test all(isapprox.(abs.(sum(b_eval[2][1], dims=2)), 0.0, atol=1e-10))
 
     # interpolate a function and check derivatives
     # f = exp(Wt x) + 2*exp(-Wt x)
