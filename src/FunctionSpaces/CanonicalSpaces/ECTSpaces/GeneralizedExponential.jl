@@ -1,8 +1,9 @@
-@doc raw"""
-    struct GeneralizedExponential <: AbstractECTSpaces
+"""
+    GeneralizedExponential <: AbstractECTSpaces
 
-Concrete type for Generalized Exponential section space spanned by `<1, x, ..., x^(p-2),
-exp(wx), exp(-wx)>`, equivalently `<1, x, ..., x^(p-2), cosh(wx), sinh(wx)>`, on `[0,l]`.
+Concrete type for Generalized Exponential section space spanned by
+`<1, x, ..., x^(p-2), exp(wx), exp(-wx)>`, equivalently
+`<1, x, ..., x^(p-2), cosh(wx), sinh(wx)>`, on `[0,l]`.
 
 # Fields
 - `p::Int`: Degree of the space.
@@ -102,14 +103,14 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
     return M
 end
 
-@doc raw"""
+"""
     evaluate(gexp::GeneralizedExponential, ξ::Vector{Float64})
 
 Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
 
 # Arguments
 - `gexp::GeneralizedExponential`:  Generalized Exponential section space.
-- `xi::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
+- `xi::Vector{Float64}`: vector of evaluation points ``in [0.0, 1.0]``.
 """
 function evaluate(gexp::GeneralizedExponential, xi::Vector{Float64})
     return evaluate(gexp, xi, 0)
@@ -119,7 +120,7 @@ function evaluate(gexp::GeneralizedExponential, xi::Float64)
     return evaluate(gexp, [xi], 0)
 end
 
-@doc raw"""
+"""
     gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
 
 Build representation matrix for Generalized Exponential section space of degree `p`, weight
@@ -128,6 +129,7 @@ Build representation matrix for Generalized Exponential section space of degree 
 # Arguments
 - `p::Int`: Degree of the space.
 - `w::Float64`: Weight parameter for the space.
+- `l::Float64`: Length of the interval. GExp space is not scale-invariant.
 - `t::Bool`: flag to indicate if critical length is exceeded.
 - `m::Int`: number of terms from the infinite sum used to build the basis.
 
@@ -159,18 +161,18 @@ function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:p+2*m))], I[:,1])
         M1 = M[1:p+1, :]
         M1[p, :] = ww * M[p:2:end, :]
-        M1[p+1, :] = ww * M[p+1:2:end, :]
+        M1[p + 1, :] = ww * M[(p + 1):2:end, :]
     end
-    cs = zeros(Float64, p+1)
-    C = zeros(Float64, p+1, p+1)
-    C[p+1, :] =  [M1[:, 1] M0[:, 1:p]]' \ I[:,1]
-    for i = 2:p
-        cs = cs + C[p+1-i+2, :]
-        cc = zeros(Float64, p+1)
+    cs = zeros(Float64, p + 1)
+    C = zeros(Float64, p + 1, p + 1)
+    C[p + 1, :] = [M1[:, 1] M0[:, 1:p]]' \ I[:, 1]
+    for i in 2:p
+        cs = cs + C[p + 1 - i + 2, :]
+        cc = zeros(Float64, p + 1)
         cc[i] = -cs' * M1[:, i]
-        C[p+1-i+1, :] .= [M1[:, 1:i] M0[:, 1:p+1-i]]' \ cc
+        C[p + 1 - i + 1, :] .= [M1[:, 1:i] M0[:, 1:(p + 1 - i)]]' \ cc
     end
-    C[1, :] .= [M0[:, 1] M1[:, 1:p]]' \ I[:,1]
+    C[1, :] .= [M0[:, 1] M1[:, 1:p]]' \ I[:, 1]
 
     return C
 end
@@ -222,9 +224,11 @@ length in half for each power.
 """
 function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
     num_ref = log2(num_sub_elements)
-    if num_sub_elements < 2 || !isapprox(num_ref-round(num_ref), 0.0, atol=1e-12)
+    if num_sub_elements < 2 || !isapprox(num_ref - round(num_ref), 0.0; atol=1e-12)
         throw(
-            ArgumentError("Number of subdivisions should be a power of 2 and greater than 1")
+            ArgumentError(
+                "Number of subdivisions should be a power of 2 and greater than 1"
+            ),
         )
     end
 

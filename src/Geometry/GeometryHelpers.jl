@@ -52,7 +52,7 @@ function create_curvilinear_square(
     unit_square = create_cartesian_box(starting_points, box_sizes, num_elements)
 
     # build curved mapping
-    function mapping(x::AbstractArray{Float64,1})
+    function mapping(x::AbstractVector)
         x1_new =
             (2.0 / (box_sizes[1])) * x[1] - 2.0 * starting_points[1] / (box_sizes[1]) - 1.0
         x2_new =
@@ -62,7 +62,7 @@ function create_curvilinear_square(
             x[2] + ((box_sizes[2]) / 2.0) * crazy_c * sinpi(x1_new) * sinpi(x2_new),
         ]
     end
-    function dmapping(x::AbstractArray{Float64,1})
+    function dmapping(x::AbstractVector)
         x1_new =
             (2.0 / (box_sizes[1])) * x[1] - 2.0 * starting_points[1] / (box_sizes[1]) - 1.0
         x2_new =

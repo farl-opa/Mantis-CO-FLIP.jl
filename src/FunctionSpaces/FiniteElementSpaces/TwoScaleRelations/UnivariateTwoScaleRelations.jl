@@ -1,7 +1,8 @@
 """
     get_element_children(coarse_element_id::Int, nsubdivisions::Int) -> Vector{Int}
 
-Compute and return the child element IDs for a given coarse element ID based on the number of subdivisions.
+Compute and return the child element IDs for a given coarse element ID based on the number
+    of subdivisions.
 
 # Arguments
 - `coarse_element_id::Int`: The identifier of the coarse element.
@@ -10,7 +11,10 @@ Compute and return the child element IDs for a given coarse element ID based on 
 # Returns
 - `::Vector{Int}`: A vector containing the identifiers of the child elements.
 """
-get_element_children(coarse_element_id::Int, nsubdivisions::Int) = [i+((coarse_element_id-1)*nsubdivisions) for i ∈ 1:nsubdivisions]
+function get_element_children(coarse_element_id::Int, nsubdivisions::Int)
+    return [i+((coarse_element_id-1)*nsubdivisions) for i ∈ 1:nsubdivisions]
+end
 
-
-get_element_parent(fine_element_id::Int, nsubdivisions::Int) = floor(Int, (fine_element_id-1)/nsubdivisions + 1)
+function get_element_parent(fine_element_id::Int, nsubdivisions::Int)
+    return floor(Int, (fine_element_id-1)/nsubdivisions + 1)
+end

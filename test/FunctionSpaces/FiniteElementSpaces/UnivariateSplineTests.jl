@@ -16,6 +16,8 @@ patch1 = Mantis.Mesh.Patch1D(breakpoints)
 B1_univariate_bs = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, 1, -1])
 quad_rule = Mantis.Quadrature.gauss_legendre(deg1+1)
 x = Mantis.Quadrature.get_nodes(quad_rule)[1]
+
+# @test get_num_basis(B1_univariate_bs.extraction_op) == size(B1_univariate_bs.knot_vector.patch_1d) * (B1_univariate_bs.knot_vector.polynomial_degree + 1) + sum(B1_univariate_bs.knot_vector.multiplicity .- (B1_univariate_bs.knot_vector.polynomial_degree + 1))
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B1_univariate_bs)
     # check extraction coefficients
     ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B1_univariate_bs, el)
@@ -40,6 +42,7 @@ patch2 = Mantis.Mesh.Patch1D(breakpoints)
 B2_univariate_bs = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, 1, 3, -1])
 quad_rule2 = Mantis.Quadrature.gauss_legendre(deg2+1)
 x = Mantis.Quadrature.get_nodes(quad_rule2)[1]
+# @test get_num_basis(B2_univariate_bs.extraction_op) == size(B2_univariate_bs.knot_vector.patch_1d) * (B2_univariate_bs.knot_vector.polynomial_degree + 1) + sum(B2_univariate_bs.knot_vector.multiplicity .- (B2_univariate_bs.knot_vector.polynomial_degree + 1))
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B2_univariate_bs)
     # check extraction coefficients
     ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B2_univariate_bs, el)

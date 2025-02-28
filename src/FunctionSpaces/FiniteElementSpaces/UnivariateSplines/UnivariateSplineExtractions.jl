@@ -8,7 +8,8 @@ Create a vector of `ni` identity matrices, each of size `d × d`.
 - `d::Int`: Size of each identity matrix.
 
 # Returns
-- `Vector{Matrix{Float64}}`: A vector containing `ni` identity matrices, each of size `d × d`.
+- `Vector{Matrix{Float64}}`: A vector containing `ni` identity matrices, each of size
+    `d × d`.
 
 # Examples
 julia> create_identity(2, 3)
@@ -27,7 +28,7 @@ function create_identity(ni::Int, d::Int)
 
         # Set diagonal elements to 1.0 to create an identity matrix
         for j in 1:d
-            Id[i][j,j] = 1.0
+            Id[i][j, j] = 1.0
         end
     end
 
@@ -35,40 +36,40 @@ function create_identity(ni::Int, d::Int)
 end
 
 """
-    extract_bspline_to_section_space(knot_vector::KnotVector, polynomials::F) where {F <: AbstractCanonicalSpace}
+    extract_bspline_to_section_space(knot_vector::KnotVector, canonical_space::AbstractCanonicalSpace)
 
-Compute the extraction coefficients of B-Spline basis functions in terms of canonical basis functions.
+Compute the extraction coefficients of B-Spline basis functions in terms of canonical basis
+functions.
 
 # Arguments
 - `knot_vector::KnotVector`: The knot vector defining the B-Spline basis.
-- `polynomials::F`: The canonical space.
+- `polynomials::AbstractCanonicalSpace`: The canonical space.
 
 # Returns
-- `ExtractionOperator`: An object containing extraction coefficients, basis indices, number of elements, and total number of basis functions.
+- `::ExtractionOperator`: See [`ExtractionOperator`](@ref) for the details.
 """
-function extract_bspline_to_section_space(knot_vector::KnotVector, polynomials::F) where {F <: AbstractCanonicalSpace}
-    if typeof(polynomials) <: Bernstein
-        return extract_bspline_to_bernstein(knot_vector)
-
-    elseif typeof(polynomials) <: AbstractECTSpaces
-        return extract_bspline_to_ect(knot_vector, polynomials)
-
-    elseif typeof(polynomials) <: AbstractLagrangePolynomials
-        return extract_bspline_to_lagrange(knot_vector)
-
-    end
+function extract_bspline_to_section_space(
+    knot_vector::KnotVector, canonical_space::AbstractCanonicalSpace
+)
+    error("The extraction to $(typeof(canonical_space)) spaces has not been implemented.")
 end
 
-function extract_bspline_to_lagrange(knot_vector)
+function extract_bspline_to_section_space(
+    knot_vector::KnotVector, canonical_space::AbstractLagrangePolynomials
+)
     # Number of elements in the knot vector
     nel = size(knot_vector.patch_1d)
 
     # Ensure that regularities at all breakpoints are either 0 or -1
-    for el ∈ 1:nel-1
+    for el in 1:(nel - 1)
         # Get multiplicity of the knot at the end of the current element
-        mult = knot_vector.multiplicity[el+1]
+        mult = knot_vector.multiplicity[el + 1]
         if mult < knot_vector.polynomial_degree
-            throw(ArgumentError("The Lagrange extraction is only implemented for regularities 0 and -1."))
+            throw(
+                ArgumentError(
+                    "The Lagrange extraction is only implemented for regularities 0 and -1."
+                ),
+            )
         end
     end
 
@@ -77,16 +78,18 @@ function extract_bspline_to_lagrange(knot_vector)
 
     # Compute indices of supported basis functions on each element
     basis_indices = Vector{Vector{Int}}(undef, nel)
-    basis_indices[1] = 1:knot_vector.polynomial_degree+1
-    for el = 2:nel
-        basis_indices[el] = basis_indices[el-1] .+ knot_vector.multiplicity[el]
+    basis_indices[1] = 1:(knot_vector.polynomial_degree + 1)
+    for el in 2:nel
+        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
     end
 
-    # Create and return the ExtractionOperator struct
-    return ExtractionOperator(E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree+1])
+    return ExtractionOperator(
+        E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree + 1]
+    )
 end
 
 """
+<<<<<<< HEAD:src/FunctionSpaces/FiniteElementSpaces/UnivariateSplineExtractions.jl
     extract_bspline_to_bernstein(knot_vector::KnotVector) -> ExtractionOperator
 
 Compute the extraction coefficients of B-Spline basis functions defined by the given knot vector.
@@ -112,8 +115,13 @@ combination of reference Bernstein polynomials determining the basis functions o
 - Borden, M. J., Scott, M. A., Evans, J. A., & Hughes, T. J. R. (2011).
   Isogeometric finite element data structures based on Bézier extraction of spline_spaces.
   International Journal for Numerical Methods in Engineering, 87(1-5), 15-47.
+=======
+Algorithm from [Borden2011](@cite), adapted to 1-based indexing for Julia.
+>>>>>>> main:src/FunctionSpaces/FiniteElementSpaces/UnivariateSplines/UnivariateSplineExtractions.jl
 """
-function extract_bspline_to_bernstein(knot_vector::KnotVector)
+function extract_bspline_to_section_space(
+    knot_vector::KnotVector, canonical_space::Bernstein
+)
     # Number of elements in the knot vector
     nel = size(knot_vector.patch_1d)
 
@@ -126,37 +134,51 @@ function extract_bspline_to_bernstein(knot_vector::KnotVector)
     # Iterate over all elements
     for el in 1:nel
         # Get multiplicity of the knot at the end of the current element
-        mult = knot_vector.multiplicity[el+1]
+        mult = knot_vector.multiplicity[el + 1]
 
         # If multiplicity is less than polynomial degree, perform knot insertion
         if mult < knot_vector.polynomial_degree
             # Calculate numerator for alpha coefficients
-            numer = knot_vector.patch_1d.breakpoints[el+1] - knot_vector.patch_1d.breakpoints[el]
+            numer = knot_vector.patch_1d.breakpoints[el + 1] -
+                knot_vector.patch_1d.breakpoints[el]
             r = knot_vector.polynomial_degree - mult
 
             # Compute alpha coefficients
-            for j in knot_vector.polynomial_degree-1:-1:mult
-                idx = el+1+floor(Int, j/mult)
+            for j in (knot_vector.polynomial_degree - 1):-1:mult
+                idx = el + 1 + floor(Int, j / mult)
 
-                if idx > nel+1
-                    alphas[j-mult+1] = numer / (knot_vector.patch_1d.breakpoints[end] - knot_vector.patch_1d.breakpoints[el])
+                if idx > nel + 1
+                    alphas[j - mult + 1] =
+                        numer / (
+                            knot_vector.patch_1d.breakpoints[end] -
+                            knot_vector.patch_1d.breakpoints[el]
+                        )
                 else
-                    alphas[j-mult+1] = numer / (knot_vector.patch_1d.breakpoints[idx] - knot_vector.patch_1d.breakpoints[el])
+                    alphas[j - mult + 1] =
+                        numer / (
+                            knot_vector.patch_1d.breakpoints[idx] -
+                            knot_vector.patch_1d.breakpoints[el]
+                        )
                 end
             end
 
             # Update extraction coefficients
             for j in 1:r
                 s = mult + j - 1
-                for k in knot_vector.polynomial_degree:-1:s+1
-                    alpha = alphas[k-s]
-                    E[el][k+1, :] .=  (@view E[el][k+1, :]) .* alpha  .+  (@view E[el][k, :]) .* (1.0-alpha)
+                for k in (knot_vector.polynomial_degree):-1:(s + 1)
+                    alpha = alphas[k - s]
+                    E[el][k + 1, :] .=
+                        (@view E[el][k + 1, :]) .* alpha .+
+                        (@view E[el][k, :]) .* (1.0 - alpha)
                 end
 
                 # Save coefficients for the next element
                 save = r - j + 1
                 if el < nel
-                    E[el+1][save, save:save+j] .= (@view E[el][knot_vector.polynomial_degree+1, knot_vector.polynomial_degree-j+1:knot_vector.polynomial_degree+1])
+                    E[el + 1][save, save:(save + j)] .= (@view E[el][
+                        knot_vector.polynomial_degree + 1,
+                        (knot_vector.polynomial_degree - j + 1):(knot_vector.polynomial_degree + 1),
+                    ])
                 end
             end
         end
@@ -164,93 +186,93 @@ function extract_bspline_to_bernstein(knot_vector::KnotVector)
 
     # Compute indices of supported basis functions on each element
     basis_indices = Vector{Vector{Int}}(undef, nel)
-    basis_indices[1] = 1:knot_vector.polynomial_degree+1
-    for el = 2:nel
-        basis_indices[el] = basis_indices[el-1] .+ knot_vector.multiplicity[el]
+    basis_indices[1] = 1:(knot_vector.polynomial_degree + 1)
+    for el in 2:nel
+        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
     end
 
     # Create and return the ExtractionOperator struct
-    return ExtractionOperator(E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree+1])
+    return ExtractionOperator(
+        E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree + 1]
+    )
 end
 
-"""
-    extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) where {F <: AbstractECTSpaces) -> ExtractionOperator
-
-Compute the extraction coefficients of B-Spline basis functions in terms of ECT basis functions.
-
-# Arguments
-- `knot_vector::KnotVector`: The knot vector defining the B-Spline basis.
-- `canonical_space::F`: The ECT space.
-
-# Returns
-- `ExtractionOperator`: An object containing extraction coefficients, basis indices, number of elements, and total number of basis functions.
-"""
-function extract_bspline_to_ect(knot_vector::KnotVector, canonical_space::F) where {F <: AbstractECTSpaces}
+function extract_bspline_to_section_space(
+    knot_vector::KnotVector, canonical_space::AbstractECTSpaces
+)
     # Polynomial degree of the B-Spline basis
     p = knot_vector.polynomial_degree
     # Number of elements in the knot vector
     nel = size(knot_vector.patch_1d)
 
     # Construct cumulative sum of all element-wise canonical space dimensions
-    canonical_dims = cumsum([0, repeat([p+1], nel, 1)...])
+    canonical_dims = cumsum([0, repeat([p + 1], nel, 1)...])
 
     # Initialize global extraction matrix as an identity matrix
-    H = SparseArrays.sparse(1:canonical_dims[nel+1], 1:canonical_dims[nel+1], ones(Float64,canonical_dims[nel+1]), canonical_dims[nel+1], canonical_dims[nel+1])
+    H = SparseArrays.sparse(
+        1:canonical_dims[nel + 1],
+        1:canonical_dims[nel + 1],
+        ones(Float64, canonical_dims[nel + 1]),
+        canonical_dims[nel + 1],
+        canonical_dims[nel + 1],
+    )
 
     # Loop over all internal breakpoints and update extraction by imposing smoothness
-    for el ∈ 1:nel-1
+    for el in 1:(nel - 1)
         # Get regularity at this breakpoint
-        mult = knot_vector.multiplicity[el+1]
+        mult = knot_vector.multiplicity[el + 1]
         r = p - mult
 
         # Construct smoothness constraint matrix contributions from the left and right of the breakpoint
         KL = _evaluate_all_at_point(canonical_space, 1.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
         KR = _evaluate_all_at_point(canonical_space, 0.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KR)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
         # element sizes where constraints are evaluated
         h_L = get_element_size(knot_vector, el)
-        h_R = get_element_size(knot_vector, el+1)
+        h_R = get_element_size(knot_vector, el + 1)
         # scale the constraints by the element sizes and findnz values
-        scaling_L = [h_L^(-j) for j = 0:r]
-        scaling_R = [h_R^(-j) for j = 0:r]
+        scaling_L = [h_L^(-j) for j in 0:r]
+        scaling_R = [h_R^(-j) for j in 0:r]
         KL = SparseArrays.findnz(SparseArrays.sparse(KL * LinearAlgebra.diagm(scaling_L)))
         KR = SparseArrays.findnz(SparseArrays.sparse(KR * LinearAlgebra.diagm(scaling_R)))
         # join the constraints together
-        rows = [KL[1]; KR[1] .+ (canonical_dims[el+1] - canonical_dims[el])]
+        rows = [KL[1]; KR[1] .+ (canonical_dims[el + 1] - canonical_dims[el])]
         cols = [KL[2]; KR[2]]
         vals = [-KL[3]; KR[3]]
-        K = SparseArrays.sparse(rows,cols,vals,(canonical_dims[el+2] - canonical_dims[el]),r+1)
+        K = SparseArrays.sparse(
+            rows, cols, vals, (canonical_dims[el + 2] - canonical_dims[el]), r + 1
+        )
 
-        # Update local extraction matrix by building double-diagonal nullspace of constraints
-        L = H[:, canonical_dims[el]+1:canonical_dims[el+2]] * K
-        for j = 0:r
-            Hbar = build_sparse_nullspace(L[:, j+1])
+        # Update local extraction matrix by building double-diagonal nullspace
+        L = H[:, (canonical_dims[el] + 1):canonical_dims[el + 2]] * K
+        for j in 0:r
+            Hbar = build_sparse_nullspace(L[:, j + 1])
             H = Hbar * H
             L = Hbar * L
         end
     end
 
     # Remove small values obtained as a result of round-off errors
-    SparseArrays.fkeep!((i,j,x) -> abs(x) > 1e-13, H)
+    SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, H)
 
     # Compute basis indices
     basis_indices = Vector{Vector{Int}}(undef, nel)
-    basis_indices[1] = 1:p+1
-    for el ∈ 2:nel
-        basis_indices[el] = basis_indices[el-1] .+ knot_vector.multiplicity[el]
+    basis_indices[1] = 1:(p + 1)
+    for el in 2:nel
+        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
     end
     # Convert global extraction matrix to element local extractions
-    # (here, the matrix is transposed so that [canonical_space] * [extraction] = [B-splines])
+    # (the matrix is transposed here so that [canonical_space] * [extraction] = [B-splines])
     extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
-    for el ∈ 1:nel
-        cols_el = canonical_dims[el]+1:canonical_dims[el+1]
+    for el in 1:nel
+        cols_el = (canonical_dims[el] + 1):canonical_dims[el + 1]
         # Matrix of coefficients
         extraction_coefficients[el] = Array(H[basis_indices[el], cols_el])'
     end
 
     # Create and return the ExtractionOperator
-    return ExtractionOperator(extraction_coefficients, basis_indices, nel, size(H,1))
+    return ExtractionOperator(extraction_coefficients, basis_indices, nel, size(H, 1))
 end
 
 """
@@ -265,48 +287,56 @@ Compute the extraction coefficients of GTB-Spline basis functions in terms of (r
 # Returns
 - `ExtractionOperator`: The extraction operator containing the coefficients.
 """
-function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Vector{Int}) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
+function extract_gtbspline_to_bspline(
+    spline_spaces::NTuple{m, F}, regularity::Vector{Int}
+) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
     # Construct cumulative sum of all B-spline dimensions
-    spl_dims = zeros(Int, m+1)
-    for i in 2:m+1
-        spl_dims[i] = spl_dims[i-1] + get_num_basis(spline_spaces[i-1])
+    spl_dims = zeros(Int, m + 1)
+    for i in 2:(m + 1)
+        spl_dims[i] = spl_dims[i - 1] + get_num_basis(spline_spaces[i - 1])
     end
 
     # Number of elements for all spline_spaces
-    bspl_nels = [get_num_elements(spline_spaces[i]) for i = 1:m]
+    bspl_nels = [get_num_elements(spline_spaces[i]) for i in 1:m]
     nel = sum(bspl_nels)
 
     # Initialize global extraction matrix
-    H = SparseArrays.sparse(1:spl_dims[m+1], 1:spl_dims[m+1], ones(Float64, spl_dims[m+1]), spl_dims[m+1], spl_dims[m+1])
+    H = SparseArrays.sparse(
+        1:spl_dims[m + 1],
+        1:spl_dims[m + 1],
+        ones(Float64, spl_dims[m + 1]),
+        spl_dims[m + 1],
+        spl_dims[m + 1],
+    )
 
     # Loop over all internal patch interfaces and update extraction by imposing smoothness
-    for i = 1:m-1
+    for i in 1:(m - 1)
         # Regularity at this interface
         r = regularity[i]
 
         # Smoothness constraint matrix
         KL = _evaluate_all_at_point(spline_spaces[i], bspl_nels[i], 1.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)
-        KR = _evaluate_all_at_point(spline_spaces[i+1], 1, 0.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KR)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
+        KR = _evaluate_all_at_point(spline_spaces[i + 1], 1, 0.0, r)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
         # element sizes where constraints are evaluated
         h_L = get_element_size(spline_spaces[i], bspl_nels[i])
-        h_R = get_element_size(spline_spaces[i+1], 1)
+        h_R = get_element_size(spline_spaces[i + 1], 1)
         # scale the constraints by the element sizes and findnz values
-        scaling_L = [h_L^(-j) for j = 0:r]
-        scaling_R = [h_R^(-j) for j = 0:r]
+        scaling_L = [h_L^(-j) for j in 0:r]
+        scaling_R = [h_R^(-j) for j in 0:r]
         KL = SparseArrays.findnz(SparseArrays.sparse(KL * LinearAlgebra.diagm(scaling_L)))
         KR = SparseArrays.findnz(SparseArrays.sparse(KR * LinearAlgebra.diagm(scaling_R)))
         # join the constraints together
-        rows = [KL[1]; KR[1] .+ (spl_dims[i+1] - spl_dims[i])]
+        rows = [KL[1]; KR[1] .+ (spl_dims[i + 1] - spl_dims[i])]
         cols = [KL[2]; KR[2]]
         vals = [-KL[3]; KR[3]]
-        K = SparseArrays.sparse(rows, cols, vals, (spl_dims[i+2] - spl_dims[i]), r+1)
+        K = SparseArrays.sparse(rows, cols, vals, (spl_dims[i + 2] - spl_dims[i]), r + 1)
 
         # Update local extraction matrix by building double-diagonal nullspace of constraints
-        L = H[:, spl_dims[i]+1:spl_dims[i+2]] * K
-        for j = 0:r
-            Hbar = build_sparse_nullspace(L[:, j+1])
+        L = H[:, (spl_dims[i] + 1):spl_dims[i + 2]] * K
+        for j in 0:r
+            Hbar = build_sparse_nullspace(L[:, j + 1])
             H = Hbar * H
             L = Hbar * L
         end
@@ -315,30 +345,43 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
     # Impose periodicity if desired for i = m
     if regularity[m] > -1
         r = regularity[m]
-        if size(H, 1) >= 2*(r+1)
-            Hper = circshift(H, r+1)
+        if size(H, 1) >= 2 * (r + 1)
+            Hper = circshift(H, r + 1)
 
             # smoothness constraints
             KL = _evaluate_all_at_point(spline_spaces[m], bspl_nels[m], 1.0, r)
-            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KL)
+            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
             KR = _evaluate_all_at_point(spline_spaces[1], 1, 0.0, r)
-            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, KR)
+            SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
             # element sizes where constraints are evaluated
             h_L = get_element_size(spline_spaces[m], bspl_nels[m])
             h_R = get_element_size(spline_spaces[1], 1)
             # scale the constraints by the element sizes and findnz values
-            scaling_L = [h_L^(-j) for j = 0:r]
-            scaling_R = [h_R^(-j) for j = 0:r]
-            KL = SparseArrays.findnz(SparseArrays.sparse(KL * LinearAlgebra.diagm(scaling_L)))
-            KR = SparseArrays.findnz(SparseArrays.sparse(KR * LinearAlgebra.diagm(scaling_R)))
+            scaling_L = [h_L^(-j) for j in 0:r]
+            scaling_R = [h_R^(-j) for j in 0:r]
+            KL = SparseArrays.findnz(
+                SparseArrays.sparse(KL * LinearAlgebra.diagm(scaling_L))
+            )
+            KR = SparseArrays.findnz(
+                SparseArrays.sparse(KR * LinearAlgebra.diagm(scaling_R))
+            )
 
-            rows = [KL[1]; KR[1] .+ (spl_dims[m+1] - spl_dims[m])]
+            rows = [KL[1]; KR[1] .+ (spl_dims[m + 1] - spl_dims[m])]
             cols = [KL[2]; KR[2]]
             vals = [-KL[3]; KR[3]]
-            K = SparseArrays.sparse(rows, cols, vals, (spl_dims[m+1] - spl_dims[m] + spl_dims[2] - spl_dims[1]), r+1)
-            Lper = Hper[:, [spl_dims[m]+1:spl_dims[m+1]; spl_dims[1]+1:spl_dims[2]]] * K
-            for j = 0:r
-                Hbar = build_sparse_nullspace(Lper[:, j+1])
+            K = SparseArrays.sparse(
+                rows,
+                cols,
+                vals,
+                (spl_dims[m + 1] - spl_dims[m] + spl_dims[2] - spl_dims[1]),
+                r + 1,
+            )
+            Lper =
+                Hper[
+                    :, [(spl_dims[m] + 1):spl_dims[m + 1]; (spl_dims[1] + 1):spl_dims[2]]
+                ] * K
+            for j in 0:r
+                Hbar = build_sparse_nullspace(Lper[:, j + 1])
                 Hper = Hbar * Hper
                 Lper = Hbar * Lper
             end
@@ -347,21 +390,22 @@ function extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Ve
     end
 
     # Remove small values obtained as a result of round-off errors
-    SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-13, H)
+    SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, H)
 
     # Convert global extraction matrix to element local extractions
     # (here, the matrix is transposed so that [spline_spaces] * [extraction] = [GTB-splines])
     extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
     basis_indices = Vector{Vector{Int}}(undef, nel)
     count = 0
-    for i = 1:m
-        for j = 1:bspl_nels[i]
+    for i in 1:m
+        for j in 1:bspl_nels[i]
             _, cols_ij = get_extraction(spline_spaces[i], j)
             eij = SparseArrays.findnz(H[:, cols_ij .+ spl_dims[i]])
             # Unique indices for non-zero rows and columns
-            basis_indices[count+1] = unique(eij[1])
+            basis_indices[count + 1] = unique(eij[1])
             # Matrix of coefficients
-            extraction_coefficients[count+1] = Array(H[basis_indices[count+1], cols_ij .+ spl_dims[i]])'
+            extraction_coefficients[count + 1] =
+                Array(H[basis_indices[count + 1], cols_ij .+ spl_dims[i]])'
             count += 1
         end
     end
@@ -382,16 +426,16 @@ Build the sparsest possible nullspace of a constraint vector with no zero entrie
 """
 function build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
     q = length(constraint)
-    nz_flag = .!isapprox.(constraint, 0.0, atol=1e-13)
+    nz_flag = .!isapprox.(constraint, 0.0, atol=1e-14)
     i1 = findfirst(nz_flag)
     i2 = findlast(nz_flag)
-    dd = zeros(Float64, q-1, 2)
+    dd = zeros(Float64, q - 1, 2)
     dd[1:i1, 1] .= 1.0
-    for j = i1:i2-2
-        dd[j, 2] = -constraint[j] / constraint[j+1] * dd[j, 1]
-        dd[j+1, 1] = 1 - dd[j, 2]
+    for j in i1:(i2 - 2)
+        dd[j, 2] = -constraint[j] / constraint[j + 1] * dd[j, 1]
+        dd[j + 1, 1] = 1 - dd[j, 2]
     end
-    dd[i2-1:q-1, 2] .= 1.0
+    dd[(i2 - 1):(q - 1), 2] .= 1.0
 
-    return SparseArrays.spdiagm(q-1, q, 0 => dd[:,1], 1 => dd[:,2])
+    return SparseArrays.spdiagm(q - 1, q, 0 => dd[:, 1], 1 => dd[:, 2])
 end

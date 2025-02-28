@@ -1,20 +1,21 @@
-import SparseArrays, LinearAlgebra
 
-abstract type AbstractECTSpaces <: AbstractCanonicalSpace end
-
-@doc raw"""
+"""
     evaluate(ect_space::AbstractECTSpaces, ξ::Vector{Float64}, nderivatives::Int64)
 
-Compute derivatives up to order `nderivatives` for all basis functions of degree `p` at `ξ` for ``\xi \in [0.0, 1.0]``. 
+Compute derivatives up to order `nderivatives` for all basis functions of degree `p` at `ξ`
+for ``\\xi \\in [0.0, 1.0]``.
 
 # Arguments
 - `ect_space::AbstractECTSpaces`: ECT section space.
-- `ξ::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
-- `nderivatives::Int64`: maximum order of derivatives to be computed (nderivatives ``\leq p``).
+- `ξ::Vector{Float64}`: vector of evaluation points ``\\in [0.0, 1.0]``.
+- `nderivatives::Int64`: maximum order of derivatives to be computed (nderivatives
+    ``\\leq p``).
 
 See also [`evaluate(ect_space::AbstractECTSpaces, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-@Memoization.memoize function evaluate(ect_space::AbstractECTSpaces, ξ::Vector{Float64}, nderivatives::Int)
+@Memoization.memoize function evaluate(
+    ect_space::AbstractECTSpaces, ξ::Vector{Float64}, nderivatives::Int
+)
     neval = length(ξ)
     # allocate space for derivatives
     # - ders[j+1][1] contains the matrix of evaluations of the j-th derivative
@@ -33,5 +34,5 @@ See also [`evaluate(ect_space::AbstractECTSpaces, ξ::Float64, nderivatives::Int
     return ders
 end
 
-include("ECTSpaces/GeneralizedTrigonometric.jl")
-include("ECTSpaces/GeneralizedExponential.jl")
+include("GeneralizedTrigonometric.jl")
+include("GeneralizedExponential.jl")

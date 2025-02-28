@@ -1,10 +1,8 @@
-import LinearAlgebra, ToeplitzMatrices
+"""
+    GeneralizedTrigonometric <: AbstractECTSpaces
 
-@doc raw"""
-    struct GeneralizedTrigonometric <: AbstractECTSpaces
-
-Concrete type for Generalized Trignometric section space spanned by `<1, x, ..., x^(p-2),
-cos(wx), sin(wx)>` on `[0,l]`.
+Concrete type for Generalized Trignometric section space spanned by
+``<1, x, ..., x^(p-2), cos(wx), sin(wx)>`` on ``[0,l]``.
 
 # Fields
 - `p::Int`: Degree of the space.
@@ -115,14 +113,16 @@ function _evaluate(gtrig::GeneralizedTrigonometric, xi::Float64, nderivatives::I
     return M
 end
 
-@doc raw"""
+"""
     evaluate(gtrig::GeneralizedTrigonometric, ξ::Vector{Float64})
 
 Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
 
 # Arguments
 - `gtrig::GeneralizedTrigonometric`:  Generalized Trigonometric section space.
-- `xi::Vector{Float64}`: vector of evaluation points ``\in [0.0, 1.0]``.
+- `xi::Vector{Float64}`: vector of evaluation points in ``[0.0, 1.0]``.
+
+See also [`evaluate(gtrig::GeneralizedTrigonometric, xi::Vector{Float64}, nderivatives::Int64)`](@ref).
 """
 function evaluate(gtrig::GeneralizedTrigonometric, xi::Vector{Float64})
     return evaluate(gtrig, xi, 0)
@@ -132,8 +132,7 @@ function evaluate(gtrig::GeneralizedTrigonometric, xi::Float64)
     return evaluate(gtrig, [xi], 0)
 end
 
-
-@doc raw"""
+"""
     gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
 
 Build representation matrix for Generalized Trignometric section space of degree `p`, weight
@@ -178,16 +177,16 @@ function gtrig_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:p+2*m))], I[:,1])
         M1 = M[1:p+1, :]
         M1[p, :] = ww * M[p:2:end, :]
-        M1[p+1, :] = ww * M[p+1:2:end, :]
+        M1[p + 1, :] = ww * M[(p + 1):2:end, :]
     end
-    cs = zeros(Float64, p+1)
-    C = zeros(Float64, p+1, p+1)
-    C[p+1, :] =  [M1[:, 1] M0[:, 1:p]]' \ [1.0; zeros(p)]
-    for i = 2:p
-        cs = cs + C[p+1-i+2, :]
-        cc = zeros(Float64, p+1)
+    cs = zeros(Float64, p + 1)
+    C = zeros(Float64, p + 1, p + 1)
+    C[p + 1, :] = [M1[:, 1] M0[:, 1:p]]' \ [1.0; zeros(p)]
+    for i in 2:p
+        cs = cs + C[p + 1 - i + 2, :]
+        cc = zeros(Float64, p + 1)
         cc[i] = -cs' * M1[:, i]
-        C[p+1-i+1, :] = [M1[:, 1:i] M0[:, 1:p+1-i]]' \ cc
+        C[p + 1 - i + 1, :] = [M1[:, 1:i] M0[:, 1:(p + 1 - i)]]' \ cc
     end
     C[1, :] = [M0[:, 1] M1[:, 1:p]]' \ [1.0; zeros(p)]
 
@@ -207,7 +206,7 @@ Get the space of one degree lower than the input space.
 """
 function get_derivative_space(ect_space::GeneralizedTrigonometric)
     return GeneralizedTrigonometric(
-        ect_space.p-1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
+        ect_space.p - 1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
     )
 end
 
@@ -240,13 +239,14 @@ length in half for each power.
 - `::GeneralizedTrigonometric`: A ect space with the subdivided length.
 """
 function get_finer_canonical_space(
-    ect_space::GeneralizedTrigonometric,
-    num_sub_elements::Int
-    )
+    ect_space::GeneralizedTrigonometric, num_sub_elements::Int
+)
     num_ref = log2(num_sub_elements)
-    if num_sub_elements < 2 || !isapprox(num_ref-round(num_ref), 0.0, atol=1e-12)
+    if num_sub_elements < 2 || !isapprox(num_ref - round(num_ref), 0.0; atol=1e-12)
         throw(
-            ArgumentError("Number of subdivisions should be a power of 2 and larger than 1")
+            ArgumentError(
+                "Number of subdivisions should be a power of 2 and greater than 1"
+            ),
         )
     end
 
