@@ -79,3 +79,57 @@ end
 # function get_boundary_dof_indices(wf::WeakFormInputs)
 #     return Forms.get_boundary_dof_indices(wf.space_trial)
 # end
+
+############################################################################################
+#                                    Maxwell Eigenvalue                                    #
+############################################################################################
+
+struct EigenvalueWeakFormInputs{manifold_dim, Ttrial, Ttest} <: AbstractInputs
+    space_trial::Ttrial
+    space_test::Ttest
+
+    quad_rule::Quadrature.QuadratureRule{manifold_dim}
+
+    function EigenvalueWeakFormInputs(space_trial::Ttrial, 
+                            space_test::Ttest,
+                            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, 
+                            G <: Geometry.AbstractGeometry{manifold_dim},
+                            Ttrial <: Forms.AbstractFormSpace{manifold_dim, form_rank, G},
+                            Ttest <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
+        
+        new{manifold_dim, Ttrial, Ttest}(space_trial, space_test, quad_rule)
+    end
+end
+
+function get_num_elements(wf::EigenvalueWeakFormInputs)
+    geo = Forms.get_geometry(wf.space_trial)
+    return Geometry.get_num_elements(geo)
+end
+
+function get_problem_size(wf::EigenvalueWeakFormInputs)
+    return Forms.get_num_basis(wf.space_trial), Forms.get_num_basis(wf.space_test)
+end
+
+function get_estimated_nnz_per_elem(wf::EigenvalueWeakFormInputs)
+    return Forms.get_max_local_dim(wf.space_trial) * Forms.get_max_local_dim(wf.space_test), Forms.get_max_local_dim(wf.space_trial) * Forms.get_max_local_dim(wf.space_test)
+end
+
+function maxwell_eigenvalue(inputs::EigenvalueWeakFormInputs{manifold_dim, Ttrial, Ttest}, element_id) where {manifold_dim, Ttrial, Ttest}
+    # The weak form in question is:
+    #  ⟨curl u, curl v⟩ = ω²⟨u,v⟩, ∀v ∈ H(curl; Ω).   
+
+    # Left-hand side
+    # A term = ⟨curl u, curl v⟩
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(Forms.exterior_derivative(inputs.space_trial), Forms.exterior_derivative(inputs.space_test), element_id, inputs.quad_rule)
+    
+    # Right-hand side
+    # B term = ⟨u,v⟩
+    B_row_idx, B_col_idx, B_elem = Forms.evaluate_inner_product(inputs.space_trial, inputs.space_test, element_id, inputs.quad_rule)
+    
+    # The output should be the contribution to the left-hand-side matrix 
+    # A and right-hand-side vector b. The outputs are tuples of 
+    # row_indices, column_indices, values for the matrix part and 
+    # row_indices, values for the vector part. For this case, no shifts 
+    # or offsets are needed.
+    return (A_row_idx, A_col_idx, A_elem), (B_row_idx, B_col_idx, B_elem)
+end

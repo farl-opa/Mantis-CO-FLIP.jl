@@ -230,3 +230,22 @@ function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
 
     return component_dof_partition
 end
+
+function get_dof_partition(
+    space::DirectSumSpace{manifold_dim, num_components, F}
+) where {manifold_dim, num_components, F}
+    component_spaces = get_component_spaces(space)
+    dof_offsets = _get_dof_offsets(space)
+
+    dof_partition_per_component = FunctionSpaces.get_dof_partition.(component_spaces)
+    dof_partition = deepcopy(dof_partition_per_component)
+
+    for component in 1:num_components
+        for patch in 1:length(dof_partition_per_component[component][1])
+            dof_partition[component][1][patch] =
+                dof_partition_per_component[component][1][patch] .+ dof_offsets[component]
+        end
+    end
+
+    return dof_partition
+end
