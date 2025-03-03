@@ -179,33 +179,45 @@ end
 #                                    Maxwell Eigenvalue                                    #
 ############################################################################################
 
-function maxwell_eigen_function(m::Int, n::Int, x::Matrix{Float64})
+function maxwell_eigen_function(
+    m::Int, n::Int, scale_factors::NTuple{2, Float64}, x::Matrix{Float64}
+)
     num_points = size(x, 1)
 
     x_component = Vector{Float64}(undef, num_points)
     y_component = Vector{Float64}(undef, num_points)
 
     for point in axes(x, 1)
-        x_component[point] = -cos(m * x[point, 1]) * sin(n * x[point, 2])
-        y_component[point] = sin(m * x[point, 1]) * cos(n * x[point, 2])
+        x_component[point] =
+            cos(m * scale_factors[1] * x[point, 1]) *
+            sin(n * scale_factors[2] * x[point, 2])
+        y_component[point] =
+            sin(m * scale_factors[1] * x[point, 1]) *
+            cos(n * scale_factors[2] * x[point, 2])
     end
 
     return [x_component, y_component]
 end
 
-function get_maxwell_eig(num_eig::Int, geom::Mantis.Geometry.AbstractGeometry{2})
-    max_index = floor(Int, sqrt(num_eig))
+function get_maxwell_eig(
+    num_eig::Int, geom::Mantis.Geometry.AbstractGeometry{2}, box_size::NTuple{2, Float64}
+)
 
-    eig_vals = Int[]
-    eig_funcs = Mantis.Forms.AnalyticalFormField{2, 1, typeof(geom)}[]
-    for m in 0:max_index
-        for n in 0:max_index
-            curr_val = m^2 + n^2
-            push!(eig_vals, curr_val)
-            eig_func_expr = x -> maxwell_eigen_function(m, n, x)
-            push!(eig_funcs, Mantis.Forms.AnalyticalFormField(
+    eig_vals = Vector{Float64}(undef, (num_eig+1)^2)
+    eig_funcs = Vector{Mantis.Forms.AnalyticalFormField{2, 1, typeof(geom)}}(
+        undef, (num_eig+1)^2
+    )
+    eig_count = 1
+    scale_factors = (fpi / box_size[1], fpi / box_size[2])
+    for m in 0:num_eig
+        for n in 0:num_eig
+            curr_val = (scale_factors[1] * m)^2 + (scale_factors[2] * n)^2
+            eig_vals[eig_count] = curr_val
+            eig_func_expr = x -> maxwell_eigen_function(m, n, scale_factors, x)
+            eig_funcs[eig_count] = Mantis.Forms.AnalyticalFormField(
                 1, eig_func_expr, geom, "u"
-            ))
+            )
+            eig_count += 1
         end
     end
 

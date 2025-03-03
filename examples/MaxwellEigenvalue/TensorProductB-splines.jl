@@ -53,7 +53,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 if verbose
     # Exact eigenvalues
     num_eig = 20
-    ω² = get_maxwell_eig(num_eig, ⊞)[1]
+    ω² = get_maxwell_eig(num_eig, ⊞, box_size)[1]
 
     println("Printing first $(num_eig) exact and computed eigenvalues...")
     println("i    ω²[i]      ωₕ²[i]     (ωₕ²[i] - ω²[i])^2")
