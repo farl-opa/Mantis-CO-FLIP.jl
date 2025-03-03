@@ -1,0 +1,79 @@
+module TensorProductBsplinesMaxwellEigenvalueTests
+
+import Mantis
+
+using Test
+
+# Refer to the following file for method and variable definitions
+include("../../examples/HelperFunctions.jl")
+
+############################################################################################
+#                                      Problem setup                                       #
+############################################################################################
+# Mesh 
+const starting_point = (0.0, 0.0)
+const box_size = (fpi, 1.0) # This size is so that the eigenvalues are unique.
+const num_runs = 5 # Number of problem runs. Each solve 2≤i≤num_runs will have 2^i elements.
+num_elements = [(2, 2) .^ i for i in 1:num_runs]
+
+# B-spline parameters
+p = (3, 3) # Polynomial degrees.
+k = p .- 1 # Regularities. (Maximally smooth B-splines.)
+
+# Quadrature rules
+nq_assembly = p .+ 1
+nq_error = nq_assembly .* 2
+qrule_assembly, qrule_error = get_quadrature_rules(nq_assembly, nq_error)
+
+# Number of eigenvalues to compute
+const num_eig = 5
+
+############################################################################################
+#                                       Run problem                                        #
+############################################################################################
+function run_problems(num_elements, p, k, qrule_assembly)
+    eig_val_errors = [Vector{Float64}(undef, num_runs) for _ in 1:num_eig]
+    eig_func_errors = [Vector{Float64}(undef, num_runs) for _ in 1:num_eig]
+    for run_id in 1:num_runs 
+        curr_num_elements = num_elements[run_id]
+        R_complex = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(
+            starting_point, box_size, curr_num_elements, p, k
+        )
+        R0, R1  = R_complex[1], R_complex[2]
+        geom = Mantis.Forms.get_geometry(R0)
+        compt_eig_vals, compt_eig_funcs = solve_maxwell_eig(R0, R1, qrule_assembly, num_eig)
+        exact_eig_vals, exact_eig_funcs = get_maxwell_eig(num_eig, geom, box_size)
+        
+        for eig_id in 1:num_eig
+            eig_val_errors[eig_id][run_id] = compt_eig_vals[eig_id] - exact_eig_vals[eig_id]
+           eig_func_errors[eig_id][run_id] = Mantis.Analysis.compute_error_total(
+                compt_eig_funcs[eig_id], exact_eig_funcs[eig_id], qrule_error, "L2"
+            )
+        end
+        @test all(isapprox.(compt_eig_vals, exact_eig_vals, atol=10.0^(1-run_id)))
+    end
+
+    return eig_val_errors, eig_func_errors
+end
+
+eig_val_errors, eig_func_errors = run_problems(num_elements, p, k, qrule_assembly)
+
+eig_val_error_rates = [Vector{Float64}(undef, num_runs) for _ in 1:num_eig]
+eig_func_error_rates = [Vector{Float64}(undef, num_runs) for _ in 1:2]
+for eig_id in 1:num_eig
+    eig_val_error_rates[eig_id] = log.(
+        Ref(2), eig_val_errors[eig_id][1:end-1] ./ eig_val_errors[eig_id][2:end]
+    )
+    if eig_id <= 2 # Eigenvectors after this can have a -1 factor that is hard to predict.
+        eig_func_error_rates[eig_id] =
+            log.(
+                Ref(2),
+                eig_func_errors[eig_id][1:(end - 1)] ./ eig_func_errors[eig_id][2:end],
+            )
+
+        @test isapprox(eig_func_error_rates[eig_id][end], minimum(p) - 1, atol=2e-1)
+    end
+    @test isapprox(eig_val_error_rates[eig_id][end], 2 * minimum(p), atol=2e-1)
+end
+
+end
