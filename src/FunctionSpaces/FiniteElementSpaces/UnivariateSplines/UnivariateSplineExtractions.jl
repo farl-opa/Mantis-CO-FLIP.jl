@@ -89,7 +89,6 @@ function extract_bspline_to_section_space(
 end
 
 """
-<<<<<<< HEAD:src/FunctionSpaces/FiniteElementSpaces/UnivariateSplineExtractions.jl
     extract_bspline_to_bernstein(knot_vector::KnotVector) -> ExtractionOperator
 
 Compute the extraction coefficients of B-Spline basis functions defined by the given knot vector.
@@ -102,10 +101,10 @@ to Bernstein polynomials on each element of the knot vector.
 
 # Returns
 - `ExtractionOperator`: A struct containing:
-  - `E::Vector{Matrix{Float64}}`: Extraction coefficients for each element.
-  - `basis_indices::Vector{Vector{Int}}`: Indices of supported basis functions on each element.
-  - `nel::Int`: Number of elements.
-  - `num_basis_functions::Int`: Total number of basis functions.
+- `E::Vector{Matrix{Float64}}`: Extraction coefficients for each element.
+- `basis_indices::Vector{Vector{Int}}`: Indices of supported basis functions on each element.
+- `nel::Int`: Number of elements.
+- `num_basis_functions::Int`: Total number of basis functions.
 
 # Note
 The extraction coefficients `E[el]` for element `el` contain the coefficients of the linear
@@ -115,9 +114,6 @@ combination of reference Bernstein polynomials determining the basis functions o
 - Borden, M. J., Scott, M. A., Evans, J. A., & Hughes, T. J. R. (2011).
   Isogeometric finite element data structures based on Bézier extraction of spline_spaces.
   International Journal for Numerical Methods in Engineering, 87(1-5), 15-47.
-=======
-Algorithm from [Borden2011](@cite), adapted to 1-based indexing for Julia.
->>>>>>> main:src/FunctionSpaces/FiniteElementSpaces/UnivariateSplines/UnivariateSplineExtractions.jl
 """
 function extract_bspline_to_section_space(
     knot_vector::KnotVector, canonical_space::Bernstein

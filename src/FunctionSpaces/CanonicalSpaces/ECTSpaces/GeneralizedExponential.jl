@@ -21,40 +21,15 @@ struct GeneralizedExponential <: AbstractECTSpaces
     m::Int
     C::Matrix{Float64}
     endpoint_tol::Float64
-    function GeneralizedExponential(p::Int)
-        l = 1.0
-        w = 1.0
-        t = false
-        m = 10
-        GeneralizedExponential(p, w, l, t, m)
-    end
 
-    function GeneralizedExponential(p::Int, w::Float64)
-        l = 1.0
+    function GeneralizedExponential(p::Int, w::Float64 = 1.0, l::Float64 = 1.0, m::Int = 10)
         t = abs(w) * l >= 3.0
-        m = 10
-        GeneralizedExponential(p, w, l, t, m)
-    end
-
-    function GeneralizedExponential(p::Int, w::Float64, l::Float64)
-        t = abs(w) * l >= 3.0
-        m = 10
-        GeneralizedExponential(p, w, l, t, m)
-    end
-
-    function GeneralizedExponential(p::Int, w::Float64, l::Float64, m::Int)
-        t = abs(w) * l >= 3.0
-        GeneralizedExponential(p, w, l, t, m)
-    end
-
-    function GeneralizedExponential(p::Int, w::Float64, l::Float64, t::Bool)
-        m = 10
-        GeneralizedExponential(p, w, l, t, m)
+        return GeneralizedExponential(p, w, l, t, m)
     end
 
     function GeneralizedExponential(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         endpoint_tol = 1e-12
-        new(p, w, l, t, m, gexp_representation(p, w, l, t, m),endpoint_tol)
+        new(p, w, l, t, m, gexp_representation(p, w, l, t, m), endpoint_tol)
      end
 end
 
