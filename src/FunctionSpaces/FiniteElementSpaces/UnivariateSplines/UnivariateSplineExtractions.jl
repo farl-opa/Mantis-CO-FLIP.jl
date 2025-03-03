@@ -89,7 +89,31 @@ function extract_bspline_to_section_space(
 end
 
 """
-Algorithm from [Borden2011](@cite), adapted to 1-based indexing for Julia.
+    extract_bspline_to_bernstein(knot_vector::KnotVector) -> ExtractionOperator
+
+Compute the extraction coefficients of B-Spline basis functions defined by the given knot vector.
+
+This function implements the Bézier extraction process, converting B-Spline basis functions
+to Bernstein polynomials on each element of the knot vector.
+
+# Arguments
+- `knot_vector::KnotVector`: The knot vector defining the B-Spline basis.
+
+# Returns
+- `ExtractionOperator`: A struct containing:
+- `E::Vector{Matrix{Float64}}`: Extraction coefficients for each element.
+- `basis_indices::Vector{Vector{Int}}`: Indices of supported basis functions on each element.
+- `nel::Int`: Number of elements.
+- `num_basis_functions::Int`: Total number of basis functions.
+
+# Note
+The extraction coefficients `E[el]` for element `el` contain the coefficients of the linear
+combination of reference Bernstein polynomials determining the basis functions on that element.
+
+# References
+- Borden, M. J., Scott, M. A., Evans, J. A., & Hughes, T. J. R. (2011).
+  Isogeometric finite element data structures based on Bézier extraction of spline_spaces.
+  International Journal for Numerical Methods in Engineering, 87(1-5), 15-47.
 """
 function extract_bspline_to_section_space(
     knot_vector::KnotVector, canonical_space::Bernstein
@@ -199,7 +223,7 @@ function extract_bspline_to_section_space(
         KL = _evaluate_all_at_point(canonical_space, 1.0, r)
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
         KR = _evaluate_all_at_point(canonical_space, 0.0, r)
-        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
+        SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
         # element sizes where constraints are evaluated
         h_L = get_element_size(knot_vector, el)
         h_R = get_element_size(knot_vector, el + 1)
@@ -216,7 +240,7 @@ function extract_bspline_to_section_space(
             rows, cols, vals, (canonical_dims[el + 2] - canonical_dims[el]), r + 1
         )
 
-        # Update local extraction matrix by building double-diagonal nullspace of constraints
+        # Update local extraction matrix by building double-diagonal nullspace
         L = H[:, (canonical_dims[el] + 1):canonical_dims[el + 2]] * K
         for j in 0:r
             Hbar = build_sparse_nullspace(L[:, j + 1])
@@ -235,7 +259,7 @@ function extract_bspline_to_section_space(
         basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
     end
     # Convert global extraction matrix to element local extractions
-    # (here, the matrix is transposed so that [canonical_space] * [extraction] = [B-splines])
+    # (the matrix is transposed here so that [canonical_space] * [extraction] = [B-splines])
     extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
     for el in 1:nel
         cols_el = (canonical_dims[el] + 1):canonical_dims[el + 1]
@@ -398,7 +422,7 @@ Build the sparsest possible nullspace of a constraint vector with no zero entrie
 """
 function build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
     q = length(constraint)
-    nz_flag = .!isapprox.(constraint, 0.0, atol=1e-13)
+    nz_flag = .!isapprox.(constraint, 0.0, atol=1e-14)
     i1 = findfirst(nz_flag)
     i2 = findlast(nz_flag)
     dd = zeros(Float64, q - 1, 2)
