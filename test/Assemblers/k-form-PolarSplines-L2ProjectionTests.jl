@@ -64,10 +64,10 @@ R = 1.0
 p⁰ = [2, 3]
 # type of section spaces to use
 θ = 2*pi
-α = 10.0
+α = 5.0
 section_space_type = [Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential, Mantis.FunctionSpaces.Bernstein]
 # print info?
-verbose = false
+verbose = true
 # tolerance for zero values
 zero_tol = 1e-12
 # tolerance for convergence rates
@@ -111,10 +111,7 @@ for (p_idx, p) in enumerate(p⁰)
 
         # number of elements at the coarsest refinement level
         num_elements = (num_el_θ, num_el_r)
-        # ECT coefficients at the coarsest refinement level
-        θ₀ = θ ./ num_elements
-        α₀ = α ./ num_elements
-
+        
         for ref_lev = 0:num_ref_levels
 
             if verbose
@@ -123,10 +120,10 @@ for (p_idx, p) in enumerate(p⁰)
 
             # section spaces
             if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
-                section_spaces = map(section_space, degree, θ₀)
+                section_spaces = map(section_space, degree, (θ, θ), 1 ./ num_elements)
                 dq⁰ = 2 .* degree
             elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
-                section_spaces = map(section_space, degree, α₀)
+                section_spaces = map(section_space, degree, (α, α), 1 ./ num_elements)
                 dq⁰ = 3 .* degree
             else
                 section_spaces = map(section_space, degree)
@@ -141,10 +138,7 @@ for (p_idx, p) in enumerate(p⁰)
 
             # update number of elements
             num_elements = (num_el_θ, num_el_r) .* (2^ref_lev)
-            # update ECT coefficients
-            θ₀ = θ₀ ./ 2
-            α₀ = α₀ ./ 2
-
+            
             # retrieve geometry underlying the form spaces
             geometry = Mantis.Forms.get_geometry(X[1])
 
