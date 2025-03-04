@@ -23,7 +23,9 @@ k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-qrule_assembly, qrule_error = get_quadrature_rules(nq_assembly, nq_error)
+qrule_assembly, qrule_error = Mantis.Quadrature.get_quadrature_rules(
+    Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
+)
 
 # Number of eigenvalues to compute
 const num_eig = 5
@@ -41,8 +43,8 @@ function run_problems(num_elements, p, k, qrule_assembly)
         )
         R0, R1  = R_complex[1], R_complex[2]
         geom = Mantis.Forms.get_geometry(R0)
-        compt_eig_vals, compt_eig_funcs = solve_maxwell_eig(R0, R1, qrule_assembly, num_eig)
-        exact_eig_vals, exact_eig_funcs = get_maxwell_eig(num_eig, geom, box_size)
+        compt_eig_vals, compt_eig_funcs = Mantis.Assemblers.solve_maxwell_eig(R0, R1, qrule_assembly, num_eig)
+        exact_eig_vals, exact_eig_funcs = Mantis.Assemblers.get_maxwell_eig(num_eig, geom, box_size)
         
         for eig_id in 1:num_eig
             eig_val_errors[eig_id][run_id] = compt_eig_vals[eig_id] - exact_eig_vals[eig_id]

@@ -20,7 +20,9 @@ k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-∫ₐ, ∫ₑ = get_quadrature_rules(nq_assembly, nq_error)
+∫ₐ, ∫ₑ = Mantis.Quadrature.get_quadrature_rules(
+    Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
+)
 
 # Number of eigenvalues to compute
 num_eig = 20
@@ -43,7 +45,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ⊞ = Mantis.Forms.get_geometry(ℜ⁰)
 
 # Solve problem
-ωₕ², uₕ = solve_maxwell_eig(ℜ⁰, ℜ¹, ∫ₐ, num_eig; verbose)
+ωₕ², uₕ = Mantis.Assemblers.solve_maxwell_eig(ℜ⁰, ℜ¹, ∫ₐ, num_eig; verbose)
 
 ############################################################################################
 #                                      Solution data                                       #
@@ -53,7 +55,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 if verbose
     # Exact eigenvalues
     num_eig = 20
-    ω² = get_maxwell_eig(num_eig, ⊞, box_size)[1]
+    ω² = Mantis.Assemblers.get_maxwell_eig(num_eig, ⊞, box_size)[1]
 
     println("Printing first $(num_eig) exact and computed eigenvalues...")
     println("i    ω²[i]      ωₕ²[i]     (ωₕ²[i] - ω²[i])^2")

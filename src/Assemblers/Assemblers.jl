@@ -20,6 +20,7 @@ abstract type AbstractInputs end
 
 include("WeakFormulations.jl")
 include("GlobalAssemblers.jl")
+include("AssemblersHelpers.jl")
 
 
 end

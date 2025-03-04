@@ -283,3 +283,67 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degre
 
     return form_spaces, global_extraction_operators, geom_coeffs_tp
 end
+
+############################################################################################
+#                                   Boundary conditions                                    #
+############################################################################################
+
+"""
+    null_tangential_boundary_conditions(
+        form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
+    ) where {manifold_dim, expression_rank, G}
+
+Creates a dictionary of null-tangential boundary conditions for a given form expression.
+These are the boundary conditions of the space ``H_{0}(\\text{curl}; \\Omega)``.
+
+# Arguments
+- `form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}`: The one-form for
+    which to compute the boundary conditions.
+
+# Returns
+- `Dict{Int, Float64}`: The dictionary of null-tangential boundary conditions.
+"""
+function null_tangential_boundary_conditions(
+    form::AbstractFormExpression{2, 1, expression_rank, G}
+) where {expression_rank, G}
+    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+    bc_H_zero_curl_1 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[1][1][j]
+    )
+    bc_H_zero_curl_2 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[2][1][j]
+    )
+    bc_H_zero_curl = merge(bc_H_zero_curl_1, bc_H_zero_curl_2)
+
+    return bc_H_zero_curl
+end
+
+"""
+    null_normal_boundary_conditions(
+        form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
+    ) where {manifold_dim, expression_rank, G}
+
+Creates a dictionary of null-normal boundary conditions for a given form expression.
+These are the boundary conditions of the space ``H_{0}(\\text{div}; \\Omega)``.
+
+# Arguments
+- `form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}`: The one-form for
+    which to compute the boundary conditions.
+
+# Returns
+- `Dict{Int, Float64}`: The dictionary of null-normal boundary conditions.
+"""
+function null_normal_boundary_conditions(
+    form::AbstractFormExpression{2, 1, expression_rank, G}
+) where {expression_rank, G}
+    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+    bc_H_zero_div_1 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[1][1][j]
+    )
+    bc_H_zero_div_2 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[2][1][j]
+    )
+    bc_H_zero_div = merge(bc_H_zero_div_1, bc_H_zero_div_2)
+
+    return bc_H_zero_div
+end
