@@ -12,7 +12,7 @@ number of quadrature points in each dimension.
 - `q_rule::Function`: The type of univariate quadrature rule to use.
 - `nq_single::NTuple{manifold_dim, Int}`: Number of quadrature points per dimension for the
     first quadrature rule.
-- `nq_others::NTuple{manifold_dim, Int}`: Number of quadrature points per dimension for the
+- `nq_others::NTuple{manifold_dim, Int}...`: Number of quadrature points per dimension for the
     other quadrature rules.
 
 # Returns
