@@ -111,7 +111,7 @@ for (p_idx, p) in enumerate(p⁰)
 
         # number of elements at the coarsest refinement level
         num_elements = (num_el_θ, num_el_r)
-        
+
         for ref_lev = 0:num_ref_levels
 
             if verbose
@@ -138,7 +138,7 @@ for (p_idx, p) in enumerate(p⁰)
 
             # update number of elements
             num_elements = (num_el_θ, num_el_r) .* (2^ref_lev)
-            
+
             # retrieve geometry underlying the form spaces
             geometry = Mantis.Forms.get_geometry(X[1])
 

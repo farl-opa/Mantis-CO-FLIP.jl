@@ -16,11 +16,11 @@ Wt = pi / 2
 b_θ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
 b_r = Mantis.FunctionSpaces.Bernstein(deg)
 
-(P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ = 
-    Mantis.FunctionSpaces.create_polar_spline_space_and_geometry(
+(P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ =
+    Mantis.FunctionSpaces.create_scalar_polar_splines_and_geometry(
         (4, 1), (b_θ, b_r), (1, -1), 1.0
 )
-geom = Mantis.Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
+geom = Mantis.Geometry.FEMGeometry(P_geom, geom_coeffs_polar)
 field_coeffs = Matrix{Float64}(
     LinearAlgebra.I,
     Mantis.FunctionSpaces.get_num_basis(P_sol),

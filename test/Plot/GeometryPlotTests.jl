@@ -20,11 +20,10 @@ patch = Mantis.Mesh.Patch1D(breakpoints)
 Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
 GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
 Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1, -1])
-geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GBθ),Mantis.FunctionSpaces.get_num_basis(Br),1.0)
-PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]))
+geom_coeffs_tp, _, _ = Mantis.FunctionSpaces._build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GBθ),Mantis.FunctionSpaces.get_num_basis(Br),1.0)
+PSplines, E = Mantis.FunctionSpaces.PolarSplineScalars(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]))
 geom_coeffs_θr = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
-PSpline_spaces = Mantis.FunctionSpaces.get_component_spaces(PSplines)
-S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(tuple(PSpline_spaces..., GBθ))
+S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(tuple(PSplines, GBθ))
 # control points for geometry cross-section
 geom_coeffs_θr0 = [geom_coeffs_θr.+[4 0] zeros(size(geom_coeffs_θr,1))]
 # rotate the cross-section points around the y-axis to create control points for torus
@@ -211,7 +210,7 @@ for n_subcells in n_subcells_range
         # Plot
         Mantis.Plot.plot(mapped_geometry; vtk_filename = output_file[1:end-4], n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
 
-        # Test plotting 
+        # Test plotting
         # Read the cell data from the reference file
         reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
         vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -222,7 +221,7 @@ for n_subcells in n_subcells_range
         vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
         output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
         output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-        
+
         # # Check if cell data is identical
         @test reference_points ≈ output_points atol = 1e-13
         @test reference_cells == output_cells
@@ -252,14 +251,14 @@ degrees_range = 1:3:10
 n_subcells_range = 1:3:10
 
 for n_subcells in n_subcells_range
-    for degree in degrees_range 
+    for degree in degrees_range
         output_filename = @sprintf "spiral_fem_geometry__n_sub_%02d_degree_%02d.vtu" n_subcells degree
         output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-        
+
         # Plot
         Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
 
-        # Test plotting  
+        # Test plotting
         # Read the cell data from the reference file
         reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
         vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
@@ -270,7 +269,7 @@ for n_subcells in n_subcells_range
         vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
         output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
         output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-        
+
         # Check if cell data is identical
         @test reference_points ≈ output_points atol = 1e-14
         @test reference_cells == output_cells
