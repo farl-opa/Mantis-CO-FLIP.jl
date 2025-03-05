@@ -12,10 +12,11 @@ function _compute_square_error_per_element(
 ) where {
     manifold_dim,
     form_rank,
-    expression_rank,
+    expression_rank_1,
+    expression_rank_2,
     G <: Geometry.AbstractGeometry{manifold_dim},
-    TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
-    TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G},
+    TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
     Q <: Quadrature.QuadratureRule{manifold_dim},
 }
     num_elements = Geometry.get_num_elements(Forms.get_geometry(computed_sol))
@@ -48,14 +49,31 @@ function _compute_square_error_per_element(
 end
 
 
-function compute_error_per_element(computed_sol::TF1, exact_sol::TF2, quad_rule::Q, norm="L2") where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}, Q <: Quadrature.QuadratureRule{manifold_dim}}
-    partial_result = _compute_square_error_per_element(computed_sol, exact_sol, quad_rule, norm)
+function compute_error_per_element(
+    computed_sol::TF1, exact_sol::TF2, quad_rule::Q, norm="L2"
+) where {
+    manifold_dim,
+    form_rank,
+    expression_rank_1,
+    expression_rank_2,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G},
+    TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
+    Q <: Quadrature.QuadratureRule{manifold_dim},
+}
+    partial_result = _compute_square_error_per_element(
+        computed_sol, exact_sol, quad_rule, norm
+    )
     if norm == "Linf"
         return partial_result
     elseif norm == "L2" || norm == "H1"
         return sqrt.(partial_result)
     else
-        throw(ArgumentError("Unknown norm '$norm'. Only 'L2', 'Linf', and 'H1' are accepted inputs."))
+        throw(
+            ArgumentError(
+                "Unknown norm '$norm'. Only 'L2', 'Linf', and 'H1' are accepted inputs."
+            ),
+        )
     end
 end
 
@@ -64,10 +82,11 @@ function compute_error_total(
 ) where {
     manifold_dim,
     form_rank,
-    expression_rank,
+    expression_rank_1,
+    expression_rank_2,
     G <: Geometry.AbstractGeometry{manifold_dim},
-    TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
-    TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G},
+    TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
     Q <: Quadrature.QuadratureRule{manifold_dim},
 }
     partial_result = _compute_square_error_per_element(

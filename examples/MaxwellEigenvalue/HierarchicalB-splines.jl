@@ -11,16 +11,16 @@ include("../HelperFunctions.jl")
 # Mesh 
 starting_point = (0.0, 0.0)
 box_size = (fpi, fpi) #(π, π)
-num_elements = (15, 15) #(2, 2) .^ 3 # Ininital mesh size.
+num_elements = (2, 2) .^ 3 # Ininital mesh size.
 
 # B-spline parameters
-p = (4, 4) # Polynomial degrees.
+p = (2, 2) # Polynomial degrees.
 k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 
 # Hierarchical parameters.
-truncate = false # true = THB, false = HB
+truncate = true # true = THB, false = HB
 simplified = false
-num_steps = 1 # Number of refinement steps.
+num_steps = 2 # Number of refinement steps.
 num_sub = (2, 2) # Number of subdivisions per dimension per step.
 θ = 0.2 # Dorfler parameter.
 Lchains = false # Decide if Lchains are added to fix inexact refinements.
@@ -34,7 +34,7 @@ nq_error = nq_assembly .* 2
 )
 
 # Number of eigenvalues to compute
-num_eig = 10
+num_eig = 5 
 
 verbose = true # Set to true for problem information.
 export_vtk = true # Set to true to export the computed eigenfunctions.
@@ -75,10 +75,10 @@ if verbose
     end
 end
 
-if export_vtk 
+if export_vtk
     println("Exporting computed eigenfunctions to VTK...")
-
-    file_base_name = "MaxwellEigenvalueHBsplines-computed-p=$(p)-k=$(k)-nels=$(num_elements)"
+    hier_num_elements = Mantis.Geometry.get_num_elements(Mantis.Forms.get_geometry(uₕ[1]))
+    file_base_name = "MaxwellEigenvalueHBsplines-computed-p=$(p)-k=$(k)-nels=$(hier_num_elements)"
     labels = Vector{String}(undef, num_eig)
     for i in 1:num_eig
         labels[i] = uₕ[i].label

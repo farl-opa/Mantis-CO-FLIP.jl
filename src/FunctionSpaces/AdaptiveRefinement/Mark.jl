@@ -41,7 +41,6 @@ function add_padding!(
     hier_space::HierarchicalFiniteElementSpace{n, S, T},
 ) where {n, S <: AbstractFESpace{n}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(hier_space)
-    get_basis_indices_from_extraction(space, element) = get_extraction(space, element)[2]
 
     for level in 1:num_levels
         if marked_elements_per_level[level] == Int[]
@@ -50,7 +49,7 @@ function add_padding!(
 
         basis_in_marked_elements = reduce(
             union,
-            get_basis_indices_from_extraction.(
+            get_basis_indices.(
                 Ref(hier_space.spaces[level]), marked_elements_per_level[level]
             ),
         )
@@ -77,9 +76,13 @@ function get_marked_elements_children(
             if marked_elements_per_level[level] == Int[]
                 marked_children[level + 1] = Int[]
             else
-                marked_children[level + 1] = get_element_children(
-                    get_twoscale_operator(hier_space, level),
-                    marked_elements_per_level[level],
+                marked_children[level + 1] =
+                reduce(
+                    vcat,
+                    get_element_children.(
+                        Ref(get_twoscale_operator(hier_space, level)),
+                        marked_elements_per_level[level],
+                    ),
                 )
             end
         elseif marked_elements_per_level[level] != Int[]

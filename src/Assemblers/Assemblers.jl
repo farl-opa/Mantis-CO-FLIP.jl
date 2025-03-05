@@ -13,6 +13,7 @@ import .. Forms
 import .. Quadrature
 import .. Mesh
 import .. FunctionSpaces
+import .. Analysis
 
 abstract type AbstractInputs end
 

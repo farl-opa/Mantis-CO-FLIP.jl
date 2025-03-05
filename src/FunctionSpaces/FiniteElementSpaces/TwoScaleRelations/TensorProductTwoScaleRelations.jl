@@ -28,11 +28,7 @@ struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <:
         T <: NTuple{num_spaces, AbstractFESpace},
         TS <: NTuple{num_spaces, AbstractTwoScaleOperator},
     }
-        gm = kron(
-            [
-                twoscale_operators[i].global_subdiv_matrix for i in num_spaces:-1:1
-            ]...,
-        )
+        gm = kron([twoscale_operators[i].global_subdiv_matrix for i in num_spaces:-1:1]...)
 
         return new{manifold_dim, typeof(coarse_space), TS}(
             coarse_space, fine_space, gm, twoscale_operators

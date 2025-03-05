@@ -3,7 +3,7 @@
 #                                    Maxwell Eigenvalue                                    #
 ############################################################################################
 
-function maxwell_eigen_function(
+function analytical_maxwell_eigenfunction(
     m::Int, n::Int, scale_factors::NTuple{2, Float64}, x::Matrix{Float64}
 )
     num_points = size(x, 1)
@@ -24,7 +24,9 @@ function maxwell_eigen_function(
 end
 
 function get_maxwell_eig(
-    num_eig::Int, geom::Geometry.AbstractGeometry{2}, box_size::NTuple{2, Float64}
+    num_eig::Int,
+    geom::Geometry.AbstractGeometry{2},
+    box_size::NTuple{2, Float64}=(Float64(pi), Float64(pi)),
 )
 
     eig_vals = Vector{Float64}(undef, (num_eig+1)^2)
@@ -37,7 +39,7 @@ function get_maxwell_eig(
         for n in 0:num_eig
             curr_val = (scale_factors[1] * m)^2 + (scale_factors[2] * n)^2
             eig_vals[eig_count] = curr_val
-            eig_func_expr = x -> maxwell_eigen_function(m, n, scale_factors, x)
+            eig_func_expr = x -> analytical_maxwell_eigenfunction(m, n, scale_factors, x)
             eig_funcs[eig_count] = Forms.AnalyticalFormField(
                 1, eig_func_expr, geom, "u"
             )
@@ -113,7 +115,7 @@ function solve_maxwell_eig(
     end
 
     # Exact solution on initial step
-    # ω, u = get_maxwell_eig(num_eig, Forms.get_geometry(complex[1]))
+    exact_eigvals, exact_eigfuncs = get_maxwell_eig(num_eig, Forms.get_geometry(complex[1]))
 
     # Solve problem on initial step
     compt_eigvals, compt_eigfuncs = solve_maxwell_eig(
@@ -121,18 +123,18 @@ function solve_maxwell_eig(
     )
 
     # Calculate element-wise error
-
-    #TODO: this needs to be changed to compute the error per element based on
-    # a chosen eigenfunction
-    #err_per_element = Mantis.Assemblers.compute_error_per_element(uₕ, uₑ, ∫ₑ)
-    err_per_element = Float64[]
+    err_per_element = Analysis.compute_error_per_element(
+        compt_eigfuncs[eigenfunction], exact_eigfuncs[eigenfunction], q_rule_error
+    )
 
     # COMPUTE ERROR -------------------------------------------------------------------
-    #println("Computing error...")
-    #error_σ = L2_norm(σₕ - σₑ, ∫ₑ)
-    #error_u = L2_norm(uₕ - uₑ, ∫ₑ)
-    #println("Error in σ: ", error_σ)
-    #println("Error in u: ", error_u)
+    if verbose
+        println("Computing error...")
+        error_u = Analysis.L2_norm(
+            compt_eigfuncs[eigenfunction] - exact_eigfuncs[eigenfunction], q_rule_error
+        )
+        println("Error in eigenfunction $(eigenfunction): ", error_u)
+    end
 
     for step in 1:num_steps
         println("Solving the problem on step $step...")
@@ -141,27 +143,19 @@ function solve_maxwell_eig(
 
         L = FunctionSpaces.get_num_levels(zero_form_space)
 
-        # New operators and spaces for Lchains and extra refinement
         new_operator, new_space = FunctionSpaces.build_two_scale_operator(
             FunctionSpaces.get_space(zero_form_space, L),
             FunctionSpaces.get_num_subdivisions(zero_form_space),
         )
 
-        # Get dorfler marking based on θ
-        #dorfler_marking = FunctionSpaces.get_dorfler_marking(err_per_element, θ)
+        dorfler_marking = FunctionSpaces.get_dorfler_marking(
+            err_per_element, dorfler_parameter
+        )
 
         # Get domains to be refined in current step
-        basis_support = [ 1, 2, 3, 4, 5, 16, 17, 18, 19, 20, 31, 32, 33, 34, 35, 46, 47, 48,
-        49, 50, 61, 62, 63, 64, 65, ]
-        marked_elements_per_level = [
-            vcat(
-                basis_support .+ (5 + 15 * 2),
-                basis_support .+ (8 + 15 * 5),
-                basis_support .+ (2 + 15 * 5),
-                basis_support .+ (5 + 15 * 8),
-            ),
-        ]
-        #marked_elements_per_level = FunctionSpaces.get_padding_per_level(zero_form_space, dorfler_marking)
+        marked_elements_per_level = FunctionSpaces.get_padding_per_level(
+            zero_form_space, dorfler_marking
+        )
 
         # Add Lchains if needed
         if Lchains
@@ -180,20 +174,27 @@ function solve_maxwell_eig(
         )
 
         # Update exact solution
-        #uₑ, σₑ, fₑ = sol_func(1, W.geometry)
+        exact_eigvals, exact_eigfuncs = get_maxwell_eig(
+            num_eig, Forms.get_geometry(complex[1])
+        )
 
         # Solve problem on current step
-        compt_eigvals, compt_eigfuncs = solve_maxwell_eig(complex[1], complex[2], q_rule_assembly, num_eig)
-        # Calculate element-wise error
-        #err_per_element = Assemblers.compute_error_per_element(uₕ, fₑ, ∫ₑ)
-        err_per_element = [Int[]]
+        compt_eigvals, compt_eigfuncs = solve_maxwell_eig(
+            complex[1], complex[2], q_rule_assembly, num_eig; verbose
+        )
+
+        err_per_element = Analysis._compute_square_error_per_element(
+            compt_eigfuncs[eigenfunction], exact_eigfuncs[eigenfunction], q_rule_error
+        )
 
         # COMPUTE ERROR -------------------------------------------------------------------
-        #println("Computing error...")
-        #error_σ = L2_norm(σₕ - σₑ, ∫ₑ)
-        #error_u = L2_norm(uₕ - uₑ, ∫ₑ)
-        #println("Error in σ: ", error_σ)
-        #println("Error in u: ", error_u)
+        if verbose
+            println("Computing error...")
+            error_u = Analysis.L2_norm(
+                compt_eigfuncs[eigenfunction] - exact_eigfuncs[eigenfunction], q_rule_error
+            )
+            println("Error in eigenfunction $(eigenfunction): ", error_u)
+        end
     end
 
     return compt_eigvals, compt_eigfuncs
