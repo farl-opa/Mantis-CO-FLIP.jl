@@ -26,6 +26,11 @@ nq_error = nq_assembly .* 2
 
 # Number of eigenvalues to compute
 num_eig = 20
+# Scaling form maxwell eigenfunctions.
+scale_factors = ntuple(2) do k
+    return pi /(box_size[k] - starting_point[k])
+end 
+
 
 verbose = true # Set to true for problem information.
 export_vtk = false # Set to true to export the computed eigenfunctions.
@@ -54,7 +59,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 
 if verbose
     # Exact eigenvalues
-    ω² = Mantis.Assemblers.get_maxwell_eig(num_eig, ⊞, box_size)[1]
+    ω² = Mantis.Assemblers.get_analytical_maxwell_eig(num_eig, ⊞, scale_factors)[1]
 
     println("Printing first $(num_eig) exact and computed eigenvalues...")
     println("i    ω²[i]      ωₕ²[i]     (ωₕ²[i] - ω²[i])^2")

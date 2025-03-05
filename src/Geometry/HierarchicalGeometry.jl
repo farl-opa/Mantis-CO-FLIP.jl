@@ -89,6 +89,16 @@ function jacobian(
     return J
 end
 
+function get_element_vertices(hier_geo::HierarchicalGeometry, hier_id::Int)
+    level, element_level_id = FunctionSpaces.convert_to_element_level_and_level_id(
+        get_space(hier_geo), hier_id
+    )
+    
+    return FunctionSpaces.get_element_vertices(
+        FunctionSpaces.get_space(get_space(hier_geo), level), element_level_id
+    )
+end
+
 function get_element_lengths(hier_geo::HierarchicalGeometry, hier_id::Int)
     level, element_level_id = FunctionSpaces.convert_to_element_level_and_level_id(
         get_space(hier_geo), hier_id

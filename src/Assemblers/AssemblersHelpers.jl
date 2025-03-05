@@ -3,6 +3,22 @@
 #                                    Maxwell Eigenvalue                                    #
 ############################################################################################
 
+"""
+    analytical_maxwell_eigenfunction(
+        m::Int, n::Int, scale_factors::NTuple{2, Float64}, x::Matrix{Float64}
+    )
+
+Evaluates the analytical Maxwell eigenfunction for the eigenmode `(m, n)` at points `x`. 
+
+# Arguments
+- `m::Int`: Eigenmode component x.
+- `n::Int`: Eigenmode component y.
+- `scale_factors::NTuple{2, Int}`: Scaling factors based on the size of the domain.
+- `x::Matrix{Float64}`: Evaluation points. 
+
+# Returns
+- `NTuple{2, Vector{Float64}}`: The evaluated Maxwell eigenfunction at points `x`.
+"""
 function analytical_maxwell_eigenfunction(
     m::Int, n::Int, scale_factors::NTuple{2, Float64}, x::Matrix{Float64}
 )
@@ -23,18 +39,29 @@ function analytical_maxwell_eigenfunction(
     return [x_component, y_component]
 end
 
-function get_maxwell_eig(
-    num_eig::Int,
-    geom::Geometry.AbstractGeometry{2},
-    box_size::NTuple{2, Float64}=(Float64(pi), Float64(pi)),
-)
+"""
+    get_maxwell_eig(num_eig::Int, geom::G) where {G <: Geometry.AbstractGeometry{2}}
 
+Returns the first `num_eig` eigenvalues and 1-form eigenfunctions on the geometry `geom`.
+
+# Arguments
+- `num_eig::Int`: Number of eigenvalues and eigenfunctions to compute.
+- `geom::Geometry.AbstractGeometry{2}`: The two-dimensional geometry.
+
+# Returns
+- `Vector{Float64}`: The first `num_eig` analytical eigenvalues.
+- `Vector{Forms.AnalyticalFormField{2, 1, G}`: The first `num_eig` analytical
+    eigenfunctions.
+"""
+function get_analytical_maxwell_eig(
+    num_eig::Int, geom::G, scale_factors::NTuple{2, Float64}
+) where {G <: Geometry.AbstractGeometry{2}}
     eig_vals = Vector{Float64}(undef, (num_eig+1)^2)
     eig_funcs = Vector{Forms.AnalyticalFormField{2, 1, typeof(geom)}}(
         undef, (num_eig+1)^2
     )
+
     eig_count = 1
-    scale_factors = (pi / box_size[1], pi / box_size[2])
     for m in 0:num_eig
         for n in 0:num_eig
             curr_val = (scale_factors[1] * m)^2 + (scale_factors[2] * n)^2
@@ -107,7 +134,8 @@ function solve_maxwell_eig(
     q_rule_assembly::Quadrature.AbstractQuadratureRule{manifold_dim},
     q_rule_error::Quadrature.AbstractQuadratureRule{manifold_dim},
     eigenfunction::Int,
-    num_eig::Int;
+    num_eig::Int,
+    scale_factors::NTuple{manifold_dim, Float64};
     verbose::Bool=false,
 ) where {manifold_dim, num_forms, C <: NTuple{num_forms, Forms.AbstractFormSpace}}
     if verbose
@@ -115,7 +143,9 @@ function solve_maxwell_eig(
     end
 
     # Exact solution on initial step
-    exact_eigvals, exact_eigfuncs = get_maxwell_eig(num_eig, Forms.get_geometry(complex[1]))
+    exact_eigvals, exact_eigfuncs = get_analytical_maxwell_eig(
+        num_eig, Forms.get_geometry(complex[1]), scale_factors
+    )
 
     # Solve problem on initial step
     compt_eigvals, compt_eigfuncs = solve_maxwell_eig(
@@ -153,9 +183,44 @@ function solve_maxwell_eig(
         )
 
         # Get domains to be refined in current step
-        marked_elements_per_level = FunctionSpaces.get_padding_per_level(
-            zero_form_space, dorfler_marking
-        )
+        # marked_elements_per_level = FunctionSpaces.get_padding_per_level(
+        #     zero_form_space, dorfler_marking
+        # )
+        basis_support = [
+            1,
+            2,
+            3,
+            4,
+            5,
+            16,
+            17,
+            18,
+            19,
+            20,
+            31,
+            32,
+            33,
+            34,
+            35,
+            46,
+            47,
+            48,
+            49,
+            50,
+            61,
+            62,
+            63,
+            64,
+            65,
+        ]
+        marked_elements_per_level = [
+            vcat(
+                basis_support .+ (5 + 15 * 2),
+                basis_support .+ (8 + 15 * 5),
+                basis_support .+ (2 + 15 * 5),
+                basis_support .+ (5 + 15 * 8),
+            ),
+        ]
 
         # Add Lchains if needed
         if Lchains
@@ -174,8 +239,8 @@ function solve_maxwell_eig(
         )
 
         # Update exact solution
-        exact_eigvals, exact_eigfuncs = get_maxwell_eig(
-            num_eig, Forms.get_geometry(complex[1])
+        exact_eigvals, exact_eigfuncs = get_analytical_maxwell_eig(
+            num_eig, Forms.get_geometry(complex[1]), scale_factors
         )
 
         # Solve problem on current step

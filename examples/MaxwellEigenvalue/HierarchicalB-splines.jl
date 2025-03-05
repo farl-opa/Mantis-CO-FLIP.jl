@@ -11,16 +11,16 @@ include("../HelperFunctions.jl")
 # Mesh 
 starting_point = (0.0, 0.0)
 box_size = (fpi, fpi) #(π, π)
-num_elements = (2, 2) .^ 3 # Ininital mesh size.
+num_elements = (15, 15)# .^ 3 # Ininital mesh size.
 
 # B-spline parameters
-p = (2, 2) # Polynomial degrees.
+p = (4, 4) # Polynomial degrees.
 k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 
 # Hierarchical parameters.
 truncate = true # true = THB, false = HB
 simplified = false
-num_steps = 2 # Number of refinement steps.
+num_steps = 1 # Number of refinement steps.
 num_sub = (2, 2) # Number of subdivisions per dimension per step.
 θ = 0.2 # Dorfler parameter.
 Lchains = false # Decide if Lchains are added to fix inexact refinements.
@@ -34,10 +34,14 @@ nq_error = nq_assembly .* 2
 )
 
 # Number of eigenvalues to compute
-num_eig = 5 
+num_eig = 50 
+# Scaling form maxwell eigenfunctions.
+scale_factors = ntuple(2) do k
+    return pi /(box_size[k] - starting_point[k])
+end 
 
 verbose = true # Set to true for problem information.
-export_vtk = true # Set to true to export the computed eigenfunctions.
+export_vtk = false # Set to true to export the computed eigenfunctions.
 
 ############################################################################################
 #                                       Run problem                                        #
@@ -46,14 +50,11 @@ export_vtk = true # Set to true to export the computed eigenfunctions.
 ℌ = Mantis.Forms.create_hierarchical_de_rham_complex(
     starting_point, box_size, num_elements, p, k, num_sub, truncate
 )
-# Geometry
-# TODO: ⊞ = Mantis.Forms.get_geometry(ℌ) (from forms overhaul)
-⊞ = Mantis.Forms.get_geometry(ℌ[1])
-
 # Solve problem
 ωₕ², uₕ= Mantis.Assemblers.solve_maxwell_eig(
-    ℌ, num_steps, θ, Lchains, ∫ₐ, ∫ₑ, eigenfunc, num_eig; verbose
+    ℌ, num_steps, θ, Lchains, ∫ₐ, ∫ₑ, eigenfunc, num_eig, scale_factors; verbose
 )
+
 
 ############################################################################################
 #                                      Solution data                                       #
@@ -61,8 +62,9 @@ export_vtk = true # Set to true to export the computed eigenfunctions.
 # Print eigenvalues
 
 if verbose
+    ⊞ = Mantis.Forms.get_geometry(uₕ[1])
     # Exact eigenvalues
-    ω² = Mantis.Assemblers.get_maxwell_eig(num_eig, ⊞, box_size)[1]
+    ω² = Mantis.Assemblers.get_analytical_maxwell_eig(num_eig, ⊞, scale_factors)[1]
 
     println("Printing first $(num_eig) exact and computed eigenvalues...")
     println("i    ω²[i]      ωₕ²[i]     (ωₕ²[i] - ω²[i])^2")

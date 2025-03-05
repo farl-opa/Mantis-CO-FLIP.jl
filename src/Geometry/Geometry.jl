@@ -114,6 +114,31 @@ function get_element_lengths(
 end
 
 """
+    get_element_vertices(
+        geometry::AbstractGeometry{manifold_dim}, element_id::Int,
+    ) where {manifold_dim}
+
+Computes the vertices, in each manifold dimension, of the element given by `element_id` in
+`geometry`.
+
+# Arguments
+- 'geometry::AbstractGeometry': The geometry being used.
+- 'element_id::Int': Index of the element being considered.
+
+# Returns
+- '::NTuple{manifold_dim, Float64}': The element's vertices.
+
+# Notes
+There is no generic fallback for this method. It should be implemented for each concrete
+geometry type.
+"""
+function get_element_vertices(
+    geometry::AbstractGeometry{manifold_dim}, element_id::Int
+) where {manifold_dim}
+    throw(ArgumentError("Method not defined for geometry of type $(typeof(geometry))."))
+end
+
+"""
     evaluate(
         geometry::AbstractGeometry{manifold_dim},
         element_id::Int,

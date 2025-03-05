@@ -119,17 +119,27 @@ function jacobian(
     return J
 end
 
-function get_element_lengths(
+function get_element_vertices(
     geometry::CartesianGeometry{manifold_dim}, element_id::Int
 ) where {manifold_dim}
     ordered_id = get_ordered_indices(geometry, element_id)
     breakpoints = get_breakpoints(geometry)
+    element_vertices = ntuple(manifold_dim) do k
+        vertex_1 = breakpoints[k][ordered_id[k]+1]
+        vertex_2 = breakpoints[k][ordered_id[k]]
 
-    element_lengths = Vector{Float64}(undef, manifold_dim)
-    for k in 1:manifold_dim
-        element_lengths[k] = abs(
-            breakpoints[k][ordered_id[k] + 1] - breakpoints[k][ordered_id[k]]
-        )
+        return [vertex_1, vertex_2]
+    end
+    
+    return element_vertices
+end
+
+function get_element_lengths(
+    geometry::CartesianGeometry{manifold_dim}, element_id::Int
+) where {manifold_dim}
+    element_vertices = get_element_vertices(geometry, element_id)
+    element_lengths = ntuple(manifold_dim) do k
+        return abs(element_vertices[k][2] - element_vertices[k][1])
     end
 
     return element_lengths
