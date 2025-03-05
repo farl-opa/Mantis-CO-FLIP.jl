@@ -40,6 +40,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         domains::HierarchicalActiveInfo,
         num_subdivisions::NTuple{manifold_dim, Int},
         truncated::Bool=false,
+        simplified::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
     }
@@ -92,7 +93,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
 
         # Computes necessary hierarchical information
         active_elements, active_basis, nested_domains = get_active_objects_and_nested_domains(
-            spaces, two_scale_operators, domains
+            spaces, two_scale_operators, domains, simplified
         )
         multilevel_elements, multilevel_extraction_coeffs, multilevel_basis_indices = get_multilevel_extraction(
             spaces, two_scale_operators, active_elements, active_basis, truncated
@@ -345,7 +346,10 @@ basis are active or not.
 - `active_basis::HierarchicalActiveInfo`: active basis on each level.
 """
 function get_active_objects_and_nested_domains(
-    spaces::Vector{S}, two_scale_operators::Vector{T}, domains::HierarchicalActiveInfo
+    spaces::Vector{S},
+    two_scale_operators::Vector{T},
+    domains::HierarchicalActiveInfo,
+    simplified::Bool=false,
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(domains)
 
@@ -362,22 +366,48 @@ function get_active_objects_and_nested_domains(
         basis_to_remove = Int[]
         basis_to_add = Int[]
 
-        for Ni in active_basis_per_level[level] # Loop over active basis on current level
-            # Gets the support of Ni on current level and the next one
-            support = get_support(spaces[level], Ni)
-            element_children = [
-                child for parent in support for
-                child in get_element_children(two_scale_operators[level], parent)
-            ]
-            # checks if the support is contained in the next level domain
-            check_in_next_domain = element_children .∈ next_level_domain
+        if ~simplified
+            for coarse_basis in 1:get_num_basis(spaces[level])
+                # Gets the support of Ni on current level and the next one
+                support = get_support(spaces[level], coarse_basis)
+                element_children = [
+                    child for parent in support for
+                    child in get_element_children(two_scale_operators[level], parent)
+                ]
+                # checks if the support is contained in the next level domain
+                check_in_next_domain = element_children .∈ next_level_domain
+                # Updates elements and basis to add and remove based on check_in_next_domain
+                if all(check_in_next_domain)
+                    append!(elements_to_remove, support)
+                    append!(basis_to_remove, coarse_basis)
+                end
+            end
+            for fine_basis in 1:get_num_basis(spaces[level+1])
+                support = get_support(spaces[level+1], fine_basis)
+                check_in_next_domain = support .∈ next_level_domain
+                if all(check_in_next_domain)
+                    append!(elements_to_add, support)
+                    append!(basis_to_add, fine_basis)
+                end
+            end
+        else 
+            for coarse_basis in active_basis_per_level[level] # Loop over active basis on current level
+                # Gets the support of Ni on current level and the next one
+                support = get_support(spaces[level], coarse_basis)
+                element_children = [
+                    child for parent in support for
+                    child in get_element_children(two_scale_operators[level], parent)
+                ]
+                # checks if the support is contained in the next level domain
+                check_in_next_domain = element_children .∈ next_level_domain
 
-            # Updates elements and basis to add and remove based on check_in_next_domain
-            if all(check_in_next_domain)
-                append!(elements_to_remove, support)
-                append!(basis_to_remove, Ni)
-                append!(elements_to_add, element_children)
-                append!(basis_to_add, get_basis_children(two_scale_operators[level], Ni))
+                # Updates elements and basis to add and remove based on check_in_next_domain
+                if all(check_in_next_domain)
+                    append!(elements_to_remove, support)
+                    append!(basis_to_remove, coarse_basis)
+                    append!(elements_to_add, element_children)
+                    append!(basis_to_add, get_basis_children(two_scale_operators[level], coarse_basis))
+                end
             end
         end
 
