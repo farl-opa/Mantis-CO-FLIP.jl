@@ -81,7 +81,109 @@ end
 # end
 
 ############################################################################################
-#                                    Maxwell Eigenvalue                                    #
+#                                       Mixed Inputs                                       #
+############################################################################################
+
+"""
+    struct WeakFormInputsMixed{manifold_dim, Frhs, Ttrial1, Ttrial2, Ttest1, Ttest2} <: AbstractInputs
+
+Contains the required data for a two variable (mixed) FEM that uses forms.
+
+# Fields
+- `forcing::Frhs <: Forms.AbstractFormExpression{manifold_dim, form_rank, G}`: Forcing function defined as a form.
+- `space_trial_u_1::Ttrial1 <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}`: Trial (Solution) space for the (n-1)-form.
+- `space_trial_phi_2::Ttrial2 <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}`: Trial (Solution) space for the n-form.
+- `space_test_eps_1::Ttest1 <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}`: Test space for the (n-1)-forms.
+- `space_test_eps_2::Ttest1 <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}`: Test space for the n-forms.
+- `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: Quadrature rule.
+"""
+struct WeakFormInputsMixed{manifold_dim, Frhs, Ttrial1, Ttrial2, Ttest1, Ttest2} <:
+       AbstractInputs
+    forcing::Frhs
+
+    space_trial_u_1::Ttrial1
+    space_trial_phi_2::Ttrial2
+
+    space_test_eps_1::Ttest1
+    space_test_eps_2::Ttest2
+
+    quad_rule::Quadrature.QuadratureRule{manifold_dim}
+
+    function WeakFormInputsMixed(
+        forcing::Frhs,
+        space_trial_1::Ttrial1,
+        space_trial_2::Ttrial2,
+        space_test_1::Ttest1,
+        space_test_2::Ttest2,
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    ) where {
+        manifold_dim,
+        form_rank,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        Frhs <: Forms.AbstractFormExpression{manifold_dim, manifold_dim, G},
+        Ttrial1 <: Forms.AbstractFormSpace{manifold_dim, form_rank, G},
+        Ttrial2 <: Forms.AbstractFormSpace{manifold_dim, manifold_dim, G},
+        Ttest1 <: Forms.AbstractFormSpace{manifold_dim, form_rank, G},
+        Ttest2 <: Forms.AbstractFormSpace{manifold_dim, manifold_dim, G},
+    }
+        # Check that form_rank == manifold_dim - 1
+        # We may not want to do this here, as this struct is more general than only the mixed Poisson problem.
+        return new{manifold_dim, Frhs, Ttrial1, Ttrial2, Ttest1, Ttest2}(
+            forcing, space_trial_1, space_trial_2, space_test_1, space_test_2, quad_rule
+        )
+    end
+
+    # Constructor for 1-form mixed problem
+    function WeakFormInputsMixed(
+        forcing::Frhs,
+        space_trial_1::Ttrial1,
+        space_trial_2::Ttrial2,
+        space_test_1::Ttest1,
+        space_test_2::Ttest2,
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    ) where {
+        manifold_dim,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        Frhs <: Forms.AbstractFormExpression{manifold_dim, 1, G},
+        Ttrial1 <: Forms.AbstractFormSpace{manifold_dim, 0, G},
+        Ttrial2 <: Forms.AbstractFormSpace{manifold_dim, 1, G},
+        Ttest1 <: Forms.AbstractFormSpace{manifold_dim, 0, G},
+        Ttest2 <: Forms.AbstractFormSpace{manifold_dim, 1, G},
+    }
+        # We may not want to do this here, as this struct is more general than only the mixed Poisson problem.
+        return new{manifold_dim, Frhs, Ttrial1, Ttrial2, Ttest1, Ttest2}(
+            forcing, space_trial_1, space_trial_2, space_test_1, space_test_2, quad_rule
+        )
+    end
+end
+
+# Every bilinear form will need the functions defined below. These are 
+# used by the global assembler to set up the problem.
+function get_num_elements(wf::WeakFormInputsMixed)
+    geo = Forms.get_geometry(wf.space_trial_phi_2)
+    return Geometry.get_num_elements(geo)
+end
+
+function get_problem_size(wf::WeakFormInputsMixed)
+    return Forms.get_num_basis(wf.space_trial_u_1) +
+           Forms.get_num_basis(wf.space_trial_phi_2),
+    Forms.get_num_basis(wf.space_test_eps_1) + Forms.get_num_basis(wf.space_test_eps_2)
+end
+
+function get_estimated_nnz_per_elem(wf::WeakFormInputsMixed)
+    return (
+        Forms.get_max_local_dim(wf.space_trial_u_1) +
+        Forms.get_max_local_dim(wf.space_trial_phi_2)
+    ) * (
+        Forms.get_max_local_dim(wf.space_test_eps_1) +
+        Forms.get_max_local_dim(wf.space_test_eps_2)
+    ),
+    Forms.get_max_local_dim(wf.space_test_eps_1) +
+    Forms.get_max_local_dim(wf.space_test_eps_2)
+end
+
+############################################################################################
+#                                        Eigenvalue                                        #
 ############################################################################################
 
 struct EigenvalueWeakFormInputs{manifold_dim, Ttrial, Ttest} <: AbstractInputs
@@ -112,24 +214,4 @@ end
 
 function get_estimated_nnz_per_elem(wf::EigenvalueWeakFormInputs)
     return Forms.get_max_local_dim(wf.space_trial) * Forms.get_max_local_dim(wf.space_test), Forms.get_max_local_dim(wf.space_trial) * Forms.get_max_local_dim(wf.space_test)
-end
-
-function maxwell_eigenvalue(inputs::EigenvalueWeakFormInputs{manifold_dim, Ttrial, Ttest}, element_id) where {manifold_dim, Ttrial, Ttest}
-    # The weak form in question is:
-    #  ⟨curl u, curl v⟩ = ω²⟨u,v⟩, ∀v ∈ H(curl; Ω).   
-
-    # Left-hand side
-    # A term = ⟨curl u, curl v⟩
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(Forms.exterior_derivative(inputs.space_trial), Forms.exterior_derivative(inputs.space_test), element_id, inputs.quad_rule)
-    
-    # Right-hand side
-    # B term = ⟨u,v⟩
-    B_row_idx, B_col_idx, B_elem = Forms.evaluate_inner_product(inputs.space_trial, inputs.space_test, element_id, inputs.quad_rule)
-    
-    # The output should be the contribution to the left-hand-side matrix 
-    # A and right-hand-side vector b. The outputs are tuples of 
-    # row_indices, column_indices, values for the matrix part and 
-    # row_indices, values for the vector part. For this case, no shifts 
-    # or offsets are needed.
-    return (A_row_idx, A_col_idx, A_elem), (B_row_idx, B_col_idx, B_elem)
 end

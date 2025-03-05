@@ -3,6 +3,35 @@
 #                                    Maxwell Eigenvalue                                    #
 ############################################################################################
 
+function maxwell_eigenvalue(
+    inputs::EigenvalueWeakFormInputs{manifold_dim, Ttrial, Ttest}, element_id
+) where {manifold_dim, Ttrial, Ttest}
+    # The weak form in question is:
+    #  ⟨curl u, curl v⟩ = ω²⟨u,v⟩, ∀v ∈ H(curl; Ω).   
+
+    # Left-hand side
+    # A term = ⟨curl u, curl v⟩
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(
+        Forms.exterior_derivative(inputs.space_trial),
+        Forms.exterior_derivative(inputs.space_test),
+        element_id,
+        inputs.quad_rule,
+    )
+
+    # Right-hand side
+    # B term = ⟨u,v⟩
+    B_row_idx, B_col_idx, B_elem = Forms.evaluate_inner_product(
+        inputs.space_trial, inputs.space_test, element_id, inputs.quad_rule
+    )
+
+    # The output should be the contribution to the left-hand-side matrix 
+    # A and right-hand-side vector b. The outputs are tuples of 
+    # row_indices, column_indices, values for the matrix part and 
+    # row_indices, values for the vector part. For this case, no shifts 
+    # or offsets are needed.
+    return (A_row_idx, A_col_idx, A_elem), (B_row_idx, B_col_idx, B_elem)
+end
+
 """
     analytical_maxwell_eigenfunction(
         m::Int, n::Int, scale_factors::NTuple{2, Float64}, x::Matrix{Float64}
@@ -213,4 +242,104 @@ function solve_maxwell_eig(
     end
 
     return compt_eigvals, compt_eigfuncs
+end
+
+############################################################################################
+#                                     Hodge Laplacian                                      #
+############################################################################################
+function poisson_mixed_1_form(
+    inputs::WeakFormInputsMixed{manifold_dim, Frhs, Ttrial1, Ttrial2, Ttest1, Ttest2},
+    element_id,
+) where {manifold_dim, Frhs, Ttrial1, Ttrial2, Ttest1, Ttest2}
+
+    # The mixed weak form in question is:
+    #  ⟨τ, σ⟩ - ⟨dτ, u⟩ = 0, ∀τ ∈ V⁰,   
+    #  ⟨v, dσ⟩ + ⟨dv, du⟩ = ⟨v, f⟩, ∀v ∈ V¹.
+
+    # Left-hand side 
+
+    # A11 term = ⟨τ, σ⟩
+    A_row_idx_11, A_col_idx_11, A_elem_11 = Forms.evaluate_inner_product(
+        inputs.space_test_eps_1, inputs.space_trial_u_1, element_id, inputs.quad_rule
+    )
+
+    # A12 term = -⟨dτ, u⟩
+    A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(
+        Forms.exterior_derivative(inputs.space_test_eps_1),
+        inputs.space_trial_phi_2,
+        element_id,
+        inputs.quad_rule,
+    )
+    @. A_elem_12 *= -1.0
+
+    # A21 term = ⟨v, dσ⟩
+    A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(
+        inputs.space_test_eps_2,
+        Forms.exterior_derivative(inputs.space_trial_u_1),
+        element_id,
+        inputs.quad_rule,
+    )
+
+    # A22 term = ⟨dv, du⟩
+    A_row_idx_22, A_col_idx_22, A_elem_22 = Forms.evaluate_inner_product(
+        Forms.exterior_derivative(inputs.space_test_eps_2),
+        Forms.exterior_derivative(inputs.space_trial_phi_2),
+        element_id,
+        inputs.quad_rule,
+    )
+
+    # Add offsets.
+    A_row_idx_21 .+= Forms.get_num_basis(inputs.space_test_eps_1)
+    A_col_idx_12 .+= Forms.get_num_basis(inputs.space_trial_u_1)
+    A_row_idx_22 .+= Forms.get_num_basis(inputs.space_test_eps_1)
+    A_col_idx_22 .+= Forms.get_num_basis(inputs.space_trial_u_1)
+
+    # Put all variables together.
+    A_row_idx = vcat(A_row_idx_11, A_row_idx_12, A_row_idx_21, A_row_idx_22)
+    A_col_idx = vcat(A_col_idx_11, A_col_idx_12, A_col_idx_21, A_col_idx_22)
+    A_elem = vcat(A_elem_11, A_elem_12, A_elem_21, A_elem_22)
+
+    # Right-hand side 
+
+    # b1 term = 0
+
+    # b2 term = ⟨v, f⟩
+    b_row_idx_2, _, b_elem_2 = Forms.evaluate_inner_product(
+        inputs.space_test_eps_2, inputs.forcing, element_id, inputs.quad_rule
+    )
+    b_row_idx_2 .+= Forms.get_num_basis(inputs.space_test_eps_1)
+
+    # The output should be the contribution to the left-hand-side matrix 
+    # A and right-hand-side vector b. The outputs are tuples of 
+    # row_indices, column_indices, values for the matrix part and 
+    # row_indices, values for the vector part.
+    return (A_row_idx, A_col_idx, A_elem), (b_row_idx_2, b_elem_2)
+end
+
+function solve_one_form_mixed_laplacian(W, X, ∫, fₑ)
+    # inputs for the mixed weak form
+    weak_form_inputs = Mantis.Assemblers.WeakFormInputsMixed(fₑ, W, X, W, X, ∫)
+
+    # assemble all matrices
+    weak_form = Mantis.Assemblers.poisson_mixed_1_form
+    A, b = Mantis.Assemblers.assemble(weak_form, weak_form_inputs, Dict{Int, Float64}())
+    # solve for coefficients of solution
+
+    #=
+    #check for harmonic forms
+    ℌ¹_dim=size(A,1)-rank(A)
+    if ℌ¹_dim > 0
+        printstyled("Warning! dim(ℌ¹)=$ℌ¹_dim. Solutions will be wrong due to spurious harmonic 1-forms.\n"; color = :red)
+    end
+    =#
+
+    sol = A \ b
+
+    # create solution as forms and return
+    σₕ = Mantis.Forms.FormField(W, "σₕ")
+    uₕ = Mantis.Forms.FormField(X, "uₕ")
+    σₕ.coefficients .= sol[1:Mantis.Forms.get_num_basis(W)]
+    uₕ.coefficients .= sol[Mantis.Forms.get_num_basis(W)+1:end]
+
+    return uₕ, σₕ
 end
