@@ -1,16 +1,14 @@
 """
-    get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter::Float64)
+    get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter::Float64) 
 
-Computes the indices of elements with at least `dorfler_parameter*100`% of the highest
-error in `element_errors`.
+Computes the indices of elements with at least `dorfler_parameter*100`% of the highest error in `element_errors`.
 
 # Arguments
 - `element_errors::Vector{Float64}`: element-wise errors.
 - `dorfler_parameter::Float64`: dorfler parameter determing how many elements are selected.
 
 # Returns
-- `::Vector{Int}`: indices of elements with at least `dorfler_parameter*100`% of the \
-    highest error.
+- `::Vector{Int}`: indices of elements with at least `dorfler_parameter*100`% of the highest error.
 """
 function get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter::Float64)
     0.0 <= dorfler_parameter < 1.0 || throw(
@@ -25,33 +23,28 @@ function get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter:
 end
 
 """
-    compute_marked_elements_padding(
-        hier_space::HierarchicalFiniteElementSpace,
-        marked_elements_per_level::Vector{Vector{Int}},
-    )
+    get_marked_element_padding(hier_space::HierarchicalFiniteElementSpace{n, S, T}, marked_elements_per_level::Vector{Vector{Int}}) where {n, S<:AbstractFESpace{n}, T<:AbstractTwoScaleOperator}
 
-Returns all the elements in the support of basis functions supported on
-`marked_elements_per_level`.
+Returns all the elements in the support of basis functions supported on `marked_elements_per_level`.
 
 # Arguments
-- `hier_space::HierarchicalFiniteElementSpace`: hierarchical finite element space.
+
+- `hier_space::HierarchicalFiniteElementSpace{n, S, T}`: hierarchical finite element space.
 - `marked_elements_per_level::Vector{Vector{Int}}`: marked elements, separated by level.
 
 # Returns
+
 - `element_padding::Vector{Vector{Int}}`: padding of marked elements.
 """
-function compute_marked_elements_padding(
-    hier_space::HierarchicalFiniteElementSpace,
+function add_padding!(
     marked_elements_per_level::Vector{Vector{Int}},
-)
+    hier_space::HierarchicalFiniteElementSpace{n, S, T},
+) where {n, S <: AbstractFESpace{n}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(hier_space)
     get_basis_indices_from_extraction(space, element) = get_extraction(space, element)[2]
 
-    element_padding = Vector{Vector{Int}}(undef, num_levels)
-
     for level in 1:num_levels
         if marked_elements_per_level[level] == Int[]
-            element_padding[level] = Int[]
             continue
         end
 
@@ -61,19 +54,19 @@ function compute_marked_elements_padding(
                 Ref(hier_space.spaces[level]), marked_elements_per_level[level]
             ),
         )
-        element_padding[level] = union(
+        marked_elements_per_level[level] = union(
             get_support.(Ref(hier_space.spaces[level]), basis_in_marked_elements)...
         )
     end
 
-    return element_padding
+    return marked_elements_per_level
 end
 
 function get_marked_elements_children(
-    hier_space::HierarchicalFiniteElementSpace{manifold_dim, S, T},
+    hier_space::HierarchicalFiniteElementSpace{n, S, T},
     marked_elements_per_level::Vector{Vector{Int}},
     new_operator::T,
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {n, S <: AbstractFESpace{n}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(hier_space)
 
     marked_children = Vector{Vector{Int}}(undef, num_levels)
@@ -92,7 +85,12 @@ function get_marked_elements_children(
         elseif marked_elements_per_level[level] != Int[]
             push!(
                 marked_children,
-                get_element_children(new_operator, marked_elements_per_level[level]),
+                reduce(
+                    vcat,
+                    get_element_children.(
+                        Ref(new_operator), marked_elements_per_level[level]
+                    ),
+                ),
             )
         end
     end
@@ -100,20 +98,22 @@ function get_marked_elements_children(
     return marked_children
 end
 
-function get_refinement_domains(
-    hier_space::HierarchicalFiniteElementSpace, marked_elements::Vector{Int}, new_operator
-)
+function get_padding_per_level(
+    hier_space::HierarchicalFiniteElementSpace{n, S, T}, marked_elements::Vector{Int}
+) where {n, S <: AbstractFESpace{n}, T <: AbstractTwoScaleOperator}
     element_ids_per_level = convert_element_vector_to_elements_per_level(
         hier_space, marked_elements
     )
 
-    element_ids_per_level = compute_marked_elements_padding(
-        hier_space, element_ids_per_level
-    )
+    add_padding!(element_ids_per_level, hier_space)
 
-    refinement_domains = get_marked_elements_children(
-        hier_space, element_ids_per_level, new_operator
-    )
+    return element_ids_per_level
+end
 
-    return refinement_domains
+function get_refinement_domains(
+    hier_space::HierarchicalFiniteElementSpace{n, S, T},
+    marked_elements_per_level::Vector{Vector{Int}},
+    new_operator,
+) where {n, S <: AbstractFESpace{n}, T <: AbstractTwoScaleOperator}
+    return get_marked_elements_children(hier_space, marked_elements_per_level, new_operator)
 end

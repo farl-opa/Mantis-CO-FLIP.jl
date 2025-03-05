@@ -14,7 +14,6 @@ import .. Quadrature
 import .. Mesh
 import .. FunctionSpaces
 
-
 abstract type AbstractInputs end
 
 

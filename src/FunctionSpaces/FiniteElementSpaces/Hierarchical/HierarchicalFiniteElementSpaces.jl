@@ -29,6 +29,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
     multilevel_elements::SparseArrays.SparseVector{Int, Int}
     multilevel_extraction_coeffs::Vector{Matrix{Float64}}
     multilevel_basis_indices::Vector{Vector{Int}}
+    num_subdivisions::NTuple{manifold_dim, Int}
     truncated::Bool
     dof_partition::Vector{Vector{Vector{Int}}}
 
@@ -37,6 +38,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         spaces::Vector{S},
         two_scale_operators::Vector{T},
         domains::HierarchicalActiveInfo,
+        num_subdivisions::NTuple{manifold_dim, Int},
         truncated::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
@@ -108,6 +110,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
             multilevel_elements,
             multilevel_extraction_coeffs,
             multilevel_basis_indices,
+            num_subdivisions,
             truncated,
             dof_partition,
         )
@@ -118,6 +121,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         spaces::Vector{S},
         two_scale_operators::Vector{T},
         domains_per_level::Vector{Vector{Int}},
+        num_subdivisions::NTuple{manifold_dim, Int},
         truncated::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
@@ -125,7 +129,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         domains = HierarchicalActiveInfo(domains_per_level)
 
         return HierarchicalFiniteElementSpace(
-            spaces, two_scale_operators, domains, truncated
+            spaces, two_scale_operators, domains, num_subdivisions, truncated
         )
     end
 end
@@ -140,12 +144,52 @@ function get_num_elements(hier_space::HierarchicalFiniteElementSpace)
     return get_num_objects(hier_space.active_elements)
 end
 
-function get_num_basis(space::HierarchicalFiniteElementSpace)
-    return get_num_objects(space.active_basis)
+function get_num_basis(hier_space::HierarchicalFiniteElementSpace)
+    return get_num_objects(hier_space.active_basis)
 end
 
-function get_max_local_dim(space::HierarchicalFiniteElementSpace)
-    return get_max_local_dim(space.spaces[1]) * 2
+function get_num_subdivisions(hier_space::HierarchicalFiniteElementSpace)
+    return hier_space.num_subdivisions
+end
+
+function get_num_basis(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
+    if hier_space.multilevel_elements[hier_id] == 0
+        element_level, element_level_id = convert_to_element_level_and_level_id(
+            hier_space, hier_id
+        )
+        num_basis = get_num_basis(get_space(hier_space, element_level), element_level_id)
+    else
+        multilevel_id = hier_space.multilevel_elements[hier_id]
+        basis_indices = hier_space.multilevel_basis_indices[multilevel_id]
+
+        num_basis = length(basis_indices)
+    end
+
+    return num_basis
+end
+
+function get_basis_indices(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
+    if hier_space.multilevel_elements[hier_id] == 0
+        element_level, element_level_id = convert_to_element_level_and_level_id(
+            hier_space, hier_id
+        )
+
+        basis_level_ids = get_basis_indices(
+            get_space(hier_space, element_level), element_level_id
+        )
+
+        basis_indices =
+            convert_to_basis_hier_id.(Ref(hier_space), Ref(element_level), basis_level_ids)
+    else
+        multilevel_id = hier_space.multilevel_elements[hier_id]
+        basis_indices = hier_space.multilevel_basis_indices[multilevel_id]
+    end
+
+    return basis_indices 
+end
+
+function get_max_local_dim(hier_space::HierarchicalFiniteElementSpace)
+    return get_max_local_dim(hier_space.spaces[1]) * 2
 end
 
 function get_element_level(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
@@ -686,7 +730,7 @@ function get_extraction(
     else
         multilevel_id = space.multilevel_elements[hier_id]
         coeffs = space.multilevel_extraction_coeffs[multilevel_id]
-        basis_indices = space.multilevel_basis_indices[multilevel_id]
+        basis_indices = copy(space.multilevel_basis_indices[multilevel_id])
     end
 
     return coeffs, basis_indices
@@ -795,24 +839,35 @@ function update_hierarchical_space!(
     domains::Vector{Vector{Int}},
     new_operator::T,
     new_space::S,
-    t=false,
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S, T}
     num_levels = get_num_levels(hier_space)
-    for level in 1:num_levels
-        union!(domains[level], get_level_domain(hier_space, level))
+    complete_domains = Vector{Vector{Int}}(undef, length(domains))
+    complete_domains[1] = Int[]
+    for level in 2:num_levels
+        complete_domains[level] = union(domains[level], get_level_domain(hier_space, level))
     end
+    for level in (num_levels + 1):length(domains)
+        complete_domains[level] = domains[level]
+    end
+
+    num_sub = get_num_subdivisions(hier_space)
 
     if length(domains) > num_levels
         return HierarchicalFiniteElementSpace(
             vcat(hier_space.spaces, new_space),
             vcat(hier_space.two_scale_operators, new_operator),
-            domains,
+            complete_domains,
+            num_sub,
             hier_space.truncated,
         )
     end
 
     return HierarchicalFiniteElementSpace(
-        hier_space.spaces, hier_space.two_scale_operators, domains, hier_space.truncated
+        hier_space.spaces,
+        hier_space.two_scale_operators,
+        complete_domains,
+        num_sub,
+        hier_space.truncated,
     )
 end
 
@@ -855,6 +910,14 @@ function get_basis_contained_in_next_level_domain(
 end
 
 # Geometry methods
+
+function get_element_vertices(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
+    element_level, element_level_id = convert_to_element_level_and_level_id(
+        hier_space, hier_id
+    )
+
+    return get_element_vertices(hier_space.spaces[element_level], element_level_id)
+end
 
 function get_element_size(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
     element_level, element_level_id = convert_to_element_level_and_level_id(

@@ -28,18 +28,11 @@ struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <:
         T <: NTuple{num_spaces, AbstractFESpace},
         TS <: NTuple{num_spaces, AbstractTwoScaleOperator},
     }
-        #=
-        # Does not work because equality of structures is not straightforward
-
-        for space_id ∈ 1:num_spaces
-            if get_space(coarse_space, space_id) != twoscale_operators[space_id].coarse_space
-                throw(ArgumentError("The coarse space in the two-scale operator does not match the space in the coarse tensor product space at space index $space_id."))
-            elseif get_space(fine_space, space_id) != twoscale_operators[space_id].fine_space
-                throw(ArgumentError("The fine space in the two-scale operator does not match the space in the fine tensor product space at space index $space_id."))
-            end
-        end
-        =#
-        gm = kron([twoscale_operators[i].global_subdiv_matrix for i in 1:num_spaces]...)
+        gm = kron(
+            [
+                twoscale_operators[i].global_subdiv_matrix for i in num_spaces:-1:1
+            ]...,
+        )
 
         return new{manifold_dim, typeof(coarse_space), TS}(
             coarse_space, fine_space, gm, twoscale_operators

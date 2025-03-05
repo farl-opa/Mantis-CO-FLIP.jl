@@ -119,22 +119,6 @@ function jacobian(
     return J
 end
 
-function get_element_measure(
-    geometry::CartesianGeometry{manifold_dim}, element_id::Int
-) where {manifold_dim}
-    ordered_id = get_ordered_indices(geometry, element_id)
-    breakpoints = get_breakpoints(geometry)
-
-    element_measure = 1
-    for k in 1:manifold_dim
-        element_measure *= abs(
-            breakpoints[k][ordered_id[k] + 1] - breakpoints[k][ordered_id[k]]
-        )
-    end
-
-    return element_measure
-end
-
 function get_element_lengths(
     geometry::CartesianGeometry{manifold_dim}, element_id::Int
 ) where {manifold_dim}
@@ -150,3 +134,10 @@ function get_element_lengths(
 
     return element_lengths
 end
+
+function get_element_measure(geometry::CartesianGeometry, element_id::Int)
+    element_lengths = get_element_lengths(geometry, element_id)
+
+    return prod(element_lengths)
+end
+

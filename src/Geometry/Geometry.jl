@@ -186,6 +186,7 @@ include("./CartesianGeometry.jl")
 include("./FEMGeometry.jl")
 include("./MappedGeometry.jl")
 include("./TensorProductGeometry.jl")
+include("./HierarchicalGeometry.jl")
 include("./Metric.jl")
 
 # helper functions for convenience
