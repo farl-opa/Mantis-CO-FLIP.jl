@@ -22,10 +22,10 @@ k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 # Hierarchical parameters.
 truncate = true # true = THB, false = HB
 simplified = false
-num_steps = 2 # Number of refinement steps.
+num_steps = 3 # Number of refinement steps.
 num_sub = (2, 2) # Number of subdivisions per dimension per step.
 θ = 0.2 # Dorfler parameter.
-Lchains = false # Decide if Lchains are added to fix inexact refinements.
+Lchains = true # Decide if Lchains are added to fix inexact refinements.
 eigenfunc = 1 # Eigenfunction to use for adaptive refinement.
 
 # Quadrature rules

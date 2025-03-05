@@ -202,8 +202,15 @@ function check_nl_intersection(
     for k in 1:manifold_dim
         fine_space = operator.twoscale_operators[k].fine_space
         ts = operator.twoscale_operators[k]
-        supp_intersection = intersect(basis_supp_per_dim1[k], basis_supp_per_dim2[k])
-        I_k = get_contained_knot_vector(supp_intersection, ts, fine_space)
+        min_basis_1 = minimum(basis_supp_per_dim1[k])
+        max_basis_1 = maximum(basis_supp_per_dim1[k])
+        min_basis_2 = minimum(basis_supp_per_dim2[k])
+        max_basis_2 = maximum(basis_supp_per_dim2[k])
+        intersection_boundary_breakpoints = (
+            maximum((min_basis_1, min_basis_2)), minimum((max_basis_1, max_basis_2))
+        )
+        
+        I_k = get_contained_knot_vector(intersection_boundary_breakpoints, ts, fine_space)
 
         length_flag[k] = get_knot_vector_length(I_k) > p_fine[k]
     end
@@ -211,36 +218,27 @@ function check_nl_intersection(
     return sum(length_flag) >= manifold_dim - 1 ? true : false
 end
 
-function get_contained_knot_vector(supp_intersection::Vector{Int}, ts::T, fine_space::BSplineSpace) where {T <: AbstractTwoScaleOperator}
-    if supp_intersection == []
-        breakpoint_idxs = get_element_children(ts, minimum(supp_intersection))[1]
+function get_contained_knot_vector(
+    boundary_breakpoints::NTuple{2, Int}, ts::T, fine_space::BSplineSpace
+) where {T <: AbstractTwoScaleOperator}
+    if boundary_breakpoints[1] == boundary_breakpoints[2]
+        breakpoint_idxs = get_element_children(ts, boundary_breakpoints[1])[1]
     else
         element_idxs = Int[]
-
-        for element ∈ supp_intersection
+        # A breakpoint i is associated to element [ξᵢ, ξᵢ₊₁]
+        for element in boundary_breakpoints
             append!(element_idxs, get_element_children(ts, element))
         end
-        
-        breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs)+1)
+
+        breakpoint_idxs = minimum(element_idxs):(maximum(element_idxs) + 1)
     end
 
     breakpoints = get_patch(fine_space).breakpoints[breakpoint_idxs]
     multiplicity = get_multiplicity_vector(fine_space)[breakpoint_idxs]
 
-    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity)
-end
-
-function get_contained_knot_vector(supp_intersection::Vector{Int}, fem_space::BSplineSpace)
-    if supp_intersection == []
-        breakpoint_idxs = minimum(supp_intersection)
-    else
-        breakpoint_idxs = minimum(supp_intersection):maximum(supp_intersection)+1
-    end
-
-    breakpoints = get_patch(fem_space).breakpoints[breakpoint_idxs]
-    multiplicity = get_multiplicity_vector(fem_space)[breakpoint_idxs]
-
-    return KnotVector(Mesh.Patch1D(breakpoints), get_polynomial_degree(fem_space), multiplicity)
+    return KnotVector(
+        Mesh.Patch1D(breakpoints), get_polynomial_degree(fine_space), multiplicity
+    )
 end
 
 @doc raw"""

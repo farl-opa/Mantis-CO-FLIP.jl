@@ -157,17 +157,10 @@ function solve_maxwell_eig(
         compt_eigfuncs[eigenfunction], exact_eigfuncs[eigenfunction], q_rule_error
     )
 
-    # COMPUTE ERROR -------------------------------------------------------------------
-    if verbose
-        println("Computing error...")
-        error_u = Analysis.L2_norm(
-            compt_eigfuncs[eigenfunction] - exact_eigfuncs[eigenfunction], q_rule_error
-        )
-        println("Error in eigenfunction $(eigenfunction): ", error_u)
-    end
-
     for step in 1:num_steps
-        println("Solving the problem on step $step...")
+        if verbose 
+            println("Solving the problem on step $step...")
+        end
 
         zero_form_space = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
 
@@ -217,14 +210,6 @@ function solve_maxwell_eig(
             compt_eigfuncs[eigenfunction], exact_eigfuncs[eigenfunction], q_rule_error
         )
 
-        # COMPUTE ERROR -------------------------------------------------------------------
-        if verbose
-            println("Computing error...")
-            error_u = Analysis.L2_norm(
-                compt_eigfuncs[eigenfunction] - exact_eigfuncs[eigenfunction], q_rule_error
-            )
-            println("Error in eigenfunction $(eigenfunction): ", error_u)
-        end
     end
 
     return compt_eigvals, compt_eigfuncs
