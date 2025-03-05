@@ -39,7 +39,7 @@ refined_elements = vcat(Mantis.FunctionSpaces.get_element_children.(Ref(CTS), co
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([collect(1:CTP_num_els),refined_elements])
 
 ###
-hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains)
+hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(spaces, [CTS], refined_domains, (nsub1, nsub2))
 
 qrule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
 xi = Mantis.Quadrature.get_nodes(qrule)
