@@ -31,6 +31,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
     multilevel_basis_indices::Vector{Vector{Int}}
     num_subdivisions::NTuple{manifold_dim, Int}
     truncated::Bool
+    simplified::Bool
     dof_partition::Vector{Vector{Vector{Int}}}
 
     # Constructor that builds the space
@@ -113,6 +114,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
             multilevel_basis_indices,
             num_subdivisions,
             truncated,
+            simplified,
             dof_partition,
         )
     end
@@ -124,13 +126,14 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         domains_per_level::Vector{Vector{Int}},
         num_subdivisions::NTuple{manifold_dim, Int},
         truncated::Bool=false,
+        simplified::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
     }
         domains = HierarchicalActiveInfo(domains_per_level)
 
         return HierarchicalFiniteElementSpace(
-            spaces, two_scale_operators, domains, num_subdivisions, truncated
+            spaces, two_scale_operators, domains, num_subdivisions, truncated, simplified
         )
     end
 end
@@ -349,7 +352,7 @@ function get_active_objects_and_nested_domains(
     spaces::Vector{S},
     two_scale_operators::Vector{T},
     domains::HierarchicalActiveInfo,
-    simplified::Bool=false,
+    simplified::Bool,
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(domains)
 
@@ -390,7 +393,8 @@ function get_active_objects_and_nested_domains(
                     append!(basis_to_add, fine_basis)
                 end
             end
-        else 
+        else
+            println("TEST")
             for coarse_basis in active_basis_per_level[level] # Loop over active basis on current level
                 # Gets the support of Ni on current level and the next one
                 support = get_support(spaces[level], coarse_basis)
@@ -889,6 +893,7 @@ function update_hierarchical_space!(
             complete_domains,
             num_sub,
             hier_space.truncated,
+            hier_space.simplified,
         )
     end
 
@@ -898,6 +903,7 @@ function update_hierarchical_space!(
         complete_domains,
         num_sub,
         hier_space.truncated,
+        hier_space.simplified,
     )
 end
 

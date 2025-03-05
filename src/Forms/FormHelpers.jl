@@ -150,6 +150,7 @@ function create_hierarchical_de_rham_complex(
     regularities::NTuple{manifold_dim, Int},
     num_subdivisions::NTuple{manifold_dim, Int},
     truncate::Bool,
+    simplified::Bool,
     geometry::G,
 ) where {
     manifold_dim,
@@ -199,6 +200,7 @@ function create_hierarchical_de_rham_complex(
                 [Int[]],
                 num_subdivisions,
                 truncate,
+                simplified,
             )
 
             return hierarchical_space
@@ -220,6 +222,7 @@ function create_hierarchical_de_rham_complex(
     regularities::NTuple{manifold_dim, Int},
     num_subdivisions::NTuple{manifold_dim, Int},
     truncate::Bool,
+    simplified::Bool,
 ) where {manifold_dim}
 
     # create underlying box geometry
@@ -233,6 +236,7 @@ function create_hierarchical_de_rham_complex(
         regularities,
         num_subdivisions,
         truncate,
+        simplified,
         geometry,
     )
 end

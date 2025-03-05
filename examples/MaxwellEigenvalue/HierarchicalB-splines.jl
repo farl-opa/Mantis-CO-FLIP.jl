@@ -2,6 +2,8 @@ module HierarchicalBsplines
 
 import Mantis
 
+using DelimitedFiles
+
 # Refer to the following file for method and variable definitions
 include("../HelperFunctions.jl")
 
@@ -11,16 +13,16 @@ include("../HelperFunctions.jl")
 # Mesh 
 starting_point = (0.0, 0.0)
 box_size = (fpi, fpi) #(π, π)
-num_elements = (15, 15)# .^ 3 # Ininital mesh size.
+num_elements = (2, 2) .^ 3 # Ininital mesh size.
 
 # B-spline parameters
-p = (4, 4) # Polynomial degrees.
+p = (2, 2) # Polynomial degrees.
 k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 
 # Hierarchical parameters.
 truncate = true # true = THB, false = HB
 simplified = false
-num_steps = 1 # Number of refinement steps.
+num_steps = 2 # Number of refinement steps.
 num_sub = (2, 2) # Number of subdivisions per dimension per step.
 θ = 0.2 # Dorfler parameter.
 Lchains = false # Decide if Lchains are added to fix inexact refinements.
@@ -34,13 +36,14 @@ nq_error = nq_assembly .* 2
 )
 
 # Number of eigenvalues to compute
-num_eig = 50 
+num_eig = 10 
 # Scaling form maxwell eigenfunctions.
 scale_factors = ntuple(2) do k
     return pi /(box_size[k] - starting_point[k])
 end 
 
 verbose = true # Set to true for problem information.
+export_csv = false # Set to true to export the computed eigenvalues.
 export_vtk = false # Set to true to export the computed eigenfunctions.
 
 ############################################################################################
@@ -48,7 +51,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ############################################################################################
 # Hierarchical de Rham complex 
 ℌ = Mantis.Forms.create_hierarchical_de_rham_complex(
-    starting_point, box_size, num_elements, p, k, num_sub, truncate
+    starting_point, box_size, num_elements, p, k, num_sub, truncate, simplified
 )
 # Solve problem
 ωₕ², uₕ= Mantis.Assemblers.solve_maxwell_eig(
@@ -87,6 +90,16 @@ if export_vtk
     end
 
     Mantis.Plot.export_form_fields_to_vtk(uₕ, labels, file_base_name)
+end
+if export_csv
+    eig_ids = 1:num_eig
+    eigenvalue_offset = 0
+    filename = "MaxwellEigenvaluesHBSplines"
+    writedlm(filename * "-exact.csv", [eig_ids ω²])
+    writedlm(
+        filename * "-approximate.csv",
+        [eig_ids ωₕ²[(1 + eigenvalue_offset):(num_eig + eigenvalue_offset)]],
+    )
 end
 
 end

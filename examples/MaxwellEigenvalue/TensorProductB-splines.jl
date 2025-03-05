@@ -33,6 +33,7 @@ end
 
 
 verbose = true # Set to true for problem information.
+export_csv = false # Set to true to export the computed eigenvalues.
 export_vtk = false # Set to true to export the computed eigenfunctions.
 
 ############################################################################################
@@ -82,6 +83,17 @@ if export_vtk
     end
 
     Mantis.Plot.export_form_fields_to_vtk(uₕ, labels, file_base_name)
+end
+
+if export_csv
+    eig_ids = 1:num_eig
+    eigenvalue_offset = 0
+    filename = "MaxwellEigenvaluesTPBSplines"
+    writedlm(filename * "-exact.csv", [eig_ids ω²])
+    writedlm(
+        filename * "-approximate.csv",
+        [eig_ids ωₕ²[(1 + eigenvalue_offset):(num_eig + eigenvalue_offset)]],
+    )
 end
 
 end

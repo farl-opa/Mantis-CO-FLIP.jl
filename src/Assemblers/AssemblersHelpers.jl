@@ -183,44 +183,9 @@ function solve_maxwell_eig(
         )
 
         # Get domains to be refined in current step
-        # marked_elements_per_level = FunctionSpaces.get_padding_per_level(
-        #     zero_form_space, dorfler_marking
-        # )
-        basis_support = [
-            1,
-            2,
-            3,
-            4,
-            5,
-            16,
-            17,
-            18,
-            19,
-            20,
-            31,
-            32,
-            33,
-            34,
-            35,
-            46,
-            47,
-            48,
-            49,
-            50,
-            61,
-            62,
-            63,
-            64,
-            65,
-        ]
-        marked_elements_per_level = [
-            vcat(
-                basis_support .+ (5 + 15 * 2),
-                basis_support .+ (8 + 15 * 5),
-                basis_support .+ (2 + 15 * 5),
-                basis_support .+ (5 + 15 * 8),
-            ),
-        ]
+        marked_elements_per_level = FunctionSpaces.get_padding_per_level(
+            zero_form_space, dorfler_marking
+        )
 
         # Add Lchains if needed
         if Lchains
