@@ -93,10 +93,10 @@ refined_elements = vcat(Mantis.FunctionSpaces.get_element_children.(Ref(CTS), co
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([collect(1:CTP_num_els),refined_elements])
 
 non_simplified_hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(
-    spaces, [CTS], refined_domains, false, false
+    spaces, [CTS], refined_domains, (nsub1, nsub2), false
 )
 simplified_hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(
-    spaces, [CTS], refined_domains, false, true
+    spaces, [CTS], refined_domains, (nsub1, nsub2), false, true
 )
 
 for level in 1:2

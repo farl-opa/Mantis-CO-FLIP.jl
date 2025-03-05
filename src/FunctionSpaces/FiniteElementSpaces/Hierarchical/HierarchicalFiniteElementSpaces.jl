@@ -394,7 +394,6 @@ function get_active_objects_and_nested_domains(
                 end
             end
         else
-            println("TEST")
             for coarse_basis in active_basis_per_level[level] # Loop over active basis on current level
                 # Gets the support of Ni on current level and the next one
                 support = get_support(spaces[level], coarse_basis)

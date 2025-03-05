@@ -125,8 +125,8 @@ function get_element_vertices(
     ordered_id = get_ordered_indices(geometry, element_id)
     breakpoints = get_breakpoints(geometry)
     element_vertices = ntuple(manifold_dim) do k
-        vertex_1 = breakpoints[k][ordered_id[k]+1]
-        vertex_2 = breakpoints[k][ordered_id[k]]
+        vertex_1 = breakpoints[k][ordered_id[k]]
+        vertex_2 = breakpoints[k][ordered_id[k]+1]
 
         return [vertex_1, vertex_2]
     end
@@ -139,7 +139,7 @@ function get_element_lengths(
 ) where {manifold_dim}
     element_vertices = get_element_vertices(geometry, element_id)
     element_lengths = ntuple(manifold_dim) do k
-        return abs(element_vertices[k][2] - element_vertices[k][1])
+        return element_vertices[k][2] - element_vertices[k][1]
     end
 
     return element_lengths
