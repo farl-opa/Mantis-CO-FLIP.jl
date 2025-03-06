@@ -25,7 +25,7 @@ nq_error = nq_assembly .* 2
 )
 
 verbose = true # Set to true for problem information.
-export_vtk = false # Set to true to export the computed eigenfunctions.
+export_vtk = true # Set to true to export the computed eigenfunctions.
 
 ############################################################################################
 #                                       Run problem                                        #
@@ -41,52 +41,22 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ⊞ = Mantis.Forms.get_geometry(ℜ⁰)
 
 # Forcing function
-uₑ, σₑ, fₑ = sinusoidal_data(1, ⊞)
+u, δu, fₑ = sinusoidal_data(1, ⊞)
 
 # Solve problem
-uₕ, σₕ = Mantis.Assemblers.solve_one_form_mixed_laplacian(ℜ⁰, ℜ¹, ∫ₐ, fₑ)
+uₕ, δuₕ = Mantis.Assemblers.solve_one_form_mixed_laplacian(ℜ⁰, ℜ¹, ∫ₐ, fₑ)
 
 ############################################################################################
 #                                      Solution data                                       #
 ############################################################################################
-# Print eigenvalues
-
-if verbose
-    # Exact eigenvalues
-    ω² = Mantis.Assemblers.get_analytical_maxwell_eig(num_eig, ⊞, scale_factors)[1]
-
-    println("Printing first $(num_eig) exact and computed eigenvalues...")
-    println("i    ω²[i]      ωₕ²[i]     (ωₕ²[i] - ω²[i])^2")
-    println("--   --------   --------   --------")
-    for i in 1:num_eig
-        @printf "%02.f" i
-        @printf "   %08.5f" ω²[i]
-        @printf "   %08.5f" ωₕ²[i]
-        @printf "   %08.5f\n" (ωₕ²[i] - ω²[i])^2
-    end
-end
-
 if export_vtk 
-    println("Exporting computed eigenfunctions to VTK...")
+    println("Exporting computed solutions to VTK...")
 
-    file_base_name = "MaxwellEigenvalueTPBsplines-computed-p=$(p)-k=$(k)-nels=$(num_elements)"
-    labels = Vector{String}(undef, num_eig)
-    for i in 1:num_eig
-        labels[i] = uₕ[i].label
-    end
+    compt_file_name = "1-Form-HodgeLaplacian-TPBsplines-computed-p=$(p)-k=$(k)-nels=$(num_elements)"
+    exact_file_name = "1-Form-HodgeLaplacian-TPBsplines-exact-p=$(p)-k=$(k)-nels=$(num_elements)"
 
-    Mantis.Plot.export_form_fields_to_vtk(uₕ, labels, file_base_name)
-end
-
-if export_csv
-    eig_ids = 1:num_eig
-    eigenvalue_offset = 0
-    filename = "MaxwellEigenvaluesTPBSplines"
-    writedlm(filename * "-exact.csv", [eig_ids ω²])
-    writedlm(
-        filename * "-approximate.csv",
-        [eig_ids ωₕ²[(1 + eigenvalue_offset):(num_eig + eigenvalue_offset)]],
-    )
+    Mantis.Plot.export_form_fields_to_vtk((uₕ, δuₕ), compt_file_name)
+    Mantis.Plot.export_form_fields_to_vtk((u, δu), exact_file_name)
 end
 
 end
