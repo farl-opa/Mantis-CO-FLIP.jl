@@ -312,7 +312,7 @@ function one_form_hodge_laplacian(inputs::WeakFormInputs, element_id::Int)
     return (A_row_idx, A_col_idx, A_elem), (b_row_idx_2, b_elem_2)
 end
 
-function solve_one_form_mixed_laplacian(zero_form, one_form, qr_assembly, forcing)
+function solve_one_form_hodge_laplacian(zero_form, one_form, qr_assembly, forcing)
     weak_form_inputs = Assemblers.WeakFormInputs(
         qr_assembly, (zero_form, one_form), (zero_form, one_form), (forcing,)
     )
@@ -326,5 +326,92 @@ function solve_one_form_mixed_laplacian(zero_form, one_form, qr_assembly, forcin
     compt_zero_form.coefficients .= sol[1:coeff_offset]
     compt_one_form.coefficients .= sol[(coeff_offset + 1):end]
 
-    return compt_zero_form, compt_one_form
+    return compt_one_form, compt_zero_form
+end
+
+function solve_one_form_hodge_laplacian(
+    complex::C,
+    forcing_function::Function,
+    num_steps::Int,
+    dorfler_parameter::Float64,
+    Lchains::Bool,
+    q_rule_assembly::Quadrature.AbstractQuadratureRule{manifold_dim},
+    q_rule_error::Quadrature.AbstractQuadratureRule{manifold_dim};
+    verbose::Bool=false,
+) where {manifold_dim, num_forms, C <: NTuple{num_forms, Forms.AbstractFormSpace}}
+    if verbose
+        println("Solving the problem on initial step...")
+    end
+
+    # Exact solution on initial step
+    exact_one_form, exact_zero_form, forcing = forcing_function(
+        1, Forms.get_geometry(complex[1])
+    )
+
+    # Solve problem on initial step
+    compt_one_form, compt_zero_form = solve_one_form_hodge_laplacian(
+        complex[1], complex[2], q_rule_assembly, forcing
+    )
+
+    # Calculate element-wise error
+    err_per_element = Analysis.compute_error_per_element(
+        compt_one_form, exact_one_form, q_rule_error
+    )
+
+    for step in 1:num_steps
+        if verbose 
+            println("Solving the problem on step $step...")
+        end
+
+        zero_form_space = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
+
+        L = FunctionSpaces.get_num_levels(zero_form_space)
+
+        new_operator, new_space = FunctionSpaces.build_two_scale_operator(
+            FunctionSpaces.get_space(zero_form_space, L),
+            FunctionSpaces.get_num_subdivisions(zero_form_space),
+        )
+
+        dorfler_marking = FunctionSpaces.get_dorfler_marking(
+            err_per_element, dorfler_parameter
+        )
+
+        # Get domains to be refined in current step
+        marked_elements_per_level = FunctionSpaces.get_padding_per_level(
+            zero_form_space, dorfler_marking
+        )
+
+        # Add Lchains if needed
+        if Lchains
+            FunctionSpaces.add_Lchains_supports!(
+                marked_elements_per_level, zero_form_space, new_operator
+            )
+        end
+        # Get children of marked elements
+        refinement_domains = FunctionSpaces.get_refinement_domains(
+            zero_form_space, marked_elements_per_level, new_operator
+        )
+
+        # Update the hierarchical complex based on the refinement domains and the 0-form space
+        complex = Forms.update_hierarchical_de_rham_complex(
+            complex, refinement_domains, new_operator, new_space
+        )
+
+        # Update exact solution
+        exact_one_form, exact_zero_form, forcing = forcing_function(
+            1, Forms.get_geometry(complex[1])
+        )
+
+        # Solve problem on current step
+        compt_one_form, compt_zero_form = solve_one_form_hodge_laplacian(
+            complex[1], complex[2], q_rule_assembly, forcing
+        )
+
+        # Calculate element-wise error
+        err_per_element = Analysis.compute_error_per_element(
+            compt_one_form, exact_one_form, q_rule_error
+        )
+    end
+
+    return compt_one_form, compt_zero_form
 end
