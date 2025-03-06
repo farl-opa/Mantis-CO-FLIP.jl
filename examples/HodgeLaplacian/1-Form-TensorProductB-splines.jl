@@ -25,7 +25,7 @@ nq_error = nq_assembly .* 2
 )
 
 verbose = true # Set to true for problem information.
-export_vtk = true # Set to true to export the computed eigenfunctions.
+export_vtk = false # Set to true to export the computed solutions.
 
 ############################################################################################
 #                                       Run problem                                        #
