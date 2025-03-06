@@ -8,7 +8,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         quad_rule::Quadrature.QuadratureRule{manifold_dim},
         trial_forms::TrF,
         test_forms::TeF,
-        forcing::F=nothing,
+        forcing::F=(nothing,),
     ) where {
         manifold_dim,
         num_TrF,
@@ -16,12 +16,12 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         num_F,
         TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
         TeF <: NTuple{num_TeF, Forms.AbstractFormSpace{manifold_dim}},
-        F <: Union{Nothing, NTuple{num_F, Forms.AbstractFormExpression{manifold_dim}}},
+        F <: NTuple{num_F, Union{Nothing, Forms.AbstractFormExpression{manifold_dim}}},
     }
         return new{manifold_dim, TrF, TeF, F}(quad_rule, trial_forms, test_forms, forcing)
     end
 
-    # Convenience constructor for single trial, test and forcing forms.
+    # Convenience constructor for single trial, test and forcing forms..
     function WeakFormInputs(
         quad_rule::Quadrature.QuadratureRule{manifold_dim},
         trial_forms::TrF,
@@ -33,10 +33,6 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TeF <: Forms.AbstractFormSpace{manifold_dim},
         F <: Union{Nothing, Forms.AbstractFormExpression{manifold_dim}},
     }
-        if forcing === nothing
-            return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,))
-        end
-
         return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,), (forcing,)) 
     end
 
@@ -44,13 +40,13 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
     function WeakFormInputs(
         quad_rule::Quadrature.QuadratureRule{manifold_dim},
         forms::TrF,
-        forcing::F=nothing,
+        forcing::F=(nothing,),
     ) where {
         manifold_dim,
         num_TrF,
         num_F,
         TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
-        F <: Union{Nothing, NTuple{num_F, Forms.AbstractFormExpression{manifold_dim}}},
+        F <: NTuple{num_F, Union{Nothing, Forms.AbstractFormExpression{manifold_dim}}},
     }
         return WeakFormInputs(quad_rule, forms, forms, forcing)
     end
@@ -64,12 +60,8 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
     ) where {
         manifold_dim,
         TrF <: Forms.AbstractFormSpace{manifold_dim},
-        F <: Union{Nothing, Forms.AbstractFormExpression{manifold_dim}},
+        F <: Forms.AbstractFormExpression{manifold_dim},
     }
-        if forcing === nothing
-            return WeakFormInputs(quad_rule, (forms,))
-        end
-
         return WeakFormInputs(quad_rule, (forms,), (forcing,)) 
     end
 end

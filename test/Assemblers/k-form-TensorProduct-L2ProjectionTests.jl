@@ -54,8 +54,7 @@ function L2_projection(fₑ, Xᵏ, ∫)
     sol = A \ b
 
     # create the form field from the solution coefficients
-    trial_form = Mantis.Assemblers.get_trial_forms(weak_form_inputs)[1]
-    fₕ = Mantis.Forms.FormField(trial_form, "fₕ")
+    fₕ = Mantis.Forms.FormField(Xᵏ, "fₕ")
     fₕ.coefficients .= sol
 
     # return the field

@@ -326,5 +326,5 @@ function solve_one_form_mixed_laplacian(zero_form, one_form, qr_assembly, forcin
     compt_zero_form.coefficients .= sol[1:coeff_offset]
     compt_one_form.coefficients .= sol[(coeff_offset + 1):end]
 
-    return uₕ, σₕ
+    return compt_zero_form, compt_one_form
 end
