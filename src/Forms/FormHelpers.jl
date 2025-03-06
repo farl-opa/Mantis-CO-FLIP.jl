@@ -1,3 +1,75 @@
+############################################################################################
+#                                    Form construction                                     #
+############################################################################################
+function build_form_fields(form_space::AbstractFormSpace; label::String=nothing)
+    if label===nothing
+        return FormField(form_space, form_space.label) 
+    end
+
+    return FormField(form_space, label)
+end
+
+function build_form_fields(
+    form_space::AbstractFormSpace, coeffs::Vector{Float64}; label::String=nothing
+)
+    if length(coeffs) != get_num_basis(form_space)
+        throw(
+            ArgumentError("""\
+                Size mismatch. Number of given coefficients differs from the dimension of\
+                `form_space`. The given numbers were $(length(coeffs)) and \
+                $(get_num_basis(form_space)), respectively.
+                """)
+        )
+    end
+    form_field = build_form_fields(form_space; label)
+    form_field.coefficients .= coeffs
+
+    return form_field
+end
+
+function build_form_fields(
+    form_spaces::FS; labels::L=nothing
+) where {
+    num_forms, FS <: NTuple{num_forms, AbstractFormSpace}, L <: NTuple{num_forms, String}
+}
+    if labels === nothing
+        labels = ntuple(num_forms) do _
+            return nothing
+        end
+    end
+
+    form_fields = ntuple(num_forms) do i
+        return build_form_fields(form_spaces[i]; label = labels[i])
+    end
+
+    return form_fields
+end
+
+function build_form_fields(
+    form_spaces::FS, coeffs::Vector{Float64}; labels::L=nothing
+) where {
+    num_forms, FS <: NTuple{num_forms, AbstractFormSpace}, L <: NTuple{num_forms, String}
+}
+    if labels === nothing
+        labels = ntuple(num_forms) do _
+            return nothing
+        end
+    end
+    
+    start_id = 1
+    form_fields = ntuple(num_forms) do i
+        num_coeffs = get_num_basis(form_spaces[i])
+        ff = build_form_fields(
+            form_spaces[i], coeffs[start_id:(start_id + num_coeffs - 1)]; label = labels[i]
+        )
+        start_id += num_coeffs
+
+        return ff
+    end
+
+    return form_fields
+end
+
 ################################################################################
 # Tensor-product B-spline de Rham complex
 ################################################################################

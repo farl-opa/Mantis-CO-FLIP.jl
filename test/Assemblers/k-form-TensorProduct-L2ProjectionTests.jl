@@ -17,7 +17,7 @@ For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k_h \in X^k`` such tha
 ```
 where ``X`` is the discrete de Rham complex.
 """
-function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, TrF, TeF, F}, element_id) where {manifold_dim, TrF, TeF, F}
+function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs, element_id)
     Forms = Mantis.Forms
     Assemblers = Mantis.Assemblers
 

@@ -49,7 +49,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TeF <: Forms.AbstractFormSpace{manifold_dim},
         F <: Union{Nothing, Forms.AbstractFormExpression{manifold_dim}},
     }
-        return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,)) 
+        return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,), (forcing, )) 
     end
 
     # Convenience constructor for Galerking methods: trial and test spaces are the same.
@@ -78,7 +78,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TrF <: Forms.AbstractFormSpace{manifold_dim},
         F <: Union{Nothing, Forms.AbstractFormExpression{manifold_dim}}
     }
-        return WeakFormInputs(quad_rule, (forms,), (forms,))
+        return WeakFormInputs(quad_rule, (forms,), (forms,), (forcing,))
     end
 end
 
