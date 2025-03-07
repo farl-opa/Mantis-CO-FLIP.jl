@@ -10,7 +10,7 @@ include("../HelperFunctions.jl")
 ############################################################################################
 # Mesh 
 starting_point = (0.0, 0.0)
-box_size = (fpi, fpi) #(π, π)
+box_size = (1.0, 1.0)
 num_elements = (2, 2) .^ 3 # Ininital mesh size.
 
 # B-spline parameters
