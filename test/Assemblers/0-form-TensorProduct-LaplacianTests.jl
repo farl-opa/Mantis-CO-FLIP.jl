@@ -50,7 +50,7 @@ function zero_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, ele
 
 end
 
-function zero_form_hodge_laplacian(fₑ, X⁰, ∫)
+function zero_form_hodge_laplacian(∫, X⁰, fₑ)
     # inputs for the mixed weak form
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(∫, X⁰, fₑ)
 
@@ -66,10 +66,8 @@ function zero_form_hodge_laplacian(fₑ, X⁰, ∫)
     sol = A \ b
 
     # create the form field from the solution coefficients
-    uₕ = Mantis.Forms.FormField(X⁰, "uₕ")
-    uₕ.coefficients .= sol
+    uₕ = Mantis.Forms.build_form_field(X⁰, sol)
 
-    # return the field
     return uₕ
 end
 
@@ -188,7 +186,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 uₑ, duₑ, fₑ = sinusoidal_solution(geometry)
 
                 # solve the problem
-                uₕ = zero_form_hodge_laplacian(fₑ, X[1], ∫)
+                uₕ = zero_form_hodge_laplacian(∫, X[1], fₑ)
 
                 # compute error
                 error = Mantis.Analysis.L2_norm(uₕ - uₑ, ∫)

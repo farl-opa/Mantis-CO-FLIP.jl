@@ -42,7 +42,7 @@ function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs, element_id)
     return (A_row_idx, A_col_idx, A_elem), (b_row_idx, b_elem)
 end
 
-function L2_projection(fₑ, Xᵏ, ∫)
+function L2_projection(∫, Xᵏ, fₑ)
     # inputs for the mixed weak form
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(∫, Xᵏ, fₑ)
 
@@ -53,8 +53,7 @@ function L2_projection(fₑ, Xᵏ, ∫)
     sol = A \ b
 
     # create the form field from the solution coefficients
-    fₕ = Mantis.Forms.FormField(Xᵏ, "fₕ")
-    fₕ.coefficients .= sol
+    fₕ = Mantis.Forms.build_form_field(Xᵏ, sol; label = "fₕ")
 
     # return the field
     return fₕ
@@ -76,7 +75,7 @@ p⁰ = [2, 3]
 α = 5.0
 section_space_type = [Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential, Mantis.FunctionSpaces.Bernstein]
 # print info?
-verbose = true
+verbose = false
 # tolerance for zero values
 zero_tol = 1e-12
 # tolerance for convergence rates
@@ -160,7 +159,7 @@ for (p_idx, p) in enumerate(p⁰)
                 fₑ = sinusoidal_solution(form_rank, geometry)
 
                 # solve the problem
-                fₕ = L2_projection(fₑ, X[form_rank+1], ∫)
+                fₕ = L2_projection(∫, X[form_rank+1], fₑ)
 
                 # compute error
                 error = Mantis.Analysis.L2_norm(fₕ - fₑ, ∫)

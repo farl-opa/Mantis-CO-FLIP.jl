@@ -271,7 +271,6 @@ function one_form_hodge_laplacian(inputs::WeakFormInputs, element_id::Int)
     A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(
         Forms.exterior_derivative(test_forms[1]), trial_forms[2], element_id, q_rule
     )
-    @. A_elem_12 *= -1.0
 
     # A21 term = ⟨v, dσ⟩
     A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(
@@ -297,7 +296,7 @@ function one_form_hodge_laplacian(inputs::WeakFormInputs, element_id::Int)
     # Put all variables together.
     A_row_idx = vcat(A_row_idx_11, A_row_idx_12, A_row_idx_21, A_row_idx_22)
     A_col_idx = vcat(A_col_idx_11, A_col_idx_12, A_col_idx_21, A_col_idx_22)
-    A_elem = vcat(A_elem_11, A_elem_12, A_elem_21, A_elem_22)
+    A_elem = vcat(A_elem_11, -A_elem_12, A_elem_21, A_elem_22)
 
     # Right-hand side 
 
@@ -320,11 +319,9 @@ function solve_one_form_hodge_laplacian(zero_form, one_form, qr_assembly, forcin
     A, b = Assemblers.assemble(weak_form, weak_form_inputs, Dict{Int, Float64}())
     sol = A \ b
     # Create solutions as forms and return.
-    compt_zero_form = Forms.FormField(zero_form, "δuₕ")
-    compt_one_form = Forms.FormField(one_form, "uₕ")
-    coeff_offset = Forms.get_num_basis(zero_form)
-    compt_zero_form.coefficients .= sol[1:coeff_offset]
-    compt_one_form.coefficients .= sol[(coeff_offset + 1):end]
+    compt_zero_form, compt_one_form = Forms.build_form_fields(
+        (zero_form, one_form), sol; labels=("δuₕ", "uₕ")
+    )
 
     return compt_one_form, compt_zero_form
 end

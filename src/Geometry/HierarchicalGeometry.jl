@@ -20,16 +20,16 @@ end
 #                                      Basic Getters                                       #
 ############################################################################################
 
-function get_space(hier_geo::HierarchicalGeometry)
-    return hier_geo.hier_space
+function get_space(geometry::HierarchicalGeometry)
+    return geometry.hier_space
 end
 
-function get_num_elements(hier_geo::HierarchicalGeometry)
-    return FunctionSpaces.get_num_elements(get_space(hier_geo))
+function get_num_elements(geometry::HierarchicalGeometry)
+    return FunctionSpaces.get_num_elements(get_space(geometry))
 end
 
-function get_num_levels(hier_geo::HierarchicalGeometry)
-    return FunctionSpaces.get_num_levels(get_space(hier_geo))
+function get_num_levels(geometry::HierarchicalGeometry)
+    return FunctionSpaces.get_num_levels(get_space(geometry))
 end
 
 function get_domain_dim(::HierarchicalGeometry{manifold_dim, H}) where {manifold_dim, H}
@@ -40,8 +40,8 @@ function get_image_dim(::HierarchicalGeometry{manifold_dim, H}) where {manifold_
     return manifold_dim
 end
 
-function get_num_subdivisions(hier_geo::HierarchicalGeometry)
-    return FunctionSpaces.get_num_subdivisions(get_space(hier_geo))
+function get_num_subdivisions(geometry::HierarchicalGeometry)
+    return FunctionSpaces.get_num_subdivisions(get_space(geometry))
 end
 
 ############################################################################################
@@ -49,11 +49,11 @@ end
 ############################################################################################
 
 function evaluate(
-    hier_geo::HierarchicalGeometry{manifold_dim, H},
-    hier_id::Int,
+    geometry::HierarchicalGeometry{manifold_dim, H},
+    element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, H}
-    element_vertices = FunctionSpaces.get_element_vertices(get_space(hier_geo), hier_id)
+    element_vertices = FunctionSpaces.get_element_vertices(get_space(geometry), element_id)
     A = zeros(Float64, manifold_dim, manifold_dim)
     b = zeros(Float64, manifold_dim)
     for k in 1:manifold_dim
@@ -68,11 +68,11 @@ function evaluate(
 end
 
 function jacobian(
-    hier_geo::HierarchicalGeometry{manifold_dim, H},
-    hier_id::Int,
+    geometry::HierarchicalGeometry{manifold_dim, H},
+    element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, H}
-    element_vertices = FunctionSpaces.get_element_vertices(get_space(hier_geo), hier_id)
+    element_vertices = FunctionSpaces.get_element_vertices(get_space(geometry), element_id)
     delta = zeros(Float64, manifold_dim)
     for k in 1:manifold_dim
         delta[k] = (element_vertices[k][2] - element_vertices[k][1])
@@ -89,32 +89,27 @@ function jacobian(
     return J
 end
 
-function get_element_vertices(hier_geo::HierarchicalGeometry, hier_id::Int)
+function get_element_vertices(geometry::HierarchicalGeometry, element_id::Int)
     level, element_level_id = FunctionSpaces.convert_to_element_level_and_level_id(
-        get_space(hier_geo), hier_id
+        get_space(geometry), element_id
     )
-    
+
     return FunctionSpaces.get_element_vertices(
-        FunctionSpaces.get_space(get_space(hier_geo), level), element_level_id
+        FunctionSpaces.get_space(get_space(geometry), level), element_level_id
     )
 end
 
-function get_element_lengths(hier_geo::HierarchicalGeometry, hier_id::Int)
-    level, element_level_id = FunctionSpaces.convert_to_element_level_and_level_id(
-        get_space(hier_geo), hier_id
-    )
+function get_element_lengths(
+    geometry::HierarchicalGeometry{manifold_dim}, element_id::Int
+) where {manifold_dim}
+    element_vertices = get_element_vertices(geometry, element_id)
+    element_lengths = ntuple(manifold_dim) do k
+        return element_vertices[k][2] - element_vertices[k][1]
+    end
 
-    return FunctionSpaces.get_element_dimensions(
-        FunctionSpaces.get_space(get_space(hier_geo), level), element_level_id
-    )
+    return element_lengths
 end
 
-function get_element_measure(hier_geo::HierarchicalGeometry, hier_id::Int)
-    level, element_level_id = FunctionSpaces.convert_to_element_level_and_level_id(
-        get_space(hier_geo), hier_id
-    )
-
-    return FunctionSpaces.get_element_measure(
-        FunctionSpaces.get_space(get_space(hier_geo), level), element_level_id
-    )
+function get_element_measure(geometry::HierarchicalGeometry, element_id::Int)
+    return prod(get_element_lengths(geometry, element_id))
 end

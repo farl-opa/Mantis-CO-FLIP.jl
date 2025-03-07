@@ -954,12 +954,12 @@ function get_element_vertices(hier_space::HierarchicalFiniteElementSpace, hier_i
     return get_element_vertices(hier_space.spaces[element_level], element_level_id)
 end
 
-function get_element_size(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
+function get_element_measure(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
     element_level, element_level_id = convert_to_element_level_and_level_id(
         hier_space, hier_id
     )
 
-    return get_element_size(hier_space.spaces[element_level], element_level_id)
+    return get_element_measure(hier_space.spaces[element_level], element_level_id)
 end
 
 function _compute_thb_parametric_geometry_coeffs(

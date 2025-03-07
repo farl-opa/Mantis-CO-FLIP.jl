@@ -23,7 +23,7 @@ function assemble(weak_form::F, weak_form_inputs::W, dirichlet_bcs::Dict{Int, Fl
     # Pre-allocate
     nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
 
-    nvals_A = 9 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 4 times due to the forms being per component. This needs to be updated.
+    nvals_A = 9 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 9 times due to the forms being per component. This needs to be updated.
     A_column_idxs = Vector{Int}(undef, nvals_A)
     A_row_idxs = Vector{Int}(undef, nvals_A)
     A_vals = Vector{Float64}(undef, nvals_A)

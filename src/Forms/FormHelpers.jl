@@ -1,16 +1,20 @@
 ############################################################################################
 #                                    Form construction                                     #
 ############################################################################################
-function build_form_fields(form_space::AbstractFormSpace; label::String=nothing)
-    if label===nothing
-        return FormField(form_space, form_space.label) 
+function build_form_field(
+    form_space::AbstractFormSpace; label::Union{String, Nothing}=nothing
+)
+    if isnothing(label)
+        return FormField(form_space, form_space.label)
     end
 
     return FormField(form_space, label)
 end
 
-function build_form_fields(
-    form_space::AbstractFormSpace, coeffs::Vector{Float64}; label::String=nothing
+function build_form_field(
+    form_space::AbstractFormSpace,
+    coeffs::Vector{Float64};
+    label::Union{String, Nothing}=nothing,
 )
     if length(coeffs) != get_num_basis(form_space)
         throw(
@@ -21,36 +25,36 @@ function build_form_fields(
                 """)
         )
     end
-    form_field = build_form_fields(form_space; label)
+    form_field = build_form_field(form_space; label)
     form_field.coefficients .= coeffs
 
     return form_field
 end
 
 function build_form_fields(
-    form_spaces::FS; labels::L=nothing
+    form_spaces::FS; labels::Union{L, Nothing}=nothing
 ) where {
     num_forms, FS <: NTuple{num_forms, AbstractFormSpace}, L <: NTuple{num_forms, String}
 }
-    if labels === nothing
+    if isnothing(labels)
         labels = ntuple(num_forms) do _
             return nothing
         end
     end
 
     form_fields = ntuple(num_forms) do i
-        return build_form_fields(form_spaces[i]; label = labels[i])
+        return build_form_field(form_spaces[i]; label = labels[i])
     end
 
     return form_fields
 end
 
 function build_form_fields(
-    form_spaces::FS, coeffs::Vector{Float64}; labels::L=nothing
+    form_spaces::FS, coeffs::Vector{Float64}; labels::Union{L, Nothing}=nothing
 ) where {
     num_forms, FS <: NTuple{num_forms, AbstractFormSpace}, L <: NTuple{num_forms, String}
 }
-    if labels === nothing
+    if isnothing(labels)
         labels = ntuple(num_forms) do _
             return nothing
         end
@@ -59,7 +63,7 @@ function build_form_fields(
     start_id = 1
     form_fields = ntuple(num_forms) do i
         num_coeffs = get_num_basis(form_spaces[i])
-        ff = build_form_fields(
+        ff = build_form_field(
             form_spaces[i], coeffs[start_id:(start_id + num_coeffs - 1)]; label = labels[i]
         )
         start_id += num_coeffs

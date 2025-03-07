@@ -47,13 +47,12 @@ function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, e
     # Put all variables together.
     A_row_idx = vcat(A_row_idx_11, A_row_idx_12, A_row_idx_21)
     A_col_idx = vcat(A_col_idx_11, A_col_idx_12, A_col_idx_21)
-    A_elem = vcat(A_elem_11, A_elem_12, A_elem_21)
+    A_elem = vcat(A_elem_11, -A_elem_12, A_elem_21)
 
 
     # Right hand side. Only the second part is non-zero.
     # <ε², f²>
     b_row_idx, _, b_elem = Forms.evaluate_inner_product(test_forms[2], forcing[1], element_id, q_rule)
-    b_elem .*= -1.0
 
     b_row_idx .+= Forms.get_num_basis(test_forms[1])
 
@@ -67,7 +66,7 @@ function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, e
 
 end
 
-function volume_form_hodge_laplacian(fₑ, Xⁿ⁻¹, Xⁿ, ∫)
+function volume_form_hodge_laplacian(∫, Xⁿ⁻¹, Xⁿ, fₑ)
     # inputs for the mixed weak form
     weak_form_inputs = Mantis.Assemblers.WeakFormInputs(∫, (Xⁿ⁻¹, Xⁿ), (fₑ,))
 
@@ -102,7 +101,7 @@ p⁰ = [2, 3]
 α = 10.0
 section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
 # print info?
-verbose = true
+verbose = false
 
 # number of refinement levels to run
 num_ref_levels = 4
@@ -224,7 +223,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 ϕₑ, δϕₑ, fₑ = sinusoidal_solution(geometry)
 
                 # solve the problem
-                uₕ, ϕₕ = volume_form_hodge_laplacian(fₑ, X[2], X[3], ∫)
+                uₕ, ϕₕ = volume_form_hodge_laplacian(∫, X[2], X[3], fₑ)
 
                 # compute error
                 error = Mantis.Analysis.L2_norm(ϕₕ - ϕₑ, ∫)

@@ -16,7 +16,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         num_F,
         TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
         TeF <: NTuple{num_TeF, Forms.AbstractFormSpace{manifold_dim}},
-        F <: NTuple{num_F, Forms.AbstractFormExpression{manifold_dim}},
+        F <: NTuple{num_F, Forms.AbstractFormField{manifold_dim}},
     }
         return new{manifold_dim, TrF, TeF, F}(quad_rule, trial_forms, test_forms, forcing)
     end
@@ -47,7 +47,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         manifold_dim,
         TrF <: Forms.AbstractFormSpace{manifold_dim},
         TeF <: Forms.AbstractFormSpace{manifold_dim},
-        F <: Forms.AbstractFormExpression{manifold_dim}
+        F <: Forms.AbstractFormField{manifold_dim}
     }
         return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,), (forcing,)) 
     end
@@ -75,7 +75,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         num_TrF,
         num_F,
         TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
-        F <: NTuple{num_F, Forms.AbstractFormExpression{manifold_dim}},
+        F <: NTuple{num_F, Forms.AbstractFormField{manifold_dim}},
     }
         return WeakFormInputs(quad_rule, forms, forms, forcing)
     end
@@ -101,7 +101,7 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
     ) where {
         manifold_dim,
         TrF <: Forms.AbstractFormSpace{manifold_dim},
-        F <: Forms.AbstractFormExpression{manifold_dim}
+        F <: Forms.AbstractFormField{manifold_dim}
     }
         return WeakFormInputs(quad_rule, (forms,), (forms,), (forcing,))
     end
