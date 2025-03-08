@@ -13,7 +13,7 @@ breakpoints2 = collect(range(0,1,ne2+1))
 patch2 = Mantis.Mesh.Patch1D(breakpoints2)
 deg1 = 2
 deg2 = 2
-nsubs = (2, 2)
+nsubs = (3, 3)
 nlevels = 3
 
 CB1 = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1; fill(deg1-1, ne1-1); -1])
@@ -51,7 +51,7 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
     # Positivity of the basis
     @test minimum(h_eval[1][1]) >= 0.0
     # Partition of unity
-    # @test all(isapprox.(sum(h_eval[1][1], dims=2), 1.0, atol=1e-14))
+    @test all(isapprox.(sum(h_eval[1][1], dims=2), 1.0, atol=1e-14))
 end
 
 # Geometry visualization

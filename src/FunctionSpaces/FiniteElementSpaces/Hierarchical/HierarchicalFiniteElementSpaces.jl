@@ -395,6 +395,11 @@ function get_active_objects_and_nested_domains(
                 support = get_support(spaces[level+1], fine_basis)
                 check_in_next_domain = support .∈ next_level_domain
                 if all(check_in_next_domain)
+                    parents = reduce(
+                        union,
+                        get_element_parent.(Ref(two_scale_operators[level]), support),
+                    )
+                    append!(elements_to_remove, parents)
                     append!(elements_to_add, support)
                     append!(basis_to_add, fine_basis)
                 end
