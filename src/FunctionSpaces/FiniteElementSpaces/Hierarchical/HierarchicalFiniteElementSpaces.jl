@@ -180,7 +180,6 @@ function get_num_basis(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
     return length(get_basis_indices(hier_space, hier_id))
 end
 
-
 function get_max_local_dim(hier_space::HierarchicalFiniteElementSpace)
     return get_max_local_dim(hier_space.spaces[1]) * 2
 end
