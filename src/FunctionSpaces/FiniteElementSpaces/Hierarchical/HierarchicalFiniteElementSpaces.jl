@@ -156,22 +156,6 @@ function get_num_subdivisions(hier_space::HierarchicalFiniteElementSpace)
     return hier_space.num_subdivisions
 end
 
-function get_num_basis(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
-    if hier_space.multilevel_elements[hier_id] == 0
-        element_level, element_level_id = convert_to_element_level_and_level_id(
-            hier_space, hier_id
-        )
-        num_basis = get_num_basis(get_space(hier_space, element_level), element_level_id)
-    else
-        multilevel_id = hier_space.multilevel_elements[hier_id]
-        basis_indices = hier_space.multilevel_basis_indices[multilevel_id]
-
-        num_basis = length(basis_indices)
-    end
-
-    return num_basis
-end
-
 function get_basis_indices(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
     if hier_space.multilevel_elements[hier_id] == 0
         element_level, element_level_id = convert_to_element_level_and_level_id(
@@ -191,6 +175,11 @@ function get_basis_indices(hier_space::HierarchicalFiniteElementSpace, hier_id::
 
     return basis_indices 
 end
+
+function get_num_basis(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
+    return length(get_basis_indices(hier_space, hier_id))
+end
+
 
 function get_max_local_dim(hier_space::HierarchicalFiniteElementSpace)
     return get_max_local_dim(hier_space.spaces[1]) * 2
@@ -361,6 +350,23 @@ function get_active_objects_and_nested_domains(
     active_basis_per_level = [collect(1:get_num_basis(spaces[1]))]
     nested_domains_per_level = [collect(1:get_num_elements(spaces[1]))]
 
+    if ~simplified
+        new_domains = [get_level_ids(domains, level) for level in 1:num_levels]
+        for level in num_levels:-1:2
+            parents = reduce(
+                union,
+                get_element_parent.(Ref(two_scale_operators[level-1]), new_domains[level]),
+            )
+            children = reduce(
+                vcat, get_element_children.(Ref(two_scale_operators[level-1]), parents)
+            )
+            new_domains[level] = children
+            append!(new_domains[level-1], parents)
+        end
+
+        domains = HierarchicalActiveInfo(new_domains)
+    end
+
     for level in 1:(num_levels - 1) # Loop over levels
         next_level_domain = [get_level_ids(domains, level + 1)]
 
@@ -370,7 +376,7 @@ function get_active_objects_and_nested_domains(
         basis_to_add = Int[]
 
         if ~simplified
-            for coarse_basis in 1:get_num_basis(spaces[level])
+            for coarse_basis in active_basis_per_level[level]
                 # Gets the support of Ni on current level and the next one
                 support = get_support(spaces[level], coarse_basis)
                 element_children = [
@@ -385,6 +391,7 @@ function get_active_objects_and_nested_domains(
                     append!(basis_to_remove, coarse_basis)
                 end
             end
+
             for fine_basis in 1:get_num_basis(spaces[level+1])
                 support = get_support(spaces[level+1], fine_basis)
                 check_in_next_domain = support .∈ next_level_domain
