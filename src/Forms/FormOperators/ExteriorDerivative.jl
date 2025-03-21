@@ -84,22 +84,15 @@ get_geometry(ext_der::ExteriorDerivative) = get_geometry(get_form(ext_der))
 
 """
     evaluate(
-        ext_der::ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F},
+        ext_der::ExteriorDerivative{manifold_dim},
         element_id::Int,
         xi::NTuple{manifold_dim, Vector{Float64}},
-    ) where {
-        manifold_dim,
-        form_rank,
-        expression_rank,
-        G <: Geometry.AbstractGeometry{manifold_dim},
-        F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
-    }
+    ) where {manifold_dim}
 
 Function description
 
 # Arguments
-- `ext_der::ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F}`: The
-    exterior derivative structure.
+- `ext_der::ExteriorDerivative{manifold_dim}`: The exterior derivative structure.
 - `element_id::Int`: The element idenfier.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The set of canonical points.
 
@@ -112,16 +105,10 @@ Function description
     to a `Vector`.
 """
 function evaluate(
-    ext_der::ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F},
+    ext_der::ExteriorDerivative{manifold_dim},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
-) where {
-    manifold_dim,
-    form_rank,
-    expression_rank,
-    G <: Geometry.AbstractGeometry{manifold_dim},
-    F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
-}
+) where {manifold_dim}
     return evaluate_exterior_derivative(get_form(ext_der), element_id, xi)
 end
 
@@ -131,17 +118,16 @@ end
 
 """
     evaluate_exterior_derivative(
-        form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+        form::AbstractFormExpression{manifold_dim},
         element_id::Int, 
         xi::NTuple{manifold_dim, Vector{Float64}},
-    ) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry}
+    ) where {manifold_dim}
 
 Returns the exterior derivative of a `form` at the element given by `element_id`, and
 canonical points `xi`.
 
 # Arguments
-- `form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The form being
-    evaluated.
+- `form::AbstractFormExpression{manifold_dim}`: The form being evaluated.
 - `element_id::Int`: The element idenfier.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The set of canonical points.
 
@@ -154,10 +140,10 @@ canonical points `xi`.
     to a `Vector`.
 """
 function evaluate_exterior_derivative(
-    form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    form::AbstractFormExpression{manifold_dim},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
-) where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry}
+) where {manifold_dim}
     throw(ArgumentError("Method not implement for type $(typeof(form))."))
 end
 

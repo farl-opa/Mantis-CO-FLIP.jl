@@ -1,4 +1,113 @@
 ############################################################################################
+#                                        Structure                                         #
+############################################################################################
+
+
+"""
+    HodgeStar{manifold_dim, form_rank, expression_rank, G, F} <:
+    AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+
+Represents the hodge star of an `AbstractFormExpression`.
+
+# Fields
+- `form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The form to
+    which the hodge star is applied.
+- `label::String`: The hodge star label. This is a concatenation of `"★"` with the
+    label of `form`.
+
+# Type parameters
+- `manifold_dim`: Dimension of the manifold. 
+- `form_rank`: The form rank of the hodge star. If the form rank of `form` is `k`
+    then `form_rank` is `manifold_dim - k`.
+- `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0,
+    with one single set of basis forms have rank 1, with two sets of basis forms have rank
+    2. Higher ranks are not possible.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
+- `F <: Forms.AbstractFormExpression{manifold_dim, manifold_dim-form_rank, expression_rank,
+    G}`: The type of `form`.
+
+# Inner Constructors
+- `HodgeStar(form::F)`: General constructor.
+"""
+struct HodgeStar{manifold_dim, form_rank, expression_rank, G, F} <:
+       AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+    form::F
+    label::String
+
+    function HodgeStar(
+        form::F
+    ) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    }
+        hodge_star_rank = manifold_dim - form_rank
+
+        return new{manifold_dim, hodge_star_rank, expression_rank, G}(
+            form, "★" * get_label(form)
+        )
+    end
+end
+
+"""
+    get_form(hodge_star::HodgeStar)
+
+Returns the form to which the hodge star is applied.
+
+# Arguments
+- `hodge_star::HodgeStar`: The hodge star structure.
+
+# Returns
+- `<:AbstractFormExpression`: The form to which the hodge star is applied.
+"""
+get_form(hodge_star::HodgeStar) = hodge_star.form
+
+"""
+    get_geometry(hodge_star::HodgeStar)
+
+Returns the geometry of the form associated with the hodge star.
+
+# Arguments
+- `hodge_star::HodgeStar`: The hodge star structure.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the form.
+"""
+get_geometry(hodge_star::HodgeStar) = get_geometry(get_form(hodge_star))
+
+"""
+    evaluate(
+        hodge_star::HodgeStar{manifold_dim},
+        element_id::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+    ) where {manifold_dim}
+
+Function description
+
+# Arguments
+- `hodge_star::HodgeStar{manifold_dim}`: The hodge star structure.
+- `element_id::Int`: The element idenfier.
+- `xi::NTuple{manifold_dim, Vector{Float64}`: The set of canonical points.
+
+# Returns
+- `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated hodge star. The number of
+    entries in the `Vector` is `binomial(manifold_dim, manifold_dim - form_rank)`. The size
+    of the `Array` is `(num_eval_points, num_basis)`, where `num_eval_points =
+    prod(length.(xi))` and `num_basis` is the number of basis functions used to represent
+    the `form` on `element_id` ― for `expression_rank = 0` the inner `Array` is equivalent
+    to a `Vector`.
+"""
+function evaluate(
+    hodge_star::HodgeStar{manifold_dim},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {manifold_dim}
+    return evaluate_hodge_star(get_form(hodge_star), element_id, xi)
+end
+
+############################################################################################
 #                                     Abstract method                                      #
 ############################################################################################
 
