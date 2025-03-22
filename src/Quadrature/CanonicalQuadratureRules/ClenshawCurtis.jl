@@ -10,7 +10,7 @@ Gauss quadrature (in some cases), see [Trefethen2008](@cite) and [Trefethen2022]
 - `p::Integer`: Degree of the quadrature rule.
 
 # Returns
-- `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
+- `::CanonicalQuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
     There will be `p+1` nodes and weights.
 
 # Notes
@@ -48,5 +48,5 @@ function clenshaw_curtis(p::Integer)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
 
-    return QuadratureRule{1}((ξ,), w, "Clenshaw-Curtis")
+    return CanonicalQuadratureRule{1}((ξ,), w, "Clenshaw-Curtis")
 end

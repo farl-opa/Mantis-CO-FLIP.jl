@@ -11,7 +11,7 @@ of ``\\xi \\in [-1, 1]`` as usual.
 - `N::Integer`: Number of nodes used in the quadrature rule.
 
 # Returns
-- `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
+- `::CanonicalQuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
     There will be `N` nodes and weights.
 
 # Throws
@@ -27,7 +27,7 @@ function gauss_lobatto(N::Integer)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
 
-    return QuadratureRule{1}((ξ,), w, "Gauss-Lobatto")
+    return CanonicalQuadratureRule{1}((ξ,), w, "Gauss-Lobatto")
 end
 
 """
@@ -43,7 +43,7 @@ of ``\\xi \\in [-1, 1]`` as usual.
 - `N::Integer`: Number of nodes used in the quadrature rule.
 
 # Returns
-- `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
+- `::CanonicalQuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
     There will be `N` nodes and weights.
 
 # Throws
@@ -66,5 +66,5 @@ function gauss_legendre(N::Integer)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
 
-    return QuadratureRule{1}((ξ,), w, "Gauss-Legendre")
+    return CanonicalQuadratureRule{1}((ξ,), w, "Gauss-Legendre")
 end

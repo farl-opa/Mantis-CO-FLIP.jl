@@ -7,17 +7,17 @@ Returns a tensor product quadrature rule of given degree and rule type.
 
 # Arguments
 - `p::NTuple{manifold_dim, Integer}`: Degree of the quadrature rule per dimension.
-- `quad_rule::F`: The function that returns a `QuadratureRule{1}` given an integer degree.
+- `quad_rule::F`: The function that returns a `CanonicalQuadratureRule{1}` given an integer degree.
     May take additional arguments.
 - `rule_args_1d...`: Additional arguments for the 1D quadrature rule. Optional.
 
 # Returns
-- `::QuadratureRule{manifold_dim}`: QuadratureRule of the new dimension.
+- `::CanonicalQuadratureRule{manifold_dim}`: CanonicalQuadratureRule of the new dimension.
 """
 function tensor_product_rule(
     p::NTuple{manifold_dim, Integer}, quad_rule::F, rule_args_1d...
 ) where {manifold_dim, F <: Function}
-    qrules = NTuple{manifold_dim, QuadratureRule{1}}(
+    qrules = NTuple{manifold_dim, CanonicalQuadratureRule{1}}(
         quad_rule(p[k], rule_args_1d...) for k = 1:manifold_dim
     )
     points = NTuple{manifold_dim, Vector{Float64}}(
@@ -38,23 +38,23 @@ function tensor_product_rule(
         rule_label = "Tensor-product of $manifold_dim $(qrule_label) rules"
     end
 
-    return QuadratureRule{manifold_dim}(points, weights, rule_label)
+    return CanonicalQuadratureRule{manifold_dim}(points, weights, rule_label)
 end
 
 """
-    tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}) where {
+    tensor_product_rule(qrules_1d::NTuple{manifold_dim, CanonicalQuadratureRule{1}}) where {
         manifold_dim
     }
 
 Returns a tensor product quadrature rule from the given rules.
 
 # Arguments
-- `qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}`: Quadrature rules per dimension.
+- `qrules_1d::NTuple{manifold_dim, CanonicalQuadratureRule{1}}`: Quadrature rules per dimension.
 
 # Returns
-- `::QuadratureRule{manifold_dim}`: QuadratureRule of the new dimension.
+- `::CanonicalQuadratureRule{manifold_dim}`: CanonicalQuadratureRule of the new dimension.
 """
-function tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}}) where {
+function tensor_product_rule(qrules_1d::NTuple{manifold_dim, CanonicalQuadratureRule{1}}) where {
     manifold_dim
 }
     points = NTuple{manifold_dim, Vector{Float64}}(
@@ -75,7 +75,7 @@ function tensor_product_rule(qrules_1d::NTuple{manifold_dim, QuadratureRule{1}})
         rule_label = "Tensor-product of ($rule_labels) rules"
     end
 
-    return QuadratureRule{manifold_dim}(points, weights, rule_label)
+    return CanonicalQuadratureRule{manifold_dim}(points, weights, rule_label)
 end
 
 """

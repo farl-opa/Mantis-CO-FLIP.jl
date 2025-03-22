@@ -1,6 +1,6 @@
 
 """
-    RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
+    RationalFESpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
 
 A rational finite element space obtained by dividing all elements of a given function space
 by a fixed element from the same function space. The latter is defined with the help of
@@ -11,11 +11,11 @@ specified weights.
 - `weights::Vector{Float64}`: The weights associated with the basis functions of the
     function space.
 """
-struct RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
+struct RationalFESpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
     function_space::F
     weights::Vector{Float64}
 
-    function RationalFiniteElementSpace(
+    function RationalFESpace(
         function_space::F, weights::Vector{Float64}
     ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1}}
         if get_num_basis(function_space) != length(weights)
@@ -26,46 +26,46 @@ struct RationalFiniteElementSpace{manifold_dim, F} <: AbstractFESpace{manifold_d
     end
 end
 
-function get_num_basis(space::RationalFiniteElementSpace)
+function get_num_basis(space::RationalFESpace)
     return get_num_basis(space.function_space)
 end
-function get_num_basis(space::RationalFiniteElementSpace, element_id::Int)
+function get_num_basis(space::RationalFESpace, element_id::Int)
     return get_num_basis(space.function_space, element_id)
 end
 
-function get_basis_indices(space::RationalFiniteElementSpace, element_id::Int)
+function get_basis_indices(space::RationalFESpace, element_id::Int)
     return get_basis_indices(space.function_space, element_id)
 end
 
-function get_num_elements(rat_space::RationalFiniteElementSpace)
+function get_num_elements(rat_space::RationalFESpace)
     return get_num_elements(rat_space.function_space)
 end
 
 """
-    get_polynomial_degree(rat_space::RationalFiniteElementSpace, element_id::Int)
+    get_polynomial_degree(rat_space::RationalFESpace, element_id::Int)
 
 Returns the polynomial degree (or the degree of the underlying function space) of the
 rational finite element space for a specific element.
 
 # Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
+- `rat_space::RationalFESpace`: The rational finite element space.
 - `element_id::Int`: The index of the element.
 
 # Returns
 The polynomial degree (or the degree of the underlying function space) of the rational
 finite element space for the specified element.
 """
-function get_polynomial_degree(rat_space::RationalFiniteElementSpace, element_id::Int)
+function get_polynomial_degree(rat_space::RationalFESpace, element_id::Int)
     return get_polynomial_degree(rat_space.function_space, element_id)
 end
 
-function get_dof_partition(space::RationalFiniteElementSpace)
+function get_dof_partition(space::RationalFESpace)
     return get_dof_partition(space.function_space)
 end
 
 """
     evaluate(
-        rat_space::RationalFiniteElementSpace{manifold_dim, F},
+        rat_space::RationalFESpace{manifold_dim, F},
         element_id::Int,
         xi::NTuple{manifold_dim, Vector{Float64}},
         nderivatives::Int
@@ -74,7 +74,7 @@ end
 Evaluates the basis functions and their derivatives for the rational finite element space.
 
 # Arguments
-- `rat_space::RationalFiniteElementSpace{manifold_dim, F}`: The rational finite
+- `rat_space::RationalFESpace{manifold_dim, F}`: The rational finite
     element space.
 - `element_id::Int`: The index of the element.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
@@ -87,7 +87,7 @@ A tuple containing:
 - The basis indices.
 """
 function evaluate(
-    rat_space::RationalFiniteElementSpace{manifold_dim, F},
+    rat_space::RationalFESpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
@@ -131,12 +131,12 @@ function evaluate(
     return homog_basis, basis_indices
 end
 
-function get_max_local_dim(space::RationalFiniteElementSpace)
+function get_max_local_dim(space::RationalFESpace)
     return get_max_local_dim(space.function_space)
 end
 
 function get_local_basis(
-    space::RationalFiniteElementSpace{manifold_dim, F},
+    space::RationalFESpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
@@ -144,7 +144,7 @@ function get_local_basis(
     return evaluate(space, element_id, xi, nderivatives)[1]
 end
 
-function get_extraction(space::RationalFiniteElementSpace, element_id::Int)
+function get_extraction(space::RationalFESpace, element_id::Int)
     # Get the basis indices for the underlying function space
     _, basis_indices = get_extraction(space.function_space, element_id)
     n_supp = length(basis_indices)
@@ -153,21 +153,21 @@ function get_extraction(space::RationalFiniteElementSpace, element_id::Int)
 end
 
 """
-    get_element_size(rat_space::RationalFiniteElementSpace, element_id::Int)
+    get_element_size(rat_space::RationalFESpace, element_id::Int)
 
 Returns the size of the element for the rational finite element space.
 
 # Arguments
-- `rat_space::RationalFiniteElementSpace`: The rational finite element space.
+- `rat_space::RationalFESpace`: The rational finite element space.
 - `element_id::Int`: The index of the element.
 
 # Returns
 The size of the element for the rational finite element space.
 """
-function get_element_size(rat_space::RationalFiniteElementSpace, element_id::Int)
+function get_element_size(rat_space::RationalFESpace, element_id::Int)
     return get_element_size(rat_space.function_space, element_id)
 end
 
-function get_element_dimensions(rat_space::RationalFiniteElementSpace, element_id::Int)
+function get_element_dimensions(rat_space::RationalFESpace, element_id::Int)
     return get_element_dimensions(rat_space.function_space, element_id)
 end

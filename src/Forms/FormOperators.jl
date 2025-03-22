@@ -33,7 +33,7 @@ following Einstein's summation convention. This definition can then be extend to
 - `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}`: The differential `form_rank_1`-form expression. It represents a `form_rank_1`-form on a manifold.
 - `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}`: The differential `form_rank_2`-form expression. It represents a `form_rank_2`-form on a manifold.
 - `element_id::Int`: Index of the element to evaluate.
-- `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: The quadrature rule used to approximate the integral of the inner product over the specified element.
+- `quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim}`: The quadrature rule used to approximate the integral of the inner product over the specified element.
 
 # Returns
 - `prod_form_rows::Vector{Int}`: Indices of the first form expression for each index of the linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of basis functions in the first form expression and `i` and `j` are the local basis indices of the first and second expression, respectively. I.e., `prod_form_rows[l(i,j)]` stores the global basis index of the local basis `i` when integrated against local basis `j`.
@@ -44,7 +44,7 @@ function evaluate_inner_product(
     form_expression_1::AbstractFormExpression{manifold_dim,form_rank_1,expression_rank_1,G},
     form_expression_2::AbstractFormExpression{manifold_dim,form_rank_2,expression_rank_2,G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     form_rank_1,
@@ -72,7 +72,7 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim,0,expression_rank_1,G},
     form_expression2::AbstractFormExpression{manifold_dim,0,expression_rank_2,G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     expression_rank_1,
@@ -95,14 +95,14 @@ function _evaluate_inner_product(
     end
 
     _, sqrt_g = Geometry.metric(
-        get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
+        get_geometry(form_expression1, form_expression2), element_id, Quadrature.get_nodes(quad_rule)
     )
 
     # evaluate both the form expressions; it is assumed that the output is of the following form:
     # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
-    form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
-    form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
+    form1_eval, form1_indices = evaluate(form_expression1, element_id, Quadrature.get_nodes(quad_rule))
+    form2_eval, form2_indices = evaluate(form_expression2, element_id, Quadrature.get_nodes(quad_rule))
 
     # Get dimension of each form expression
     # Since we restrict to expresions with expression rank 0 or 1, we only have one set of indices
@@ -140,7 +140,7 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim,manifold_dim,expression_rank_1,G},
     form_expression2::AbstractFormExpression{manifold_dim,manifold_dim,expression_rank_2,G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     expression_rank_1,
@@ -163,13 +163,13 @@ function _evaluate_inner_product(
     end
 
     _, sqrt_g = Geometry.metric(
-        get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
+        get_geometry(form_expression1, form_expression2), element_id, Quadrature.get_nodes(quad_rule)
     )
 
     # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
-    form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
-    form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
+    form1_eval, form1_indices = evaluate(form_expression1, element_id, Quadrature.get_nodes(quad_rule))
+    form2_eval, form2_indices = evaluate(form_expression2, element_id, Quadrature.get_nodes(quad_rule))
 
     # Get dimension of each form expression
     # Since we restrict to expresions with expression rank 0 or 1, we only have one set of indices
@@ -207,7 +207,7 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim,1,expression_rank_1,G},
     form_expression2::AbstractFormExpression{manifold_dim,1,expression_rank_2,G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     expression_rank_1,
@@ -230,13 +230,13 @@ function _evaluate_inner_product(
     end
 
     inv_g, _, sqrt_g = Geometry.inv_metric(
-        get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
+        get_geometry(form_expression1, form_expression2), element_id, Quadrature.get_nodes(quad_rule)
     )
 
     # form_eval::Vector{Matrix{Float64}} of length manifold_dim, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
-    form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
-    form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
+    form1_eval, form1_indices = evaluate(form_expression1, element_id, Quadrature.get_nodes(quad_rule))
+    form2_eval, form2_indices = evaluate(form_expression2, element_id, Quadrature.get_nodes(quad_rule))
 
     # Get dimension of each form expression
     # Since we restrict to expresions with expression rank 0 or 1, we only have one set of indices
@@ -287,7 +287,7 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{3,2,expression_rank_1,G},
     form_expression2::AbstractFormExpression{3,2,expression_rank_2,G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{3},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{3},
 ) where {expression_rank_1,expression_rank_2,G<:Geometry.AbstractGeometry{3}}
     if expression_rank_1 > 1
         throw(
@@ -305,14 +305,14 @@ function _evaluate_inner_product(
     end
 
     inv_g, _, sqrt_g = Geometry.inv_metric(
-        get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
+        get_geometry(form_expression1, form_expression2), element_id, Quadrature.get_nodes(quad_rule)
     )
 
     # assumes that the output is of the following form:
     # form_eval::Vector{Matrix{Float64}} of length 3, where each matrix is of size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
-    form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
-    form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
+    form1_eval, form1_indices = evaluate(form_expression1, element_id, Quadrature.get_nodes(quad_rule))
+    form2_eval, form2_indices = evaluate(form_expression2, element_id, Quadrature.get_nodes(quad_rule))
 
     # Get dimension of each form expression
     # Since we restrict to expresions with expression rank 0 or 1, we only have one set of indices
@@ -1688,7 +1688,7 @@ function _evaluate_wedge(
     for wedge_component_idx in 1:n_components_wedge
         for cart_ind in CartesianIndices(wedge_eval[wedge_component_idx])
             (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-            wedge_eval[wedge_component_idx][cart_ind] = 
+            wedge_eval[wedge_component_idx][cart_ind] =
                 form_expression_1_eval[wedge_component_idx][point, basis_id_1] *
                 form_expression_2_eval[1][point, basis_id_2]
         end
@@ -1735,7 +1735,7 @@ function _evaluate_wedge(
     # Compute the wedge evaluation
     for wedge_component_idx in 1:n_components_wedge
         for cart_ind in CartesianIndices(wedge_eval[wedge_component_idx])
-            wedge_eval[wedge_component_idx][cart_ind] = 
+            wedge_eval[wedge_component_idx][cart_ind] =
                 form_expression_1_eval[1][cart_ind] *
                 form_expression_2_eval[wedge_component_idx][cart_ind]
         end
@@ -1794,7 +1794,7 @@ function _evaluate_wedge(
     for wedge_component_idx in 1:n_components_wedge
         for cart_ind in CartesianIndices(wedge_eval[wedge_component_idx])
             (point, basis_id) = Tuple(cart_ind)
-            wedge_eval[wedge_component_idx][cart_ind] = 
+            wedge_eval[wedge_component_idx][cart_ind] =
                 form_expression_1_eval[1][cart_ind] *
                 form_expression_2_eval[wedge_component_idx][point, 1]
         end
@@ -1853,7 +1853,7 @@ function _evaluate_wedge(
     for wedge_component_idx in 1:n_components_wedge
         for cart_ind in CartesianIndices(wedge_eval[wedge_component_idx])
             (point, basis_id) = Tuple(cart_ind)
-            wedge_eval[wedge_component_idx][cart_ind] = 
+            wedge_eval[wedge_component_idx][cart_ind] =
                 form_expression_1_eval[1][point, 1] *
                 form_expression_2_eval[wedge_component_idx][cart_ind]
         end
@@ -1922,7 +1922,7 @@ function _evaluate_wedge(
     for wedge_component_idx in 1:n_components_wedge
         for cart_ind in CartesianIndices(wedge_eval[wedge_component_idx])
             (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-            wedge_eval[wedge_component_idx][cart_ind] = 
+            wedge_eval[wedge_component_idx][cart_ind] =
                 form_expression_1_eval[1][point, basis_id_1] *
                 form_expression_2_eval[wedge_component_idx][point, basis_id_2]
         end
@@ -1964,7 +1964,7 @@ function _evaluate_wedge(
     # Compute the wedge evaluation
     # Only one component because it is a 2-form in 2D
     for cart_ind in CartesianIndices(wedge_eval[1])
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][cart_ind] * form_expression_2_eval[2][cart_ind] -
             form_expression_1_eval[2][cart_ind] * form_expression_2_eval[1][cart_ind]
     end
@@ -2015,7 +2015,7 @@ function _evaluate_wedge(
     # Only one component because it is a 2-form in 2D
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][cart_ind] * form_expression_2_eval[2][point, 1] -
             form_expression_1_eval[2][cart_ind] * form_expression_2_eval[1][point, 1]
     end
@@ -2066,7 +2066,7 @@ function _evaluate_wedge(
     # Only one component because it is a 2-form in 2D
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][point, 1] * form_expression_2_eval[2][cart_ind] -
             form_expression_1_eval[2][point, 1] * form_expression_2_eval[1][cart_ind]
     end
@@ -2121,7 +2121,7 @@ function _evaluate_wedge(
     # Only one component because it is a 2-form in 2D
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][point, basis_id_1] *
                 form_expression_2_eval[2][point, basis_id_2] -
             form_expression_1_eval[2][point, basis_id_1] *
@@ -2168,21 +2168,21 @@ function _evaluate_wedge(
     # Compute the wedge evaluation
     # (α₂β₃ - α₃β₂)dξ²∧dξ³
     for cart_ind in CartesianIndices(wedge_eval[1])
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[2][cart_ind] * form_expression_2_eval[3][cart_ind] -
             form_expression_1_eval[3][cart_ind] * form_expression_2_eval[2][cart_ind]
     end
 
     # (α₃β₁ - α₁β₃)dξ³∧dξ¹
     for cart_ind in CartesianIndices(wedge_eval[2])
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[3][cart_ind] * form_expression_2_eval[1][cart_ind] -
             form_expression_1_eval[1][cart_ind] * form_expression_2_eval[3][cart_ind]
     end
 
     # (α₁β₂ - α₂β₁)dξ¹∧dξ²
     for cart_ind in CartesianIndices(wedge_eval[3])
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][cart_ind] * form_expression_2_eval[2][cart_ind] -
             form_expression_1_eval[2][cart_ind] * form_expression_2_eval[1][cart_ind]
     end
@@ -2237,7 +2237,7 @@ function _evaluate_wedge(
     # (α₂β₃ - α₃β₂)dξ²∧dξ³
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[2][cart_ind] * form_expression_2_eval[3][point, 1] -
             form_expression_1_eval[3][cart_ind] * form_expression_2_eval[2][point, 1]
     end
@@ -2245,7 +2245,7 @@ function _evaluate_wedge(
     # (α₃β₁ - α₁β₃)dξ³∧dξ¹
     for cart_ind in CartesianIndices(wedge_eval[2])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[3][cart_ind] * form_expression_2_eval[1][point, 1] -
             form_expression_1_eval[1][cart_ind] * form_expression_2_eval[3][point, 1]
     end
@@ -2253,7 +2253,7 @@ function _evaluate_wedge(
     # (α₁β₂ - α₂β₁)dξ¹∧dξ²
     for cart_ind in CartesianIndices(wedge_eval[3])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][cart_ind] * form_expression_2_eval[2][point, 1] -
             form_expression_1_eval[2][cart_ind] * form_expression_2_eval[1][point, 1]
     end
@@ -2308,7 +2308,7 @@ function _evaluate_wedge(
     # (α₂β₃ - α₃β₂)dξ²∧dξ³
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[2][point, 1] * form_expression_2_eval[3][cart_ind] -
             form_expression_1_eval[3][point, 1] * form_expression_2_eval[2][cart_ind]
     end
@@ -2316,7 +2316,7 @@ function _evaluate_wedge(
     # (α₃β₁ - α₁β₃)dξ³∧dξ¹
     for cart_ind in CartesianIndices(wedge_eval[2])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[3][point, 1] * form_expression_2_eval[1][cart_ind] -
             form_expression_1_eval[1][point, 1] * form_expression_2_eval[3][cart_ind]
     end
@@ -2324,7 +2324,7 @@ function _evaluate_wedge(
     # (α₁β₂ - α₂β₁)dξ¹∧dξ²
     for cart_ind in CartesianIndices(wedge_eval[3])
         (point, basis_id) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][point, 1] * form_expression_2_eval[2][cart_ind] -
             form_expression_1_eval[2][point, 1] * form_expression_2_eval[1][cart_ind]
     end
@@ -2383,8 +2383,8 @@ function _evaluate_wedge(
     # (α₂β₃ - α₃β₂)dξ²∧dξ³
     for cart_ind in CartesianIndices(wedge_eval[1])
         (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
-            form_expression_1_eval[2][point, basis_id_1] * 
+        wedge_eval[1][cart_ind] =
+            form_expression_1_eval[2][point, basis_id_1] *
                 form_expression_2_eval[3][point, basis_id_2] -
             form_expression_1_eval[3][point, basis_id_1] *
                 form_expression_2_eval[2][point, basis_id_2]
@@ -2393,7 +2393,7 @@ function _evaluate_wedge(
     # (α₃β₁ - α₁β₃)dξ³∧dξ¹
     for cart_ind in CartesianIndices(wedge_eval[2])
         (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[3][point, basis_id_1] *
                 form_expression_2_eval[1][point, basis_id_2] -
             form_expression_1_eval[1][point, basis_id_1] *
@@ -2403,7 +2403,7 @@ function _evaluate_wedge(
     # (α₁β₂ - α₂β₁)dξ¹∧dξ²
     for cart_ind in CartesianIndices(wedge_eval[3])
         (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-        wedge_eval[1][cart_ind] = 
+        wedge_eval[1][cart_ind] =
             form_expression_1_eval[1][point, basis_id_1] *
                 form_expression_2_eval[2][point, basis_id_2] -
             form_expression_1_eval[2][point, basis_id_1] *
@@ -2452,7 +2452,7 @@ function _evaluate_wedge(
     # (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][cart_ind] *
                 form_expression_2_eval[form_components_idx][cart_ind]
         end
@@ -2510,7 +2510,7 @@ function _evaluate_wedge(
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
             (point, basis_id) = Tuple(cart_ind)
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][cart_ind] *
                 form_expression_2_eval[form_components_idx][point, 1]
         end
@@ -2568,7 +2568,7 @@ function _evaluate_wedge(
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
             (point, basis_id) = Tuple(cart_ind)
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][point, 1] *
                 form_expression_2_eval[form_components_idx][cart_ind]
         end
@@ -2630,7 +2630,7 @@ function _evaluate_wedge(
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
             (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][point, basis_id_1] *
                 form_expression_2_eval[form_components_idx][point, basis_id_2]
         end
@@ -2678,7 +2678,7 @@ function _evaluate_wedge(
     # (α₁β₁ + α₂β₂ + α₃β₃) dξ¹∧dξ²∧dξ³
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][cart_ind] *
                 form_expression_2_eval[form_components_idx][cart_ind]
         end
@@ -2736,7 +2736,7 @@ function _evaluate_wedge(
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
             (point, basis_id) = Tuple(cart_ind)
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][cart_ind] *
                 form_expression_2_eval[form_components_idx][point, 1]
         end
@@ -2794,7 +2794,7 @@ function _evaluate_wedge(
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
             (point, basis_id) = Tuple(cart_ind)
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][point, 1] *
                 form_expression_2_eval[form_components_idx][cart_ind]
         end
@@ -2856,7 +2856,7 @@ function _evaluate_wedge(
     for form_components_idx in 1:3
         for cart_ind in CartesianIndices(wedge_eval[1])
             (point, basis_id_1, basis_id_2) = Tuple(cart_ind)
-            wedge_eval[1][cart_ind] += 
+            wedge_eval[1][cart_ind] +=
                 form_expression_1_eval[form_components_idx][point, basis_id_1] *
                 form_expression_2_eval[form_components_idx][point, basis_id_2]
         end

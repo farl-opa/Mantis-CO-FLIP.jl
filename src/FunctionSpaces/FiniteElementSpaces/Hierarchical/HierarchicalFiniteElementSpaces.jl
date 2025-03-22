@@ -40,7 +40,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         two_scale_operators::Vector{T},
         domains::HierarchicalActiveInfo,
         num_subdivisions::NTuple{manifold_dim, Int},
-        truncated::Bool=false,
+        truncated::Bool=true,
         simplified::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
@@ -125,7 +125,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         two_scale_operators::Vector{T},
         domains_per_level::Vector{Vector{Int}},
         num_subdivisions::NTuple{manifold_dim, Int},
-        truncated::Bool=false,
+        truncated::Bool=true,
         simplified::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
@@ -173,7 +173,7 @@ function get_basis_indices(hier_space::HierarchicalFiniteElementSpace, hier_id::
         basis_indices = hier_space.multilevel_basis_indices[multilevel_id]
     end
 
-    return basis_indices 
+    return basis_indices
 end
 
 function get_num_basis(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)

@@ -59,6 +59,7 @@ dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping_ip_test, dmapping_ip_test)
 geom_crazy = Mantis.Geometry.MappedGeometry(geom_cart, crazy_mapping)
 
+# -------------------------------------------------------------------------
 # Test the inner product of the 0-form spaces -----------------------------
 q_rule = Mantis.Quadrature.tensor_product_rule((deg1+3, deg2+3), Mantis.Quadrature.gauss_legendre)
 for geom in [geom_cart, geom_crazy]
@@ -73,7 +74,6 @@ for geom in [geom_cart, geom_crazy]
     @test isapprox(inner_prod_0, 1.0, atol=1e-12)
 end
 # -------------------------------------------------------------------------
-
 # Test the inner product of analytical form fields -----------------------------
 function analytical_1valued_form_func(x::Matrix{Float64})
     return [@. 8.0 * pi^2 * sinpi(2.0 * x[:,1]) * sinpi(2.0 * x[:,2])]
@@ -127,7 +127,7 @@ for geom in [geom_cart, geom_crazy]
         # Because forms are defined on the parametric domain, the constant coefficents equal to 1 will not result
         # in form equal to 1 evaluated on each element, therefore we need to account for it
         element_dimensions = [Mantis.Geometry.get_element_lengths(geom, elem_id)...]
-    
+
         # 1-forms
         integrated_metric_1 = zeros((2,2))
 

@@ -10,7 +10,7 @@ include("../../examples/HelperFunctions.jl")
 ############################################################################################
 #                                      Problem setup                                       #
 ############################################################################################
-# Mesh 
+# Mesh
 const starting_point = (0.0, 0.0)
 const box_size = (fpi, 1.0) # This size is so that the eigenvalues are unique.
 const num_runs = 5 # Number of problem runs. Each solve 2≤i≤num_runs will have 2^i elements.
@@ -32,7 +32,7 @@ eigenfunc = 1 # Eigenfunction to use for adaptive refinement.
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-qrule_assembly, qrule_error = Mantis.Quadrature.get_quadrature_rules(
+qrule_assembly, qrule_error = Mantis.Quadrature.get_canonical_quadrature_rules(
     Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
 )
 
@@ -41,7 +41,7 @@ const num_eig = 20
 # Scaling form maxwell eigenfunctions.
 scale_factors = ntuple(2) do k
     return pi /(box_size[k] - starting_point[k])
-end 
+end
 
 ############################################################################################
 #                                       Run problem                                        #
@@ -51,14 +51,14 @@ function run_problems(
     num_steps::Int,
     dorfler_parameter::Float64,
     Lchains::Bool,
-    q_rule_assembly::Mantis.Quadrature.AbstractQuadratureRule{manifold_dim},
-    q_rule_error::Mantis.Quadrature.AbstractQuadratureRule{manifold_dim},
+    q_rule_assembly::Mantis.Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    q_rule_error::Mantis.Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
     eigenfunction::Int,
     num_eig::Int,
     scale_factors::NTuple{manifold_dim, Float64};
     verbose::Bool=false,
 ) where {manifold_dim, num_forms, C <: NTuple{num_forms, Mantis.Forms.AbstractFormSpace}}
-    
+
     eigval_errors = [Vector{Float64}(undef, num_steps+1) for _ in 1:num_eig]
     eigfunc_errors = [Vector{Float64}(undef, num_steps+1) for _ in 1:num_eig]
 
@@ -153,7 +153,7 @@ function runt_tests(eigval_errors, num_steps, num_eig)
     return nothing
 end
 
- 
+
 R_complex = Mantis.Forms.create_hierarchical_de_rham_complex(
     starting_point, box_size, num_elements, p, k, num_sub, truncate, simplified
 )

@@ -10,12 +10,9 @@ using SparseArrays
 ############################################################################################
 ##                                       Testing methods                                  ##
 ############################################################################################
-function test_inner_prod_equality(geom::G, q_rule, complex) where {
-    manifold_dim, G <: Mantis.Geometry.AbstractGeometry{manifold_dim}
+function test_inner_prod_equality(q_rule::Q, complex) where {
+    manifold_dim, Q <: Mantis.Quadrature.AbstractGlobalQuadratureRule{manifold_dim}
 }
-    quad_nodes = Mantis.Quadrature.get_nodes(q_rule)
-    quad_weights = Mantis.Quadrature.get_weights(q_rule)
-
     for rank in 0:manifold_dim
         # Generate the form space ϵᵏ, or form rank k, and matching hodge and form field.
         ϵ = complex[rank + 1]
@@ -24,40 +21,41 @@ function test_inner_prod_equality(geom::G, q_rule, complex) where {
             0, zero_form_expression, Mantis.Forms.get_geometry(ϵ), "α⁰"
         )
 
-        for elem_id in 1:Mantis.Geometry.get_num_elements(geom)
+        for elem_id in 1:Mantis.Quadrature.get_num_elements(q_rule)
             # Compare the inner product
             #   <ϵ, ϵ>
             # with
             #   ϵ ∧ ★ϵ
+
+            # get element quadrature rule
+            element_q_rule = Mantis.Quadrature.get_element_quadrature_rule(q_rule, elem_id)
             # Compute the inner product: <ϵ, ϵ>
-            _, _, inner_product_eval = 
-                Mantis.Forms.evaluate_inner_product(ϵ, ϵ, elem_id, q_rule)
+            _, _, inner_product_eval =
+                Mantis.Forms.evaluate_inner_product(ϵ, ϵ, elem_id, element_q_rule)
 
             # Compute the wedge product: ϵ ∧ ⋆ϵ
             wedge = Mantis.Forms.wedge(ϵ, ★ϵ)
-
-            # Evaluate it at the quadrature nodes
             wedge_eval, _ = Mantis.Forms.evaluate(
-                wedge, elem_id, quad_nodes
+                wedge, elem_id, Mantis.Quadrature.get_nodes(element_q_rule)
             )
-
-            # Integrate the wedge product
-            wedge_integral_eval = vec(sum(quad_weights .* wedge_eval[1]; dims=1))
-
-            # Test if wedge is the same as the inner product
-            @test all(isapprox.(wedge_integral_eval, inner_product_eval; atol=1e-12))
-
             # Test if ϵ ∧ ★ϵ == ϵ ∧ ★ϵ ∧ α⁰ (since α⁰ = 1)
             wedge_triple = Mantis.Forms.wedge(wedge, α⁰)
             wedge_triple_eval, _ = Mantis.Forms.evaluate(
-                wedge_triple, elem_id, quad_nodes
+                wedge_triple, elem_id, Mantis.Quadrature.get_nodes(element_q_rule)
             )
             @test all(isapprox.(wedge_eval, wedge_triple_eval; atol=1e-12))
-                
+
+            # Integrate the wedge product
+            wedge_integral_eval, _ = Mantis.Analysis.integrate(
+                q_rule, elem_id, wedge
+            )
+            # Test if the integral is the same as the inner product
+            @test all(isapprox.(wedge_integral_eval, inner_product_eval; atol=1e-12))
+
             # Test if the wedge product expression has the correct expression rank
             @test Mantis.Forms.get_expression_rank(wedge) == 2
         end
-        
+
         # Test ϵ¹ ∧ ⋆ϵ¹ ∧ ϵ¹ to check if form rank 3 expressions are not allowed
         if rank == 1
             wedge = Mantis.Forms.wedge(ϵ, ★ϵ)
@@ -84,7 +82,7 @@ function test_combinations_2d(complex, q_rule)
     ε⁰ = Mantis.Forms.FormField(ϵ⁰, "ε⁰")
     ε¹ = Mantis.Forms.FormField(ϵ¹, "ε¹")
     ε² = Mantis.Forms.FormField(ϵ², "ε²")
-    
+
     # Test if different form-/expression-rank combinations don't throw errors
     zero_form_space_wedge = Mantis.Forms.wedge(ϵ⁰, ϵ⁰) # 0-form space with 0-form space
     zero_form_field_wedge = Mantis.Forms.wedge(ε⁰, ε⁰) # 0-form field with 0-form field
@@ -112,7 +110,7 @@ function test_combinations_2d(complex, q_rule)
     zero_one_form_mixed_2_wedge = Mantis.Forms.wedge(ε⁰, ϵ¹) # 0-form field with 1-form space
 
     quad_nodes = Mantis.Quadrature.get_nodes(q_rule)
-    
+
     # We changed the tests to use try/catch because @test_nowarn was extremely slow, as it
     # triggers a recompilation for every call.
     test_const = 0
@@ -152,11 +150,11 @@ function test_combinations_2d(complex, q_rule)
 end
 
 function test_combinations_3d(complex, q_rule)
-    
+
     # Create form spaces
     ϵ⁰ = complex[1]
-    ϵ¹ = complex[2] 
-    ϵ² = complex[3] 
+    ϵ¹ = complex[2]
+    ϵ² = complex[3]
     ϵ³ = complex[4]
 
     # Create the form fields
@@ -208,7 +206,7 @@ function test_combinations_3d(complex, q_rule)
     top_zero_form_mixed_2_wedge = Mantis.Forms.wedge(ε³, ϵ⁰) # top-form field with 0-form space
 
     quad_nodes = Mantis.Quadrature.get_nodes(q_rule)
-    
+
     # We changed the tests to use try/catch because @test_nowarn was extremely slow, as it
     # triggers a recompilation for every call.
     test_const = 0
@@ -307,7 +305,7 @@ end
 ############################################################################################
 ##                                       2D TESTS                                         ##
 ############################################################################################
-# Setup the complex 
+# Setup the complex
 complex_2d = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(
     starting_point_2d, box_size_2d, num_elements_2d, degrees_2d, regularities_2d
 )
@@ -322,21 +320,25 @@ dimension = (2, 2)
 crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping, dmapping)
 geom_crazy_2d = Mantis.Geometry.MappedGeometry(geom_cart_2d, crazy_mapping)
 
-# The quadrature information.
-q_rule_2d = Mantis.Quadrature.tensor_product_rule(
-    degrees_2d .+ 1, Mantis.Quadrature.gauss_legendre
+# The canonical quadrature information.
+canonical_qrule_2d = Mantis.Quadrature.tensor_product_rule(
+    degrees_2d .+ 2, Mantis.Quadrature.gauss_legendre
 )
 
 # Test the different geometries.
 for geom in (geom_cart_2d, geom_crazy_2d)
-    test_inner_prod_equality(geom, q_rule_2d, complex_2d)
+    # the global standard quadrature rule
+    q_rule_2d = Mantis.Quadrature.StandardQuadrature(
+        canonical_qrule_2d, Mantis.Geometry.get_num_elements(geom)
+    )
+    test_inner_prod_equality(q_rule_2d, complex_2d)
 end
-test_combinations_2d(complex_2d, q_rule_2d)
+test_combinations_2d(complex_2d, canonical_qrule_2d)
 
 ############################################################################################
 ##                                       3D TESTS                                         ##
 ############################################################################################
-# Setup the complex 
+# Setup the complex
 complex_3d = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(
     starting_point_3d, box_size_3d, num_elements_3d, degrees_3d, regularities_3d
 )
@@ -354,14 +356,18 @@ line_geo_3 = Mantis.Geometry.CartesianGeometry((breakpoints3,))
 geom_crazy_3d = Mantis.Geometry.TensorProductGeometry((geom_crazy_2d, line_geo_3))
 
 # The quadrature information.
-q_rule_3d = Mantis.Quadrature.tensor_product_rule(
-    degrees_3d .+ 1, Mantis.Quadrature.gauss_legendre
+canonical_qrule_3d = Mantis.Quadrature.tensor_product_rule(
+    degrees_3d .+ 2, Mantis.Quadrature.gauss_legendre
 )
 
 # Test the different geometries.
 for geom in (geom_cart_3d, geom_crazy_3d)
-    test_inner_prod_equality(geom, q_rule_3d, complex_3d)
+    # the global standard quadrature rule
+    q_rule_3d = Mantis.Quadrature.StandardQuadrature(
+        canonical_qrule_3d, Mantis.Geometry.get_num_elements(geom)
+    )
+    test_inner_prod_equality(q_rule_3d, complex_3d)
 end
-test_combinations_3d(complex_3d, q_rule_3d)
+test_combinations_3d(complex_3d, canonical_qrule_3d)
 
 end

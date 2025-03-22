@@ -6,59 +6,6 @@ using Test
 using LinearAlgebra
 using SparseArrays
 
-@doc raw"""
-    L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
-
-Weak form for the computation of the ``L^2``-projection on the given element. The associated weak formulation is:
-
-For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k_h \in X^k`` such that
-```math
-\int_{\Omega} \phi^k_h \wedge \star \varphi^k_h = -\int_{\Omega} f^k \wedge \star \varphi^k_h \quad \forall \ \varphi^k_h \in X^k\;,
-```
-where ``X`` is the discrete de Rham complex.
-"""
-function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs, element_id)
-    Forms = Mantis.Forms
-    Assemblers = Mantis.Assemblers
-
-    trial_forms = Assemblers.get_trial_forms(inputs)
-    test_forms = Assemblers.get_test_forms(inputs)
-    forcing = Assemblers.get_forcing(inputs)
-    q_rule = Assemblers.get_quadrature_rule(inputs)
-    # The l.h.s. is the inner product between the test and trial functions.
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(
-        test_forms[1], trial_forms[1], element_id, q_rule
-    )
-
-    # The r.h.s. is the inner product between the test and forcing functions.
-    b_row_idx, _, b_elem = Forms.evaluate_inner_product(
-        test_forms[1], forcing[1], element_id, q_rule
-    )
-
-    # The output should be the contribution to the left-hand-side matrix
-    # A and right-hand-side vector b. The outputs are tuples of
-    # row_indices, column_indices, values for the matrix part and
-    # column_indices, values for the vector part.
-    return (A_row_idx, A_col_idx, A_elem), (b_row_idx, b_elem)
-
-end
-
-function L2_projection(∫, Xᵏ, fₑ)
-    # inputs for the mixed weak form
-    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(∫, Xᵏ, fₑ)
-
-    # assemble all matrices
-    A, b = Mantis.Assemblers.assemble(L2_projection, weak_form_inputs, Dict{Int, Float64}())
-
-    # solve for coefficients of solution
-    sol = A \ b
-
-    # create the form field from the solution coefficients
-    fₕ = Mantis.Forms.build_form_field(Xᵏ, sol; label="fₕ")
-
-    return fₕ
-end
-
 # PROBLEM PARAMETERS -------------------------------------------------------------------
 # manifold dimensions
 manifold_dim = 2
@@ -77,7 +24,7 @@ p⁰ = [2, 3]
 α = 10.0
 section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
 # print info?
-verbose = false
+verbose = true
 
 # number of refinement levels to run
 num_ref_levels = 5
@@ -142,7 +89,9 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 end
 
                 # quadrature rule
-                ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+                canonical_qrule = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+                # global quadrature rule
+                ∫ = Mantis.Quadrature.StandardQuadrature(canonical_qrule, Mantis.Geometry.get_num_elements(geometry))
 
                 # create tensor-product B-spline complex
                 X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
@@ -156,10 +105,10 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                     fₑ = sinusoidal_solution(form_rank, geometry)
 
                     # solve the problem
-                    fₕ = L2_projection(∫, X[form_rank+1], fₑ)
+                    fₕ = Mantis.Assemblers.solve_L2_projection(∫, X[form_rank+1], fₑ)
 
                     # compute error
-                    error = Mantis.Analysis.L2_norm(fₕ - fₑ, ∫)
+                    error = Mantis.Analysis.L2_norm(∫, fₕ - fₑ)
                     errors[ref_lev+1, p_idx, ss_idx, mesh_idx, form_rank+1] = error
 
                     if verbose; display("   Error: $error"); end

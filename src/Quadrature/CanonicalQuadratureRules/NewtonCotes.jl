@@ -14,7 +14,7 @@ The algorithm used to compute the weights is not the most efficient nor the most
 - `type::String`: Type of the Newton-Cotes rule. Valid types are "closed" and "open".
 
 # Returns
-- `::QuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
+- `::CanonicalQuadratureRule{1}`: 1 dimensional quadrature rule containing the nodes and weights.
 """
 function newton_cotes(num_points::Integer, type::String)
     # Compute the equally spaced nodes on the interval [-1, 1].
@@ -77,5 +77,5 @@ function newton_cotes(num_points::Integer, type::String)
     @. ξ = (ξ + 1.0)/2.0
     @. w = 0.5 * w
 
-    return QuadratureRule{1}((ξ,), w, "Newton-Cotes ($type)")
+    return CanonicalQuadratureRule{1}((ξ,), w, "Newton-Cotes ($type)")
 end

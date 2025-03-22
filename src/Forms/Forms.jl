@@ -5,9 +5,11 @@ Contains all definitions of forms, including form fields, form spaces, and form 
 """
 module Forms
 
-import .. FunctionSpaces
-import .. Geometry
-import .. Quadrature
+import ..FunctionSpaces
+import ..Geometry
+import ..Quadrature
+
+import SparseArrays
 
 abstract type AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
 abstract type AbstractFormField{manifold_dim, form_rank, expression_rank, G} <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
@@ -52,7 +54,7 @@ end
 Returns the expression rank for the given `form` (expression).
 
 # Arguments
-- `form::AbstractFormExpression`: The form of which to get the expression rank. Expressions without basis forms have rank 0, 
+- `form::AbstractFormExpression`: The form of which to get the expression rank. Expressions without basis forms have rank 0,
       with one single set of basis forms have rank 1, with two sets of basis forms have rank 2. Higher ranks are not possible.
 """
 function get_expression_rank(form::FE) where {FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
@@ -102,7 +104,6 @@ end
 include("./FormSpaces.jl")
 include("./FormExpressions.jl") # Requires FormSpaces
 include("./FormOperators.jl") # Mind the order, FormOperators requires FormSpaces and FormExpressions
-include("./MixedFormSpace.jl")
 
 # helper functions for convenience
 include("./FormHelpers.jl")

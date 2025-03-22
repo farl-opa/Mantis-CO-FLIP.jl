@@ -6,71 +6,6 @@ using Test
 using LinearAlgebra
 using SparseArrays
 
-@doc raw"""
-    zero_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
-
-Function for assembling the weak form of the 0-form Hodge Laplacian on the given element. The associated weak formulation is:
-
-For given ``f^0 \in L^2 \Lambda^0 (\Omega)``, find ``\phi^0_h \in X^0`` such that
-```math
-\int_{\Omega} d \phi^0_h \wedge \star d \varphi^0_h = -\int_{\Omega} f^0 \wedge \star \varphi^0_h \quad \forall \ \varphi^0_h \in X^0\;,
-```
-where ``X`` is the discrete de Rham complex, and such that ``\phi^0_h`` satisfies zero Dirichlet boundary conditions.
-"""
-function zero_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, element_id)
-    Forms = Mantis.Forms
-    Assemblers = Mantis.Assemblers
-
-    trial_forms = Assemblers.get_trial_forms(inputs)
-    test_forms = Assemblers.get_test_forms(inputs)
-    forcing = Assemblers.get_forcing(inputs)
-    q_rule = Assemblers.get_quadrature_rule(inputs)
-    # The inner product will be between the exterior derivative of the
-    # trial zero form with the exterior derivative of the test zero
-    # form, so we compute those first.
-    dtrial = Forms.exterior_derivative(trial_forms[1])
-    dtest = Forms.exterior_derivative(test_forms[1])
-
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(
-        dtest, dtrial, element_id, q_rule
-    )
-
-    # The linear form is the inner product between the trial form and
-    # the forcing function which is a form of an appropriate rank.
-    b_row_idx, _, b_elem = Forms.evaluate_inner_product(
-        test_forms[1], forcing[1], element_id, q_rule
-    )
-
-    # The output should be the contribution to the left-hand-side matrix
-    # A and right-hand-side vector b. The outputs are tuples of
-    # row_indices, column_indices, values for the matrix part and
-    # row_indices, values for the vector part. For this case, no shifts
-    # or offsets are needed.
-    return (A_row_idx, A_col_idx, A_elem), (b_row_idx, b_elem)
-
-end
-
-function zero_form_hodge_laplacian(∫, X⁰, fₑ)
-    # inputs for the mixed weak form
-    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(∫, X⁰, fₑ)
-
-    # boundary conditions: all entries of the dof_partition contribute except for the interior (=5th index)
-    dof_partition = Mantis.FunctionSpaces.get_component_dof_partition(X⁰.fem_space, 1)
-    bc_inds = vcat([dof_partition[1][i] for i in setdiff(1:9, 5)]...)
-    bc_vals = zeros(Float64,length(bc_inds))
-
-    # assemble all matrices
-    A, b = Mantis.Assemblers.assemble(zero_form_hodge_laplacian, weak_form_inputs, Dict(zip(bc_inds, bc_vals)))
-
-    # solve for coefficients of solution
-    sol = A \ b
-
-    # create the form field from the solution coefficients
-    uₕ = Mantis.Forms.build_form_field(X⁰, sol)
-
-    return uₕ
-end
-
 # PROBLEM PARAMETERS -------------------------------------------------------------------
 # manifold dimensions
 manifold_dim = 2
@@ -89,7 +24,7 @@ p⁰ = [2, 3]
 α = 10.0
 section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
 # print info?
-verbose = false
+verbose = true
 
 # number of refinement levels to run
 num_ref_levels = 4
@@ -172,7 +107,9 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 end
 
                 # quadrature rule
-                ∫ = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+                canonical_qrule = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+                # global quadrature rule
+                ∫ = Mantis.Quadrature.StandardQuadrature(canonical_qrule, Mantis.Geometry.get_num_elements(geometry))
 
                 # create tensor-product B-spline complex
                 X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
@@ -186,11 +123,11 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 uₑ, duₑ, fₑ = sinusoidal_solution(geometry)
 
                 # solve the problem
-                uₕ = zero_form_hodge_laplacian(∫, X[1], fₑ)
+                uₕ = Mantis.Assemblers.solve_zero_form_hodge_laplacian(∫, X[1], fₑ)
 
                 # compute error
-                error = Mantis.Analysis.L2_norm(uₕ - uₑ, ∫)
-                derror = Mantis.Analysis.L2_norm(Mantis.Forms.exterior_derivative(uₕ) - duₑ, ∫)
+                error = Mantis.Analysis.L2_norm(∫, uₕ - uₑ)
+                derror = Mantis.Analysis.L2_norm(∫, Mantis.Forms.exterior_derivative(uₕ) - duₑ)
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 1] = error
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 2] = derror
 

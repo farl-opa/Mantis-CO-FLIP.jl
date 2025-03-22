@@ -17,10 +17,8 @@ import .. Analysis
 
 abstract type AbstractInputs end
 
-
-include("WeakFormulations.jl")
+include("WeakFormulations/WeakFormulations.jl")
 include("GlobalAssemblers.jl")
-include("AssemblersHelpers.jl")
 
 
 end

@@ -16,7 +16,7 @@ Wt = pi / 2
 b_θ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
 b_r = Mantis.FunctionSpaces.Bernstein(deg)
 
-(P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ = 
+(P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ =
     Mantis.FunctionSpaces.create_polar_spline_space_and_geometry(
         (4, 1), (b_θ, b_r), (1, -1), 1.0
 )
@@ -217,7 +217,7 @@ output_points, output_cells = get_point_cell_data(output_file_path)
 # Test FEMGeometry (NURBS quarter annulus) ---------------------------------------------
 deg = 2
 b = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), deg, [-1, -1])
-B = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1 / sqrt(2), 1])
+B = Mantis.FunctionSpaces.RationalFESpace(b, [1, 1 / sqrt(2), 1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
 TP = Mantis.FunctionSpaces.TensorProductSpace((B, b1))
 # control points for geometry
@@ -262,7 +262,7 @@ Mantis.Plot.plot(
 # Test FEMGeometry (NURBS annulus) ---------------------------------------------
 deg = 2
 b = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), deg, [-1, -1])
-br = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1 / sqrt(2), 1])
+br = Mantis.FunctionSpaces.RationalFESpace(b, [1, 1 / sqrt(2), 1])
 B = (br, br, br, br)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
@@ -310,7 +310,7 @@ Mantis.Plot.plot(
 # Test FEMGeometry (NURBS wavy surface) ---------------------------------------------
 deg = 2
 b = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), deg, [-1, -1])
-br = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1 / sqrt(2), 1])
+br = Mantis.FunctionSpaces.RationalFESpace(b, [1, 1 / sqrt(2), 1])
 B = (br, br, br, br)
 GB = Mantis.FunctionSpaces.GTBSplineSpace(B, [1, 1, 1, 1])
 b1 = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
@@ -358,7 +358,7 @@ Mantis.Plot.plot(
 # Test FEMGeometry (NURBS vs GTB basis) ---------------------------------------------
 deg = 2
 b = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), deg, [-1, -1])
-br = Mantis.FunctionSpaces.RationalFiniteElementSpace(b, [1, 1 / sqrt(2), 1])
+br = Mantis.FunctionSpaces.RationalFESpace(b, [1, 1 / sqrt(2), 1])
 Bsp = Mantis.FunctionSpaces.GTBSplineSpace((b, b, b, b), [1, 1, 1, 1])
 Nurbs = Mantis.FunctionSpaces.GTBSplineSpace((br, br, br, br), [1, 1, 1, 1])
 

@@ -14,11 +14,11 @@ struct AnalyticalFormField{manifold_dim, form_rank, G, E} <: AbstractFormField{m
     # Arguments
     - `geometry::G`: The underlying geometry that defines the manifold where this form is defined.
     - `expression:E`: The expression that defined the forms. These expressions must be evaluated at points with physical coordinates `x`.
-                      The dimension, $n$, of the physical domain must be the same as the dimension of the image of the geometry. The 
+                      The dimension, $n$, of the physical domain must be the same as the dimension of the image of the geometry. The
                       Input to expression must must have the same format as the ouput of the evaluation of geometries, i.e, an $m \times n$ matrix
                       containing the $m$ points with their $n$ coordinates.
-                      The components must be returned in a vector of vectors. Each element of the outer vector is associated to a component  
-                      of the form. The elements of the inner vector are associated to the evaluation points. The components must, as all 
+                      The components must be returned in a vector of vectors. Each element of the outer vector is associated to a component
+                      of the form. The elements of the inner vector are associated to the evaluation points. The components must, as all
                       other forms, be given for the following form basis
                             0-forms: single component.
                             1-forms:
@@ -46,7 +46,7 @@ Evaluate a FormField at given points.
 # Arguments
 - `form::AbstractFormField`: The form field to evaluate.
 - `element_idx::Int`: Index of the element to evaluate.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
         Points are the tensor product of the coordinates per dimension, therefore there will be
         ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
@@ -63,8 +63,8 @@ Evaluate a FormField at given points.
         n-forms: single component
 
         Note: The forms are pulledback via the geometry mapping, therefore they are evaluated on the computational manifold.
-        
-- `form_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length 1 with value 1, since for an 
+
+- `form_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length 1 with value 1, since for an
         `AnalyticalFormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 
 # Sizes
@@ -73,9 +73,9 @@ Evaluate a FormField at given points.
 """
 function evaluate(form::AnalyticalFormField{manifold_dim, 0, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
-    
+
     form_eval = form.expression(x)
-    
+
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
     return form_eval, [[1]]
 end
@@ -84,19 +84,19 @@ function evaluate(form::AnalyticalFormField{manifold_dim, manifold_dim, G, E}, e
     if Geometry.get_image_dim(form.geometry) != manifold_dim
         throw("Image manifold must have the same dimension as the domain manifold.")
     end
-    
+
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
     J = Geometry.jacobian(form.geometry, element_idx, ξ)  # Jₖⱼ = ∂Φᵏ\∂ξⱼ
     form_eval = form.expression(x)
 
     form_eval[1][:] .*= LinearAlgebra.det.(eachslice(J; dims=1))
-    
+
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
     return form_eval, [[1]]
 end
 
 function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx::Int, ξ::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}, E <: Function}
-    
+
     x = Geometry.evaluate(form.geometry, element_idx, ξ)
     J = Geometry.jacobian(form.geometry, element_idx, ξ)  # Jₖⱼ = ∂Φᵏ\∂ξⱼ
     form_eval = form.expression(x) # size: num_points x image_dim
@@ -116,7 +116,7 @@ function evaluate(form::AnalyticalFormField{manifold_dim, 1, G, E}, element_idx:
     for j= 1:manifold_dim
         form_pullback[j] = a[:,j]
     end
-    
+
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
     return form_pullback, [[1]]
 end
@@ -177,7 +177,7 @@ Evaluate a FormField at given points.
 # Arguments
 - `form::FormField`: The form field to evaluate.
 - `element_idx::Int`: Index of the element to evaluate.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
         Points are the tensor product of the coordinates per dimension, therefore there will be
         ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
@@ -192,7 +192,7 @@ Evaluate a FormField at given points.
         2-forms:
             3D: ``[\mathrm{d}\xi_{2}\wedge\mathrm{d}\xi_{3}, \mathrm{d}\xi_{3}\wedge\mathrm{d}\xi_{1}, \mathrm{d}\xi_{1}\wedge\mathrm{d}\xi_{2}]``
         n-forms: single component
-- `form_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length 1 with value 1, since for a 
+- `form_indices`: Vector of length `n_form_components`, where each element is a Vector{Int} of length 1 with value 1, since for a
         `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 
 # Sizes
@@ -221,46 +221,46 @@ Evaluate the exterior derivative of a FormField at given points.
 # Arguments
 - `form::FormField`: The form field to evaluate
 - `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
         Points are the tensor product of the coordinates per dimension, therefore there will be
         ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
 # Returns
 - `d_form_eval::Vector{Vector{Float64}}`: Evaluated exterior derivative of the form field.
-        Follows the same data format as evaluate: `d_form_eval[i][j]` is the component `i` 
+        Follows the same data format as evaluate: `d_form_eval[i][j]` is the component `i`
         of the exterior derivative evaluated at the tensor product `j`.
 
 # Sizes
 - `d_form_eval`: Vector of length `n_derivative_components`, where each element is a Vector{Float64} of length `n_evaluation_points`
         `n_evaluation_points = n_1 * ... * n_n`, where `n_i` is the number of points in the component `i` of the tensor product Tuple.
-- `d_form_indices`: Vector of length `n_derivative_components`, where each element is a Vector{Int} of length 1 of value 1, since for a 
+- `d_form_indices`: Vector of length `n_derivative_components`, where each element is a Vector{Int} of length 1 of value 1, since for a
         `FormField` there is only one `basis`. This is done for consistency with `FormBasis`.
 """
 function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G, FS}, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}, FS <: AbstractFormSpace{manifold_dim, form_rank, G}}
     n_form_components = binomial(manifold_dim, form_rank)
     d_form_basis_eval, form_basis_indices = evaluate_exterior_derivative(form.form_space, element_idx, xi)
     n_derivative_components = size(d_form_basis_eval, 1)
-    
+
     d_form_eval = Vector{Vector{Float64}}(undef, n_derivative_components)
 
-    # This algorithm works for all exterior derivatives, as long as the 
-    # exterior derivative of the basis of the form space are correctly 
+    # This algorithm works for all exterior derivatives, as long as the
+    # exterior derivative of the basis of the form space are correctly
     # implemented. The algorithm works in the following way.
-    # 
-    # The number of components, n_form_components, of the original k-form, 
+    #
+    # The number of components, n_form_components, of the original k-form,
     # αᵏ, is given by
     #
     #   n_form_components = binomial(manifold_dim, form_rank)
     #
     # This means that αᵏ is given by n_form_components sets of coefficients, aᵢ,
     # one set per component, and an equal number of sets of basis functions, Nⱼ,
-    # 
+    #
     #   aᵢ = [aᵢ₁, ... , aᵢᵣ] with i = 1, ..., n_form_components and r = Mᵢ the number of coefficients (basis) in this component
     #   Nᵢ = [Nᵢ₁, ..., Nᵢᵣ], with i and r as above
-    # 
+    #
     # The computation (evaluation) of the k-form is to loop over the components and multiply
     # the basis by the coefficients (the basis as evaluated at the points of interest)
-    # 
+    #
     #  αᵏᵢ = ∑ʳⱼ₌₁ aᵢⱼNᵢⱼ
     #
     # The computation of the derivative is the same, as long as there is
@@ -273,7 +273,7 @@ function evaluate_exterior_derivative(form::FormField{manifold_dim, form_rank, G
     #       1-forms: dξ₁, dξ₂, dξ₃                    (in this order)
     #       2-forms: dξ₂ ∧ dξ₃, dξ₃ ∧ dξ₁, dξ₁ ∧ dξ₂  (in this order)
     #       3-forms: dξ₁ ∧ dξ₂ ∧ dξ₃
-    # 
+    #
     for derivative_form_component_idx in 1:n_derivative_components
         d_form_eval[derivative_form_component_idx] = d_form_basis_eval[derivative_form_component_idx] * form.coefficients[form_basis_indices[1]]
     end
@@ -295,8 +295,8 @@ Represents an expression involving differential forms.
 # Type parameters
 - `n`: Dimension of the manifold.
 - `k`: Rank of the resulting form.
-- `expression_rank`: The rank of the expression. 0-rank means no basis forms in expression, 1-rank 
-      means one set of basis forms in the expression, 2-rank means two sets of basis forms in the 
+- `expression_rank`: The rank of the expression. 0-rank means no basis forms in expression, 1-rank
+      means one set of basis forms in the expression, 2-rank means two sets of basis forms in the
       expression. Higher ranks are not possible.
 - `G`: Type of the geometry
 - `F`: Type of the children tuple. Can be another FormExpression, a FormField, in the future also FormSpaces.
@@ -331,7 +331,7 @@ struct FormExpression{manifold_dim, form_rank, expression_rank, G, F} <:Abstract
         else
             label_2 = "(" * forms[2].label * ")" * super("$form_rank_2")
         end
-        
+
         if op == "∧"
             if (expression_rank_1 + expression_rank_2) > 2
                 throw(ArgumentError("Wedge of FormExpressions requires expressions with total expression rank smaller than three, got: $expression_rank_1 and $expression_rank_2"))
@@ -341,14 +341,14 @@ struct FormExpression{manifold_dim, form_rank, expression_rank, G, F} <:Abstract
             end
             # With the wedge sum the resulting form has a rank equal to the sum of the two forms
             form_rank = form_rank_1 + form_rank_2
-            
+
         elseif op == "-"
             if form_rank_1 != form_rank_2
                 throw(ArgumentError("Subtraction of FormExpressions requires expressions with the same rank, got: $form_rank_1 and $form_rank_2"))
             end
             # Since they are the same the resulting expression has the same rank
             form_rank = form_rank_1
-    
+
         elseif op == "+"
             if form_rank_1 != form_rank_2
                 throw(ArgumentError("Subtraction of FormExpressions requires expressions with the same rank, got: $form_rank_1 and $form_rank_2"))
@@ -370,7 +370,7 @@ Evaluate a unary FormExpression at given points.
 # Arguments
 - `form::FormExpression`: The form expression to evaluate
 - `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
         Points are the tensor product of the coordinates per dimension, therefore there will be
         ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
@@ -400,7 +400,7 @@ Evaluate a binary FormExpression at given points.
 # Arguments
 - `form::FormExpression`: The form expression to evaluate
 - `element_idx::Int`: Index of the element to evaluate
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points. 
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
         Points are the tensor product of the coordinates per dimension, therefore there will be
         ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
 
@@ -413,7 +413,7 @@ function evaluate(form::FormExpression{manifold_dim, form_rank, expression_rank,
     #print("Evaluating: " * form.label * "\n")
     if form.op == "∧"
         form_eval = evaluate_wedge(form.children[1], form.children[2], element_idx, xi)
-        
+
     elseif form.op == "-"
         form_1_eval = evaluate(form.children[1], element_idx, xi)
         form_2_eval = evaluate(form.children[2], element_idx, xi)
@@ -531,5 +531,3 @@ Create an exterior derivative expression of a form.
 function exterior_derivative(form::F) where {F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     return FormExpression((form,), "d")
 end
-
-
