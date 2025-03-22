@@ -417,7 +417,7 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, secti
     end
 
     # polar spline geometry
-    geometry = Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
+    geometry = Geometry.FEGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
@@ -487,7 +487,7 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degre
     end
 
     # polar spline geometry
-    geometry = Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
+    geometry = Geometry.FEGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")

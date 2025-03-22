@@ -4,15 +4,15 @@ The exported names are:
 """
 module FunctionSpaces
 
-import ..Mesh
-
-import Combinatorics
 import Graphs
 import LinearAlgebra
 import Memoization
 import PolynomialBases
 import SparseArrays
 import ToeplitzMatrices
+
+using ..GeneralHelpers
+import ..Mesh
 
 """
     AbstractFunctionSpace

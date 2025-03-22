@@ -1,6 +1,6 @@
 
 """
-    FEMGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
+    FEGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
 
 Geometry defined from a finite element space `fem_space` and a matrix of geometric
 coefficients `geometry_coeffs`.
@@ -21,19 +21,19 @@ coefficients `geometry_coeffs`.
     the geometry.
 
 # Inner Constructors
-- `FEMGeometry(fem_space::F, geometry_coeffs::Matrix{Float64})`: Constructs the FEMGeometry
+- `FEGeometry(fem_space::F, geometry_coeffs::Matrix{Float64})`: Constructs the FEGeometry
     from a finite element space `fem_space` and a set of pre-defined `geometry_coeffs`,
     deducing the number of elements from `fem_space`.
 
 # Outer Constructors
 - [`compute_parametric_geometry`](@ref).
 """
-struct FEMGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
+struct FEGeometry{manifold_dim, F} <: AbstractGeometry{manifold_dim}
     geometry_coeffs::Matrix{Float64}
     fem_space::F
     num_elements::Int
 
-    function FEMGeometry(
+    function FEGeometry(
         fem_space::F, geometry_coeffs::Matrix{Float64}
     ) where {manifold_dim, F <: FunctionSpaces.AbstractFESpace{manifold_dim, 1}}
         num_elements = FunctionSpaces.get_num_elements(fem_space)
@@ -53,28 +53,28 @@ coefficients of the space.
     for which to compute the geometry.
 
 # Returns
-- `::FEMGeometry{manifold_dim, F}`: structure of the finite element geometry.
+- `::FEGeometry{manifold_dim, F}`: structure of the finite element geometry.
 """
 function compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFESpace)
     geometry_coefficients = FunctionSpaces._compute_parametric_geometry_coeffs(fem_space)
 
-    return FEMGeometry(fem_space, geometry_coefficients)
+    return FEGeometry(fem_space, geometry_coefficients)
 end
 
-function get_element_measure(geometry::FEMGeometry, element_id::Int)
+function get_element_measure(geometry::FEGeometry, element_id::Int)
     return FunctionSpaces.get_element_size(geometry.fem_space, element_id)
 end
 
-function get_element_lengths(geometry::FEMGeometry, element_id::Int)
+function get_element_lengths(geometry::FEGeometry, element_id::Int)
     return FunctionSpaces.get_element_dimensions(geometry.fem_space, element_id)
 end
 
-function get_image_dim(geometry::FEMGeometry)
+function get_image_dim(geometry::FEGeometry)
     return size(geometry.geometry_coeffs)[2]
 end
 
 function evaluate(
-    geometry::FEMGeometry{manifold_dim, F},
+    geometry::FEGeometry{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, F}
@@ -99,7 +99,7 @@ function evaluate(
 end
 
 function jacobian(
-    geometry::FEMGeometry{manifold_dim, F},
+    geometry::FEGeometry{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, F}

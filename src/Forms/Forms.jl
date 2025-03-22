@@ -5,11 +5,11 @@ Contains all definitions of forms, including form fields, form spaces, and form 
 """
 module Forms
 
+import SparseArrays
+
 import ..FunctionSpaces
 import ..Geometry
 import ..Quadrature
-
-import SparseArrays
 
 abstract type AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
 abstract type AbstractFormField{manifold_dim, form_rank, expression_rank, G} <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end

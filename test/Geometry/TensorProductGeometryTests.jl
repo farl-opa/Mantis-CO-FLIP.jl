@@ -15,15 +15,15 @@ using Test
 line_1_geometry = Mantis.Geometry.create_cartesian_box((0.0,), (1.0,), (10,))
 line_2_geometry = Mantis.Geometry.create_cartesian_box((2.0,), (1.0,), (10,))
 
-# Tensor product geometry 
+# Tensor product geometry
 tensor_prod_geometry = Mantis.Geometry.TensorProductGeometry((
     line_1_geometry, line_2_geometry
 ))
 
 # Set file name and path
 file_name = "tensor_product_geometry.vtu"
-output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
-# Generate the vtk file 
+output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
+# Generate the vtk file
 Mantis.Plot.plot(
     tensor_prod_geometry;
     vtk_filename=output_file_path[1:(end - 4)],
@@ -60,22 +60,22 @@ geom_coeffs_circle = [
     -1.0 +1.0
     -1.0 -1.0
 ]
-cylinder_circle_geometry = Mantis.Geometry.FEMGeometry(GB, geom_coeffs_circle)
+cylinder_circle_geometry = Mantis.Geometry.FEGeometry(GB, geom_coeffs_circle)
 dx_cylinder_line = 0.1
 nz_elements = 10
 cylinder_line_geometry = Mantis.Geometry.create_cartesian_box(
     (0.0,), (1.0,), (nz_elements,)
 )
 
-# Tensor product geometry 
+# Tensor product geometry
 cylinder_tensor_prod_geometry = Mantis.Geometry.TensorProductGeometry((
     cylinder_circle_geometry, cylinder_line_geometry
 ))
 
 # Set file name and path
 file_name = "tensor_product_cylinder_geometry.vtu"
-output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
-# Generate the vtk file 
+output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
+# Generate the vtk file
 Mantis.Plot.plot(
     cylinder_tensor_prod_geometry;
     vtk_filename=output_file_path[1:(end - 4)], #remove the file extension
@@ -93,7 +93,7 @@ output_points, output_cells = get_point_cell_data(output_file_path)
 @test all(isequal.(reference_cells, output_cells))
 
 # Test Jacobian with single point evaluation
-# We check the Jacobian 
+# We check the Jacobian
 #    J^{k}_{ij} = \partial{\Phi^{i}(\boldsymbol{x}_{k})}{\partial x^{0}_{j}}
 # at four points k at different z levels
 

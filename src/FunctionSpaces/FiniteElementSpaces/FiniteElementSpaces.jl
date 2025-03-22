@@ -369,7 +369,6 @@ function _compute_parametric_geometry_coeffs(
     return coeffs
 end
 
-include("FiniteElementSpacesHelpers.jl")
 # Extraction operator: functionaly for extraction operator
 include("ExtractionOperator.jl")
 # rational version of finite element spaces
