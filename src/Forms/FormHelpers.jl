@@ -560,32 +560,61 @@ Creates a list of basis function idxs which control the trace of the form on the
 # Returns
 - `Vector{Int}`: The list of basis idxs.
 """
-function trace_basis_idxs(form::AbstractFormExpression)
-    return _trace_basis_idxs(form)
-end
-
-function _trace_basis_idxs(
-    form::AbstractFormExpression{manifold_dim, 0, expression_rank, G}
-) where {manifold_dim, expression_rank, G}
-
+function trace_basis_idxs(
+    form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+) where {manifold_dim, form_rank, expression_rank, G}
     dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
     num_sides = 3^manifold_dim
     basis_idxs = [
         i
+        for k in eachindex(dof_partition)
         for j in setdiff(1:num_sides, Int((num_sides+1) / 2))
-        for i in dof_partition[1][1][j]
+        for i in dof_partition[k][1][j]  # TODO: is this general enough for multipatch?
     ]
-
     return basis_idxs
 end
 
-function _trace_basis_idxs(
-    form::AbstractFormExpression{2, 1, expression_rank, G}
-) where {expression_rank, G}
+# function _trace_basis_idxs(
+#     form::AbstractFormExpression{manifold_dim, 0, expression_rank, G}
+# ) where {manifold_dim, expression_rank, G}
 
-    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
-    bc_1 = [i for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[1][1][j]]
-    bc_2 = [i for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[2][1][j]]
+#     dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+#     num_sides = 3^manifold_dim
+#     basis_idxs = [
+#         i
+#         for j in setdiff(1:num_sides, Int((num_sides+1) / 2))
+#         for i in dof_partition[1][1][j]
+#     ]
 
-    return vcat(bc_1, bc_2)
-end
+#     return basis_idxs
+# end
+
+# function _trace_basis_idxs(
+#     _::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G}
+# ) where {manifold_dim, expression_rank, G}
+#     return Int[]
+# end
+
+# function _trace_basis_idxs(
+#     form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
+# ) where {manifold_dim, expression_rank, G}
+
+#     side_idxs_per_dim = [
+#         [1, 2, 3],
+#         [[1, 3] for _ in 2:manifold_dim]...
+#     ]
+#     side_idxs = Vector{Vector{Int}}(undef, manifold_dim)
+#     for dim in 1:manifold_dim
+#         side_idxs[dim] = vec(
+#             [
+#                 FunctionSpaces.ordered_to_linear_index(
+#                     idxs, tuple([3 for _ in 1:manifold_dim]...)
+#                 ) for idxs in Iterators.product(side_idxs_per_dim...)
+#             ]
+#         )
+#         side_idxs_per_dim = circshift(side_idxs_per_dim, 1)
+#     end
+#     dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+
+#     return [i for k in 1:manifold_dim for j in side_idxs[k] for i in dof_partition[k][1][j]]
+# end
