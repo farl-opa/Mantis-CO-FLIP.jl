@@ -1,14 +1,10 @@
-module TensorProductBsplinesMaxwellEigenvalueTests
-
 import Mantis
 
 using Test
-using DelimitedFiles
+# using DelimitedFiles
 
 # Refer to the following file for method and variable definitions
 include("../../examples/HelperFunctions.jl")
-include(".AssemblersHelperFunctions.jl")
-
 
 t_begin = time()
 ############################################################################################
@@ -17,7 +13,7 @@ t_begin = time()
 # Mesh
 const starting_point = (0.0, 0.0)
 const box_size = (fpi, 1.0) # This size is so that the eigenvalues are unique.
-const num_runs = 1 # Number of problem runs. Each solve 2≤i≤num_runs will have 2^i elements.
+const num_runs = 5 # Number of problem runs. Each solve 2≤i≤num_runs will have 2^i elements.
 num_elements = [(2, 2) .^ i for i in 1:num_runs]
 
 # B-spline parameters
@@ -116,5 +112,3 @@ end
 
 t_end = time()
 println("Total time taken: ", t_end - t_begin, " seconds")
-
-end

@@ -5,14 +5,20 @@ import Mantis
 using Test
 using LinearAlgebra
 using SparseArrays
+using DelimitedFiles
+
+include("./AssemblerTestsHelpers.jl")
 
 # PROBLEM PARAMETERS -------------------------------------------------------------------
+# sub-directory for data
+sub_dir = "n-form-TensorProduct-MixedLaplacian"
 # manifold dimensions
 manifold_dim = 2
 # mesh types to be used
-mesh_type = ["cartesian"]#, "curvilinear"]
+mesh_type = ["cartesian", "curvilinear"]
 # number of elements in each direction at the coarsest level of refinement
-num_el_0 = 2
+num_el_0 = 5
+num_elements = num_el_0 .* tuple([1 for _ in 1:manifold_dim]...)
 # origin of the parametric domain in each direction
 origin = (0.0, 0.0)
 # length of the domain in each direction
@@ -22,12 +28,9 @@ p⁰ = [3]
 # type of section spaces to use
 θ = 2*pi
 α = 10.0
-section_space_type = [Mantis.FunctionSpaces.Bernstein]#Mantis.FunctionSpaces.Bernstein]#, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
+section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
 # print info?
-verbose = true
-
-# number of refinement levels to run
-num_ref_levels = 4
+verbose = false
 
 # exact solution for the 0-form problem
 function sinusoidal_solution(geo::Mantis.Geometry.AbstractGeometry)
@@ -85,7 +88,7 @@ function sinusoidal_solution(geo::Mantis.Geometry.AbstractGeometry)
 end
 
 # RUN POISSON PROBLEM -------------------------------------------------------------------
-errors = zeros(Float64, num_ref_levels+1, length(p⁰), length(section_space_type), length(mesh_type), 2)
+errors = zeros(Float64, length(p⁰), length(section_space_type), length(mesh_type), 2)
 for (mesh_idx, mesh) in enumerate(mesh_type)
     for (p_idx, p) in enumerate(p⁰)
         for (ss_idx, section_space) in enumerate(section_space_type)
@@ -103,97 +106,76 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 regularities = tuple([0 for _ in 1:manifold_dim]...)
             end
 
-            for ref_lev = 0:num_ref_levels
-
-                if verbose
-                    println("Refinement level = $ref_lev ------------------------------------")
-                end
-
-                # update number of elements
-                num_elements = (num_el_0 * (2^ref_lev)) .* tuple([1 for _ in 1:manifold_dim]...)
-
-                # geometry
-                if mesh == "cartesian"
-                    geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
-                else
-                    geometry = Mantis.Geometry.create_curvilinear_square(origin, L, num_elements)
-                end
-
-                # section spaces
-                if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
-                    section_spaces = map(section_space, degree, (θ, θ), L ./ num_elements)
-                    dq⁰ = 2 .* degree
-                elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
-                    section_spaces = map(section_space, degree, (α, α), L ./ num_elements)
-                    dq⁰ = 3 .* degree
-                else
-                    section_spaces = map(section_space, degree)
-                    dq⁰ = (2, 2)
-                end
-
-                # quadrature rule
-                canonical_qrule = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
-                ∫ = Mantis.Quadrature.StandardQuadrature(
-                    canonical_qrule, prod(num_elements)
-                )
-
-                # create tensor-product B-spline complex
-                X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
-
-                # number of dofs
-                n_dofs = Mantis.Forms.get_num_basis(X[2]) + Mantis.Forms.get_num_basis(X[3])
-                if verbose
-                    display("   n_dofs = $n_dofs")
-                end
-                # exact solution for the problem
-                ϕₑ, δϕₑ, fₑ = sinusoidal_solution(geometry)
-
-                # solve the problem
-                uₕ, ϕₕ = Mantis.Assemblers.solve_volume_form_hodge_laplacian(∫, X[2], X[3], fₑ)
-                # if verbose
-                #     display("   cond_num = $cond_num")
-                # end
-                # display([n_dofs cond_num])
-
-                # compute error
-                error = Mantis.Analysis.L2_norm(∫, ϕₕ - ϕₑ)
-                δerror = Mantis.Analysis.L2_norm(∫, uₕ - δϕₑ)
-                errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 1] = error
-                errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 2] = δerror
-
-                if verbose
-                    display("   L2-Error in ϕ: $error")
-                    display("   L2-Error in δϕ: $δerror")
-                end
-                if verbose; println("...done!"); end
-            end
-        end
-    end
-end
-
-# compute orders of convergence
-error_rates = log.(Ref(2), errors[1:end-1,:,:,:,:]./errors[2:end,:,:,:,:])
-if verbose
-    println("Error convergence rates:")
-    display(error_rates)
-end
-for (p_idx, p) in enumerate(p⁰)
-    for (ss_idx, section_space) in enumerate(section_space_type)
-        for (mesh_idx, mesh) in enumerate(mesh_type)
-            if isapprox(errors[end, p_idx, ss_idx, mesh_idx, 1], 0.0, atol=1e-12)
-                continue
+            # geometry
+            if mesh == "cartesian"
+                geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
             else
-                # expected (n-1)-form convergence: p
-                @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 1], p, atol=5e-2)
-                if isapprox(errors[end, p_idx, ss_idx, mesh_idx, 2], 0.0, atol=1e-12)
-                    continue
-                else
-                    # expected n-form convergence: p
-                    @test isapprox(error_rates[end, p_idx, ss_idx, mesh_idx, 2], p, atol=5e-2)
-                end
+                geometry = Mantis.Geometry.create_curvilinear_square(origin, L, num_elements)
             end
+
+            # section spaces
+            if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
+                section_spaces = map(section_space, degree, (θ, θ), L ./ num_elements)
+                dq⁰ = 2 .* degree
+            elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
+                section_spaces = map(section_space, degree, (α, α), L ./ num_elements)
+                dq⁰ = 3 .* degree
+            else
+                section_spaces = map(section_space, degree)
+                dq⁰ = (2, 2)
+            end
+
+            # quadrature rule
+            canonical_qrule = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+            ∫ = Mantis.Quadrature.StandardQuadrature(
+                canonical_qrule, prod(num_elements)
+            )
+
+            # create tensor-product B-spline complex
+            X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
+
+            # number of dofs
+            n_dofs = Mantis.Forms.get_num_basis(X[2]) + Mantis.Forms.get_num_basis(X[3])
+            if verbose
+                display("   n_dofs = $n_dofs")
+            end
+            # exact solution for the problem
+            ϕₑ, δϕₑ, fₑ = sinusoidal_solution(geometry)
+
+            # solve the problem
+            uₕ, ϕₕ = Mantis.Assemblers.solve_volume_form_hodge_laplacian(∫, X[2], X[3], fₑ)
+            # if verbose
+            #     display("   cond_num = $cond_num")
+            # end
+            # display([n_dofs cond_num])
+
+            ref_coeffs = read_data(
+                sub_dir, "$p-$section_space-$mesh-uh.txt"
+            )
+            @test all(isapprox.(uₕ.coefficients, ref_coeffs, atol=atol, rtol=rtol))
+            ref_coeffs = read_data(
+                sub_dir, "$p-$section_space-$mesh-phih.txt"
+            )
+            @test all(isapprox.(ϕₕ.coefficients, ref_coeffs, atol=atol, rtol=rtol))
+
+            # compute error
+            error = Mantis.Analysis.L2_norm(∫, ϕₕ - ϕₑ)
+            δerror = Mantis.Analysis.L2_norm(∫, uₕ - δϕₑ)
+            errors[p_idx, ss_idx, mesh_idx, 1] = error
+            errors[p_idx, ss_idx, mesh_idx, 2] = δerror
+
+            if verbose
+                display("   L2-Error in ϕ: $error")
+                display("   L2-Error in δϕ: $δerror")
+            end
+            if verbose; println("...done!"); end
         end
     end
+end
+
+ref_errors = read_data(sub_dir, "errors.txt")
+for i in eachindex(errors)
+    @test isapprox(errors[i], ref_errors[i], atol=atol, rtol=rtol)
 end
 
 end

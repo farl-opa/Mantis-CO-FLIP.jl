@@ -9,13 +9,10 @@ end
     include("k-form-PolarSplines-L2ProjectionTests.jl")
 end
 @testset "0-form-TensorProduct-LaplacianTests" begin
-    include("0-form-TensorProduct-LaplacianTests.jl")
+    include("0-form-TensorProduct-LaplacianTests.jl")q
 end
 @testset "n-form-TensorProduct-MixedLaplacianTests" begin
     include("n-form-TensorProduct-MixedLaplacianTests.jl")
-end
-@testset "1-form-TensorProduct-MaxwellEigenvalueTests" begin
-    include("1-form-TensorProduct-MaxwellEigenvalueTests.jl")
 end
 
 end
