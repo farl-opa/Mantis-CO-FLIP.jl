@@ -8,7 +8,7 @@ include("../HelperFunctions.jl")
 ############################################################################################
 #                                      Problem setup                                       #
 ############################################################################################
-# Mesh 
+# Mesh
 starting_point = (0.0, 0.0)
 box_size = (1.0, 1.0)
 num_elements = (2, 2) .^ 3
@@ -20,7 +20,7 @@ k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-∫ₐ, ∫ₑ = Mantis.Quadrature.get_quadrature_rules(
+∫ₐ, ∫ₑ = Mantis.Quadrature.get_canonical_quadrature_rules(
     Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
 )
 
@@ -30,7 +30,7 @@ export_vtk = false # Set to true to export the computed solutions.
 ############################################################################################
 #                                       Run problem                                        #
 ############################################################################################
-# de Rham complex 
+# de Rham complex
 ℜ = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(
     starting_point, box_size, num_elements, p, k
 )
@@ -49,7 +49,7 @@ uₕ, δuₕ = Mantis.Assemblers.solve_one_form_hodge_laplacian(ℜ⁰, ℜ¹, �
 ############################################################################################
 #                                      Solution data                                       #
 ############################################################################################
-if export_vtk 
+if export_vtk
     println("Exporting computed solutions to VTK...")
 
     compt_file_name = "1-Form-HodgeLaplacian-TPBsplines-computed-p=$(p)-k=$(k)-nels=$(num_elements)"

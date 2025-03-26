@@ -72,5 +72,5 @@ _compute_tensor_product
 ### Helper Functions
 Create several tensor-product rules of the same type:
 ```@docs
-get_quadrature_rules
+get_canonical_quadrature_rules
 ```

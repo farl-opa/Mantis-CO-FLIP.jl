@@ -8,7 +8,7 @@ include("../HelperFunctions.jl")
 ############################################################################################
 #                                      Problem setup                                       #
 ############################################################################################
-# Mesh 
+# Mesh
 starting_point = (0.0, 0.0)
 box_size = (fpi, fpi) #(π, π)
 num_elements = (2, 2) .^ 3
@@ -20,7 +20,7 @@ k = p .- 1 # Regularities. (Maximally smooth B-splines.)
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-∫ₐ, ∫ₑ = Mantis.Quadrature.get_quadrature_rules(
+∫ₐ, ∫ₑ = Mantis.Quadrature.get_canonical_quadrature_rules(
     Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
 )
 
@@ -29,7 +29,7 @@ num_eig = 20
 # Scaling form maxwell eigenfunctions.
 scale_factors = ntuple(2) do k
     return pi /(box_size[k] - starting_point[k])
-end 
+end
 
 
 verbose = true # Set to true for problem information.
@@ -39,7 +39,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ############################################################################################
 #                                       Run problem                                        #
 ############################################################################################
-# de Rham complex 
+# de Rham complex
 ℜ = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(
     starting_point, box_size, num_elements, p, k
 )
@@ -73,7 +73,7 @@ if verbose
     end
 end
 
-if export_vtk 
+if export_vtk
     println("Exporting computed eigenfunctions to VTK...")
 
     file_base_name = "MaxwellEigenvalueTPBsplines-computed-p=$(p)-k=$(k)-nels=$(num_elements)"
