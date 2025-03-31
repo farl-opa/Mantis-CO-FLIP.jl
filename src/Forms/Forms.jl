@@ -181,6 +181,19 @@ function get_expression_rank(::FE) where {
     return expression_rank
 end
 
+"""
+    get_label(form::AbstractFormExpression)
+
+Returns the label of the form expression.
+
+# Arguments
+- `form::AbstractFormExpression`: The form expression.
+
+# Returns
+- `String`: The label of the form expression.
+"""
+get_label(form::AbstractFormExpression) = form.label
+
 ############################################################################################
 #                                         Includes                                         #
 ############################################################################################

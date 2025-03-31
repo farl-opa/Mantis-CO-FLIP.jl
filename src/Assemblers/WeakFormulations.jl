@@ -1,81 +1,194 @@
-
-@doc raw"""
-    struct WeakFormInputs{manifold_dim, Frhs, Ttrial, Ttest, G} <: AbstractInputs
-
-# Fields
-- `forcing::Frhs`: The forcing `Forms.MixedFormField` of the weak form.
-- `space_trial::Ttrial`: The trial `Forms.MixedFormSpace` of the weak form.
-- `space_test::Ttest`: The test `Forms.MixedFormSpace` of the weak form.
-- `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: The quadrature rule used to evaluate the weak form.
-"""
-struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractInputs
-    forcing::Frhs
-
-    space_trial::Ttrial
-    space_test::Ttest
-
+struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
     quad_rule::Quadrature.QuadratureRule{manifold_dim}
+    trial_forms::TrF
+    test_forms::TeF
+    forcing::F
 
-    function WeakFormInputs(forcing::Frhs, 
-                            space_trial::Ttrial, 
-                            space_test::Ttest,
-                            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, num_forms, F1, F2, F3,
-                            Frhs <: Forms.MixedFormField{num_forms, F1},
-                            Ttrial <: Forms.MixedFormSpace{num_forms, F2},
-                            Ttest <: Forms.MixedFormSpace{num_forms, F3}}
-        
-        new{manifold_dim, num_forms, Frhs, Ttrial, Ttest}(forcing, space_trial, space_test, quad_rule)
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        trial_forms::TrF,
+        test_forms::TeF,
+        forcing::F,
+    ) where {
+        manifold_dim,
+        num_TrF,
+        num_TeF,
+        num_F,
+        TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
+        TeF <: NTuple{num_TeF, Forms.AbstractFormSpace{manifold_dim}},
+        F <: NTuple{num_F, Forms.AbstractFormField{manifold_dim}},
+    }
+        return new{manifold_dim, TrF, TeF, F}(quad_rule, trial_forms, test_forms, forcing)
     end
 
-    # Convenience constructor for the Galerkin case, i.e., when the trial and test spaces are the same.
-    function WeakFormInputs(forcing::Frhs, 
-            space::T, 
-            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, num_forms, F1, F2,
-            Frhs <: Forms.MixedFormField{num_forms, F1},
-            T <: Forms.MixedFormSpace{num_forms, F2}}
-
-        WeakFormInputs(forcing, space, space, quad_rule)
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        trial_forms::TrF,
+        test_forms::TeF,
+    ) where {
+        manifold_dim,
+        num_TrF,
+        num_TeF,
+        TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
+        TeF <: NTuple{num_TeF, Forms.AbstractFormSpace{manifold_dim}},
+    }
+        return new{manifold_dim, TrF, TeF, Tuple{Nothing}}(
+            quad_rule, trial_forms, test_forms, (nothing,)
+        )
     end
 
-    # Convenience constructor for non-mixed problems.
-    function WeakFormInputs(forcing::Frhs, 
-            space_trial::Ttrial, 
-            space_test::Ttest, 
-            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, 
-            G <: Geometry.AbstractGeometry{manifold_dim},
-            Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, G},
-            Ttrial <: Forms.AbstractFormSpace{manifold_dim, form_rank, G},
-            Ttest <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
-
-        WeakFormInputs(forcing, Forms.MixedFormSpace((space_trial,)), Forms.MixedFormSpace((space_test,)), quad_rule)
+    # Convenience constructor for single trial, test and forcing forms..
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        trial_forms::TrF,
+        test_forms::TeF,
+        forcing::F,
+    ) where {
+        manifold_dim,
+        TrF <: Forms.AbstractFormSpace{manifold_dim},
+        TeF <: Forms.AbstractFormSpace{manifold_dim},
+        F <: Forms.AbstractFormField{manifold_dim}
+    }
+        return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,), (forcing,)) 
     end
 
-    # Convenience constructor for non-mixed Galerkin problems
-    function WeakFormInputs(forcing::Frhs, 
-            space::T, 
-            quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank,
-            G <: Geometry.AbstractGeometry{manifold_dim},
-            Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, G},
-            T <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
+    # Convenience constructor for single trial, test and forcing forms..
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        trial_forms::TrF,
+        test_forms::TeF,
+    ) where {
+        manifold_dim,
+        TrF <: Forms.AbstractFormSpace{manifold_dim},
+        TeF <: Forms.AbstractFormSpace{manifold_dim},
+    }
+        return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,)) 
+    end
 
-        WeakFormInputs(Forms.MixedFormField((forcing,)), Forms.MixedFormSpace((space,)), Forms.MixedFormSpace((space,)), quad_rule)
+    # Convenience constructor for Galerking methods: trial and test spaces are the same.
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        forms::TrF,
+        forcing::F,
+    ) where {
+        manifold_dim,
+        num_TrF,
+        num_F,
+        TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
+        F <: NTuple{num_F, Forms.AbstractFormField{manifold_dim}},
+    }
+        return WeakFormInputs(quad_rule, forms, forms, forcing)
+    end
+
+    # Convenience constructor for Galerking methods: trial and test spaces are the same.
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        forms::TrF,
+    ) where {
+        manifold_dim,
+        num_TrF,
+        TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
+    }
+        return WeakFormInputs(quad_rule, forms, forms)
+    end
+
+    # Convenience constructor for single-space Galerking methods: trial and test spaces are
+    # the same.
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        forms::TrF,
+        forcing::F
+    ) where {
+        manifold_dim,
+        TrF <: Forms.AbstractFormSpace{manifold_dim},
+        F <: Forms.AbstractFormField{manifold_dim}
+    }
+        return WeakFormInputs(quad_rule, (forms,), (forms,), (forcing,))
+    end
+
+    # Convenience constructor for single-space Galerking methods: trial and test spaces are
+    # the same.
+    function WeakFormInputs(
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        forms::TrF,
+    ) where {
+        manifold_dim,
+        TrF <: Forms.AbstractFormSpace{manifold_dim},
+    }
+        return WeakFormInputs(quad_rule, forms, forms)
     end
 end
 
-# Every bilinear form will need the functions defined below. These are 
-# used by the global assembler to set up the problem.
-function get_num_elements(wf::WeakFormInputs)
-    return Forms.get_num_elements(wf.space_trial)
+get_quadrature_rule(wf_inputs::WeakFormInputs) = wf_inputs.quad_rule
+
+function get_trial_forms(wf_inputs::WeakFormInputs)
+    return wf_inputs.trial_forms
 end
 
-function get_problem_size(wf::WeakFormInputs)
-    return Forms.get_num_basis(wf.space_trial), Forms.get_num_basis(wf.space_test)
+function get_test_forms(wf_inputs::WeakFormInputs)
+    return wf_inputs.test_forms
 end
 
-function get_estimated_nnz_per_elem(wf::WeakFormInputs)
-    return Forms.get_max_local_dim(wf.space_trial) * Forms.get_max_local_dim(wf.space_test), Forms.get_max_local_dim(wf.space_test)
+function get_forcing(wf_inputs::WeakFormInputs)
+    return wf_inputs.forcing
 end
 
-# function get_boundary_dof_indices(wf::WeakFormInputs)
-#     return Forms.get_boundary_dof_indices(wf.space_trial)
-# end
+function get_num_elements(wf_inputs::WeakFormInputs)
+    geometry = Forms.get_geometry(get_trial_forms(wf_inputs)[1])
+
+    return Geometry.get_num_elements(geometry)
+end
+
+function get_trial_size(wf_inputs::WeakFormInputs)
+    trial_size = 0
+    for form in get_trial_forms(wf_inputs)
+        trial_size += Forms.get_num_basis(form)
+    end
+
+    return trial_size
+end
+
+function get_test_size(wf_inputs::WeakFormInputs)
+    test_size = 0
+    for form in get_test_forms(wf_inputs)
+        test_size += Forms.get_num_basis(form)
+    end
+
+    return test_size
+end
+
+function get_problem_size(wf_inputs::WeakFormInputs)
+    return get_trial_size(wf_inputs), get_test_size(wf_inputs)
+end
+
+function get_trial_max_local_dim(wf_inputs::WeakFormInputs)
+    trial_max_local_dim = 0
+    for form in get_trial_forms(wf_inputs)
+        trial_max_local_dim += Forms.get_max_local_dim(form)
+    end
+
+    return trial_max_local_dim
+end
+
+function get_test_max_local_dim(wf_inputs::WeakFormInputs)
+    test_max_local_dim = 0
+    for form in get_test_forms(wf_inputs)
+        test_max_local_dim += Forms.get_max_local_dim(form)
+    end
+
+    return test_max_local_dim
+end
+
+function get_estimated_nnz_per_elem(
+    wf_inputs::WeakFormInputs{manifold_dim, TrF, TeF, F}
+) where {manifold_dim, TrF, TeF, F}
+    trial_max_local_dim = get_trial_max_local_dim(wf_inputs)
+    test_max_local_dim = get_test_max_local_dim(wf_inputs)
+    left_hand_nnz = trial_max_local_dim * test_max_local_dim
+    right_hand_nnz = test_max_local_dim
+    if F == Nothing
+        right_hand_nnz *= trial_max_local_dim
+    end
+    
+    return left_hand_nnz, right_hand_nnz
+end

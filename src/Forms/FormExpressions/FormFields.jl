@@ -46,14 +46,14 @@ struct FormField{manifold_dim, form_rank, G, FS} <:
 
     # Arguments
     - `form_space::FS`: The form space.
-    - `coefficients::Vector{Int}`: The form space.
+    - `coefficients::Vector{Float64}`: The form field coefficients.
     - `label::String`: Label for the form field.
 
     # Returns
     - `FormField`: A new FormField instance.
     """
     function FormField(
-        form_space::FS, coefficients::Vector{Int}, label::String
+        form_space::FS, coefficients::Vector{Float64}, label::String
     ) where {
         manifold_dim,
         form_rank,
@@ -77,7 +77,7 @@ struct FormField{manifold_dim, form_rank, G, FS} <:
     # Returns
     - `FormField`: A new FormField instance with zero coefficients.
     """
-    function FormField(form_space::FS, label::String)
+    function FormField(form_space::FS, label::String) where {FS}
         coefficients = zeros(get_num_basis(form_space))
 
         return FormField(form_space, coefficients, label)
