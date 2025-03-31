@@ -121,8 +121,8 @@ function get_element_lengths(geometry::MappedGeometry, element_id::Int)
     return get_element_lengths(geometry.geometry, element_id)
 end
 
-function get_element_volume(geometry::MappedGeometry, element_id::Int)
-    return get_element_volume(geometry.geometry, element_id)
+function get_element_measure(geometry::MappedGeometry, element_id::Int)
+    return get_element_measure(geometry.geometry, element_id)
 end
 
 function evaluate(

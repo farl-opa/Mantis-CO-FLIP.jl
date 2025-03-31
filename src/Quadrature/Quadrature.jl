@@ -107,4 +107,6 @@ include("NewtonCotes.jl")
 # dimensional rules, so this file must be included after the one-dimensional rules.
 include("TensorProduct.jl")
 
+include("QuadratureHelpers.jl")
+
 end

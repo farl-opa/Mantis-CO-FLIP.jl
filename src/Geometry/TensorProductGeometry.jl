@@ -57,13 +57,11 @@ function get_element_lengths(
     manifold_dim, num_geometries, T<:NTuple{num_geometries, AbstractGeometry}
 }
     ordered_index = get_ordered_indices(geometry, element_id)
-    element_lengths_per_geometry = [get_element_lengths(
-        geometry.geometries[k], ordered_index[k]
-    ) for k ∈ 1:num_geometries]
+    element_lengths_per_geometry = ntuple(num_geometries) do i
+        return get_element_lengths(geometry.geometries[i], ordered_index[i])
+    end
 
-    element_lengths = Tuple(reduce(vcat, element_lengths_per_geometry))
-
-    return element_lengths
+    return collect(Iterators.flatten(element_lengths_per_geometry))
 end
 
 function get_element_measure(geometry::TensorProductGeometry, element_id::Int)
