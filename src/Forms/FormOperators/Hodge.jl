@@ -3,7 +3,7 @@
 ############################################################################################
 
 """
-    HodgeStar{manifold_dim, form_rank, expression_rank, G, F} <:
+    Hodge{manifold_dim, form_rank, expression_rank, G, F} <:
     AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
 
 Represents the hodge star of an `AbstractFormExpression`.
@@ -26,14 +26,14 @@ Represents the hodge star of an `AbstractFormExpression`.
     G}`: The type of `form`.
 
 # Inner Constructors
-- `HodgeStar(form::F)`: General constructor.
+- `Hodge(form::F)`: General constructor.
 """
-struct HodgeStar{manifold_dim, form_rank, expression_rank, G, F} <:
+struct Hodge{manifold_dim, form_rank, expression_rank, G, F} <:
        AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
     form::F
     label::String
 
-    function HodgeStar(
+    function Hodge(
         form::F
     ) where {
         manifold_dim,
@@ -47,43 +47,52 @@ struct HodgeStar{manifold_dim, form_rank, expression_rank, G, F} <:
             msg_2 = "Expression rank $(expression_rank) was given."
             throw(ArgumentError(msg_1 * msg_2))
         end
-        hodge_star_rank = manifold_dim - form_rank
+        hodge_rank = manifold_dim - form_rank
 
-        return new{manifold_dim, hodge_star_rank, expression_rank, G, F}(
+        return new{manifold_dim, hodge_rank, expression_rank, G, F}(
             form, "★" * get_label(form)
         )
     end
 end
 
+############################################################################################
+#                                         Getters                                          #
+############################################################################################
+
 """
-    get_form(hodge_star::HodgeStar)
+    get_form(form_expression::Hodge)
 
 Returns the form to which the hodge star is applied.
 
 # Arguments
-- `hodge_star::HodgeStar`: The hodge star structure.
+- `form_expression::Hodge`: The hodge star structure.
 
 # Returns
 - `<:AbstractFormExpression`: The form to which the hodge star is applied.
 """
-get_form(hodge_star::HodgeStar) = hodge_star.form
+get_form(form_expression::Hodge) = form_expression.form
+
 
 """
-    get_geometry(hodge_star::HodgeStar)
+    get_geometry(form_expression::Hodge)
 
-Returns the geometry of the form associated with the hodge star.
+Returns the geometry of form expression used in the hodge star.
 
 # Arguments
-- `hodge_star::HodgeStar`: The hodge star structure.
+- `form_expression::Hodge`: The hodge star structure.
 
 # Returns
-- `<:Geometry.AbstractGeometry`: The geometry of the form.
+- `<:Geometry.AbstractGeometry`: The geometry of the form expression.
 """
-get_geometry(hodge_star::HodgeStar) = get_geometry(get_form(hodge_star))
+get_geometry(form_expression::Hodge) = get_geometry(get_form(form_expression))
+
+############################################################################################
+#                                     Evaluate methods                                     #
+############################################################################################
 
 """
     evaluate(
-        hodge_star::HodgeStar{manifold_dim},
+        hodge::Hodge{manifold_dim},
         element_id::Int,
         xi::NTuple{manifold_dim, Vector{Float64}},
     ) where {manifold_dim}
@@ -91,7 +100,7 @@ get_geometry(hodge_star::HodgeStar) = get_geometry(get_form(hodge_star))
 Computes the hodge star at the element given by `element_id`, and canonical points `xi`.
 
 # Arguments
-- `hodge_star::HodgeStar{manifold_dim}`: The hodge star structure.
+- `hodge::Hodge{manifold_dim}`: The hodge star structure.
 - `element_id::Int`: The element identifier.
 - `xi::NTuple{manifold_dim, Vector{Float64}`: The set of canonical points.
 
@@ -104,18 +113,18 @@ Computes the hodge star at the element given by `element_id`, and canonical poin
     to a `Vector`.
 """
 function evaluate(
-    hodge_star::HodgeStar{manifold_dim},
+    hodge::Hodge{manifold_dim},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
-    return _evaluate_hodge_star(get_form(hodge_star), element_id, xi)
+    return _evaluate_hodge(get_form(hodge), element_id, xi)
 end
 
 ############################################################################################
 #                                     Abstract method                                      #
 ############################################################################################
 
-function _evaluate_hodge_star(
+function _evaluate_hodge(
     form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
@@ -128,12 +137,13 @@ end
 ############################################################################################
 
 # 0-forms (manifold_dim)
-function _evaluate_hodge_star(
+function _evaluate_hodge(
     form_expression::AbstractFormExpression{manifold_dim, 0, expression_rank, G},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
+
+    _, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
     # We restrict the evaluation of hodge-star to expression of rank 1 and lower, therefore
@@ -150,12 +160,12 @@ function _evaluate_hodge_star(
 end
 
 # n-forms (manifold_dim)
-function _evaluate_hodge_star(
+function _evaluate_hodge(
     form_expression::AbstractFormExpression{manifold_dim, manifold_dim, expression_rank, G},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    _, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
+    _, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
     # Because we restrict ourselves to expression with rank 0 or 1, we can
@@ -172,12 +182,12 @@ function _evaluate_hodge_star(
 end
 
 # 1-forms (2 dimensions)
-function _evaluate_hodge_star(
+function _evaluate_hodge(
     form_expression::AbstractFormExpression{2, 1, expression_rank, G},
     element_id::Int,
     xi::NTuple{2, Vector{Float64}},
 ) where {expression_rank, G <: Geometry.AbstractGeometry{2}}
-    inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+    inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression), element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
 
@@ -205,7 +215,7 @@ function _evaluate_hodge_star(
 end
 
 # 1-forms (3 dimensions)
-function _evaluate_hodge_star(
+function _evaluate_hodge(
     form_expression::AbstractFormExpression{3, 1, expression_rank, G},
     element_id::Int,
     xi::NTuple{3, Vector{Float64}},
@@ -215,7 +225,7 @@ function _evaluate_hodge_star(
     n_hodge_components = 3
 
     # Compute the metric terms
-    inv_g, _, sqrt_g = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+    inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression), element_id, xi)
 
     # Evaluate the form expression to which we wish to apply the Hodge-⋆
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
@@ -252,7 +262,7 @@ function _evaluate_hodge_star(
 end
 
 # 2-forms (3 dimensions)
-function _evaluate_hodge_star(
+function _evaluate_hodge(
     form_expression::AbstractFormExpression{3, 2, expression_rank, G},
     element_id::Int,
     xi::NTuple{3, Vector{Float64}},
@@ -267,7 +277,7 @@ function _evaluate_hodge_star(
     # metric tensor instead of the inverse of the metric tensor.
 
     # Compute the metric terms
-    g, sqrt_g = Geometry.metric(form_expression.geometry, element_id, xi)
+    g, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
 
     # Evaluate the form expression to which we wish to apply the Hodge-⋆
     form_eval, form_indices = evaluate(form_expression, element_id, xi)

@@ -80,6 +80,19 @@ function get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifol
 end
 
 """
+    get_geometry(form_expression::AbstractFormExpression)
+
+Returns the geometry of the given form expression.
+
+# Arguments
+- `form_expression::AbstractFormExpression`: The form expression.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the form expression.
+"""
+get_geometry(form_expression::AbstractFormExpression) = form_expression.geometry
+
+"""
     get_geometry(
         single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
     )
@@ -101,14 +114,14 @@ function get_geometry(
     all_forms = tuple(single_form, additional_forms...)
 
     for i in 1:(length(all_forms) - 1)
-        if !(all_forms[i].geometry === all_forms[i+1].geometry)
+        if !(get_geometry(all_forms[i]) == get_geometry(all_forms[i+1]))
             msg1 = "Not all forms share a common geometry. "
             msg2 = "The geometries of form number(i) and form number(i+1) differ."
             throw(ArgumentError(msg1 * msg2))
         end
     end
 
-    return single_form.geometry
+    return get_geometry(single_form)
 end
 
 
