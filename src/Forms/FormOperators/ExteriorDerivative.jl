@@ -2,7 +2,6 @@
 #                                        Structure                                         #
 ############################################################################################
 
-
 """
     ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
     AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
@@ -89,16 +88,17 @@ get_geometry(ext_der::ExteriorDerivative) = get_geometry(get_form(ext_der))
         xi::NTuple{manifold_dim, Vector{Float64}},
     ) where {manifold_dim}
 
-Function description
+Computes the exterior derivative at the element given by `element_id`, and canonical points
+`xi`.
 
 # Arguments
 - `ext_der::ExteriorDerivative{manifold_dim}`: The exterior derivative structure.
-- `element_id::Int`: The element idenfier.
+- `element_id::Int`: The element identifier.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The set of canonical points.
 
 # Returns
 - `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated exterior derivative. The
-    number of entries in the `Vector` is `binomial(manifold_dim, form_rank + 1)`. The size
+    number of entries in the `Vector` is `binomial(manifold_dim, form_rank)`. The size
     of the `Array` is `(num_eval_points, num_basis)`, where `num_eval_points =
     prod(length.(xi))` and `num_basis` is the number of basis functions used to represent
     the `form` on `element_id` ― for `expression_rank = 0` the inner `Array` is equivalent
@@ -109,37 +109,14 @@ function evaluate(
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
-    return evaluate_exterior_derivative(get_form(ext_der), element_id, xi)
+    return _evaluate_exterior_derivative(get_form(ext_der), element_id, xi)
 end
 
 ############################################################################################
 #                                     Abstract method                                      #
 ############################################################################################
 
-"""
-    evaluate_exterior_derivative(
-        form::AbstractFormExpression{manifold_dim},
-        element_id::Int, 
-        xi::NTuple{manifold_dim, Vector{Float64}},
-    ) where {manifold_dim}
-
-Returns the exterior derivative of a `form` at the element given by `element_id`, and
-canonical points `xi`.
-
-# Arguments
-- `form::AbstractFormExpression{manifold_dim}`: The form being evaluated.
-- `element_id::Int`: The element idenfier.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: The set of canonical points.
-
-# Returns
-- `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated exterior derivative. The
-    number of entries in the `Vector` is `binomial(manifold_dim, form_rank + 1)`. The size
-    of the `Array` is `(num_eval_points, num_basis)`, where `num_eval_points =
-    prod(length.(xi))` and `num_basis` is the number of basis functions used to represent
-    the `form` on `element_id` ― for `expression_rank = 0` the inner `Array` is equivalent
-    to a `Vector`.
-"""
-function evaluate_exterior_derivative(
+function _evaluate_exterior_derivative(
     form::AbstractFormExpression{manifold_dim},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
@@ -151,7 +128,7 @@ end
 #                                        Form Field                                        #
 ############################################################################################
 
-function evaluate_exterior_derivative(
+function _evaluate_exterior_derivative(
     form::FormField{manifold_dim, form_rank, G, FS},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
@@ -161,7 +138,7 @@ function evaluate_exterior_derivative(
     G <: Geometry.AbstractGeometry{manifold_dim},
     FS <: AbstractFormSpace{manifold_dim, form_rank, G},
 }
-    d_form_basis_eval, form_basis_indices = evaluate_exterior_derivative(
+    d_form_basis_eval, form_basis_indices = _evaluate_exterior_derivative(
         form.form_space, element_id, xi
     )
 
@@ -185,7 +162,7 @@ end
 #                                        Form Space                                        #
 ############################################################################################
 
-function evaluate_exterior_derivative(
+function _evaluate_exterior_derivative(
     form_space::FS, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}
 ) where {
     manifold_dim,
@@ -221,17 +198,7 @@ function evaluate_exterior_derivative(
     return local_d_form_basis_eval, form_basis_indices
 end
 
-function evaluate_exterior_derivative(
-    form_space::FS, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}
-) where {
-    manifold_dim,
-    G <: Geometry.AbstractGeometry{manifold_dim},
-    FS <: AbstractFormSpace{manifold_dim, manifold_dim, G},
-}
-    throw(ArgumentError("Unable to compute exterior derivative of volume forms."))
-end
-
-function evaluate_exterior_derivative(
+function _evaluate_exterior_derivative(
     form_space::FS, element_id::Int, xi::NTuple{2, Vector{Float64}}
 ) where {G <: Geometry.AbstractGeometry{2}, FS <: AbstractFormSpace{2, 1, G}}
     # manifold_dim = 2
@@ -261,7 +228,7 @@ function evaluate_exterior_derivative(
     return local_d_form_basis_eval, form_basis_indices
 end
 
-function evaluate_exterior_derivative(
+function _evaluate_exterior_derivative(
     form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}
 ) where {G <: Geometry.AbstractGeometry{3}, FS <: AbstractFormSpace{3, 1, G}}
     # manifold_dim = 3
@@ -300,7 +267,7 @@ function evaluate_exterior_derivative(
     return local_d_form_basis_eval, [form_basis_indices]
 end
 
-function evaluate_exterior_derivative(
+function _evaluate_exterior_derivative(
     form_space::FS, element_id::Int, xi::NTuple{3, Vector{Float64}}
 ) where {FS <: AbstractFormSpace{3, 2, G}} where {G <: Geometry.AbstractGeometry{3}}
     # manifold_dim = 3

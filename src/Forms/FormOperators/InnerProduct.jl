@@ -1,31 +1,103 @@
 ############################################################################################
-#                                     Abstract method                                      #
+#                                        Structure                                         #
 ############################################################################################
 
 """
-    evaluate_inner_product(
-        form_1::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
-        form_2::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
-        element_id::Int,
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    InnerProduct{F1, F2, G}
+
+Represents the inner product between two differential forms.
+
+# Fields
+- `form_1 <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The first
+    form. 
+- `form_2 <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The second
+    form.
+
+# Type parameters
+- `F1 <: Forms.AbstractFormExpression`: The type of `form_1`.
+- `F2 <: Forms.AbstractFormExpression`: The type of `form_2`.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the geometry where the forms are
+    defined.
+
+# Inner Constructors
+- `InnerProduct(form_1::F1, form_2::F2)`: General constructor.
+"""
+struct InnerProduct{F1, F2, G}
+    form_1::F1
+    form_2::F2
+
+    function InnerProduct(
+        form_1::F1,
+        form_2::F2,
     ) where {
         manifold_dim,
         form_rank_1,
         form_rank_2,
         expression_rank_1,
         expression_rank_2,
-        G <: Geometry.AbstractGeometry{manifold_dim},
+        G,
+        F1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
+        F2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
     }
+        if expression_rank_1 > 1
+            throw(ArgumentError(
+                "Inner product only valid between expressions with expression rank < 2, got: 
+                $expression_rank_1",
+            ))
+        end
+        if expression_rank_2 > 1
+            throw(ArgumentError(
+                "Inner product only valid between expressions with expression rank < 2, got: 
+                $expression_rank_2",
+            ))
+        end
 
-Returns the ``L^2`` inner product  between `form_1` and `form_2` at the element given by 
-`element_id`, using the quadrature rule `quad_rule` to peform the integral evaluation.
+        return new{F1, F2, G}(form_1, form_2)
+    end
+end
+
+"""
+    get_forms(inner_product::InnerProduct)
+
+Returns the forms to which the inner product is applied. 
 
 # Arguments
-- `form_1::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}`: The 
-    first form being evaluated.
-- `form_2::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}`: The 
-    second form being evaluated.
-- `element_id::Int`: The element idenfier.
+- `inner_product::InnerProduct`: The inner product structure.
+
+# Returns
+- `<:AbstractFormExpression`: The first form to which the inner product is applied.
+- `<:AbstractFormExpression`: The second form to which the inner product is applied.
+"""
+function get_forms(inner_product::InnerProduct)
+    return inner_product.form_1, inner_product.form_2
+end
+
+"""
+    get_geometry(inner_product::InnerProduct)
+
+Returns the geometry of the forms associated with the inner product.
+
+# Arguments
+- `inner_product::InnerProduct`: The inner product structure.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the forms.
+"""
+get_geometry(inner_product::InnerProduct) = get_geometry(get_forms(inner_product))
+
+"""
+    evaluate(
+        inner_product::InnerProduct{F1, F2, G},
+        element_id::Int,
+        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    ) where {manifold_dim, F1, F2, G <: Geometry.AbstractGeometry{manifold_dim}}
+
+Computes the inner product at the element given by `element_id`, and canonical points given
+by `quad_rule`.
+
+# Arguments
+- `inner_product::InnerProduct`: The inner product structure.
+- `element_id::Int`: The element identifier.
 - `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: The quadrature rule used for
     integration.
 
@@ -45,8 +117,27 @@ Returns the ``L^2`` inner product  between `form_1` and `form_2` at the element 
     basis functions in the first form expression and `i` and `j` are the local basis indices 
     of the first and second expression, respectively. I.e., `prod_form_eval[l(i,j)]` stores 
     the result of local basis `i` integrated against local basis `j`.
+- `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated inner product. The number of
+    entries in the `Vector` is `binomial(manifold_dim, manifold_dim - form_rank)`. The size
+    of the `Array` is `(num_eval_points, num_basis)`, where `num_eval_points =
+    prod(length.(xi))` and `num_basis` is the number of basis functions used to represent
+    the `form` on `element_id` ― for `expression_rank = 0` the inner `Array` is equivalent
+    to a `Vector`.
 """
-function evaluate_inner_product(
+function evaluate(
+    inner_product::InnerProduct{F1, F2, G},
+    element_id::Int,
+    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+) where {manifold_dim, F1, F2, G <: Geometry.AbstractGeometry{manifold_dim}}
+    forms = get_forms(inner_product)
+
+    return _evaluate_inner_product(forms[1], forms[2], element_id, quad_rule)
+end
+############################################################################################
+#                                     Abstract method                                      #
+############################################################################################
+
+function _evaluate_inner_product(
     form_1::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
     form_2::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
     element_id::Int,
@@ -69,7 +160,7 @@ end
 ############################################################################################
 
 # (0-forms, 0-forms)
-function evaluate_inner_product(
+function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G},
     form_expression2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G},
     element_id::Int,
@@ -80,19 +171,6 @@ function evaluate_inner_product(
     expression_rank_2,
     G <: Geometry.AbstractGeometry{manifold_dim},
 }
-    if expression_rank_1 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_1",
-        ))
-    end
-    if expression_rank_2 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_2",
-        ))
-    end
-
     _, sqrt_g = Geometry.metric(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
@@ -171,7 +249,7 @@ function _inner_product_0_form_component!(
 end
 
 # (n-forms, n-forms)
-function evaluate_inner_product(
+function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{
         manifold_dim, manifold_dim, expression_rank_1, G
     },
@@ -186,19 +264,6 @@ function evaluate_inner_product(
     expression_rank_2,
     G <: Geometry.AbstractGeometry{manifold_dim},
 }
-    if expression_rank_1 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_1",
-        ))
-    end
-    if expression_rank_2 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_2",
-        ))
-    end
-
     _, sqrt_g = Geometry.metric(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
@@ -275,7 +340,7 @@ function _inner_product_n_form_component!(
 end
 
 # (1-forms, 1-forms)
-function evaluate_inner_product(
+function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim, 1, expression_rank_1, G},
     form_expression2::AbstractFormExpression{manifold_dim, 1, expression_rank_2, G},
     element_id::Int,
@@ -286,19 +351,6 @@ function evaluate_inner_product(
     expression_rank_2,
     G <: Geometry.AbstractGeometry{manifold_dim},
 }
-    if expression_rank_1 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_1",
-        ))
-    end
-    if expression_rank_2 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_2",
-        ))
-    end
-
     inv_g, _, sqrt_g = Geometry.inv_metric(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
@@ -395,25 +447,12 @@ function _inner_product_1_form_component!(
 end
 
 # (2-forms, 2-forms) in 3D
-function evaluate_inner_product(
+function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{3, 2, expression_rank_1, G},
     form_expression2::AbstractFormExpression{3, 2, expression_rank_2, G},
     element_id::Int,
     quad_rule::Quadrature.QuadratureRule{3},
 ) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{3}}
-    if expression_rank_1 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_1",
-        ))
-    end
-    if expression_rank_2 > 1
-        throw(ArgumentError(
-            "Inner product only valid between expressions with expression rank < 2, got: 
-            $expression_rank_2",
-        ))
-    end
-
     inv_g, _, sqrt_g = Geometry.inv_metric(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )

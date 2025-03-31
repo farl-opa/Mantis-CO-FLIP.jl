@@ -1,164 +1,176 @@
+############################################################################################
+#                                        Structure                                         #
+############################################################################################
 
-@doc raw"""
-    evaluate_wedge(form_expression_1::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}, form_expression_2::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}) where {manifold_dim, form_rank_1, expression_rank_1, form_rank_2, expression_rank_2, G <: Geometry.AbstractGeometry{manifold_dim}}
+"""
+    Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2} <:
+    AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
 
-Evaluates the wedge operator ∧ between a k-form and an l-form, i.e.,
+Represents the wedge between two differential forms.
 
-```math
-    \alpha^{k} \wedge \beta^{l}
-```
+# Fields
+- `form_1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}`: The
+    first form. 
+- `form_2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}`: The
+    second form.
+- `label :: String`: A label for the wedge.
 
-Both ```\alpha^{k}``` and ```\beta^{l}``` can have any expression rank, i.e., can be a `FormField` or `AnalyticalFormField` (rank 0),
-a FormSpace (rank 1), or higher rank expressions like the tensor product of FormSpaces (rank n),
-as obtained, for example, when computing the wedge between two FormSpaces.
+# Type parameters
+- `manifold_dim`: Dimension of the manifold. 
+- `form_rank`: The form rank of the wedge: equal to `form_rank_1 + form_rank_2`. 
+- `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0,
+    with one single set of basis forms have rank 1, with two sets of basis forms have rank
+    2. Higher ranks are not possible.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the geometry where the forms are
+    defined.
+- `F1 <: Forms.AbstractFormExpression`: The type of `form_1`.
+- `F2 <: Forms.AbstractFormExpression`: The type of `form_2`.
 
-Two cases are relevant to distinguish:
+# Inner Constructors
+- `Wedge(form_1::F1, form_2::F2)`: General constructor.
+"""
+struct Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2} <:
+       AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+    form_1::F1
+    form_2::F2
+    label::String
 
-1. ```\alpha^{k}``` or ```\beta^{l}``` is an expression of rank 0 (fields)
-2. ```\alpha^{k}``` and ```\beta^{l}``` are expressions of rank > 0 (e.g., `FormSpace`)
+    function Wedge(
+        form_1::F1,
+        form_2::F2,
+    ) where {
+        manifold_dim,
+        form_rank_1,
+        form_rank_2,
+        expression_rank_1,
+        expression_rank_2,
+        G,
+        F1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
+        F2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
+    }
+        form_rank = form_rank_1 + form_rank_2
+        expression_rank = expression_rank_1 + expression_rank_2
+        if form_rank > manifold_dim
+            throw(ArgumentError("""\
+                The resulting form rank ($(form_rank)) exceeds the\
+                manifold dimension ($(manifold_dim)).\
+                """))
+        end
 
-1.
-In this case, for example, ``\alpha^{k}`` is an expression of rank 0 (the other case is identical), then
-```\alpha^{k} \wedge \beta^{l}``` will have the same expression rank as ```\beta^{l}```.
-If ```\beta^{l}``` has rank ```n``` then ```\beta^{l}``` is an expression with ```n``` indices
+        if expression_rank > 2
+            throw(ArgumentError("""\
+                The resulting form rank ($(form_rank)) exceeds the\
+                manifold dimension ($(manifold_dim)).\
+                """))
+        end
 
-```math
-    \beta^{l} =
-    \left[
-        \begin{array}{c}
-            \beta^{l}_{i_{1}, \dots, i_{n}}
-        \end{array}
-    \right]
-```
+        label = get_label(form_1) * "∧" * get_label(form_2)
 
-and ```\alpha^{k}``` will have rank 0, therefore no indices
+        return new{manifold_dim, form_rank, expression_rank, G, F1, F2}(
+            form_1, form_2, label
+        )
+    end
+end
 
-```math
-    \alpha^{k} = \alpha^{k} \qquad (\text{no indices})
-```
+"""
+    get_forms(wedge::Wedge)
 
-The wedge will then be
-
-```math
-    \left(\alpha^{k} \wedge \beta^{l}\right)_{i_{1}, \dots, i_{n}} = \alpha^{k} \wedge \beta^{l}_{i_{1}, \dots, i_{n}}
-```
-
-Note that, because ``\alpha^{k}`` has rank 0, the rank of the wedge will be equal
-to the rank of ``\beta^{l}`` and therefore the same number of indices will be present
-in the wedge product.
-
-2.
-In this case, for example, ``\alpha^{k}`` is an expression of rank ``m``, and ``\beta^{l}``
-is an expression of rank ``n``, then ```\alpha^{k} \wedge \beta^{l}``` will have expression rank
-equal to ``(m + n)``. Again, following what was introduced above, we have that
-
-```math
-    \alpha^{k} =
-    \left[
-        \begin{array}{c}
-            \alpha^{k}_{s_{1}, \dots, s_{n}}
-        \end{array}
-    \right]
-```
-
-and
-
-```math
-    \beta^{l} =
-    \left[
-        \begin{array}{c}
-            \beta^{l}_{i_{1}, \dots, i_{n}}
-        \end{array}
-    \right]
-```
-
-The wedge will then be
-
-```math
-    \left(\alpha^{k} \wedge \beta^{l}\right)_{s_{1}, \dots, s_{m}, i_{1}, \dots, i_{n}} = \alpha^{k}_{s_{1}, \dots, s_{n}} \wedge \beta^{l}_{i_{1}, \dots, i_{n}}
-```
-
-Note again that the rank of the wedge will be equal to the sum of the (expression) ranks of each
-of the expressions. The same is true for the (form) ranks, but that is standard for the wedge product.
+Returns the forms to which the wedge is applied. 
 
 # Arguments
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G}`: The differential `form_rank_1`-form expression. It represents a `form_rank_1`-form on a manifold.
-- `form_expression::form_expression::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}`: The differential `form_rank_2`-form expression. It represents a `form_rank_2`-form on a manifold.
-- `element_idx::Int`: Index of the element to evaluate.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Tuple of tensor-product coordinate vectors for evaluation points.
-    Points are the tensor product of the coordinates per dimension, therefore there will be
-    ``n_{1} \times \dots \times n_{\texttt{manifold_dim}}`` points where to evaluate.
+- `wedge::Wedge`: The wedge structure.
 
 # Returns
-- `wedge_eval`: Vector of arrays containing evaluated wedge operator of the wedfge expression over each of the components.
-        `wedge_eval[j][r, s₁, …, sₘ, i₁, …, iₙ]` corresponds to the evaluation of component `j` at point `r` of
-        the wedge product between the term `[s₁, …, sₘ]` of `form_expression_1` and the term
-        `[i₁, …, iₘ]` of `form_expression_2`.
-        For the two cases discussed above (1 and 2) we will have
-
-        1.
-        ```math
-            \texttt{wedge_eval[j][r,i₁, …, iₙ]} = \left\{\left(\alpha^{k} \wedge \beta^{l}\right)(\boldsymbol{\xi}_{r})_{i_{1}, \dots, i_{n}}\right\}_{j} = \left\{\alpha^{k}(\boldsymbol{\xi}_{r}) \wedge \beta^{l}(\boldsymbol{\xi}_{r})_{i_{1}, \dots, i_{n}}\right\}_{j}
-        ```
-        where
-            - ```\beta^{l}_{i_{1}, \dots, i_{n}}(\boldsymbol{\xi}_{r}) is the ``(i_{1}, \dots, i_{n})``-th
-            basis of `\beta^{l} evaluated at the point ``\boldsymbol{ξ}_{r}``
-            - ```\alpha^{k}``` is single valued (no basis) therefore no index.
-            - ``\left\{\right}_{j}`` is the ``j``-th component of the expression inside the brackets, e.g.,
-                for a 1-form in 2D ``\left\{\alpha_{1}\mathrm{d}\xi^{1} + \alpha_{2}\mathrm{d}\xi^{2}\right\}_{j} = \alpha_{j}``
-                corresponds to the coefficient of ``\mathrm{d}\xi^{j}``.
-
-        Note that the case where ```\beta^{l}``` is the one with expression rank 0 is the same.
-
-        2.
-        ```math
-            \texttt{wedge_eval[j][r, s₁, …, sₘ, i₁, …, iₙ]} = \left\{\left(\alpha^{k} \wedge \beta^{l}\right)(\boldsymbol{\xi}_{r})_{s_{1}, \dots, s_{m}, i_{1}, \dots, i_{n}}\right\}_{j} = \left\{\alpha^{k}(\boldsymbol{\xi}_{r})_{s_{1}, \dots, s_{m}} \wedge \beta^{l}(\boldsymbol{\xi}_{r})_{i_{1}, \dots, i_{n}}\right\}_{j}
-        ```
-        where
-            - ```\beta^{l}_{i_{1}, \dots, i_{n}}(\boldsymbol{\xi}_{r}) is the ``(i_{1}, \dots, i_{n})``-th
-            basis of `\beta^{l} evaluated at the point ``\boldsymbol{ξ}_{r}``
-            - ```\alpha^{k}_{s_{1}, \dots, s_{m}}(\boldsymbol{\xi}_{r}) is the ``(s_{1}, \dots, s_{m})``-th
-            basis of `\alpha^{k} evaluated at the point ``\boldsymbol{ξ}_{r}``
-            - ``\left\{\right}_{j}`` is the ``j``-th component of the expression inside the brackets, e.g.,
-                for a 1-form in 2D ``\left\{\alpha_{1}\mathrm{d}\xi^{1} + \alpha_{2}\mathrm{d}\xi^{2}\right\}_{j} = \alpha_{j}``
-                corresponds to the coefficient of ``\mathrm{d}\xi^{j}``.
-- `wedge_indices`: Vector of Vectors containing the indices of the basis functions for the rank expresion_rank_1 x expression_rank_2
-        product. `wedge_indices[k]` contains the indices for dimension k + 1 of wedge_eval[j] (the first
-        dimension corresponds to the evaluation points).
+- `<:AbstractFormExpression`: The first form to which the wedge is applied.
+- `<:AbstractFormExpression`: The second form to which the wedge is applied.
 """
-function evaluate_wedge(
-    form_expression_1::AbstractFormExpression{manifold_dim,form_rank_1,expression_rank_1,G},
-    form_expression_2::AbstractFormExpression{manifold_dim,form_rank_2,expression_rank_2,G},
+function get_forms(wedge::Wedge)
+    return wedge.form_1, wedge.form_2
+end
+
+"""
+    get_geometry(wedge::Wedge)
+
+Returns the geometry of the forms associated with the wedge.
+
+# Arguments
+- `wedge::Wedge`: The wedge structure.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the forms.
+"""
+get_geometry(wedge::Wedge) = get_geometry(get_forms(wedge))
+
+"""
+    evaluate(
+        wedge::Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2},
+        element_id::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+    ) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        form_rank_1,
+        expression_rank_1,
+        form_rank_2,
+        expression_rank_2,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        F1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
+        F2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
+    }
+
+Computes the wedge at the element given by `element_id`, and canonical points `xi`.
+
+# Arguments
+- `wedge::Wedge`: The wedge structure.
+- `element_id::Int`: The element identifier.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: The canonical points used for evaluation.
+# Returns
+- `wedge_eval::Vector{Array{Float64, 1 + expression_rank_1 + expression_rank_2}}`: The
+    evaluation of the wedge. The length of the vector if `binomial(manifold_dim, form_rank)`.
+- `wedge_indices::Vector{Int}`: The indices of the evaluated basis. The length of the vector
+    is the sum of the number of basis functions of each form of the wedge supported at the
+    given element.
+"""
+function evaluate(
+    wedge::Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2},
     element_id::Int,
-    xi::NTuple{manifold_dim,Vector{Float64}},
+    xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {
     manifold_dim,
+    form_rank,
+    expression_rank,
     form_rank_1,
-    form_rank_2,
     expression_rank_1,
+    form_rank_2,
     expression_rank_2,
-    G<:Geometry.AbstractGeometry{manifold_dim},
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    F1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
+    F2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
 }
-    # Check if total (expression) rank of wedge expression is valid
-    if (expression_rank_1 + expression_rank_2) > 2
-        throw(
-            ArgumentError(
-                "Wedge of FormExpressions requires expressions with total expression rank smaller than three, got: $expression_rank_1 and $expression_rank_2",
-            ),
-        )
-    end
+    forms = get_forms(wedge)
 
-    # Check if total (form) rank of wedge expression is valid
-    if (form_rank_1 + form_rank_2) > manifold_dim
-        throw(
-            ArgumentError(
-                "The wedge product form rank (got $(form_rank_1 + form_rank_2)) cannot exceed the manifold dimension (got $manifold_dim).",
-            ),
-        )
-    end
-
-    return _evaluate_wedge(form_expression_1, form_expression_2, element_id, xi)
+    return _evaluate_wedge(forms[1], forms[2], element_id, xi)
 end
+
+############################################################################################
+#                                     Abstract method                                      #
+############################################################################################
+
+function _evaluate_wedge(
+    form_expression_1::AbstractFormExpression{manifold_dim},
+    form_expression_2::AbstractFormExpression{manifold_dim},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {
+    manifold_dim,
+}
+    throw(ArgumentError("Method not implemented for the given form expressions."))
+end
+
+############################################################################################
+#                                       Combinations                                       #
+############################################################################################
 
 # 0-forms ∧ 0-forms (expression_rank_1 = 0 & expression_rank_2 = 0)
 function _evaluate_wedge(
