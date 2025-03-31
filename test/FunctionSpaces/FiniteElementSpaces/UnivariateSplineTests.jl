@@ -16,6 +16,8 @@ patch1 = Mantis.Mesh.Patch1D(breakpoints)
 B1_univariate_bs = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, 1, -1])
 quad_rule = Mantis.Quadrature.gauss_legendre(deg1+1)
 x = Mantis.Quadrature.get_nodes(quad_rule)[1]
+
+# @test get_num_basis(B1_univariate_bs.extraction_op) == size(B1_univariate_bs.knot_vector.patch_1d) * (B1_univariate_bs.knot_vector.polynomial_degree + 1) + sum(B1_univariate_bs.knot_vector.multiplicity .- (B1_univariate_bs.knot_vector.polynomial_degree + 1))
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B1_univariate_bs)
     # check extraction coefficients
     ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B1_univariate_bs, el)
@@ -40,6 +42,7 @@ patch2 = Mantis.Mesh.Patch1D(breakpoints)
 B2_univariate_bs = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, 1, 3, -1])
 quad_rule2 = Mantis.Quadrature.gauss_legendre(deg2+1)
 x = Mantis.Quadrature.get_nodes(quad_rule2)[1]
+# @test get_num_basis(B2_univariate_bs.extraction_op) == size(B2_univariate_bs.knot_vector.patch_1d) * (B2_univariate_bs.knot_vector.polynomial_degree + 1) + sum(B2_univariate_bs.knot_vector.multiplicity .- (B2_univariate_bs.knot_vector.polynomial_degree + 1))
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B2_univariate_bs)
     # check extraction coefficients
     ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B2_univariate_bs, el)
@@ -120,5 +123,40 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)
     # Positivity of the polynomials
     @test minimum(Nurbs_eval[1][1]) >= 0.0
 end
+
+# Test Ck-smooth GeneralizedExponential spline space ----------------------------------------------------
+
+deg = 5
+Wt = 10.0
+b = Mantis.FunctionSpaces.GeneralizedExponential(deg, Wt, 0.25)
+breakpoints = [0.0, 0.25, 0.5, 0.75]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, deg-1, deg-1, -1])
+nbasis = Mantis.FunctionSpaces.get_num_basis(B)
+nel = Mantis.FunctionSpaces.get_num_elements(B)
+for el in 1:1:nel
+    # check extraction coefficients
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(B, el)
+    @test all(ex_coeffs .>= 0.0) # Test for non-negativity
+    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=5e-14)) # Test for partition of unity
+end
+
+# interpolate an exponential
+x = collect(range(start=0.1, stop=0.9, length=deg+1))
+npts = length(x)
+LHS = zeros(nel * npts, nbasis)
+RHS_P = zeros(nel * npts)
+RHS_N = zeros(nel * npts)
+for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B)
+    B_eval, inds = Mantis.FunctionSpaces.evaluate(B, el, (x,), 0)
+    LHS[(el-1)*npts .+ (1:npts),inds] = B_eval[1][1]
+    RHS_P[(el-1)*npts .+ (1:npts)] = exp.(Wt .* (x .+ (el - 1)) .* 0.25)
+    RHS_N[(el-1)*npts .+ (1:npts)] = exp.(-Wt .* (x .+ (el - 1)) .* 0.25)
+end
+coeffs_P = LHS \ RHS_P
+coeffs_N = LHS \ RHS_N
+@test all(isapprox.(abs.(LHS * coeffs_P - RHS_P), 0.0, atol=1e-10))
+@test all(isapprox.(abs.(LHS * coeffs_N - RHS_N), 0.0, atol=1e-14))
+
 
 end

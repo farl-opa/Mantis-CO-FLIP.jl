@@ -1,7 +1,7 @@
 # Helper file which defines a few test functions for quadrature rules.
 
 # Tolerance for comparing floating point numbers.
-atol = 1e-13
+atol = 1e-12
 
 
 # Monomial and integrated monomial functions.

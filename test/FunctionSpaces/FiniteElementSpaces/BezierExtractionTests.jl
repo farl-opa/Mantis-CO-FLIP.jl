@@ -1,8 +1,8 @@
 module BezierExtractionTests
 
 """
-Tests for the Bezier extraction. These tests are based on the 
-standard properties of Bezier curves. See 
+Tests for the Bezier extraction. These tests are based on the
+standard properties of Bezier curves. See
 https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Properties.
 """
 
@@ -49,7 +49,9 @@ for p in degrees_to_test, k in -1:p-1
     regularity[end] = -1
     b_spline = BSplineSpace(test_patch, p, regularity)
     # Extract the coefficients
-    E = Mantis.FunctionSpaces.extract_bspline_to_bernstein(b_spline.knot_vector)
+    E = Mantis.FunctionSpaces.extract_bspline_to_section_space(
+        b_spline.knot_vector, Mantis.FunctionSpaces.Bernstein(p)
+    )
     for el in 1:1:n-1
         ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(E, el)
         @test all(ex_coeffs .>= 0.0) # Test for non-negativity
