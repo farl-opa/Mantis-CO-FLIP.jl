@@ -1,9 +1,11 @@
 
 function L2_norm(u, ∫)
     norm = 0.0
-    for el_id ∈ 1:Geometry.get_num_elements(u.geometry)
-        norm += Forms.evaluate_inner_product(u, u, el_id, ∫)[3][1]
+    inner_prod = u * u
+    for el_id in 1:Forms.get_num_elements(u)
+        norm += Forms.evaluate(inner_prod, el_id, ∫)[3][1]
     end
+
     return sqrt(norm)
 end
 

@@ -26,13 +26,13 @@ function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs, element_id)
     forcing = Assemblers.get_forcing(inputs)
     q_rule = Assemblers.get_quadrature_rule(inputs)
     # The l.h.s. is the inner product between the test and trial functions.
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(
-        test_forms[1], trial_forms[1], element_id, q_rule
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate(
+        test_forms[1] * trial_forms[1], element_id, q_rule
     )
 
     # The r.h.s. is the inner product between the test and forcing functions.
-    b_row_idx, _, b_elem = Forms.evaluate_inner_product(
-        test_forms[1], forcing[1], element_id, q_rule
+    b_row_idx, _, b_elem = Forms.evaluate(
+        test_forms[1] * forcing[1], element_id, q_rule
     )
 
     # The output should be the contribution to the left-hand-side matrix
