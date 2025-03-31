@@ -65,6 +65,69 @@ abstract type AbstractFormSpace{manifold_dim, form_rank, G} <:
 ############################################################################################
 
 """
+    get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifold_dim}
+
+Returns the manifold dimension of the given form expression.
+
+# Arguments
+- `::AbstractFormExpression{manifold_dim}`: The form expression.
+
+# Returns
+- `manifold_dim::Int`: The manifold dimension.
+"""
+function get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifold_dim}
+    return manifold_dim
+end
+
+"""
+    get_geometry(
+        single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
+    )
+
+If, a single form is given, returns the geometry of that form. If additional forms are
+given, checks if all the geometries of the different forms refer to the same object in
+memory, and then returns it.
+
+# Arguments
+- `single_form::AbstractFormExpression`: The first form.
+- `additional_forms::AbstractFormExpression...`: Arbitrary number of additional forms.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the given form(s).
+"""
+function get_geometry(
+    single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
+)
+    all_forms = tuple(single_form, additional_forms...)
+
+    for i in 1:(length(all_forms) - 1)
+        if !(all_forms[i].geometry === all_forms[i+1].geometry)
+            msg1 = "Not all forms share a common geometry. "
+            msg2 = "The geometries of form number(i) and form number(i+1) differ."
+            throw(ArgumentError(msg1 * msg2))
+        end
+    end
+
+    return single_form.geometry
+end
+
+
+"""
+    get_num_elements(form::AbstractFormExpression)
+
+Returns the number of elements in the geometry of the given form expression.
+
+# Arguments
+- `form::AbstractFormExpression`: The form expression.
+
+# Returns
+- `Int`: The number of elements in the geometry of the form expression.
+"""
+function get_num_elements(form::AbstractFormExpression)
+    return Geometry.get_num_elements(get_geometry(form))
+end
+
+"""
     get_form_rank(::FE) where {
         manifold_dim,
         form_rank,
@@ -118,45 +181,12 @@ function get_expression_rank(::FE) where {
     return expression_rank
 end
 
-"""
-    get_geometry(
-        single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
-    )
-
-If, a single form is given, returns the geometry of that form. If additional forms are
-given, checks if all the geometries of the different forms refer to the same object in
-memory, and then returns it.
-
-# Arguments
-- `single_form::AbstractFormExpression`: The first form.
-- `additional_forms::AbstractFormExpression...`: Arbitrary number of additional forms.
-
-# Returns
-- `<:Geometry.AbstractGeometry`: The geometry of the given form(s).
-"""
-function get_geometry(
-    single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
-)
-    all_forms = tuple(single_form, additional_forms...)
-
-    for i in 1:(length(all_forms) - 1)
-        if !(all_forms[i].geometry === all_forms[i+1].geometry)
-            msg1 = "Not all forms share a common geometry. "
-            msg2 = "The geometries of form number(i) and form number(i+1) differ."
-            throw(ArgumentError(msg1 * msg2))
-        end
-    end
-
-    return single_form.geometry
-end
-
 ############################################################################################
 #                                         Includes                                         #
 ############################################################################################
 
 include("./FormExpressions/FormExpressions.jl")
 include("./FormOperators/FormOperators.jl")
-include("./MixedFormSpace.jl")
 include("./FormsHelpers.jl")
 
 end
