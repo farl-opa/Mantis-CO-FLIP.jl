@@ -28,17 +28,17 @@ function zero_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, ele
     # The inner product will be between the exterior derivative of the
     # trial zero form with the exterior derivative of the test zero
     # form, so we compute those first.
-    dtrial = Forms.exterior_derivative(trial_forms[1])
-    dtest = Forms.exterior_derivative(test_forms[1])
+    dtrial = Forms.ExteriorDerivative(trial_forms[1])
+    dtest = Forms.ExteriorDerivative(test_forms[1])
 
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(
-        dtest, dtrial, element_id, q_rule
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate(
+        dtest * dtrial, element_id, q_rule
     )
 
     # The linear form is the inner product between the trial form and
     # the forcing function which is a form of an appropriate rank.
-    b_row_idx, _, b_elem = Forms.evaluate_inner_product(
-        test_forms[1], forcing[1], element_id, q_rule
+    b_row_idx, _, b_elem = Forms.evaluate(
+        test_forms[1] * forcing[1], element_id, q_rule
     )
 
     # The output should be the contribution to the left-hand-side matrix
@@ -190,7 +190,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
                 # compute error
                 error = Mantis.Analysis.L2_norm(uₕ - uₑ, ∫)
-                derror = Mantis.Analysis.L2_norm(Mantis.Forms.exterior_derivative(uₕ) - duₑ, ∫)
+                derror = Mantis.Analysis.L2_norm(Mantis.Forms.ExteriorDerivative(uₕ) - duₑ, ∫)
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 1] = error
                 errors[ref_lev+1, p_idx, ss_idx, mesh_idx, 2] = derror
 

@@ -13,17 +13,16 @@ function maxwell_eigenvalue(
     # A term = ⟨curl u, curl v⟩
     trial_forms = get_trial_forms(inputs)
     test_forms = get_test_forms(inputs)
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(
-        Forms.exterior_derivative(trial_forms[1]),
-        Forms.exterior_derivative(test_forms[1]),
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate(
+        Forms.ExteriorDerivative(trial_forms[1]) * Forms.ExteriorDerivative(test_forms[1]),
         element_id,
         inputs.quad_rule,
     )
 
     # Right-hand side
     # B term = ⟨u,v⟩
-    B_row_idx, B_col_idx, B_elem = Forms.evaluate_inner_product(
-        trial_forms[1], test_forms[1], element_id, inputs.quad_rule
+    B_row_idx, B_col_idx, B_elem = Forms.evaluate(
+        trial_forms[1] * test_forms[1], element_id, inputs.quad_rule
     )
 
     # The output should be the contribution to the left-hand-side matrix 

@@ -29,13 +29,13 @@ function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, e
     q_rule = Assemblers.get_quadrature_rule(inputs)
     # Left hand side.
     # <ε¹, u¹>
-    A_row_idx_11, A_col_idx_11, A_elem_11 = Forms.evaluate_inner_product(test_forms[1], trial_forms[1], element_id, q_rule)
+    A_row_idx_11, A_col_idx_11, A_elem_11 = Forms.evaluate(test_forms[1] * trial_forms[1], element_id, q_rule)
 
     # <dε¹, ϕ²>
-    A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate_inner_product(Forms.exterior_derivative(test_forms[1]), trial_forms[2], element_id, q_rule)
+    A_row_idx_12, A_col_idx_12, A_elem_12 = Forms.evaluate(Forms.ExteriorDerivative(test_forms[1]) * trial_forms[2], element_id, q_rule)
 
     # <ε², du¹>
-    A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate_inner_product(test_forms[2], Forms.exterior_derivative(trial_forms[1]), element_id, q_rule)
+    A_row_idx_21, A_col_idx_21, A_elem_21 = Forms.evaluate(test_forms[2] * Forms.ExteriorDerivative(trial_forms[1]), element_id, q_rule)
 
     # The remain term, A22, is zero, so not computed.
 
@@ -52,7 +52,7 @@ function volume_form_hodge_laplacian(inputs::Mantis.Assemblers.WeakFormInputs, e
 
     # Right hand side. Only the second part is non-zero.
     # <ε², f²>
-    b_row_idx, _, b_elem = Forms.evaluate_inner_product(test_forms[2], forcing[1], element_id, q_rule)
+    b_row_idx, _, b_elem = Forms.evaluate(test_forms[2] * forcing[1], element_id, q_rule)
 
     b_row_idx .+= Forms.get_num_basis(test_forms[1])
 

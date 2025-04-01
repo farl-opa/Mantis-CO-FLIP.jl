@@ -28,7 +28,7 @@ function _compute_square_error_per_element(
         difference = computed_sol - exact_sol
         if norm == "L2"
             result[elem_id] = sum(
-                Forms.evaluate_inner_product(difference, difference, elem_id, quad_rule)[3]
+                Forms.evaluate(difference * difference, elem_id, quad_rule)[3]
             )
         elseif norm == "Linf"
             result[elem_id] = maximum(
@@ -40,8 +40,8 @@ function _compute_square_error_per_element(
             Error("Computing the H1 norm still needs to be updated.")
             d_difference = Forms.exterior_derivative(difference)
             result[elem_id] = sum(
-                Forms.evaluate_inner_product(
-                    d_difference, d_difference, elem_id, quad_rule
+                Forms.evaluate(
+                    d_difference * d_difference, elem_id, quad_rule
                 )[3],
             )
         end
