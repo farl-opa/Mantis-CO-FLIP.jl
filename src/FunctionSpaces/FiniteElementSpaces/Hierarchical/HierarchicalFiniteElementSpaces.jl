@@ -611,11 +611,7 @@ function get_multilevel_basis_evaluation(
             current_subdiv_matrix[active_indices, :] .= 0.0
         end
 
-        if level == element_level
-            local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
-        else
-            local_subdiv_matrix .= local_subdiv_matrix * current_subdiv_matrix
-        end
+        local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
         current_child_element = current_parent_element
     end
 
