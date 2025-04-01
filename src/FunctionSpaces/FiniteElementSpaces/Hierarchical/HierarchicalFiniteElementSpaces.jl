@@ -404,9 +404,11 @@ function get_multilevel_extraction(
         active_local_ids = findall(
             x -> x in get_level_ids(active_basis, level), full_level_indices
         )
+        num_basis = size(full_coeffs, 2)
+        active_basis_matrix = Matrix{Float64}(LinearAlgebra.I, (num_basis, num_basis))
+        active_basis_matrix = active_basis_matrix[:, active_local_ids]
 
-        return Matrix{Float64}(LinearAlgebra.I, size(full_coeffs))[:, active_local_ids],
-        active_local_ids
+        return active_basis_matrix, active_local_ids
     end
 
     multilevel_information = get_multilevel_information(
@@ -548,15 +550,11 @@ function get_refinement_data(
     truncated,
 )
     active_basis_size = size(active_basis_matrix)
-
     num_multilevel_basis = length(multilevel_information[(element_level, element_id)])
-
-    refinement_matrix = zeros(active_basis_size .+ (0, num_multilevel_basis))
-
-    refinement_matrix[:, 1:active_basis_size[2]] .= active_basis_matrix
-
+    refinement_matrix = hcat(
+        active_basis_matrix, zeros(active_basis_size[1], num_multilevel_basis)
+    )
     multilevel_basis_hier_ids = Vector{Int}(undef, num_multilevel_basis)
-
     ml_basis_count = 1
     for (basis_level, basis_level_id) in multilevel_information[(element_level, element_id)]
         refinement_matrix[:, active_basis_size[2] + ml_basis_count] .= get_multilevel_basis_evaluation(
