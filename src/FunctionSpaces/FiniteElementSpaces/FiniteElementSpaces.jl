@@ -377,8 +377,8 @@ include("RationalFiniteElementSpaces.jl")
 # univariate function spaces
 include("UnivariateSplines/UnivariateSplines.jl")
 # composite function spaces
-include("MultiPatchSpaces/UnstructuredSpaces.jl")
 include("TensorProductSpaces/TensorProductSpaces.jl")
+include("MultiPatchSpaces/MultiPatchSpaces.jl")
 # two scale relations
 include("TwoScaleRelations/AbstractTwoScaleRelations.jl")
 # hierarchical function spaces

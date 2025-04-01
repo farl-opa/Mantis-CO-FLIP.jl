@@ -1,7 +1,7 @@
 """
     build_two_scale_operator(
-        coarse_us_space::UnstructuredSpace{manifold_dim, m},
-        fine_us_space::UnstructuredSpace{manifold_dim, m},
+        coarse_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
+        fine_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
         nsubdivisions::NTuple{m, NTuple{manifold_dim, Int}},
     ) where {manifold_dim, m}
 
@@ -14,16 +14,16 @@ sub-elements.
     manner by solving a least-squares problem.
 
 # Arguments
-- `coarse_us_space::UnstructuredSpace{manifold_dim,m}`: The coarse unstructured space.
-- `fine_us_space::UnstructuredSpace{manifold_dim,m}`: The fine unstructured space.
+- `coarse_us_space::AbstractMultiPatchFESpace{manifold_dim,m}`: The coarse unstructured space.
+- `fine_us_space::AbstractMultiPatchFESpace{manifold_dim,m}`: The fine unstructured space.
 - `nsubdivisions::NTuple{m, NTuple{manifold_dim,Int}}`: The number of subdivisions.
 
 # Returns
 - `two_scale_op::TwoScaleOperator`: The two-scale operator.
 """
 function build_two_scale_operator(
-    coarse_us_space::UnstructuredSpace{manifold_dim, m},
-    fine_us_space::UnstructuredSpace{manifold_dim, m},
+    coarse_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
+    fine_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
     nsubdivisions::NTuple{m, NTuple{manifold_dim, Int}},
 ) where {manifold_dim, m}
     # Build the two-scale operators for the individual function spaces that form the coarse

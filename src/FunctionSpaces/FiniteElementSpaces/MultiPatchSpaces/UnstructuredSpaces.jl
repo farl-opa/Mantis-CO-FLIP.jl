@@ -1,6 +1,6 @@
 
 """
-    UnstructuredSpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, 1}
+    AbstractMultiPatchFESpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, 1}
 
 An `manifold_dim`-variate multi-patch space with `m` patches, representing an unstructured
 finite element space.
@@ -15,14 +15,14 @@ finite element space.
     the unstructured space.
 - `data::Dict`: Any auxiliary data that the user wants to store for this unstructured space.
 """
-struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
+struct AbstractMultiPatchFESpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
     function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
     us_config::Dict
     data::Dict
 
-    function UnstructuredSpace(
+    function AbstractMultiPatchFESpace(
         function_spaces::NTuple{m, AbstractFESpace{manifold_dim, 1}},
         extraction_op::ExtractionOperator,
         dof_partition::Vector{Vector{Vector{Int}}},
@@ -35,15 +35,15 @@ struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
         )
     end
 
-    function UnstructuredSpace(
+    function AbstractMultiPatchFESpace(
         function_spaces::NTuple{m, AbstractFESpace{1}},
         extraction_op::ExtractionOperator,
         data::Dict,
     ) where {m}
-        return UnstructuredSpace(function_spaces, extraction_op, 1, 1, data)
+        return AbstractMultiPatchFESpace(function_spaces, extraction_op, 1, 1, data)
     end
 
-    function UnstructuredSpace(
+    function AbstractMultiPatchFESpace(
         function_spaces::NTuple{m, AbstractFESpace{1, 1}},
         extraction_op::ExtractionOperator,
         n_dofs_left::Int,
@@ -80,90 +80,90 @@ struct UnstructuredSpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
     end
 end
 
-function get_element_dimensions(us_space::UnstructuredSpace, element_id::Int)
+function get_element_dimensions(us_space::AbstractMultiPatchFESpace, element_id::Int)
     # Find the space ID and local element ID
-    space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
+    space_id, space_element_id = get_patch_and_element_id(us_space, element_id)
 
     return get_element_dimensions(us_space.function_spaces[space_id], space_element_id)
 end
 
 """
-    get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
+    get_polynomial_degree(us_space::AbstractMultiPatchFESpace, element_id::Int)
 
 Get the polynomial degree of the specified element in the unstructured space.
 
 # Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
+- `us_space::AbstractMultiPatchFESpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
 
 # Returns
 - `::Int`: The polynomial degree of the specified element.
 """
-function get_polynomial_degree(us_space::UnstructuredSpace, element_id::Int)
+function get_polynomial_degree(us_space::AbstractMultiPatchFESpace, element_id::Int)
     # Find the space ID and local element ID
-    space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
+    space_id, space_element_id = get_patch_and_element_id(us_space, element_id)
 
     # Get the polynomial degree from the corresponding function space
     return get_polynomial_degree(us_space.function_spaces[space_id], space_element_id)
 end
 
 """
-    get_space_id(us_space::UnstructuredSpace, element_id::Int)
+    get_patch_id(us_space::AbstractMultiPatchFESpace, element_id::Int)
 
 Get the ID of the constituent space to which the specified element belongs.
 
 # Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
+- `us_space::AbstractMultiPatchFESpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
 
 # Returns
 - `::Int`: ID of the constituent space to which the element belongs.
 """
-function get_space_id(us_space::UnstructuredSpace, element_id::Int)
+function get_patch_id(us_space::AbstractMultiPatchFESpace, element_id::Int)
     return findlast(us_space.us_config["patch_nels"] .< element_id)
 end
 
-function get_max_local_dim(space::UnstructuredSpace)
+function get_max_local_dim(space::AbstractMultiPatchFESpace)
     return maximum(get_max_local_dim.(space.function_spaces))
 end
 
 function get_local_basis(
-    space::UnstructuredSpace{manifold_dim, m},
+    space::AbstractMultiPatchFESpace{manifold_dim, m},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
 ) where {manifold_dim, m}
     # We need space ID and local element ID to know which function space to evaluate.
-    space_id, space_element_id = get_local_space_and_element_id(space, element_id)
+    space_id, space_element_id = get_patch_and_element_id(space, element_id)
 
     return evaluate(space.function_spaces[space_id], space_element_id, xi, nderivatives)[1]
 end
 
 """
-    get_local_space_and_element_id(us_space::UnstructuredSpace, element_id::Int)
+    get_patch_and_element_id(us_space::AbstractMultiPatchFESpace, element_id::Int)
 
 Get the constituent space ID and local element ID for the specified global element ID.
 
 # Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
+- `us_space::AbstractMultiPatchFESpace`: The unstructured space.
 - `element_id::Int`: The global element ID.
 
 # Returns
 - `::Tuple{Int,Int}`: Tuple of constituent space ID and local element ID.
 """
-function get_local_space_and_element_id(us_space::UnstructuredSpace, element_id::Int)
-    space_id = get_space_id(us_space, element_id)
+function get_patch_and_element_id(us_space::AbstractMultiPatchFESpace, element_id::Int)
+    space_id = get_patch_id(us_space, element_id)
     space_element_id = element_id - us_space.us_config["patch_nels"][space_id]
     return space_id, space_element_id
 end
 
 """
-    get_global_element_id(us_space::UnstructuredSpace, space_id::Int, space_element_id::Int)
+    get_global_element_id(us_space::AbstractMultiPatchFESpace, space_id::Int, space_element_id::Int)
 
 Get the global element ID for the specified constituent space ID and local element ID.
 
 # Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
+- `us_space::AbstractMultiPatchFESpace`: The unstructured space.
 - `space_id::Int`: The constituent space ID.
 - `space_element_id::Int`: The local element ID.
 
@@ -171,25 +171,25 @@ Get the global element ID for the specified constituent space ID and local eleme
 - `::Int`: The global element ID.
 """
 function get_global_element_id(
-    us_space::UnstructuredSpace, space_id::Int, space_element_id::Int
+    us_space::AbstractMultiPatchFESpace, space_id::Int, space_element_id::Int
 )
     return us_space.us_config["patch_nels"][space_id] + space_element_id
 end
 
 """
-    assemble_global_extraction_matrix(us_space::UnstructuredSpace)
+    assemble_global_extraction_matrix(us_space::AbstractMultiPatchFESpace)
 
 Loops over all elements and assembles the global extraction matrix for the unstructured
 space. The extraction matrix is a sparse matrix that maps the local basis functions to the
 global basis functions.
 
 # Arguments
-- `us_space::UnstructuredSpace`: The unstructured space.
+- `us_space::AbstractMultiPatchFESpace`: The unstructured space.
 
 # Returns
 - `::Array{Float64,2}`: Global extraction matrix.
 """
-function assemble_global_extraction_matrix(us_space::UnstructuredSpace)
+function assemble_global_extraction_matrix(us_space::AbstractMultiPatchFESpace)
     # Initialize the global extraction matrix
     num_global_basis = get_num_basis(us_space)
     num_local_basis = get_num_basis.(us_space.function_spaces)
@@ -202,7 +202,7 @@ function assemble_global_extraction_matrix(us_space::UnstructuredSpace)
         extraction_coefficients, global_basis_indices = get_extraction(us_space, element_id)
 
         # Get the local space ID and local element ID
-        space_id, space_element_id = get_local_space_and_element_id(us_space, element_id)
+        space_id, space_element_id = get_patch_and_element_id(us_space, element_id)
 
         # Get the (offsetted) local basis indices
         _, local_basis_indices = get_extraction(

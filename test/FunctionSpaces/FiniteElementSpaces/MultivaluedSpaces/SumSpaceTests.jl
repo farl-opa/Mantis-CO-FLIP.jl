@@ -31,9 +31,9 @@ D_eval, D_ind = Mantis.FunctionSpaces.evaluate(D, 1, ([0.0, 0.5, 1.0],), 1)
 # Example of SumSpace that is equivalent to the above DirectSumSpace ------------------------------------------------------------
 # create fake unstructured spaces from the two spaces
 extraction_operator_1 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(3))], [[1, 2, 3]], 1, 3)
-U1 = Mantis.FunctionSpaces.UnstructuredSpace((B1,), extraction_operator_1, Dict())
+U1 = Mantis.FunctionSpaces.AbstractMultiPatchFESpace((B1,), extraction_operator_1, Dict())
 extraction_operator_2 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(4))], [[4, 5, 6, 7]], 1, 4)
-U2 = Mantis.FunctionSpaces.UnstructuredSpace((B2,), extraction_operator_2, Dict())
+U2 = Mantis.FunctionSpaces.AbstractMultiPatchFESpace((B2,), extraction_operator_2, Dict())
 
 S = Mantis.FunctionSpaces.SumSpace((U1, U2), 7)
 S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)
@@ -48,9 +48,9 @@ S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)
 # Example of a different SumSpace that mixes the components ------------------------------------------------------------
 # create fake unstructured spaces from the two spaces
 extraction_operator_1 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(3))], [[1, 2, 3]], 1, 3)
-U1 = Mantis.FunctionSpaces.UnstructuredSpace((B1,), extraction_operator_1, Dict())
+U1 = Mantis.FunctionSpaces.AbstractMultiPatchFESpace((B1,), extraction_operator_1, Dict())
 extraction_operator_2 = Mantis.FunctionSpaces.ExtractionOperator([Matrix(LinearAlgebra.I(4))], [[1, 4, 5, 6]], 1, 4)
-U2 = Mantis.FunctionSpaces.UnstructuredSpace((B2,), extraction_operator_2, Dict())
+U2 = Mantis.FunctionSpaces.AbstractMultiPatchFESpace((B2,), extraction_operator_2, Dict())
 
 S = Mantis.FunctionSpaces.SumSpace((U1, U2), 6)
 S_eval, S_ind = Mantis.FunctionSpaces.evaluate(S, 1, ([0.0, 0.5, 1.0],), 1)

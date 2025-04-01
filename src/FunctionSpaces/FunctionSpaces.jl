@@ -57,6 +57,19 @@ function get_num_components(
     return num_components
 end
 
+"""
+    AbstractMultiPatchFESpace{manifold_dim,num_spaces} <: AbstractFESpace{manifold_dim, num_components}
+
+An `manifold_dim`-variate multi-patch space with `num_patches` patches, representing an unstructured
+finite element space.
+
+# Type parameters
+- `manifold_dim::Int`: Dimension of the manifold.
+- `num_components::Int`: Number of (output) components of the function space.
+- `num_patches::Int`: Number of patches in the multi-patch space.
+"""
+abstract type AbstractMultiPatchFESpace{manifold_dim, num_components, num_patches} <: AbstractFESpace{manifold_dim, num_components} end
+
 include("FiniteElementSpaces/FiniteElementSpaces.jl")
 #include("AdaptiveRefinement/AdaptiveRefinement.jl")
 
