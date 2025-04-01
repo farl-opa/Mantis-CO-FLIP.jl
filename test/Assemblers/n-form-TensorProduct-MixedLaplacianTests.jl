@@ -135,7 +135,7 @@ function sinusoidal_solution(geo::Mantis.Geometry.AbstractGeometry)
 
         elseif size(x,2) == 2
             # (a, b) -> (-b, a)
-            w = [-w[2], w[1]]
+            w = [w[2], -w[1]]
             return w
 
         elseif size(x,2) == 3
