@@ -16,20 +16,20 @@ struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractI
 
     quad_rule::Quadrature.QuadratureRule{manifold_dim}
 
-    function WeakFormInputs(forcing::Frhs, 
-                            space_trial::Ttrial, 
+    function WeakFormInputs(forcing::Frhs,
+                            space_trial::Ttrial,
                             space_test::Ttest,
                             quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, num_forms, F1, F2, F3,
                             Frhs <: Forms.MixedFormField{num_forms, F1},
                             Ttrial <: Forms.MixedFormSpace{num_forms, F2},
                             Ttest <: Forms.MixedFormSpace{num_forms, F3}}
-        
+
         new{manifold_dim, num_forms, Frhs, Ttrial, Ttest}(forcing, space_trial, space_test, quad_rule)
     end
 
     # Convenience constructor for the Galerkin case, i.e., when the trial and test spaces are the same.
-    function WeakFormInputs(forcing::Frhs, 
-            space::T, 
+    function WeakFormInputs(forcing::Frhs,
+            space::T,
             quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, num_forms, F1, F2,
             Frhs <: Forms.MixedFormField{num_forms, F1},
             T <: Forms.MixedFormSpace{num_forms, F2}}
@@ -38,21 +38,21 @@ struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractI
     end
 
     # Convenience constructor for non-mixed problems.
-    function WeakFormInputs(forcing::Frhs, 
-            space_trial::Ttrial, 
-            space_test::Ttest, 
+    function WeakFormInputs(forcing::Frhs,
+            space_trial::Ttrial,
+            space_test::Ttest,
             quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, expression_rank,
             G <: Geometry.AbstractGeometry{manifold_dim},
             Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, expression_rank, G},
             Ttrial <: Forms.AbstractFormSpace{manifold_dim, form_rank, G},
             Ttest <: Forms.AbstractFormSpace{manifold_dim, form_rank, G}}
 
-        WeakFormInputs(forcing, Forms.MixedFormSpace((space_trial,)), Forms.MixedFormSpace((space_test,)), quad_rule)
+        WeakFormInputs(Forms.MixedFormField((forcing,)), Forms.MixedFormSpace((space_trial,)), Forms.MixedFormSpace((space_test,)), quad_rule)
     end
 
     # Convenience constructor for non-mixed Galerkin problems
-    function WeakFormInputs(forcing::Frhs, 
-            space::T, 
+    function WeakFormInputs(forcing::Frhs,
+            space::T,
             quad_rule::Quadrature.QuadratureRule{manifold_dim}) where {manifold_dim, form_rank, expression_rank,
             G <: Geometry.AbstractGeometry{manifold_dim},
             Frhs <: Forms.AbstractFormField{manifold_dim, form_rank, expression_rank, G},
@@ -62,7 +62,7 @@ struct WeakFormInputs{manifold_dim, num_forms, Frhs, Ttrial, Ttest} <: AbstractI
     end
 end
 
-# Every bilinear form will need the functions defined below. These are 
+# Every bilinear form will need the functions defined below. These are
 # used by the global assembler to set up the problem.
 function get_num_elements(wf::WeakFormInputs)
     return Forms.get_num_elements(wf.space_trial)
