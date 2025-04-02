@@ -1,17 +1,17 @@
-@doc raw"""
+"""
     struct HierarchicalActiveInfo
 
-Contains information about active objects in a hierarchical construction. The indexing in the hierarchical space is such that
-the index of an object in level l-1 is always less than that of an object in level l.
+Contains information about active objects in a hierarchical construction. The indexing in
+the hierarchical space is such that the index of an object in level l-1 is always less than
+that of an object in level l.
 
 # Fields
-- `level_ids::Vector{Vector{Int}}`: Per level collection of active objects. 
-    'level_ids[l][i]' gives the id in level 'l' of the object indicated by 'i', 
+- `level_ids::Vector{Vector{Int}}`: Per level collection of active objects.
+    'level_ids[l][i]' gives the id in level 'l' of the object indicated by 'i',
     not the hierarchical id of the overall set of objects.
-- `level_cum_num_ids::Vector{Int}`: Total number of active objects up to a certain level, i.e. 'level_cum_num_ids[l]=sum(length.(level_ids[1:l-1]))'. 
-    First entry is always 0 for ease of use.
-
-# Note
+- `level_cum_num_ids::Vector{Int}`: Total number of active objects up to a certain level,
+    i.e. 'level_cum_num_ids[l]=sum(length.(level_ids[1:l-1]))'. First entry is always 0 for
+    ease of use.
 """
 struct HierarchicalActiveInfo
     level_ids::Vector{Vector{Int}}
@@ -19,7 +19,7 @@ struct HierarchicalActiveInfo
 
     function HierarchicalActiveInfo(level_ids::Vector{Vector{Int}})
         level_cum_num_ids = [0; cumsum(length.(level_ids))]
-        
+
         return new(level_ids, level_cum_num_ids)
     end
 end
@@ -44,10 +44,10 @@ end
 
 function get_level_num_ids(active_info::HierarchicalActiveInfo, level::Int)
     level == 0 ? (return 0) : nothing
-    
+
     level_cum_num_ids = get_level_cum_num_ids(active_info)
-    
-    return level_cum_num_ids[level+1] - level_cum_num_ids[level]  
+
+    return level_cum_num_ids[level+1] - level_cum_num_ids[level]
 end
 
 function get_num_levels(active_info::HierarchicalActiveInfo)

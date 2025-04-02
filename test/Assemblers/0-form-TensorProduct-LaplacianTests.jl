@@ -153,10 +153,10 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
                 # section spaces
                 if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
-                    section_spaces = map(section_space, degree, θ ./ num_elements)
+                    section_spaces = map(section_space, degree, (θ, θ), L ./ num_elements)
                     dq⁰ = 2 .* degree
                 elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
-                    section_spaces = map(section_space, degree, α ./ num_elements)
+                    section_spaces = map(section_space, degree, (α, α), L ./ num_elements)
                     dq⁰ = 3 .* degree
                 else
                     section_spaces = map(section_space, degree)

@@ -51,7 +51,7 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
     n_dofs_right = tuple((1 for _ in 1:manifold_dim)...)
 
     # store all univariate FEM spaces helper
-    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFiniteElementSpace{1}}}(undef, 2)
+    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFESpace{1, 1}}}(undef, 2)
     # first, create all univariate FEM spaces corresponding to directional-zero forms
     fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(
         starting_points,
@@ -85,8 +85,8 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
             return FunctionSpaces.TensorProductSpace(tp_consituent_spaces)
         end
 
-        direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces) 
-         
+        direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces)
+
         return FormSpace(
             k, geometry, direct_sum_space, "ω_$k"
         )
