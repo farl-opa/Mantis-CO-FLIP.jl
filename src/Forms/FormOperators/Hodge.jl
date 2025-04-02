@@ -50,7 +50,7 @@ struct Hodge{manifold_dim, form_rank, expression_rank, G, F} <:
         hodge_rank = manifold_dim - form_rank
 
         return new{manifold_dim, hodge_rank, expression_rank, G, F}(
-            form, "★" * get_label(form)
+            form, "★(" * get_label(form) * ")"
         )
     end
 end

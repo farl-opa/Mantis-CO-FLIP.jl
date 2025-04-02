@@ -50,7 +50,7 @@ struct ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
         end
 
         return new{manifold_dim, form_rank + 1, expression_rank, G, F}(
-            form, "d" * get_label(form)
+            form, "d(" * get_label(form) * ")"
         )
     end
 end

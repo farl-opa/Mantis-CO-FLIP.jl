@@ -60,6 +60,14 @@ struct FormField{manifold_dim, form_rank, G, FS} <:
         G <: Geometry.AbstractGeometry{manifold_dim},
         FS <: AbstractFormSpace{manifold_dim, form_rank, G},
     }
+        if length(coefficients) != get_num_basis(form_space)
+            throw(ArgumentError("""\
+                      The number of coefficients ($(length(coefficients))) must match the\
+                      number of basis functions ($(get_num_basis(form_space))).
+                      """
+            ))
+        end
+        
         return new{manifold_dim, form_rank, G, FS}(
             get_geometry(form_space), form_space, coefficients, label
         )

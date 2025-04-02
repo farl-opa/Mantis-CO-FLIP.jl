@@ -64,7 +64,7 @@ struct Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2} <:
                 """))
         end
 
-        label = get_label(form_1) * "∧" * get_label(form_2)
+        label = "(" * get_label(form_1) * "∧" * get_label(form_2) * ")"
 
         return new{manifold_dim, form_rank, expression_rank, G, F1, F2}(
             form_1, form_2, label
