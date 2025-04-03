@@ -1,6 +1,6 @@
 
 """
-    TensorProductSpace{manifold_dim, T} <: AbstractFESpace{manifold_dim, 1}
+    TensorProductSpace{manifold_dim, T} <: AbstractFESpace{manifold_dim, 1, 1}
 
 A structure representing a tensor product space composed of multiple finite element spaces.
 The functions in this space are `manifold_dim`-variate where `manifold_dim` is equal to the
@@ -16,7 +16,7 @@ sum of the manifold dimensions of the input spaces.
     TensorProductSpace(fem_spaces::T, data::Dict) where {num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
     TensorProductSpace(fem_spaces::T) where {num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
 """
-struct TensorProductSpace{manifold_dim, T} <: AbstractFESpace{manifold_dim, 1}
+struct TensorProductSpace{manifold_dim, T} <: AbstractFESpace{manifold_dim, 1, 1}
     fem_spaces::T
     dof_partition::Vector{Vector{Vector{Int}}}
     data::Dict
@@ -180,7 +180,7 @@ function _get_local_basis_per_space(
             xis,
             fill(nderivatives, num_spaces),
         )...,
-    )::NTuple{num_spaces, Vector{Vector{Matrix{Float64}}}}
+    )::NTuple{num_spaces, Vector{Vector{Vector{Matrix{Float64}}}}}
 end
 
 function _get_element_vertices_per_space(tp_space::TensorProductSpace, element_id::Int)
@@ -376,23 +376,35 @@ function get_local_basis(
     # Compute local basis for each constituent space
     local_basis_per_space = _get_local_basis_per_space(space, element_id, xi, nderivatives)
 
+    num_basis = get_num_basis(space)
+    num_evaluation_points = prod(size.(xi, 1))
+
     # Generate keys for all possible derivative combinations
     der_keys = integer_sums(nderivatives, manifold_dim + 1)
     # Initialize storage of local basis functions and derivatives
-    local_basis = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
+    local_basis = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
-        local_basis[j + 1] = Vector{Matrix{Float64}}(undef, num_j_ders)
+        local_basis[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
+        for der_idx in 1:num_j_ders
+            # We assume that there is only one component.
+            local_basis[j + 1][der_idx] = [zeros(num_evaluation_points, num_basis)]
+        end
     end
 
     manifold_dim_per_space = map(get_manifold_dim, space.fem_spaces)
     cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
     # Split manifold dimensions for each constituent space
-    keys_idx = Vector{UnitRange{Int}}(undef, num_spaces)
-    for i in 1:num_spaces
-        keys_idx[i] =
-            (cum_manifold_dim_per_space[i] + 1):(cum_manifold_dim_per_space[i] + manifold_dim_per_space[i])
-    end
+    keys_idx = [
+        (cum_manifold_dim_per_space[i] + 1):(
+            cum_manifold_dim_per_space[i] + manifold_dim_per_space[i]
+        ) for i in 1:num_spaces
+    ]
+    # keys_idx = Vector{UnitRange{Int}}(undef, num_spaces)
+    # for i in 1:num_spaces
+    #     keys_idx[i] =
+    #         (cum_manifold_dim_per_space[i] + 1):(cum_manifold_dim_per_space[i] + manifold_dim_per_space[i])
+    # end
 
     # Initialize an array to hold the basis functions for each space
     basis_functions_per_space = Vector{Matrix{Float64}}(undef, num_spaces)
@@ -408,10 +420,10 @@ function get_local_basis(
             space_index = num_spaces - i + 1
             key_sum = sum(key[keys_idx[space_index]]) + 1
             derivative_index = get_derivative_idx(key[keys_idx[space_index]])
-            basis_functions_per_space[i] = local_basis_per_space[space_index][key_sum][derivative_index]
+            basis_functions_per_space[i] = local_basis_per_space[space_index][key_sum][derivative_index][1]
         end
 
-        local_basis[j + 1][der_idx] = kron(basis_functions_per_space...)
+        local_basis[j + 1][der_idx][1] = kron(basis_functions_per_space...)
     end
 
     return local_basis
@@ -452,6 +464,9 @@ function evaluate(
     # Get basis indices for the current element
     basis_indices = get_basis_indices(tp_space, element_id)
 
+    num_basis = length(basis_indices)
+    num_evaluation_points = prod(size.(xi, 1))
+
     # Get the extraction coefficients per space
     extraction_per_space = _get_extraction_per_space(tp_space, element_id)
 
@@ -473,10 +488,14 @@ function evaluate(
     end
 
     # Compute tensor product of constituent basis functions for each derivative combination
-    evaluation = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
+    evaluation = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
-        evaluation[j + 1] = Vector{Matrix{Float64}}(undef, num_j_ders)
+        evaluation[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
+        for der_idx in 1:num_j_ders
+            # We assume that there is only one component.
+            evaluation[j + 1][der_idx] = [zeros(num_evaluation_points, num_basis)]
+        end
     end
 
     # Initialize an array to hold the evaluation for each space
@@ -493,11 +512,11 @@ function evaluate(
             key_sum = sum(key[keys_idx[space_index]]) + 1
             derivative_index = get_derivative_idx(key[keys_idx[space_index]])
             evaluation_per_space[i] =
-                local_basis_per_space[space_index][key_sum][derivative_index] *
+                local_basis_per_space[space_index][key_sum][derivative_index][1] *
                 extraction_per_space[space_index][1]
         end
 
-        evaluation[j + 1][der_idx] = kron(evaluation_per_space...)
+        evaluation[j + 1][der_idx][1] = kron(evaluation_per_space...)
     end
 
     return evaluation, basis_indices

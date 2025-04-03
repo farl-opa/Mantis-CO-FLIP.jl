@@ -49,9 +49,9 @@ for el in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
     # check Hierarchical B-spline evaluation
     h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, el, xi)
     # Positivity of the basis
-    @test minimum(h_eval[1][1]) >= 0.0
+    @test minimum(h_eval[1][1][1]) >= 0.0
     # Partition of unity
-    @test all(isapprox.(sum(h_eval[1][1], dims=2), 1.0, atol=1e-14))
+    @test all(isapprox.(sum(h_eval[1][1][1], dims=2), 1.0, atol=1e-14))
 end
 
 # Geometry visualization

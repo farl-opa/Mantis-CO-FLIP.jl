@@ -87,10 +87,10 @@ function evaluate(
     eval = zeros(Float64, num_eval_points, image_dim)
 
     for dim in 1:image_dim
-        for cartesian_id in CartesianIndices(fem_basis[1][1])
+        for cartesian_id in CartesianIndices(fem_basis[1][1][1])
             (point, basis_id) = Tuple(cartesian_id)
             eval[point, dim] +=
-                fem_basis[1][1][point, basis_id] *
+                fem_basis[1][1][1][point, basis_id] *
                 geometry.geometry_coeffs[fem_basis_indices[basis_id], dim]
         end
     end
@@ -126,7 +126,7 @@ function jacobian(
         for cartesian_idx in CartesianIndices(J)
             (point, k_im, k_mani) = Tuple(cartesian_idx)
             J[point, k_im, k_mani] +=
-                fem_basis[2][der_idxs[k_mani]][point, basis_id] *
+                fem_basis[2][der_idxs[k_mani]][1][point, basis_id] *
                 geometry.geometry_coeffs[fem_basis_indices[basis_id], k_im]
         end
     end

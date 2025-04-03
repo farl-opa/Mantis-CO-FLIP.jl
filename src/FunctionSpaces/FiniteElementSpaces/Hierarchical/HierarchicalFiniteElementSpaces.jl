@@ -1,12 +1,12 @@
 """
-    HierarchicalFiniteElementSpace{manifold_dim, S, T} <: AbstractFESpace{manifold_dim, 1}
+    HierarchicalFiniteElementSpace{manifold_dim, S, T} <: AbstractFESpace{manifold_dim, 1, 1}
 
 A hierarchical space that is built from nested hierarchies of `manifold_dim`-variate
 function spaces and domains.
 
 # Fields
-- `spaces::Vector{AbstractFESpace{manifold_dim, 1}} `: collection of `manifold_dim`-variate
-    function spaces.
+- `spaces::Vector{AbstractFESpace{manifold_dim, 1, 1}} `: collection of `manifold_dim`-
+    variate function spaces.
 - `two_scale_operators::Vector{AbstractTwoScaleOperator}`: collection of two-scale
     operators relating each consecutive pair of finite element spaces.
 - `active_elements::HierarchicalActiveInfo`: information about the active elements in
@@ -20,7 +20,7 @@ active basis in `multilevel_elements`.
     `multilevel_elements`.
 """
 mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
-               AbstractFESpace{manifold_dim, 1}
+               AbstractFESpace{manifold_dim, 1, 1}
     spaces::Vector{S}
     two_scale_operators::Vector{T}
     active_elements::HierarchicalActiveInfo
@@ -39,7 +39,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         domains::HierarchicalActiveInfo,
         truncated::Bool=false,
     ) where {
-        manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
+        manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator
     }
         function _compute_dof_partition(spaces, active_basis)
             level_partition = get_dof_partition.(spaces)
@@ -120,7 +120,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         domains_per_level::Vector{Vector{Int}},
         truncated::Bool=false,
     ) where {
-        manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
+        manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator
     }
         domains = HierarchicalActiveInfo(domains_per_level)
 
@@ -290,7 +290,7 @@ basis are active or not.
 
 
 # Arguments
-- `spaces::Vector{AbstractFESpace{manifold_dim, 1}}`: finite element spaces at each level.
+- `spaces::Vector{AbstractFESpace{manifold_dim, 1, 1}}`: finite element spaces at each level.
 - `two_scale_operators::Vector{AbstractTwoScaleOperator}`: two scale operators relating the
     finite element spaces at each level.
 - `domains::HierarchicalActiveInfo`: nested domains where the support of active basis is
@@ -302,7 +302,7 @@ basis are active or not.
 """
 function get_active_objects_and_nested_domains(
     spaces::Vector{S}, two_scale_operators::Vector{T}, domains::HierarchicalActiveInfo
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(domains)
 
     # Initialize active basis and elements on first level
@@ -377,7 +377,7 @@ and active basis indices.
 The extraction coefficients depend on whether the hierarchical space is `truncated` or not.
 
 # Arguments
-- `spaces::Vector{AbstractFESpace{manifold_dim, 1}}`: finite element spaces at each level.
+- `spaces::Vector{AbstractFESpace{manifold_dim, 1, 1}}`: finite element spaces at each level.
 - `two_scale_operators::Vector{AbstractTwoScaleOperator}`: two scale operators relating the
     finite element spaces at each level.
 - `active_elements::HierarchicalActiveInfo`: active elements on each level.
@@ -398,7 +398,7 @@ function get_multilevel_extraction(
     active_elements::HierarchicalActiveInfo,
     active_basis::HierarchicalActiveInfo,
     truncated::Bool,
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     function _get_active_basis_matrix(space, element_level_id, level, active_basis)
         full_coeffs, full_level_indices = get_extraction(space, element_level_id)
         active_local_ids = findall(
@@ -488,7 +488,7 @@ multiple levels have non-empty support, as well as which basis from coarser leve
 active on those elements.
 
 # Arguments
-- `spaces::Vector{AbstractFESpace{manifold_dim, 1}}`: finite element spaces at each level.
+- `spaces::Vector{AbstractFESpace{manifold_dim, 1, 1}}`: finite element spaces at each level.
 - `two_scale_operators::Vector{AbstractTwoScaleOperator}`: two scale operators relating the
     finite element spaces at each level.
 - `active_elements::HierarchicalActiveInfo`: active elements on each level.
@@ -505,7 +505,7 @@ function get_multilevel_information(
     two_scale_operators::Vector{T},
     active_elements::HierarchicalActiveInfo,
     active_basis::HierarchicalActiveInfo,
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     L = get_num_levels(active_elements)
     multilevel_information = Dict{Tuple{Int, Int}, Vector{Tuple{Int, Int}}}()
     # Above, first tuple is level and id of ml element, second tuple
@@ -655,7 +655,7 @@ function get_local_basis(
     hier_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     element_level, element_level_id = convert_to_element_level_and_level_id(space, hier_id)
 
     return get_local_basis(
@@ -665,7 +665,7 @@ end
 
 function get_extraction(
     space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     if space.multilevel_elements[hier_id] == 0
         element_level, element_level_id = convert_to_element_level_and_level_id(
             space, hier_id
@@ -684,6 +684,28 @@ function get_extraction(
     end
 
     return coeffs, basis_indices
+end
+
+function get_basis_indices(
+    space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
+    if space.multilevel_elements[hier_id] == 0
+        element_level, element_level_id = convert_to_element_level_and_level_id(
+            space, hier_id
+        )
+        _, basis_level_ids = get_extraction(
+            get_space(space, element_level), element_level_id
+        )
+
+        # Convert level space basis indices to hierarchical space basis indices
+        basis_indices =
+            convert_to_basis_hier_id.(Ref(space), Ref(element_level), basis_level_ids)
+    else
+        multilevel_id = space.multilevel_elements[hier_id]
+        basis_indices = space.multilevel_basis_indices[multilevel_id]
+    end
+
+    return basis_indices
 end
 
 # Methods for updating the hierarchical space
@@ -790,7 +812,7 @@ function update_hierarchical_space!(
     new_operator::T,
     new_space::S,
     t=false,
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(hier_space)
     for level in 1:num_levels
         union!(domains[level], get_level_domain(hier_space, level))
@@ -860,7 +882,7 @@ end
 
 function _compute_thb_parametric_geometry_coeffs(
     hspace::HierarchicalFiniteElementSpace{manifold_dim, S, T}
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     num_levels = get_num_levels(hspace)
 
     coeffs = Matrix{Float64}(undef, get_num_basis(hspace), manifold_dim)
@@ -884,12 +906,12 @@ end
 
 function _compute_parametric_geometry_coeffs(
     hspace::HierarchicalFiniteElementSpace{manifold_dim, S, T}
-) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     if hspace.truncated
         return _compute_thb_parametric_geometry_coeffs(hspace)
     end
 
     return invoke(
-        _compute_parametric_geometry_coeffs, Tuple{AbstractFESpace{manifold_dim, 1}}, hspace
+        _compute_parametric_geometry_coeffs, Tuple{AbstractFESpace{manifold_dim, 1, 1}}, hspace
     )
 end

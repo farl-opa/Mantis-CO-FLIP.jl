@@ -1,62 +1,64 @@
 
 """
-    AbstractMultiPatchFESpace{manifold_dim,m} <: AbstractFESpace{manifold_dim, 1}
+    AbstractMultiPatchFESpace{manifold_dim, num_patches} <: AbstractFESpace{manifold_dim, 1, num_patches}
 
-An `manifold_dim`-variate multi-patch space with `m` patches, representing an unstructured
-finite element space.
+An `manifold_dim`-variate multi-patch space with `num_patches` patches, representing an
+unstructured finite element space.
 
 # Fields
-- `function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}`: Collection of `m` (uni or
+- `function_spaces::NTuple{num_patches, AbstractFESpace{manifold_dim}}`: Collection of `num_patches` (uni or
     multivariate) function spaces.
 - `extraction_op::ExtractionOperator`: Extraction operator that specifies how to combine
-    functions from the `m` spaces into functions for the unstructured space.
+    functions from the `num_patches` spaces into functions for the unstructured space.
 - `dof_partition::Vector{Vector{Int}}`: Partition of degrees of freedom.
 - `us_config::Dict`: Dictionary that stores helper functionality (e.g., connectivity) for
     the unstructured space.
 - `data::Dict`: Any auxiliary data that the user wants to store for this unstructured space.
 """
-struct AbstractMultiPatchFESpace{manifold_dim, m} <: AbstractFESpace{manifold_dim, 1}
-    function_spaces::NTuple{m, AbstractFESpace{manifold_dim}}
+struct AbstractMultiPatchFESpace{manifold_dim, num_patches} <:
+    AbstractFESpace{manifold_dim, 1, num_patches}
+
+    function_spaces::NTuple{num_patches, AbstractFESpace{manifold_dim}}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
     us_config::Dict
     data::Dict
 
     function AbstractMultiPatchFESpace(
-        function_spaces::NTuple{m, AbstractFESpace{manifold_dim, 1}},
+        function_spaces::NTuple{num_patches, AbstractFESpace{manifold_dim, 1}},
         extraction_op::ExtractionOperator,
         dof_partition::Vector{Vector{Vector{Int}}},
         us_config::Dict,
         data::Dict,
-    ) where {manifold_dim, m}
+    ) where {manifold_dim, num_patches}
         # Initialize with empty dof partitioning
-        return new{manifold_dim, m}(
+        return new{manifold_dim, num_patches}(
             function_spaces, extraction_op, dof_partition, us_config, data
         )
     end
 
     function AbstractMultiPatchFESpace(
-        function_spaces::NTuple{m, AbstractFESpace{1}},
+        function_spaces::NTuple{num_patches, AbstractFESpace{1}},
         extraction_op::ExtractionOperator,
         data::Dict,
-    ) where {m}
+    ) where {num_patches}
         return AbstractMultiPatchFESpace(function_spaces, extraction_op, 1, 1, data)
     end
 
     function AbstractMultiPatchFESpace(
-        function_spaces::NTuple{m, AbstractFESpace{1, 1}},
+        function_spaces::NTuple{num_patches, AbstractFESpace{1, 1}},
         extraction_op::ExtractionOperator,
         n_dofs_left::Int,
         n_dofs_right::Int,
         data::Dict,
-    ) where {m}
+    ) where {num_patches}
         # Build 1D topology
         patch_neighbours = [
-            -1 (1:(m - 1))...
-            (2:m)... -1
+            -1 (1:(num_patches - 1))...
+            (2:num_patches)... -1
         ]
         # Number of elements per patch
-        patch_nels = [0; cumsum([get_num_elements(function_spaces[i]) for i in 1:m])]
+        patch_nels = [0; cumsum([get_num_elements(function_spaces[i]) for i in 1:num_patches])]
 
         # Assemble patch config in a dictionary
         us_config = Dict("patch_neighbours" => patch_neighbours, "patch_nels" => patch_nels)
@@ -76,7 +78,7 @@ struct AbstractMultiPatchFESpace{manifold_dim, m} <: AbstractFESpace{manifold_di
             (get_num_basis(extraction_op) - n_dofs_right + 1):get_num_basis(extraction_op)
         )
 
-        return new{1, m}(function_spaces, extraction_op, dof_partition, us_config, data)
+        return new{1, num_patches}(function_spaces, extraction_op, dof_partition, us_config, data)
     end
 end
 
@@ -128,11 +130,11 @@ function get_max_local_dim(space::AbstractMultiPatchFESpace)
 end
 
 function get_local_basis(
-    space::AbstractMultiPatchFESpace{manifold_dim, m},
+    space::AbstractMultiPatchFESpace{manifold_dim, num_patches},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
-) where {manifold_dim, m}
+) where {manifold_dim, num_patches}
     # We need space ID and local element ID to know which function space to evaluate.
     space_id, space_element_id = get_patch_and_element_id(space, element_id)
 

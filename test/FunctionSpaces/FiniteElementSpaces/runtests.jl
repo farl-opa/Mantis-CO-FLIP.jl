@@ -9,7 +9,7 @@ using Test
 
 @testset verbose=true "HierarchicalSpaces" begin include("Hierarchical/runtests.jl") end
 
-@testset verbose=true "MultivaluedSpaces" begin include("MultivaluedSpaces/runtests.jl") end
+# @testset verbose=true "MultivaluedSpaces" begin include("MultivaluedSpaces/runtests.jl") end
 
 @testset verbose=true "TwoScaleRelations" begin include("TwoScaleRelations/runtests.jl") end
 

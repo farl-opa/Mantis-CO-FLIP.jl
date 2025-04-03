@@ -1,5 +1,5 @@
 """
-    BSplineSpace{F} <: AbstractFESpace{1, 1}
+    BSplineSpace{F} <: AbstractFESpace{1, 1, 1}
 
 Structure containing information about a univariate B-Spline function space defined on
 `patch_1d::Mesh.Patch1D`, with given `polynomial_degree` and `regularity` per breakpoint.
@@ -12,7 +12,7 @@ to be polynomials; they are just named `polynomials` for convention.
 - `polynomials::F`: local section space F, named `polynomials` just for convention.
 - `dof_partition::Vector{Vector{Vector{Int}}}`: Indices of boundary degrees of freedom.
 """
-struct BSplineSpace{F} <: AbstractFESpace{1, 1}
+struct BSplineSpace{F} <: AbstractFESpace{1, 1, 1}
     knot_vector::KnotVector
     extraction_op::ExtractionOperator
     polynomials::F
@@ -130,7 +130,20 @@ function get_polynomials(bspline::BSplineSpace)
 end
 
 function get_local_basis(space::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
-    return evaluate(get_polynomials(space), xi, nderivatives)
+    # The output of this function must correspond to the general evaluate function, so the
+    # output must be a vector{vector{vector{Matrix{Float64}}}}. The output of the evaluate
+    # on polynomials is a vector{vector{Matrix{Float64}}}, so we need to add an extra layer
+    # of vectors to the output, corresponding to the component.
+    section_space_eval = evaluate(get_polynomials(space), xi, nderivatives)
+    ext_eval = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
+    for i in 1:(nderivatives + 1)
+        # The section spaces, which are CanonicalSpaces, are always 1D, so one derivative
+        # per derivative order.
+        ext_eval[i] = Vector{Vector{Matrix{Float64}}}(undef, 1)
+        ext_eval[i][1] = [section_space_eval[i][1]]
+    end
+
+    return ext_eval
 end
 
 function get_local_basis(
