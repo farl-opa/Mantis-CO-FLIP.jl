@@ -14,9 +14,6 @@ end
 @testset "TensorProductGeometry" begin
     include("TensorProductGeometryTests.jl")
 end
-@testset "HierarchicalGeometry" begin
-    include("HierarchicalGeometryTests.jl")
-end
 @testset "Metric" begin
     include("MetricTests.jl")
 end

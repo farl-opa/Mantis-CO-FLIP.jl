@@ -17,14 +17,23 @@ For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k_h \in X^k`` such tha
 ```
 where ``X`` is the discrete de Rham complex.
 """
-function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
+function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs, element_id)
     Forms = Mantis.Forms
+    Assemblers = Mantis.Assemblers
 
+    trial_forms = Assemblers.get_trial_forms(inputs)
+    test_forms = Assemblers.get_test_forms(inputs)
+    forcing = Assemblers.get_forcing(inputs)
+    q_rule = Assemblers.get_quadrature_rule(inputs)
     # The l.h.s. is the inner product between the test and trial functions.
-    A_row_idx, A_col_idx, A_elem = Forms.evaluate_inner_product(inputs.space_test[1], inputs.space_trial[1], element_id, inputs.quad_rule)
+    A_row_idx, A_col_idx, A_elem = Forms.evaluate(
+        test_forms[1] * trial_forms[1], element_id, q_rule
+    )
 
     # The r.h.s. is the inner product between the test and forcing functions.
-    b_row_idx, _, b_elem = Forms.evaluate_inner_product(inputs.space_test[1], inputs.forcing[1], element_id, inputs.quad_rule)
+    b_row_idx, _, b_elem = Forms.evaluate(
+        test_forms[1] * forcing[1], element_id, q_rule
+    )
 
     # The output should be the contribution to the left-hand-side matrix
     # A and right-hand-side vector b. The outputs are tuples of
@@ -34,9 +43,9 @@ function L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1,
 
 end
 
-function L2_projection(fₑ, Xᵏ, ∫)
+function L2_projection(∫, Xᵏ, fₑ)
     # inputs for the mixed weak form
-    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(fₑ, Xᵏ, ∫)
+    weak_form_inputs = Mantis.Assemblers.WeakFormInputs(∫, Xᵏ, fₑ)
 
     # assemble all matrices
     A, b = Mantis.Assemblers.assemble(L2_projection, weak_form_inputs, Dict{Int, Float64}())
@@ -45,9 +54,8 @@ function L2_projection(fₑ, Xᵏ, ∫)
     sol = A \ b
 
     # create the form field from the solution coefficients
-    fₕ = Mantis.Forms.build_form_fields(weak_form_inputs.space_trial, sol; labels=("fh",))[1]
+    fₕ = Mantis.Forms.build_form_field(Xᵏ, sol; label="fₕ")
 
-    # return the field
     return fₕ
 end
 
@@ -148,7 +156,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                     fₑ = sinusoidal_solution(form_rank, geometry)
 
                     # solve the problem
-                    fₕ = L2_projection(fₑ, X[form_rank+1], ∫)
+                    fₕ = L2_projection(∫, X[form_rank+1], fₑ)
 
                     # compute error
                     error = Mantis.Analysis.L2_norm(fₕ - fₑ, ∫)
