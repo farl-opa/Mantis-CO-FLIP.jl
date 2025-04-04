@@ -41,7 +41,7 @@ struct Plus{manifold_dim, form_rank, expression_rank, F1, F2, G} <:
         F1 <: AbstractFormExpression{manifold_dim, form_rank, 0, G},
         F2 <: AbstractFormExpression{manifold_dim, form_rank, 0, G},
     }
-        label = get_label(form_1) * " + " * get_label(form_2)
+        label = "(" * get_label(form_1) * " + " * get_label(form_2) * ")"
 
         return new{manifold_dim, form_rank, 0, F1, F2, G}(form_1, form_2, label)
     end
@@ -90,7 +90,7 @@ struct Minus{manifold_dim, form_rank, expression_rank, F1, F2, G} <:
         F1 <: AbstractFormExpression{manifold_dim, form_rank, 0, G},
         F2 <: AbstractFormExpression{manifold_dim, form_rank, 0, G},
     }
-        label = get_label(form_1) * " - " * get_label(form_2)
+        label = "(" * get_label(form_1) * " - " * get_label(form_2) * ")"
 
         return new{manifold_dim, form_rank, 0, F1, F2, G}(form_1, form_2, label)
     end
