@@ -72,7 +72,6 @@ Returns the form to which the hodge star is applied.
 """
 get_form(form_expression::Hodge) = form_expression.form
 
-
 """
     get_geometry(form_expression::Hodge)
 
@@ -113,9 +112,7 @@ Computes the hodge star at the element given by `element_id`, and canonical poin
     to a `Vector`.
 """
 function evaluate(
-    hodge::Hodge{manifold_dim},
-    element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    hodge::Hodge{manifold_dim}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}
 ) where {manifold_dim}
     return _evaluate_hodge(get_form(hodge), element_id, xi)
 end
@@ -142,7 +139,6 @@ function _evaluate_hodge(
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-
     _, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
 
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
