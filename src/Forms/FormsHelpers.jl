@@ -1,3 +1,79 @@
+############################################################################################
+#                                    Form construction                                     #
+############################################################################################
+function build_form_field(
+    form_space::AbstractFormSpace; label::Union{String, Nothing}=nothing
+)
+    if isnothing(label)
+        return FormField(form_space, form_space.label)
+    end
+
+    return FormField(form_space, label)
+end
+
+function build_form_field(
+    form_space::AbstractFormSpace,
+    coeffs::Vector{Float64};
+    label::Union{String, Nothing}=nothing,
+)
+    if length(coeffs) != get_num_basis(form_space)
+        throw(
+            ArgumentError("""\
+                Size mismatch. Number of given coefficients differs from the dimension of\
+                `form_space`. The given numbers were $(length(coeffs)) and \
+                $(get_num_basis(form_space)), respectively.
+                """)
+        )
+    end
+    form_field = build_form_field(form_space; label)
+    form_field.coefficients .= coeffs
+
+    return form_field
+end
+
+function build_form_fields(
+    form_spaces::FS; labels::Union{L, Nothing}=nothing
+) where {
+    num_forms, FS <: NTuple{num_forms, AbstractFormSpace}, L <: NTuple{num_forms, String}
+}
+    if isnothing(labels)
+        labels = ntuple(num_forms) do _
+            return nothing
+        end
+    end
+
+    form_fields = ntuple(num_forms) do i
+        return build_form_field(form_spaces[i]; label = labels[i])
+    end
+
+    return form_fields
+end
+
+function build_form_fields(
+    form_spaces::FS, coeffs::Vector{Float64}; labels::Union{L, Nothing}=nothing
+) where {
+    num_forms, FS <: NTuple{num_forms, AbstractFormSpace}, L <: NTuple{num_forms, String}
+}
+    if isnothing(labels)
+        labels = ntuple(num_forms) do _
+            return nothing
+        end
+    end
+    
+    start_id = 1
+    form_fields = ntuple(num_forms) do i
+        num_coeffs = get_num_basis(form_spaces[i])
+        ff = build_form_field(
+            form_spaces[i], coeffs[start_id:(start_id + num_coeffs - 1)]; label = labels[i]
+        )
+        start_id += num_coeffs
+
+        return ff
+    end
+
+    return form_fields
+end
+
 ################################################################################
 # Tensor-product B-spline de Rham complex
 ################################################################################
@@ -138,6 +214,165 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
     return create_tensor_product_bspline_de_rham_complex(starting_points, box_sizes, num_elements, map(FunctionSpaces.Bernstein, degrees), regularities)
 end
 
+############################################################################################
+#                               Hierarchical de Rham complex                               #
+############################################################################################
+
+function create_hierarchical_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    section_spaces::NTuple{manifold_dim, F},
+    regularities::NTuple{manifold_dim, Int},
+    num_subdivisions::NTuple{manifold_dim, Int},
+    truncate::Bool,
+    simplified::Bool,
+    geometry::G,
+) where {
+    manifold_dim,
+    F <: FunctionSpaces.AbstractCanonicalSpace,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+}
+    # number of dofs on the left and right boundary of the domain
+    n_dofs_left = tuple((1 for _ in 1:manifold_dim)...)
+    n_dofs_right = tuple((1 for _ in 1:manifold_dim)...)
+
+    # store all univariate FEM spaces helper
+    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFESpace{1, 1}}}(undef, 2)
+    # first, create all univariate FEM spaces corresponding to directional-zero forms
+    fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(
+        starting_points,
+        box_sizes,
+        num_elements,
+        section_spaces,
+        regularities,
+        n_dofs_left,
+        n_dofs_right,
+    )
+    # next, create all univariate FEM spaces corresponding to directional-one forms
+    fem_spaces[2] = map(FunctionSpaces.get_derivative_space, fem_spaces[1])
+
+    # Build all the form spaces of the complex.
+    form_spaces = ntuple(manifold_dim + 1) do k
+        k = k - 1 # Because form ranks range from 0 to manifold_dim.
+        # Get k-form basis indices, these also inform the directional degree-deficits.
+        k_form_basis_idxs = get_basis_index_combinations(manifold_dim, k)
+        num_form_components = length(k_form_basis_idxs)
+        # Generate tuple with all the k-form finite element spaces.
+        k_form_fem_spaces = ntuple(num_form_components) do component
+            # By default, use direction-zero forms...
+            fem_space_idxs = ones(Int, manifold_dim)
+            # ...unless the basis index is present in the k-form basis indices.
+            fem_space_idxs[k_form_basis_idxs[component]] .= 2
+            # Build and store constituent spaces of the tensor-product FEM space.
+            tp_consituent_spaces = ntuple(manifold_dim) do dim
+                return fem_spaces[fem_space_idxs[dim]][dim]
+            end
+            # Build the corresponding tensor-product FEM space.
+            tp_space = FunctionSpaces.TensorProductSpace(tp_consituent_spaces)
+            hierarchical_space = FunctionSpaces.HierarchicalFiniteElementSpace(
+                [tp_space],
+                FunctionSpaces.AbstractTwoScaleOperator[],
+                [Int[]],
+                num_subdivisions,
+                truncate,
+                simplified,
+            )
+
+            return hierarchical_space
+        end
+
+        direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces)
+
+        return FormSpace(k, geometry, direct_sum_space, "ω_$k")
+    end
+
+    return form_spaces
+end
+
+function create_hierarchical_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    degrees::NTuple{manifold_dim, Int},
+    regularities::NTuple{manifold_dim, Int},
+    num_subdivisions::NTuple{manifold_dim, Int},
+    truncate::Bool,
+    simplified::Bool,
+) where {manifold_dim}
+
+    # create underlying box geometry
+    geometry = Geometry.create_cartesian_box(starting_points, box_sizes, num_elements)
+
+    return create_hierarchical_de_rham_complex(
+        starting_points,
+        box_sizes,
+        num_elements,
+        map(FunctionSpaces.Bernstein, degrees),
+        regularities,
+        num_subdivisions,
+        truncate,
+        simplified,
+        geometry,
+    )
+end
+
+function update_hierarchical_de_rham_complex(
+    complex::C,
+    refinement_domains::Vector{Vector{Int}},
+    new_zero_form_ts::FunctionSpaces.AbstractTwoScaleOperator{2},
+    new_zero_form_space::FunctionSpaces.AbstractFESpace{2, 1},
+) where {
+    num_forms,
+    C <: NTuple{num_forms, AbstractFormSpace},
+}
+    zero_form_space = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
+    one_form_space_x, one_form_space_y = FunctionSpaces.get_component_spaces(
+        complex[2].fem_space
+    )
+    two_form_space = FunctionSpaces.get_component_spaces(complex[3].fem_space)[1]
+
+    num_sub = FunctionSpaces.get_num_subdivisions(zero_form_space)
+    L = FunctionSpaces.get_num_levels(zero_form_space)
+
+    # Build refined 0-form space, get domains and geometry
+    zero_form_space = FunctionSpaces.update_hierarchical_space!(
+        zero_form_space, refinement_domains, new_zero_form_ts, new_zero_form_space
+    )
+    zero_form_space_domains = FunctionSpaces.get_level_ids(zero_form_space.nested_domains)
+
+    # Update other k-forms using 0-form domains
+    new_one_form_x_ts, new_one_form_x_space = FunctionSpaces.build_two_scale_operator(
+        FunctionSpaces.get_space(one_form_space_x, L), num_sub
+    )
+    new_one_form_y_ts, new_one_form_y_space = FunctionSpaces.build_two_scale_operator(
+        FunctionSpaces.get_space(one_form_space_y, L), num_sub
+    )
+    new_two_form_ts, new_two_form_space = FunctionSpaces.build_two_scale_operator(
+        FunctionSpaces.get_space(two_form_space, L), num_sub
+    )
+
+    one_form_space_x = FunctionSpaces.update_hierarchical_space!(
+        one_form_space_x, zero_form_space_domains, new_one_form_x_ts, new_one_form_x_space
+    )
+    one_form_space_y = FunctionSpaces.update_hierarchical_space!(
+        one_form_space_y, zero_form_space_domains, new_one_form_y_ts, new_one_form_y_space
+    )
+    two_form_space = FunctionSpaces.update_hierarchical_space!(
+        two_form_space, zero_form_space_domains, new_two_form_ts, new_two_form_space
+    )
+
+    # Build new form spaces
+    geom = Geometry.HierarchicalGeometry(zero_form_space)
+    zero_form_space_sum = FunctionSpaces.DirectSumSpace((zero_form_space,))
+    one_form_space_sum = FunctionSpaces.DirectSumSpace((one_form_space_x, one_form_space_y))
+    two_form_space_sum = FunctionSpaces.DirectSumSpace((two_form_space,))
+    zero_form = Forms.FormSpace(0, geom, zero_form_space_sum, "β")
+    one_form = Forms.FormSpace(1, geom, one_form_space_sum, "σ")
+    two_form = Forms.FormSpace(2, geom, two_form_space_sum, "u")
+
+    return zero_form, one_form, two_form
+end
 ################################################################################
 # Polar B-spline de Rham complex
 ################################################################################
@@ -333,4 +568,68 @@ function create_polar_spline_de_rham_complex(
     form_spaces[3] = FormSpace(2, geometry, FunctionSpaces.DirectSumSpace((P_sol_2,)), "ω_2")
 
     return form_spaces, global_extraction_operators, geom_coeffs_tp
+end
+
+############################################################################################
+#                                   Boundary conditions                                    #
+############################################################################################
+
+"""
+    null_tangential_boundary_conditions(
+        form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
+    ) where {manifold_dim, expression_rank, G}
+
+Creates a dictionary of null-tangential boundary conditions for a given form expression.
+These are the boundary conditions of the space ``H_{0}(\\text{curl}; \\Omega)``.
+
+# Arguments
+- `form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}`: The one-form for
+    which to compute the boundary conditions.
+
+# Returns
+- `Dict{Int, Float64}`: The dictionary of null-tangential boundary conditions.
+"""
+function null_tangential_boundary_conditions(
+    form::AbstractFormExpression{2, 1, expression_rank, G}
+) where {expression_rank, G}
+    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+    bc_H_zero_curl_1 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[1][1][j]
+    )
+    bc_H_zero_curl_2 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[2][1][j]
+    )
+    bc_H_zero_curl = merge(bc_H_zero_curl_1, bc_H_zero_curl_2)
+
+    return bc_H_zero_curl
+end
+
+"""
+    null_normal_boundary_conditions(
+        form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
+    ) where {manifold_dim, expression_rank, G}
+
+Creates a dictionary of null-normal boundary conditions for a given form expression.
+These are the boundary conditions of the space ``H_{0}(\\text{div}; \\Omega)``.
+
+# Arguments
+- `form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}`: The one-form for
+    which to compute the boundary conditions.
+
+# Returns
+- `Dict{Int, Float64}`: The dictionary of null-normal boundary conditions.
+"""
+function null_normal_boundary_conditions(
+    form::AbstractFormExpression{2, 1, expression_rank, G}
+) where {expression_rank, G}
+    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+    bc_H_zero_div_1 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[1][1][j]
+    )
+    bc_H_zero_div_2 = Dict{Int, Float64}(
+        i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[2][1][j]
+    )
+    bc_H_zero_div = merge(bc_H_zero_div_1, bc_H_zero_div_2)
+
+    return bc_H_zero_div
 end

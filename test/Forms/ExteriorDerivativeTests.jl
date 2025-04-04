@@ -48,14 +48,23 @@ geo_2d_cart = Mantis.Geometry.CartesianGeometry((breakpoints1, breakpoints2))
 # Crazy mesh
 crazy_c = 0.2
 function mapping_ed_test(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [x[1] + ((Lright-Lleft)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new), x[2] + ((Ltop-Lbottom)/2.0)*crazy_c*sinpi(x1_new)*sinpi(x2_new)]
+    x1_new = (2.0 / (Lright - Lleft)) * x[1] - 2.0 * Lleft / (Lright - Lleft) - 1.0
+    x2_new = (2.0 / (Ltop - Lbottom)) * x[2] - 2.0 * Lbottom / (Ltop - Lbottom) - 1.0
+
+    return [
+        x[1] + ((Lright - Lleft) / 2.0) * crazy_c * sinpi(x1_new) * sinpi(x2_new),
+        x[2] + ((Ltop - Lbottom) / 2.0) * crazy_c * sinpi(x1_new) * sinpi(x2_new),
+    ]
 end
+
 function dmapping_ed_test(x::Vector{Float64})
-    x1_new = (2.0/(Lright-Lleft))*x[1] - 2.0*Lleft/(Lright-Lleft) - 1.0
-    x2_new = (2.0/(Ltop-Lbottom))*x[2] - 2.0*Lbottom/(Ltop-Lbottom) - 1.0
-    return [1.0 + pi*crazy_c*cospi(x1_new)*sinpi(x2_new) ((Lright-Lleft)/(Ltop-Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new); ((Ltop-Lbottom)/(Lright-Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0 + pi*crazy_c*sinpi(x1_new)*cospi(x2_new)]
+    x1_new = (2.0 / (Lright - Lleft)) * x[1] - 2.0 * Lleft / (Lright - Lleft) - 1.0
+    x2_new = (2.0 / (Ltop - Lbottom)) * x[2] - 2.0 * Lbottom / (Ltop - Lbottom) - 1.0
+
+    return [
+        1.0+pi * crazy_c * cospi(x1_new) * sinpi(x2_new) ((Lright - Lleft)/(Ltop - Lbottom))*pi*crazy_c*sinpi(x1_new)*cospi(x2_new)
+        ((Ltop - Lbottom)/(Lright - Lleft))*pi*crazy_c*cospi(x1_new)*sinpi(x2_new) 1.0+pi * crazy_c * sinpi(x1_new) * cospi(x2_new)
+    ]
 end
 
 dimension = (2, 2)
@@ -81,8 +90,8 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     ζ¹.coefficients .= 1.0
 
     # Compute exterior derivatives
-    dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-    dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+    dα⁰ = Mantis.Forms.ExteriorDerivative(α⁰)
+    dζ¹ = Mantis.Forms.ExteriorDerivative(ζ¹)
 
     # Test exterior derivatives
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
@@ -169,9 +178,9 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
     β².coefficients .= 1.0
 
     # Exterior derivative of all forms
-    dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
-    dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
-    dβ² = Mantis.Forms.exterior_derivative(β²)
+    dα⁰ = Mantis.Forms.ExteriorDerivative(α⁰)
+    dζ¹ = Mantis.Forms.ExteriorDerivative(ζ¹)
+    dβ² = Mantis.Forms.ExteriorDerivative(β²)
 
     for elem_id in 1:Mantis.Geometry.get_num_elements(geom)
         # 0-form

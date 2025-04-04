@@ -28,7 +28,7 @@ for l in 1:nlevels-1
 end
 
 refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([[1,2,3,4,5,6],[3,4,5,6,7,8,9,10],[7,8,9,10,11,12,13,14,15,16]])
-hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, refined_domains); nothing
+hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, refined_domains, (subdiv,)); nothing
 
 # test if active elements are correct
 @test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 1) == [1,6]
