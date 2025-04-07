@@ -715,4 +715,4 @@ include("TwoScaleRelations/AbstractTwoScaleRelations.jl")
 
 include("Hierarchical/Hierarchical.jl")
 
-# include("MultiComponentSpaces/MultiComponentSpaces.jl")
+include("OtherSpaces/DirectSumSpace.jl")
