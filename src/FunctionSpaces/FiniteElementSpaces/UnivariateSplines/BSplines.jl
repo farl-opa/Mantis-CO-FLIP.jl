@@ -115,6 +115,21 @@ function BSplineSpace(patch_1d::Mesh.Patch1D, polynomial_degree::Int, regularity
 end
 
 """
+    get_knot_vector(bspline::BSplineSpace)
+
+Returns the knot vector of the B-spline space `bspline`.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-spline space.
+
+# Returns
+- `::KnotVector`: The knot vector of the B-spline space.
+"""
+function get_knot_vector(bspline::BSplineSpace)
+    return bspline.knot_vector
+end
+
+"""
     get_polynomials(bspline::BSplineSpace)
 
 Returns the reference Bernstein polynomials of `bspline`.
@@ -181,7 +196,7 @@ Returns the patch of the univariate function space `bspline`.
 - `::Mesh.Patch1D`: The patch of the B-Spline space.
 """
 function get_patch(bspline::BSplineSpace)
-    return bspline.knot_vector.patch_1d
+    return get_knot_vector(bspline).patch_1d
 end
 
 """
@@ -197,11 +212,11 @@ Returns the multiplicities of the knot vector associated with the univariate fun
 - `::Vector{Int}`: The multiplicity of the knot vector associated with the B-Spline space.
 """
 function get_multiplicity_vector(bspline::BSplineSpace)
-    return bspline.knot_vector.multiplicity
+    return get_knot_vector(bspline).multiplicity
 end
 
 function get_num_elements(bspline::BSplineSpace)
-    return size(bspline.knot_vector.patch_1d)
+    return size(get_knot_vector(bspline).patch_1d)
 end
 
 """
@@ -217,11 +232,11 @@ Returns the size of the element specified by `element_id`.
 - `::Float64`: The size of the element.
 """
 function get_element_size(bspline::BSplineSpace, element_id::Int)
-    return get_element_size(bspline.knot_vector, element_id)
+    return get_element_size(get_knot_vector(bspline), element_id)
 end
 
 function get_element_dimensions(bspline::BSplineSpace, element_id::Int)
-    return get_element_size(bspline.knot_vector, element_id)
+    return get_element_size(get_knot_vector(bspline), element_id)
 end
 
 """
@@ -253,15 +268,15 @@ Returns the elements where the B-spline given by `basis_id` is supported.
 - `::Vector{Int}`: The support of the basis function.
 """
 function get_support(bspline::BSplineSpace, basis_id::Int)
-    first_element = convert_knot_to_breakpoint_idx(bspline.knot_vector, basis_id)
+    first_element = convert_knot_to_breakpoint_idx(get_knot_vector(bspline), basis_id)
     last_element = convert_knot_to_breakpoint_idx(
-            bspline.knot_vector, basis_id + bspline.knot_vector.polynomial_degree + 1
+        get_knot_vector(bspline), basis_id + get_knot_vector(bspline).polynomial_degree + 1
         ) - 1
     return collect(first_element:last_element)
 end
 
 function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)
-    knot_vector = bspline.knot_vector
+    knot_vector = get_knot_vector(bspline)
     deg = get_polynomial_degree(bspline)
 
     knot_cum_sum = cumsum(knot_vector.multiplicity)
@@ -283,11 +298,11 @@ function get_local_knot_vector(bspline::BSplineSpace, basis_idx::Int)
 end
 
 function get_max_local_dim(space::BSplineSpace)
-    return space.knot_vector.polynomial_degree + 1
+    return get_knot_vector(space).polynomial_degree + 1
 end
 
 function get_greville_points(bspline::BSplineSpace)
-    return get_greville_points(bspline.knot_vector)
+    return get_greville_points(get_knot_vector(bspline))
 end
 
 """

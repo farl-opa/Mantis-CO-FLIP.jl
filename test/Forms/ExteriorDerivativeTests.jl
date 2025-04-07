@@ -29,10 +29,8 @@ B2 = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, min(deg2-1,1),  deg2-
 TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B1, B2))
 TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace((TP_Space_2d, B1))
 
-# Direct sum spaces 2d
-dsTP_0_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_2d,))
+# Direct sum spaces for the vector-valued forms.
 dsTP_1_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_2d, TP_Space_2d))
-dsTP_2_form_2d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_2d,))
 
 # Then the geometry
 # Line 1
@@ -76,9 +74,9 @@ q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadratu
 # Test on multiple geometries. Type-wise and content/metric wise.
 for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     # Create form spaces
-    zero_form_space = Mantis.Forms.FormSpace(0, geom, dsTP_0_form_2d, "ν")
+    zero_form_space = Mantis.Forms.FormSpace(0, geom, TP_Space_2d, "ν")
     one_form_space = Mantis.Forms.FormSpace(1, geom, dsTP_1_form_2d, "η")
-    top_form_space = Mantis.Forms.FormSpace(2, geom, dsTP_2_form_2d, "σ")
+    top_form_space = Mantis.Forms.FormSpace(2, geom, TP_Space_2d, "σ")
 
     # Generate the form expressions
     # 0-form: constant
@@ -92,6 +90,10 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     # Compute exterior derivatives
     dα⁰ = Mantis.Forms.ExteriorDerivative(α⁰)
     dζ¹ = Mantis.Forms.ExteriorDerivative(ζ¹)
+
+    top_field = Mantis.Forms.FormField(top_form_space, "top")
+    @test_throws ArgumentError Mantis.Forms.ExteriorDerivative(top_form_space)
+    @test_throws ArgumentError Mantis.Forms.ExteriorDerivative(top_field)
 
     # Test exterior derivatives
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
@@ -133,7 +135,6 @@ TP_Space_2d = Mantis.FunctionSpaces.TensorProductSpace((B, B))
 TP_Space_3d = Mantis.FunctionSpaces.TensorProductSpace((TP_Space_2d, B))
 
 # Then the geometry
-# Line
 line_geo = Mantis.Geometry.CartesianGeometry((breakpoints,))
 geo_3d_cart = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints, breakpoints))
 
@@ -142,16 +143,14 @@ tensor_prod_geo_2d = Mantis.Geometry.TensorProductGeometry((line_geo, line_geo))
 geo_2d_cart_aux = Mantis.Geometry.CartesianGeometry((breakpoints, breakpoints))
 crazy_geo_2d_cart = Mantis.Geometry.MappedGeometry(geo_2d_cart_aux, crazy_mapping)
 
-# Crazy mesh 3D (in x and y only, z is straight) (this is also a tensor product geometry)
+# Crazy mesh 3D (in x and y only, z is straight)
 crazy_geo_3d_cart = Mantis.Geometry.TensorProductGeometry((crazy_geo_2d_cart, line_geo))
 
 # Setup the form spaces
 
-# Generate the multivalued FEMSpaces (DirectSumSpace)
-dsTP_0_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d,))  # direct sum space
-dsTP_1_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d, TP_Space_3d, TP_Space_3d))  # direct sum space
+# Generate the multicomponent FEMSpaces for the vector-valued forms.
+dsTP_1_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d, TP_Space_3d, TP_Space_3d))
 dsTP_2_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d, TP_Space_3d, TP_Space_3d))
-dsTP_top_form_3d = Mantis.FunctionSpaces.DirectSumSpace((TP_Space_3d,))  # direct sum space
 
 
 # Quadrature rule
@@ -160,40 +159,45 @@ q_rule = Mantis.Quadrature.tensor_product_rule((deg, deg, deg) .+ 1, Mantis.Quad
 # Test on multiple geometries. Type-wise and content/metric wise.
 for geom in [geo_3d_cart, crazy_geo_3d_cart]
     # Create form spaces
-    zero_form_space = Mantis.Forms.FormSpace(0, geom, dsTP_0_form_3d, "ν")
-    one_form_space = Mantis.Forms.FormSpace(1, geom, dsTP_1_form_3d, "η")
-    two_form_space = Mantis.Forms.FormSpace(2, geom, dsTP_2_form_3d, "μ")
+    zero_form_space_3d = Mantis.Forms.FormSpace(0, geom, TP_Space_3d, "ν")
+    one_form_space_3d = Mantis.Forms.FormSpace(1, geom, dsTP_1_form_3d, "η")
+    two_form_space_3d = Mantis.Forms.FormSpace(2, geom, dsTP_2_form_3d, "μ")
+    top_form_space_3d = Mantis.Forms.FormSpace(3, geom, TP_Space_3d, "u")
 
     # Generate the form expressions
     # 0-form: constant
-    α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
-    α⁰.coefficients .= 1.0
+    γ⁰ = Mantis.Forms.FormField(zero_form_space_3d, "γ")
+    γ⁰.coefficients .= 1.0
 
     # 1-form: constant
-    ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
-    ζ¹.coefficients .= 1.0
+    ι¹ = Mantis.Forms.FormField(one_form_space_3d, "ι")
+    ι¹.coefficients .= 1.0
 
     # 2-form: constant
-    β² = Mantis.Forms.FormField(two_form_space, "β")
+    β² = Mantis.Forms.FormField(two_form_space_3d, "β")
     β².coefficients .= 1.0
 
     # Exterior derivative of all forms
-    dα⁰ = Mantis.Forms.ExteriorDerivative(α⁰)
-    dζ¹ = Mantis.Forms.ExteriorDerivative(ζ¹)
+    dγ⁰ = Mantis.Forms.ExteriorDerivative(γ⁰)
+    dι¹ = Mantis.Forms.ExteriorDerivative(ι¹)
     dβ² = Mantis.Forms.ExteriorDerivative(β²)
+
+    top_field_3d = Mantis.Forms.FormField(top_form_space_3d, "top")
+    @test_throws ArgumentError Mantis.Forms.ExteriorDerivative(top_form_space_3d)
+    @test_throws ArgumentError Mantis.Forms.ExteriorDerivative(top_field_3d)
 
     for elem_id in 1:Mantis.Geometry.get_num_elements(geom)
         # 0-form
         # Exterior derivative of a unity 0-form is a zero 1-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dγ⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dγ⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dγ⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
 
         # 1-form
         # Exterior derivative of a unity 1-form is a zero 2-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dι¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dι¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dι¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][3])), 0.0, atol=1e-12))
 
         # 2-form
         # Exterior derivative of a unity 1-form is a zero 3-form

@@ -1,4 +1,4 @@
-struct ScalarPolarSplineSpace{T} <: AbstractMultiPatchFESpace{2, 1, 1}
+struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
     patch_spaces::NTuple{1,T}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
@@ -33,7 +33,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractMultiPatchFESpace{2, 1, 1}
     - `dspace_r::Union{Nothing, AbstractFESpace{1, 1}}=nothing`: The derivative space for the radial space.
 
     # Returns
-    - `polar_splines::AbstractMultiPatchFESpace`: The polar spline space.
+    - `polar_splines::AbstractFESpace`: The polar spline space.
     - `E::ExtractionOperator`: The extraction operator.
     """
     function ScalarPolarSplineSpace(
@@ -91,7 +91,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractMultiPatchFESpace{2, 1, 1}
     end
 end
 
-struct VectorPolarSplineSpace{T} <: AbstractMultiPatchFESpace{2, 2, 1}
+struct VectorPolarSplineSpace{T} <: AbstractFESpace{2, 2, 1}
     patch_spaces::NTuple{1,T}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
@@ -123,7 +123,7 @@ struct VectorPolarSplineSpace{T} <: AbstractMultiPatchFESpace{2, 2, 1}
     - `two_poles::Bool=false`: Whether the polar spline space has two poles.
 
     # Returns
-    - `polar_splines::AbstractMultiPatchFESpace`: The polar spline space.
+    - `polar_splines::AbstractFESpace`: The polar spline space.
     - `E::ExtractionOperator`: The extraction operator.
     """
     function PolarSplineVectors(
@@ -153,7 +153,7 @@ struct VectorPolarSplineSpace{T} <: AbstractMultiPatchFESpace{2, 2, 1}
         )
 
         # build polar spline space and return along with the extraction matrix
-        polar_splines = Vector{AbstractMultiPatchFESpace}(undef, length(E))
+        polar_splines = Vector{AbstractFESpace}(undef, length(E))
         for component_idx in eachindex(polar_splines)
             polar_splines[component_idx] =
                 _build_polar_spline_space(
@@ -182,7 +182,7 @@ Build the polar spline space from the tensor product space.
 - `two_poles::Bool`: Whether the polar spline space has two poles.
 
 # Returns
-- `polar_splines::AbstractMultiPatchFESpace`: The polar spline space.
+- `polar_splines::AbstractFESpace`: The polar spline space.
 """
 function _build_polar_extraction_and_dof_partition(tp_space, E, two_poles)
     # number of elements

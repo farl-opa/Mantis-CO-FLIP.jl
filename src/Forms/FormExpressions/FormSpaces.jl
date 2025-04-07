@@ -35,9 +35,10 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
         ) where {
             manifold_dim,
             num_components,
+            num_patches,
             G <: Geometry.AbstractGeometry{manifold_dim},
-            F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components},
-        } 
+            F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components, num_patches},
+        }
 
     General constructor for differential form spaces.
 
@@ -46,7 +47,7 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
     - `geometry::G`: The geometry where the form is defined.
     - `fem_space::F`: The function space used to represent the form.
     - `label::String`: The label of the form space.
-    
+
     # Returns
     - `FormSpace{manifold_dim, form_rank, G, F}`: The FormSpace structure.
     """
@@ -55,8 +56,9 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
     ) where {
         manifold_dim,
         num_components,
+        num_patches,
         G <: Geometry.AbstractGeometry{manifold_dim},
-        F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components},
+        F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components, num_patches},
     }
         if (form_rank ∈ Set([0, manifold_dim])) && (num_components > 1)
             throw(

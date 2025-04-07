@@ -22,10 +22,11 @@ function get_component_spaces(
 end
 
 """
-    get_component_space(space::AbstractFESpace, idx::int)
+    get_component_space(space::AbstractFESpace, component_idx::int)
 
-Get the `idx`th component space of the (multi-)component finite element space. For a single
-component space, this function will return the original space if `idx` is 1.
+Get the `component_idx`th component space of the (multi-)component finite element space.
+For a single component space, this function will return the original space if
+`component_idx` is 1.
 
 # Arguments
 - `space::AbstractFESpace`: A (multi-)component finite element space.
@@ -34,22 +35,157 @@ component space, this function will return the original space if `idx` is 1.
 - `component_spaces::AbstractFESpace`: A single-component finite element space.
 
 # Exceptions
-- ArgumentError: When `idx` > 1 and there is only one component.
-- BoundsError: When `idx` larger than the number of components, and the FE space has more
-    than 1 component.
+- ArgumentError: When `component_idx` > 1 and there is only one component.
+- BoundsError: When `component_idx` larger than the number of components, and the FE space
+    has more than 1 component.
 """
-function get_component_space(space::AbstractFESpace, idx::Int)
-    return space.component_spaces[idx]
+function get_component_space(space::AbstractFESpace, component_idx::Int)
+    return get_component_spaces(space)[component_idx]
 end
 
 function get_component_space(
-    space::AbstractFESpace{manifold_dim, 1, num_patches}, idx::Int
+    space::AbstractFESpace{manifold_dim, 1, num_patches}, component_idx::Int
 ) where {manifold_dim, num_patches}
-    if idx == 1
+    if component_idx == 1
         return space
     else
-        throw(ArgumentError("Component $idx requested, but $space only has 1 component."))
+        throw(ArgumentError("Component $component_idx requested, but $space only has 1 component."))
     end
+end
+
+"""
+    get_patch_spaces(space::AbstractFESpace)
+
+Get the patch spaces of the (multi-)patch finite element space. For a single patch space,
+this function will return a length-1 tuple with `space`.
+
+# Arguments
+- `space::AbstractFESpace`: A (multi-)patch finite element space.
+
+# Returns
+- `<:Tuple{AbstractFESpace}`: Tuple of single-patch spaces of length `num_patches`.
+"""
+function get_patch_spaces(space::AbstractFESpace)
+    return space.patch_spaces
+end
+
+function get_patch_spaces(
+    space::AbstractFESpace{manifold_dim, num_components, 1}
+) where {manifold_dim, num_components}
+    return (space,)
+end
+
+"""
+    get_patch_space(space::AbstractFESpace, patch_id::int)
+
+Get the `patch_id`th patch space of the (multi-)patch finite element space.
+For a single patch space, this function will return the original space if
+`patch_id` is 1.
+
+# Arguments
+- `space::AbstractFESpace`: A (multi-)patch finite element space.
+
+# Returns
+- `<:AbstractFESpace`: A single-patch finite element space.
+
+# Exceptions
+- ArgumentError: When `patch_id` > 1 and there is only one patch.
+- BoundsError: When `patch_id` larger than the number of components, and the FE space
+    has more than 1 patch.
+"""
+function get_patch_space(space::AbstractFESpace, patch_id::Int)
+    return get_patch_spaces(space)[patch_id]
+end
+
+function get_patch_space(
+    space::AbstractFESpace{manifold_dim, num_components, 1}, patch_id::Int
+) where {manifold_dim, num_components}
+    if patch_id == 1
+        return space
+    else
+        throw(ArgumentError("Space on patch $patch_id requested, but $space only has 1 patch."))
+    end
+end
+
+"""
+    get_num_elements_per_patch(space::AbstractFESpace)
+
+Get the number of elements per patch in the multi-patch finite element space.
+
+# Arguments
+- `space::AbstractFESpace`: The multi-patch space.
+
+# Returns
+- `::NTuple{num_patches, Int}`: The number of elements per patch.
+"""
+function get_num_elements_per_patch(
+    space::AbstractFESpace{manifold_dim, num_components, num_patches}
+) where {manifold_dim, num_components, num_patches}
+    return ntuple(num_patches) do patch_id
+        return get_num_elements(get_patch_space(space, patch_id))
+    end
+end
+
+"""
+    get_patch_id(space::AbstractFESpace, element_id::Int)
+
+Get the ID of the patch to which the specified global element belongs.
+
+# Arguments
+- `space::AbstractFESpace`: The multi-patch space.
+- `element_id::Int`: The global element ID.
+
+# Returns
+- `::Int`: ID of the patch to which the element belongs.
+"""
+function get_patch_id(space::AbstractFESpace, element_id::Int)
+    return findfirst(element_id .<= cumsum(get_num_elements_per_patch(space)))
+end
+
+function get_patch_id(
+    space::AbstractFESpace{manifold_dim, num_components, 1}, element_id::Int
+) where {manifold_dim, num_components}
+    return 1
+end
+
+"""
+    get_patch_and_local_element_id(space::AbstractFESpace, element_id::Int)
+
+Get the constituent patch ID and local element ID for the specified global element ID.
+
+# Arguments
+- `space::AbstractFESpace`: The multi-patch space.
+- `element_id::Int`: The global element ID.
+
+# Returns
+- `patch_id::Int`: The patch ID
+- `local_element_id::Int`: The local element ID.
+"""
+function get_patch_and_local_element_id(space::AbstractFESpace, element_id::Int)
+    patch_id = get_patch_id(space, element_id)
+    local_element_id = element_id - sum(
+        get_num_elements, get_patch_space(space, i) for i in 1:patch_id-1; init=0
+    )
+    return patch_id, local_element_id
+end
+
+"""
+    get_global_element_id(space::AbstractFESpace, patch_id::Int, local_element_id::Int)
+
+Get the global element ID for the specified constituent patch ID and local element ID.
+
+# Arguments
+- `space::AbstractFESpace`: A (multi-)patch space.
+- `patch_id::Int`: The constituent patch ID.
+- `local_element_id::Int`: The local element ID.
+
+# Returns
+- `::Int`: The global element ID.
+"""
+function get_global_element_id(space::AbstractFESpace, patch_id::Int, local_element_id::Int)
+    return sum(
+        get_num_elements, get_patch_space(space, i) for i in 1:patch_id-1; init=0
+    ) + local_element_id
 end
 
 """
@@ -184,23 +320,21 @@ function get_num_basis(space::AbstractFESpace, element_id::Int)
 end
 
 """
-    get_dof_partition(space::AbstractFESpace{manifold_dim, 1}) where {manifold_dim}
+    get_dof_partition(space::AbstractFESpace)
 
 Retrieve and return the degrees of freedom (d.o.f.s) partition for `space`.
 
 # Arguments
-- `space::AbstractFESpace{manifold_dim, 1}`: Single-component finite element space.
+- `space::AbstractFESpace`: Single-component finite element space.
 
 # Returns
 - `::Vector{Vector{Vector{Int}}}`: Nested d.o.f. partition. The first level of nesting
     corresponds to the patch. The second level corresponds to the division (see ... for its
     definition). The third level corresponds to the individual d.o.f.s.
 """
-function get_dof_partition(space::AbstractFESpace{manifold_dim, 1}) where {manifold_dim}
+function get_dof_partition(space::AbstractFESpace)
     return space.dof_partition
 end
-
-#TODO: Fix the get_dof_partition function for multiple patches.
 
 """
     get_max_local_dim(space::AbstractFESpace)
@@ -252,6 +386,24 @@ Returns the number of elements in the underlying partition.
 """
 function get_num_elements(space::AbstractFESpace)
     return get_num_elements(get_extraction_operator(space))
+end
+
+"""
+    get_element_size(bspline::BSplineSpace, element_id::Int)
+
+Returns the size of the element specified by `element_id`.
+
+# Arguments
+- `bspline::BSplineSpace`: The B-Spline function space.
+- `element_id::Int`: The id of the element.
+
+# Returns
+- `::Float64`: The size of the element.
+"""
+function get_element_dimensions(space::AbstractFESpace, element_id::Int)
+    patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
+
+    return get_element_dimensions(get_patch_space(space, patch_id), local_element_id)
 end
 
 """
@@ -361,11 +513,11 @@ function evaluate(
 
     for component_idx in 1:num_components
         component_space = get_component_space(space, component_idx)
-        extraction_coefficients, basis_indices = get_extraction(component_space, element_id)
+        extraction_coefficients, _ = get_extraction(component_space, element_id)
         component_basis = get_local_basis(component_space, element_id, xi, nderivatives)
         for key in der_keys
             key = key[1:manifold_dim]
-            j = sum(key) # order of derivative
+            j = sum(key)  # order of derivative
             der_idx = get_derivative_idx(key)
 
             evaluations[j + 1][der_idx][component_idx][
@@ -459,11 +611,11 @@ at a given point `xi` in the element `element_id`.
 - `::SparseMatrixCSC{Float64}`: Global basis functions, size = n_dofs x nderivatives+1
 """
 function _evaluate_all_at_point(
-    fem_space::AbstractFESpace{1, num_components},
+    fem_space::AbstractFESpace{1, num_components, num_patches},
     element_id::Int,
     xi::Float64,
     nderivatives::Int,
-) where {num_components}
+) where {num_components, num_patches}
     basis_eval, basis_indices = evaluate(fem_space, element_id, ([xi],), nderivatives)
     nloc = length(basis_indices)
     ndofs = get_num_basis(fem_space)
@@ -475,7 +627,7 @@ function _evaluate_all_at_point(
         for i in 1:nloc
             I[count + 1] = basis_indices[i]
             J[count + 1] = r + 1
-            V[count + 1] = basis_eval[r + 1][1][1, i]
+            V[count + 1] = basis_eval[r + 1][1][1][1, i]
             count += 1
         end
     end
@@ -551,15 +703,16 @@ end
 
 include("FiniteElementSpacesHelpers.jl")
 include("ExtractionOperator.jl")
-include("RationalFiniteElementSpaces.jl")
+include("OtherSpaces/RationalFiniteElementSpaces.jl")
 include("UnivariateSplines/UnivariateSplines.jl")
 
 # composite function spaces
 include("TensorProductSpaces/TensorProductSpaces.jl")
-# include("MultiPatchSpaces/MultiPatchSpaces.jl")
+include("UnstructuredSpaces/GTBSplines.jl")
+include("UnstructuredSpaces/PolarSplines.jl")
 
 include("TwoScaleRelations/AbstractTwoScaleRelations.jl")
 
 include("Hierarchical/Hierarchical.jl")
 
-include("MultiComponentSpaces/MultiComponentSpaces.jl")
+# include("MultiComponentSpaces/MultiComponentSpaces.jl")

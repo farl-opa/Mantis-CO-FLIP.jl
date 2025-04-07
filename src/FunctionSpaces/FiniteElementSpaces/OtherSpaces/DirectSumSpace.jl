@@ -26,41 +26,32 @@ struct DirectSumSpace{manifold_dim, num_components, num_patches, F} <:
     end
 end
 
-get_num_basis(space::DirectSumSpace) = sum(get_num_basis.(space.component_spaces))
+get_num_basis(space::DirectSumSpace) = sum(get_num_basis.(get_component_spaces(space)))
 function get_num_basis(space::DirectSumSpace, element_id::Int)
     return sum(get_num_basis.(get_component_spaces(space), element_id))
 end
 
-function get_basis_indices(
-    space::DirectSumSpace{manifold_dim, num_components, F}, element_idx::Int
-) where {manifold_dim, num_components, F}
-    component_basis_indices =
-        FunctionSpaces.get_basis_indices.(space.component_spaces, element_idx)
-    dof_offset_component = _get_dof_offsets(space)
-
-    multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
-    for component_idx in 1:num_components
-        multivalued_basis_indices[component_idx] =
-            component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
+function get_component_space(
+    space::DirectSumSpace{manifold_dim, 1, F}, component_idx::Int
+) where {manifold_dim, F}
+    if component_idx == 1
+        return space.component_spaces[1]
+    else
+        throw(ArgumentError("Component $component_idx requested, but $space only has 1 component."))
     end
-
-    return reduce(vcat, multivalued_basis_indices)
 end
 
-function _get_dof_offsets(
-    space::DirectSumSpace{manifold_dim, num_components, F}
-) where {manifold_dim, num_components, F}
-    num_dofs_component = FunctionSpaces.get_num_basis.(space.component_spaces)
-    dof_offset_component = zeros(Int, num_components)
-    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components - 1)])
-    return dof_offset_component
+function get_component_spaces(
+    space::DirectSumSpace{manifold_dim, 1, F}
+) where {manifold_dim, F}
+    return space.component_spaces
 end
 
 function get_basis_indices_w_components(
     space::DirectSumSpace{manifold_dim, num_components, F}, element_id::Int
 ) where {manifold_dim, num_components, F}
     component_basis_indices =
-        FunctionSpaces.get_basis_indices.(space.component_spaces, element_id)
+        FunctionSpaces.get_basis_indices.(get_component_spaces(space), element_id)
     dof_offset_component = _get_dof_offsets(space)
 
     multivalued_basis_indices = Vector{Vector{Int}}(undef, num_components)
@@ -69,12 +60,25 @@ function get_basis_indices_w_components(
             component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
 
-    return reduce(vcat, multivalued_basis_indices), component_basis_indices
+    return reduce(vcat, multivalued_basis_indices), multivalued_basis_indices#component_basis_indices
+end
+
+function get_basis_indices(space::DirectSumSpace, element_id::Int)
+    return get_basis_indices_w_components(space, element_id)[1]
+end
+
+function _get_dof_offsets(
+    space::DirectSumSpace{manifold_dim, num_components, F}
+) where {manifold_dim, num_components, F}
+    num_dofs_component = FunctionSpaces.get_num_basis.(get_component_spaces(space))
+    dof_offset_component = zeros(Int, num_components)
+    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components - 1)])
+    return dof_offset_component
 end
 
 function get_max_local_dim(space::DirectSumSpace)
     max_local_dim = 0
-    for space in space.component_spaces
+    for space in get_component_spaces(space)
         max_local_dim += get_max_local_dim(space)
     end
     return max_local_dim
@@ -96,7 +100,7 @@ offsetted by the (cumulative) dimension(s) of preceding section spaces.
 """
 function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
     component_dof_partition = deepcopy(
-        get_dof_partition(space.component_spaces[component_idx])
+        get_dof_partition(get_component_space(space, component_idx))
     )
     dof_offset_component = _get_dof_offsets(space)[component_idx]
     for i in eachindex(component_dof_partition)

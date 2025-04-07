@@ -1,5 +1,5 @@
 """
-    GTBSplineSpace{num_patches, T} <: AbstractMultiPatchFESpace{1, 1, num_patches}
+    GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
 
 Constructs a GTBSplineSpace from a tuple of NURBS or B-spline spaces and a vector of
 regularity conditions.
@@ -14,9 +14,8 @@ with `r > -1`.
 - `regularity::Vector{Int}`: A vector of regularity conditions at the interfaces between
     the spaces.
 
-
 # Arguments for constructor
-- `patch_spaces::NTuple{m,T}`: A tuple of `m` NURBS or B-spline spaces.
+- `patch_spaces::NTuple{num_patches, T}`: A tuple of `num_patches` NURBS or B-spline spaces.
 - `regularity::Vector{Int}`: A vector of regularity conditions at the interfaces between
     the spaces.
 
@@ -26,7 +25,7 @@ with `r > -1`.
 - `ArgumentError`: If the minimal polynomial degree of any pair of adjacent spaces is less
     than the corresponding regularity condition.
 """
-struct GTBSplineSpace{num_patches, T} <: AbstractMultiPatchFESpace{1, 1, num_patches}
+struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
     patch_spaces::T
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
@@ -75,11 +74,11 @@ struct GTBSplineSpace{num_patches, T} <: AbstractMultiPatchFESpace{1, 1, num_pat
         dof_partition = Vector{Vector{Vector{Int}}}(undef, 1)
         dof_partition[1] = Vector{Vector{Int}}(undef, 3)
         # get the number of boundary dofs
-        ndofs_left = 1
-        ndofs_right = 1
-        if regularity[m] > -1 # periodic space: non-default dof partitioning
-            ndofs_left = 0
-            ndofs_right = 0
+        n_dofs_left = 1
+        n_dofs_right = 1
+        if regularity[num_patches] > -1 # periodic space: non-default dof partitioning
+            n_dofs_left = 0
+            n_dofs_right = 0
         end
         # First, store the left dofs ...
         dof_partition[1][1] = collect(1:n_dofs_left)
@@ -99,4 +98,26 @@ struct GTBSplineSpace{num_patches, T} <: AbstractMultiPatchFESpace{1, 1, num_pat
             collect(map(get_num_elements, patch_spaces)),
             regularity)
     end
+end
+
+# Specialise for the single patch case, as the default get_patch_space for a single-patch
+# space returns itself, leading to an infinite recursion.
+function get_patch_space(space::GTBSplineSpace{1, T}, patch_id::Int) where {T}
+    if patch_id == 1
+        return space.patch_spaces[1]
+    else
+        throw(ArgumentError("Space on patch $patch_id requested, but $space only has 1 patch."))
+    end
+end
+
+function get_local_basis(
+    space::GTBSplineSpace,
+    element_id::Int,
+    xi::NTuple{1, Vector{Float64}},
+    nderivatives::Int,
+)
+    # We need space ID and local element ID to know which function space to evaluate.
+    patch_id, patch_element_id = get_patch_and_local_element_id(space, element_id)
+
+    return evaluate(get_patch_space(space, patch_id), patch_element_id, xi, nderivatives)[1]
 end

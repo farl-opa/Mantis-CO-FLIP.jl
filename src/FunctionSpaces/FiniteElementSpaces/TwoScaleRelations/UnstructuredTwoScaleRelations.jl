@@ -1,9 +1,9 @@
 """
     build_two_scale_operator(
-        coarse_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
-        fine_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
-        nsubdivisions::NTuple{m, NTuple{manifold_dim, Int}},
-    ) where {manifold_dim, m}
+        coarse_us_space::AbstractFESpace{manifold_dim, num_patches},
+        fine_us_space::AbstractFESpace{manifold_dim, num_patches},
+        nsubdivisions::NTuple{num_patches, NTuple{manifold_dim, Int}},
+    ) where {manifold_dim, num_patches}
 
 Build the two-scale operator for a general unstructured space. The fine space is assumed to
 be obtained from the coarse space by subdividing the `i`-th patch into `nsubdivisions[i]`
@@ -14,23 +14,23 @@ sub-elements.
     manner by solving a least-squares problem.
 
 # Arguments
-- `coarse_us_space::AbstractMultiPatchFESpace{manifold_dim,m}`: The coarse unstructured space.
-- `fine_us_space::AbstractMultiPatchFESpace{manifold_dim,m}`: The fine unstructured space.
-- `nsubdivisions::NTuple{m, NTuple{manifold_dim,Int}}`: The number of subdivisions.
+- `coarse_us_space::AbstractFESpace{manifold_dim,num_patches}`: The coarse unstructured space.
+- `fine_us_space::AbstractFESpace{manifold_dim,num_patches}`: The fine unstructured space.
+- `nsubdivisions::NTuple{num_patches, NTuple{manifold_dim,Int}}`: The number of subdivisions.
 
 # Returns
 - `two_scale_op::TwoScaleOperator`: The two-scale operator.
 """
 function build_two_scale_operator(
-    coarse_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
-    fine_us_space::AbstractMultiPatchFESpace{manifold_dim, m},
-    nsubdivisions::NTuple{m, NTuple{manifold_dim, Int}},
-) where {manifold_dim, m}
+    coarse_us_space::AbstractFESpace{manifold_dim, 1, num_patches},
+    fine_us_space::AbstractFESpace{manifold_dim, 1, num_patches},
+    nsubdivisions::NTuple{num_patches, NTuple{manifold_dim, Int}},
+) where {manifold_dim, num_patches}
     # Build the two-scale operators for the individual function spaces that form the coarse
     # unstructured space.
     discontinuous_two_scale_ops = ntuple(
         i -> build_two_scale_operator(coarse_us_space.function_spaces[i], nsubdivisions[i]),
-        m,
+        num_patches,
     )
 
     ###
@@ -44,7 +44,7 @@ function build_two_scale_operator(
     # Next, concatenate the two_scale_operator subdivision matrices in a block diagonal
     # format
     discontinuous_subdivision_mat = SparseArrays.blockdiag(
-        [discontinuous_two_scale_ops[i][1].global_subdiv_matrix for i in 1:m]...
+        [discontinuous_two_scale_ops[i][1].global_subdiv_matrix for i in 1:num_patches]...
     )
 
     # Finally, compute the two-scale matrix by solving a least-squares problem
@@ -59,7 +59,7 @@ function build_two_scale_operator(
     coarse_to_fine_elements = Vector{Vector{Int}}(undef, get_num_elements(coarse_us_space))
     # loop over coarse elements, and find global fine element ids that are contained in each
     # coarse element
-    for i in 1:m
+    for i in 1:num_patches
         for j in 1:get_num_elements(coarse_us_space.function_spaces[i])
             global_coarse_el_id = get_global_element_id(coarse_us_space, i, j)
             local_coarse_to_fine_elements = discontinuous_two_scale_ops[i][1].coarse_to_fine_elements[j]
@@ -73,7 +73,7 @@ function build_two_scale_operator(
     fine_to_coarse_elements = Vector{Int}(undef, get_num_elements(fine_us_space))
     # loop over fine elements, and find the global coarse element id that contains each
     # fine element
-    for i in 1:m
+    for i in 1:num_patches
         for j in 1:get_num_elements(fine_us_space.function_spaces[i])
             global_fine_el_id = get_global_element_id(fine_us_space, i, j)
             fine_to_coarse_elements[global_fine_el_id] = get_global_element_id(
