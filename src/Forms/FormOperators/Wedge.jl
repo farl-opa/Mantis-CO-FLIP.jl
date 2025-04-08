@@ -72,6 +72,10 @@ struct Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2} <:
     end
 end
 
+function ∧(form_1::AbstractFormExpression, form_2::AbstractFormExpression)
+    return Wedge(form_1, form_2)
+end
+
 """
     get_forms(wedge::Wedge)
 

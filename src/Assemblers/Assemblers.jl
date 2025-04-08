@@ -8,19 +8,20 @@ module Assemblers
 import LinearAlgebra
 import SparseArrays; const spa = SparseArrays
 
-import .. Geometry
-import .. Forms
-import .. Quadrature
-import .. Mesh
-import .. FunctionSpaces
-import .. Analysis
+using ..Geometry
+using ..Forms
+using ..Quadrature
+using ..Mesh
+using ..FunctionSpaces
+using ..Analysis
 
 abstract type AbstractInputs end
 
-
-include("WeakFormulations.jl")
+# include("WeakFormulations.jl")
+include("temp_WeakFormInputs.jl")
 include("GlobalAssemblers.jl")
+include("temp_GlobalAssemblers.jl")
 include("AssemblersHelpers.jl")
-
+include("temp_WeakForms.jl")
 
 end

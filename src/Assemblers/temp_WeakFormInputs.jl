@@ -1,11 +1,9 @@
 struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
-    quad_rule::Quadrature.QuadratureRule{manifold_dim}
     trial_forms::TrF
     test_forms::TeF
     forcing::F
 
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         trial_forms::TrF,
         test_forms::TeF,
         forcing::F,
@@ -18,11 +16,10 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TeF <: NTuple{num_TeF, Forms.AbstractFormSpace{manifold_dim}},
         F <: NTuple{num_F, Forms.AbstractFormField{manifold_dim}},
     }
-        return new{manifold_dim, TrF, TeF, F}(quad_rule, trial_forms, test_forms, forcing)
+        return new{manifold_dim, TrF, TeF, F}(trial_forms, test_forms, forcing)
     end
 
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         trial_forms::TrF,
         test_forms::TeF,
     ) where {
@@ -33,13 +30,12 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TeF <: NTuple{num_TeF, Forms.AbstractFormSpace{manifold_dim}},
     }
         return new{manifold_dim, TrF, TeF, Tuple{Nothing}}(
-            quad_rule, trial_forms, test_forms, (nothing,)
+            trial_forms, test_forms, (nothing,)
         )
     end
 
     # Convenience constructor for single trial, test and forcing forms..
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         trial_forms::TrF,
         test_forms::TeF,
         forcing::F,
@@ -49,12 +45,11 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TeF <: Forms.AbstractFormSpace{manifold_dim},
         F <: Forms.AbstractFormField{manifold_dim}
     }
-        return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,), (forcing,)) 
+        return WeakFormInputs((trial_forms,), (test_forms,), (forcing,)) 
     end
 
     # Convenience constructor for single trial, test and forcing forms..
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         trial_forms::TrF,
         test_forms::TeF,
     ) where {
@@ -62,12 +57,11 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TrF <: Forms.AbstractFormSpace{manifold_dim},
         TeF <: Forms.AbstractFormSpace{manifold_dim},
     }
-        return WeakFormInputs(quad_rule, (trial_forms,), (test_forms,)) 
+        return WeakFormInputs((trial_forms,), (test_forms,)) 
     end
 
     # Convenience constructor for Galerking methods: trial and test spaces are the same.
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         forms::TrF,
         forcing::F,
     ) where {
@@ -77,25 +71,23 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
         F <: NTuple{num_F, Forms.AbstractFormField{manifold_dim}},
     }
-        return WeakFormInputs(quad_rule, forms, forms, forcing)
+        return WeakFormInputs(forms, forms, forcing)
     end
 
     # Convenience constructor for Galerking methods: trial and test spaces are the same.
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         forms::TrF,
     ) where {
         manifold_dim,
         num_TrF,
         TrF <: NTuple{num_TrF, Forms.AbstractFormSpace{manifold_dim}},
     }
-        return WeakFormInputs(quad_rule, forms, forms)
+        return WeakFormInputs(forms, forms)
     end
 
     # Convenience constructor for single-space Galerking methods: trial and test spaces are
     # the same.
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         forms::TrF,
         forcing::F
     ) where {
@@ -103,23 +95,21 @@ struct WeakFormInputs{manifold_dim, TrF, TeF, F} <: AbstractInputs
         TrF <: Forms.AbstractFormSpace{manifold_dim},
         F <: Forms.AbstractFormField{manifold_dim}
     }
-        return WeakFormInputs(quad_rule, (forms,), (forms,), (forcing,))
+        return WeakFormInputs((forms,), (forms,), (forcing,))
     end
 
     # Convenience constructor for single-space Galerking methods: trial and test spaces are
     # the same.
     function WeakFormInputs(
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
         forms::TrF,
     ) where {
         manifold_dim,
         TrF <: Forms.AbstractFormSpace{manifold_dim},
     }
-        return WeakFormInputs(quad_rule, forms, forms)
+        return WeakFormInputs(forms, forms)
     end
 end
 
-get_quadrature_rule(wf_inputs::WeakFormInputs) = wf_inputs.quad_rule
 get_trial_forms(wf_inputs::WeakFormInputs) = wf_inputs.trial_forms
 get_test_forms(wf_inputs::WeakFormInputs) = wf_inputs.test_forms
 get_forcing(wf_inputs::WeakFormInputs) = wf_inputs.forcing

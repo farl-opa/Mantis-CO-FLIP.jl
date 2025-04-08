@@ -55,6 +55,10 @@ struct Hodge{manifold_dim, form_rank, expression_rank, G, F} <:
     end
 end
 
+function ★(form::AbstractFormExpression)
+    return Hodge(form)
+end
+
 ############################################################################################
 #                                         Getters                                          #
 ############################################################################################

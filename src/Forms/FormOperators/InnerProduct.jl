@@ -54,10 +54,10 @@ struct InnerProduct{F1, F2, G}
 
         return new{F1, F2, G}(form_1, form_2)
     end
+end
 
-    function Base.:*(form_1::AbstractFormExpression, form_2::AbstractFormExpression)
-        return InnerProduct(form_1, form_2)
-    end
+function ⋅(form_1::AbstractFormExpression, form_2::AbstractFormExpression)
+    return InnerProduct(form_1, form_2)
 end
 
 """
