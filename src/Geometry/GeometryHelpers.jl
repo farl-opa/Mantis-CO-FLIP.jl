@@ -77,3 +77,44 @@ function create_curvilinear_square(
 
     return MappedGeometry(unit_square, curved_mapping)
 end
+
+############################################################################################
+#                                         Mappings                                         #
+############################################################################################
+
+function affine_map(
+    xi::NTuple{manifold_dim, Vector{Float64}},
+    A::Matrix,
+    b::Vector,
+) where {manifold_dim}
+    num_points_per_dim = length.(xi)
+    num_points = prod(num_points_per_dim)
+    mapped_dim = size(A, 1)
+    mapped_xi = ntuple(mapped_dim) do _ 
+        return zeros(Float64, num_points)
+    end
+    
+    xi_ord_id = CartesianIndices(num_points_per_dim)
+    xi_lin_id = LinearIndices(xi_ord_id)
+    for (lin_point, ord_point) in zip(xi_lin_id, xi_ord_id)
+        for j in axes(A, 2) 
+            for i in axes(A, 1)
+                mapped_xi[i][lin_point] += A[i, j] * xi[j][ord_point[j]] 
+            end
+        end
+        for i in axes(b, 1)
+            mapped_xi[i][lin_point] += b[i]
+        end
+    end
+
+
+    return mapped_xi
+end
+
+############################################################################################
+#                                      Other methods                                       #
+############################################################################################
+
+function vec_tuple_to_matrix(vec_tup)
+    return hcat(vec_tup...)
+end

@@ -13,13 +13,14 @@ import .. Forms
 import .. Quadrature
 import .. Mesh
 import .. FunctionSpaces
-
+import .. Analysis
 
 abstract type AbstractInputs end
 
 
 include("WeakFormulations.jl")
 include("GlobalAssemblers.jl")
+include("AssemblersHelpers.jl")
 
 function get_trace_dofs(space::FunctionSpaces.AbstractFESpace{2, 1})
     return [i for j in [1, 2, 3, 4, 6, 7, 8, 9] for i in space.dof_partition[1][j]]
