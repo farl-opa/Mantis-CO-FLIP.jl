@@ -79,7 +79,7 @@ qrule = Mantis.Quadrature.tensor_product_rule(
     p .+ 1, Mantis.Quadrature.gauss_legendre
 )
 
-wfi = Mantis.Assemblers.WeakFormInputs(f⁰, Λ⁰, Λ⁰, qrule)
+wfi = Mantis.Assemblers.WeakFormInputs(qrule, Λ⁰, Λ⁰, f⁰)
 ````
 
 We define the weak form for the Hodge-Laplacian. The weak form is defined as a function
@@ -91,15 +91,20 @@ function zero_form_hodge_laplacian(
     inputs::Mantis.Assemblers.WeakFormInputs,
     element_id,
 )
-    dtrial = Mantis.Forms.exterior_derivative(inputs.space_trial[1])
-    dtest = Mantis.Forms.exterior_derivative(inputs.space_test[1])
+    dtrial = Mantis.Forms.ExteriorDerivative(Mantis.Assemblers.get_trial_forms(inputs)[1])
+    dtest = Mantis.Forms.ExteriorDerivative(Mantis.Assemblers.get_test_forms(inputs)[1])
 
-    Ar, Ac, Av = Mantis.Forms.evaluate_inner_product(
-        dtest, dtrial, element_id, inputs.quad_rule
+    A11 = Mantis.Forms.InnerProduct(dtest, dtrial)
+    Ar, Ac, Av = Mantis.Forms.evaluate(
+        A11, element_id, Mantis.Assemblers.get_quadrature_rule(inputs)
     )
 
-    br, bc, bv = Mantis.Forms.evaluate_inner_product(
-        inputs.space_test[1], inputs.forcing[1], element_id, inputs.quad_rule
+    b1 = Mantis.Forms.InnerProduct(
+        Mantis.Assemblers.get_test_forms(inputs)[1],
+        Mantis.Assemblers.get_forcing(inputs)[1],
+    )
+    br, bc, bv = Mantis.Forms.evaluate(
+        b1, element_id, Mantis.Assemblers.get_quadrature_rule(inputs)
     )
 
     return (Ar, Ac, Av), (br, bv)
@@ -187,7 +192,7 @@ qrule_3D = Mantis.Quadrature.tensor_product_rule(
     p_3D .+ 1, Mantis.Quadrature.gauss_legendre
 )
 
-wfi_3D = Mantis.Assemblers.WeakFormInputs(f⁰_3D, Λ⁰_3D, Λ⁰_3D, qrule_3D)
+wfi_3D = Mantis.Assemblers.WeakFormInputs(qrule_3D, Λ⁰_3D, Λ⁰_3D, f⁰_3D)
 
 bc_dirichlet_3D = Dict(Mantis.Assemblers.get_trace_dofs(B_3D) .=> 0.0)
 
