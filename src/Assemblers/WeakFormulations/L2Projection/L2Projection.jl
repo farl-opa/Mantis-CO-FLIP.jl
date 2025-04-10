@@ -21,9 +21,9 @@ function L2_projection(inputs::AbstractInputs, element_id)
     ∫ = get_global_quadrature_rule(inputs)
 
     # The l.h.s. is the inner product between the test and trial functions.
-    A = Forms.wedge(test_forms[1], Forms.hodge(trial_forms[1]))
+    A = Forms.Wedge(test_forms[1], Forms.Hodge(trial_forms[1]))
     # The r.h.s. is the inner product between the test and forcing functions.
-    b = Forms.wedge(test_forms[1], Forms.hodge(forcing[1]))
+    b = Forms.Wedge(test_forms[1], Forms.Hodge(forcing[1]))
 
     # compute contributions
     A_elem, A_idx = Analysis.integrate(

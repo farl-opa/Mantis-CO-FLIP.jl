@@ -67,8 +67,11 @@ for geom in [geom_cart, geom_crazy]
     zero_form_space = Mantis.Forms.FormSpace(0, geom, TP_Space_0, "ξ")
     # compute inner product assuming unit coefficients for both spaces
     inner_prod_0 = 0.0
+    inner_prod_zero_form = zero_form_space * zero_form_space
     for element_id in 1:1:Mantis.Geometry.get_num_elements(geom)
-        prod_form_rows, prod_form_cols, prod_form_eval = Mantis.Forms.evaluate_inner_product(zero_form_space, zero_form_space, element_id, q_rule)
+        prod_form_rows, prod_form_cols, prod_form_eval = Mantis.Forms.evaluate(
+            inner_prod_zero_form, element_id, q_rule
+        )
         inner_prod_0 += sum(prod_form_eval)
     end
     @test isapprox(inner_prod_0, 1.0, atol=1e-12)
@@ -99,14 +102,14 @@ for geom in [geom_cart, geom_crazy]
     constdx.coefficients[1:Mantis.FunctionSpaces.get_num_basis(dTP_Space_dx)] .= 1.0
     constdy = Mantis.Forms.FormField(one_form_space, "ζ")
     constdy.coefficients[Mantis.FunctionSpaces.get_num_basis(dTP_Space_dx)+1:end] .= 1.0
-    dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+    dα⁰ = Mantis.Forms.ExteriorDerivative(α⁰)
     γ² = Mantis.Forms.FormField(top_form_space, "γ")
     γ².coefficients .= 1.0
-    dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+    dζ¹ = Mantis.Forms.ExteriorDerivative(ζ¹)
 
-    ★α⁰ = Mantis.Forms.hodge(α⁰)
-    ★ζ¹ = Mantis.Forms.hodge(ζ¹)
-    ★γ² = Mantis.Forms.hodge(γ²)
+    ★α⁰ = Mantis.Forms.Hodge(α⁰)
+    ★ζ¹ = Mantis.Forms.Hodge(ζ¹)
+    ★γ² = Mantis.Forms.Hodge(γ²)
 
     # AnalyticalFormFields
     f⁰_analytic = Mantis.Forms.AnalyticalFormField(0, analytical_1valued_form_func, geom, "f")
@@ -121,8 +124,8 @@ for geom in [geom_cart, geom_crazy]
         inv_g, g, det_g = Mantis.Geometry.inv_metric(geom, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         # 0-forms
         integrated_metric_0 = sum(Mantis.Quadrature.get_weights(q_rule) .* det_g)
-        # @test all(isapprox.(Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3], integrated_metric_0, atol=1e-12))
-        @test isapprox(sum(Mantis.Forms.evaluate_inner_product(zero_form_space, zero_form_space, elem_id, q_rule)[3]), integrated_metric_0, atol=1e-12) # same as the previous, but different wat of doing it (field vs space)
+        # @test all(isapprox.(Mantis.Forms.evaluate(α⁰, α⁰, elem_id, q_rule)[3], integrated_metric_0, atol=1e-12))
+        @test isapprox(sum(Mantis.Forms.evaluate(zero_form_space * zero_form_space, elem_id, q_rule)[3]), integrated_metric_0, atol=1e-12) # same as the previous, but different wat of doing it (field vs space)
 
         # Because forms are defined on the parametric domain, the constant coefficents equal to 1 will not result
         # in form equal to 1 evaluated on each element, therefore we need to account for it
@@ -139,43 +142,43 @@ for geom in [geom_cart, geom_crazy]
         # due to the partition of unity property over each element will be
         #   < ζ¹, ζ¹ > = < α dξ¹ + α dξ²,  α dξ¹ + α dξ² > = [α α] gⁱʲ [α α]ᵗ √det(g)
         reference_result = dot(element_dimensions, integrated_metric_1*element_dimensions)
-        @test isapprox(Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(ζ¹ * ζ¹, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
 
         # <dα⁰, dα⁰> for α⁰ a form with constant coefficients, is
         #   <dα⁰, dα⁰> = 0
         # because dα⁰ = 0
         reference_result = 0.0
-        @test isapprox(Mantis.Forms.evaluate_inner_product(dα⁰, dα⁰, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(dα⁰ * dα⁰, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
 
         # < α₁ dξ¹, α₂ dξ² > due to the partition of unity property over each element will be
         #   < α₁ dξ¹, α₂ dξ² > = [α₁ 0] gⁱʲ [0 α₂]ᵗ √det(g) = α₁ g¹² α₂
         reference_result = element_dimensions[1] * integrated_metric_1[1,2] * element_dimensions[2]
-        @test isapprox(Mantis.Forms.evaluate_inner_product(constdx, constdy, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(constdx * constdy, elem_id, q_rule)[3][1], reference_result, atol=1e-12)
         reference_result = element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1]
-        @test isapprox(Mantis.Forms.evaluate_inner_product(constdy, constdx, elem_id, q_rule)[3][1], element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1], atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(constdy * constdx, elem_id, q_rule)[3][1], element_dimensions[2] * integrated_metric_1[2,1] * element_dimensions[1], atol=1e-12)
 
         # This test follows the same logic as the < ζ¹, ζ¹ > test above
         reference_result = dot(element_dimensions, integrated_metric_1*element_dimensions)
-        @test isapprox(sum(Mantis.Forms.evaluate_inner_product(one_form_space, one_form_space, elem_id, q_rule)[3]), reference_result, atol=1e-12)
+        @test isapprox(sum(Mantis.Forms.evaluate(one_form_space * one_form_space, elem_id, q_rule)[3]), reference_result, atol=1e-12)
 
         # 2-forms
         integrated_metric_2 = sum(Mantis.Quadrature.get_weights(q_rule) .* (1.0./det_g))
 
         reference_result = integrated_metric_2 * prod(element_dimensions.^2)
-        @test isapprox(Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3][1], reference_result, atol=1e-12)
-        @test isapprox(Mantis.Forms.evaluate_inner_product(dζ¹, dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
-        @test isapprox(sum(Mantis.Forms.evaluate_inner_product(top_form_space, top_form_space, elem_id, q_rule)[3]), reference_result, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(γ² * γ², elem_id, q_rule)[3][1], reference_result, atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(dζ¹ * dζ¹, elem_id, q_rule)[3][1], 0.0, atol=1e-12)
+        @test isapprox(sum(Mantis.Forms.evaluate(top_form_space * top_form_space, elem_id, q_rule)[3]), reference_result, atol=1e-12)
 
-        # Test if the inner product of the hodges of the forms equals that of the forms
-        @test isapprox(Mantis.Forms.evaluate_inner_product(★α⁰, ★α⁰, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(α⁰, α⁰, elem_id, q_rule)[3], atol=1e-12)
-        @test isapprox(Mantis.Forms.evaluate_inner_product(★ζ¹, ★ζ¹, elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(ζ¹, ζ¹, elem_id, q_rule)[3], atol=1e-12)
-        @test isapprox(Mantis.Forms.evaluate_inner_product(★γ², ★γ², elem_id, q_rule)[3], Mantis.Forms.evaluate_inner_product(γ², γ², elem_id, q_rule)[3], atol=1e-12)
+        # Test if the inner product of the Hodges of the forms equals that of the forms
+        @test isapprox(Mantis.Forms.evaluate(★α⁰ * ★α⁰, elem_id, q_rule)[3], Mantis.Forms.evaluate(α⁰ * α⁰, elem_id, q_rule)[3], atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(★ζ¹ * ★ζ¹, elem_id, q_rule)[3], Mantis.Forms.evaluate(ζ¹ * ζ¹, elem_id, q_rule)[3], atol=1e-12)
+        @test isapprox(Mantis.Forms.evaluate(★γ² * ★γ², elem_id, q_rule)[3], Mantis.Forms.evaluate(γ² * γ², elem_id, q_rule)[3], atol=1e-12)
 
         # AnalyticalFormField tests
         # 0-form
-        total_integrated_analytical_field_0 += Mantis.Forms.evaluate_inner_product(f⁰_analytic, f⁰_analytic, elem_id, q_rule)[3][1]
-        total_integrated_analytical_field_1 += Mantis.Forms.evaluate_inner_product(f¹_analytic, f¹_analytic, elem_id, q_rule)[3][1]
-        total_integrated_analytical_field_n += Mantis.Forms.evaluate_inner_product(f²_analytic, f²_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_0 += Mantis.Forms.evaluate(f⁰_analytic * f⁰_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_1 += Mantis.Forms.evaluate(f¹_analytic * f¹_analytic, elem_id, q_rule)[3][1]
+        total_integrated_analytical_field_n += Mantis.Forms.evaluate(f²_analytic * f²_analytic, elem_id, q_rule)[3][1]
     end
     @test isapprox(total_integrated_analytical_field_0, 16π^4, atol=1e-11)
     @test isapprox(total_integrated_analytical_field_1, 32π^4, atol=1e-11)

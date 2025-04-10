@@ -125,7 +125,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
             # compute error
             error = Mantis.Analysis.L2_norm(∫, uₕ - uₑ)
-            derror = Mantis.Analysis.L2_norm(∫, Mantis.Forms.exterior_derivative(uₕ) - duₑ)
+            derror = Mantis.Analysis.L2_norm(∫, Mantis.Forms.ExteriorDerivative(uₕ) - duₑ)
             errors[p_idx, ss_idx, mesh_idx, 1] = error
             errors[p_idx, ss_idx, mesh_idx, 2] = derror
 

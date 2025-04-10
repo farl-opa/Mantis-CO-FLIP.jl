@@ -16,19 +16,19 @@ function one_form_hodge_laplacian(inputs::AbstractInputs, element_id::Int)
     # Left-hand side
 
     # A11 term = (τ, σ)
-    A_11 = Forms.wedge(test_forms[1], Forms.hodge(trial_forms[1]))
+    A_11 = Forms.Wedge(test_forms[1], Forms.Hodge(trial_forms[1]))
     # A12 term = -(dτ, u)
-    A_12 = Forms.wedge(Forms.exterior_derivative(test_forms[1]), Forms.hodge(trial_forms[2]))
+    A_12 = Forms.Wedge(Forms.ExteriorDerivative(test_forms[1]), Forms.Hodge(trial_forms[2]))
     # A21 term = (v, dσ)
-    A_21 = Forms.wedge(test_forms[2], Forms.hodge(Forms.exterior_derivative(trial_forms[1])))
+    A_21 = Forms.Wedge(test_forms[2], Forms.Hodge(Forms.ExteriorDerivative(trial_forms[1])))
     # A22 term = (dv, du)
-    A_22 = Forms.wedge(
-        Forms.exterior_derivative(test_forms[2]),
-        Forms.hodge(Forms.exterior_derivative(trial_forms[2]))
+    A_22 = Forms.Wedge(
+        Forms.ExteriorDerivative(test_forms[2]),
+        Forms.Hodge(Forms.ExteriorDerivative(trial_forms[2]))
     )
     # b1 term = 0
     # b2 term = (v, f)
-    b_2 = Forms.wedge(test_forms[2], Forms.hodge(forcing[1]))
+    b_2 = Forms.Wedge(test_forms[2], Forms.Hodge(forcing[1]))
 
     # integrate terms
     A_elem_11, A_idx_11 = Analysis.integrate(

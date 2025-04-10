@@ -9,9 +9,9 @@ function maxwell_eigenvalue(
 
     # Left-hand side
     # A term = (du, dv)
-    A = Forms.wedge(
-        Forms.exterior_derivative(test_forms[1]),
-        Forms.hodge(Forms.exterior_derivative(trial_forms[1]))
+    A = Forms.Wedge(
+        Forms.ExteriorDerivative(test_forms[1]),
+        Forms.Hodge(Forms.ExteriorDerivative(trial_forms[1]))
     )
     A_elem, A_idx = Analysis.integrate(
         inputs.quad_rule,
@@ -21,9 +21,9 @@ function maxwell_eigenvalue(
 
     # Right-hand side
     # B term = (u, v)
-    B = Forms.wedge(
+    B = Forms.Wedge(
         test_forms[1],
-        Forms.hodge(trial_forms[1])
+        Forms.Hodge(trial_forms[1])
     )
     B_elem, B_idx = Analysis.integrate(
         inputs.quad_rule,

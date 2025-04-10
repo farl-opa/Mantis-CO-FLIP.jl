@@ -82,15 +82,15 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     constdx.coefficients[begin:20] .= 1.0
     constdy = Mantis.Forms.FormField(one_form_space, "ζ")
     constdy.coefficients[21:end] .= 1.0
-    dα⁰ = Mantis.Forms.exterior_derivative(α⁰)
+    dα⁰ = Mantis.Forms.ExteriorDerivative(α⁰)
     γ² = Mantis.Forms.FormField(top_form_space, "γ")
     γ².coefficients .= 1.0
-    dζ¹ = Mantis.Forms.exterior_derivative(ζ¹)
+    dζ¹ = Mantis.Forms.ExteriorDerivative(ζ¹)
 
-    ★α⁰ = Mantis.Forms.hodge(α⁰)
-    ★ζ¹ = Mantis.Forms.hodge(ζ¹)
-    ★★ζ¹ = Mantis.Forms.hodge(Mantis.Forms.hodge(ζ¹))
-    ★γ² = Mantis.Forms.hodge(γ²)
+    ★α⁰ = Mantis.Forms.Hodge(α⁰)
+    ★ζ¹ = Mantis.Forms.Hodge(ζ¹)
+    ★★ζ¹ = Mantis.Forms.Hodge(★ζ¹)
+    ★γ² = Mantis.Forms.Hodge(γ²)
 
     for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
         # Note that we cannot do mixed inner products
@@ -106,13 +106,13 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
 
         # 1-forms
         # Constant dx form
-        hodge_dx_one_form_eval, hodge_dx_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_dx_one_form_eval, hodge_dx_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdx), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         dx_one_form_eval, dx_one_form_indices = Mantis.Forms.evaluate(constdx, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_dx_one_form_eval[1], -inv_g_times_det_g[:,1,2].*dx_one_form_eval[1], atol=1e-12))
         @test all(isapprox(hodge_dx_one_form_eval[2], inv_g_times_det_g[:,1,1].*dx_one_form_eval[1], atol=1e-12))
 
         # Constant dy form
-        hodge_dy_one_form_eval, hodge_dy_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_dy_one_form_eval, hodge_dy_one_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         dy_one_form_eval, dy_one_form_indices = Mantis.Forms.evaluate(constdy, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_dy_one_form_eval[1], -inv_g_times_det_g[:,2,2].*dy_one_form_eval[2], atol=1e-12))
         @test all(isapprox(hodge_dy_one_form_eval[2], inv_g_times_det_g[:,2,1].*dy_one_form_eval[2], atol=1e-12))
@@ -241,12 +241,12 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
     γ³.coefficients .= 1.0
 
     # Hodge-⋆ of all forms
-    ★α⁰ = Mantis.Forms.hodge(α⁰)
-    ★ζ¹ = Mantis.Forms.hodge(ζ¹)
-    ★★ζ¹ = Mantis.Forms.hodge(Mantis.Forms.hodge(ζ¹))
-    ★ζ² = Mantis.Forms.hodge(ζ²)
-    ★★ζ² = Mantis.Forms.hodge(Mantis.Forms.hodge(ζ²))
-    ★γ³ = Mantis.Forms.hodge(γ³)
+    ★α⁰ = Mantis.Forms.Hodge(α⁰)
+    ★ζ¹ = Mantis.Forms.Hodge(ζ¹)
+    ★★ζ¹ = Mantis.Forms.Hodge(Mantis.Forms.Hodge(ζ¹))
+    ★ζ² = Mantis.Forms.Hodge(ζ²)
+    ★★ζ² = Mantis.Forms.Hodge(Mantis.Forms.Hodge(ζ²))
+    ★γ³ = Mantis.Forms.Hodge(γ³)
 
     for elem_id in 1:Mantis.Geometry.get_num_elements(geom)
         # Note that we cannot do mixed inner products
@@ -262,15 +262,15 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         @test all(isapprox(hodge_0_form_eval[1], det_g, atol=1e-12))
 
         # 1-forms
-        hodge_1_form_dx_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdx), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_1_form_dx_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdx), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         form_dx_eval, form_dx_indices = Mantis.Forms.evaluate(constdx, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_1_form_dx_eval[1][:,1], inv_g_times_det_g[:,1,1].*form_dx_eval[1], atol=1e-12))
 
-        hodge_1_form_dy_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_1_form_dy_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         form_dy_eval, form_dy_indices = Mantis.Forms.evaluate(constdy, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_1_form_dy_eval[2][:,1], inv_g_times_det_g[:,2,2].*form_dy_eval[2], atol=1e-12))
 
-        hodge_1_form_dz_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdz), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_1_form_dz_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdz), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         form_dz_eval, form_dz_indices = Mantis.Forms.evaluate(constdz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_1_form_dz_eval[3][:,1], inv_g_times_det_g[:,3,3].*form_dz_eval[3], atol=1e-12))
 
@@ -287,15 +287,15 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
         @test all(isapprox(hodge_hodge_1_eval[3], form_zeta_eval[3], atol=1e-12))
 
         # 2-forms
-        hodge_2_form_dy_dz_eval, hodge_2_form_dy_dz_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dy_dz), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_2_form_dy_dz_eval, hodge_2_form_dy_dz_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(const_dy_dz), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         form_dy_dz_eval, form_dy_dz_indices = Mantis.Forms.evaluate(const_dy_dz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_2_form_dy_dz_eval[1][:,1], g_div_det_g[:,1,1].*form_dy_dz_eval[1], atol=1e-12))
 
-        hodge_2_form_dz_dx_eval, hodge_2_form_dz_dx_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dz_dx), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_2_form_dz_dx_eval, hodge_2_form_dz_dx_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(const_dz_dx), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         form_dz_dx_eval, form_dz_dx_indices = Mantis.Forms.evaluate(const_dz_dx, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_2_form_dz_dx_eval[2][:,1], g_div_det_g[:,2,2].*form_dz_dx_eval[2], atol=1e-12))
 
-        hodge_2_form_dx_dy_eval, hodge_2_form_dx_dy_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(const_dx_dy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        hodge_2_form_dx_dy_eval, hodge_2_form_dx_dy_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(const_dx_dy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         form_dx_dy_eval, form_dx_dy_indices = Mantis.Forms.evaluate(const_dx_dy, elem_id, Mantis.Quadrature.get_nodes(q_rule))
         @test all(isapprox(hodge_2_form_dx_dy_eval[3][:,1], g_div_det_g[:,3,3].*form_dx_dy_eval[3], atol=1e-12))
 
@@ -325,10 +325,10 @@ for geom in [geo_3d_cart, crazy_geo_3d_cart]
     #                          form_eval[2] .* (inv_g[:, 1, 3] .* inv_g[:, 2, 1] - inv_g[:, 1, 1] .* inv_g[:, 2, 3]) .+
     #                          form_eval[3] .* (inv_g[:, 1, 1] .* inv_g[:, 2, 2] - inv_g[:, 1, 2] .* inv_g[:, 2, 1])) .* sqrt_g
 
-        # hodge_1_form_dy_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        # hodge_1_form_dy_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdy), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         # @test all(isapprox(hodge_1_form_dy_eval[2][:,1], inv_g_times_det_g[:,2,2], atol=1e-12))
 
-        # hodge_1_form_dz_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.hodge(constdz), elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        # hodge_1_form_dz_eval, hodge_1_form_indices = Mantis.Forms.evaluate(Mantis.Forms.Hodge(constdz), elem_id, Mantis.Quadrature.get_nodes(q_rule))
         # @test all(isapprox(hodge_1_form_dz_eval[3][:,1], inv_g_times_det_g[:,3,3], atol=1e-12))
 
         # hodge_1_eval, hodge_1_indices = Mantis.Forms.evaluate(★ζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))

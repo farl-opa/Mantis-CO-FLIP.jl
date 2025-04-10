@@ -1,5 +1,5 @@
 function _L2_norm_square(∫, element_idx, u)
-    u² = Forms.wedge(u, Forms.hodge(u))
+    u² = Forms.Wedge(u, Forms.Hodge(u))
     return integrate(
         ∫,
         element_idx,
@@ -12,6 +12,7 @@ function L2_norm(∫, u)
     for el_id ∈ 1:Quadrature.get_num_elements(∫)
         norm += _L2_norm_square(∫, el_id, u)
     end
+
     return sqrt(norm)
 end
 
@@ -36,7 +37,7 @@ function _compute_square_error_per_element(
             result[elem_id] = _L2_norm_square(quad_rule, elem_id, difference)
         elseif norm == "H1"
             Error("Computing the H1 norm still needs to be updated.")
-            # d_difference = Forms.exterior_derivative(difference)
+            # d_difference = Forms.ExteriorDerivative(difference)
             # result[elem_id] = sum(
             #     Forms.evaluate_inner_product(
             #         d_difference, d_difference, elem_id, quad_rule

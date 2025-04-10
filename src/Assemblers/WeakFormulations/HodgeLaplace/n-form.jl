@@ -23,11 +23,11 @@ function volume_form_hodge_laplacian(inputs::WeakFormInputs, element_id)
     ∫ = get_global_quadrature_rule(inputs)
 
     # First equation: <ε¹, u¹> - <dε¹, ϕ²> = 0
-    A_11 = Forms.wedge(test_forms[1], Forms.hodge(trial_forms[1]))
-    A_12 = Forms.wedge(Forms.exterior_derivative(test_forms[1]), Forms.hodge(trial_forms[2]))
+    A_11 = Forms.Wedge(test_forms[1], Forms.Hodge(trial_forms[1]))
+    A_12 = Forms.Wedge(Forms.ExteriorDerivative(test_forms[1]), Forms.Hodge(trial_forms[2]))
     # Second equation: <ε², du¹> = <ε², f²>
-    A_21 = Forms.wedge(test_forms[2], Forms.hodge(Forms.exterior_derivative(trial_forms[1])))
-    b_21 = Forms.wedge(test_forms[2], Forms.hodge(forcing[1]))
+    A_21 = Forms.Wedge(test_forms[2], Forms.Hodge(Forms.ExteriorDerivative(trial_forms[1])))
+    b_21 = Forms.Wedge(test_forms[2], Forms.Hodge(forcing[1]))
 
     # compute contributions
     A_elem_11, A_idx_11 = Analysis.integrate(∫, element_id, A_11)

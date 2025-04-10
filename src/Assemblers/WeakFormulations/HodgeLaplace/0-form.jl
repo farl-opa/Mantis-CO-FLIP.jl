@@ -21,12 +21,12 @@ function zero_form_hodge_laplacian(inputs::AbstractInputs, element_id)
     ∫ = get_global_quadrature_rule(inputs)
 
     # LHS = (dv, du)
-    A = Forms.wedge(
-        Forms.exterior_derivative(test_forms[1]),
-        Forms.hodge(Forms.exterior_derivative(trial_forms[1]))
+    A = Forms.Wedge(
+        Forms.ExteriorDerivative(test_forms[1]),
+        Forms.Hodge(Forms.ExteriorDerivative(trial_forms[1]))
     )
     # RHS = (v, f)
-    b = Forms.wedge(test_forms[1], Forms.hodge(forcing[1]))
+    b = Forms.Wedge(test_forms[1], Forms.Hodge(forcing[1]))
 
     # compute contributions
     A_elem, A_idx = Analysis.integrate(

@@ -204,7 +204,7 @@ function _plot(form::Forms.AbstractFormExpression{manifold_dim, form_rank, 0, G}
                     point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(form, element_idx, ξ)[1]...)'[:, I_ref]
 
                 elseif form_rank == manifold_dim
-                    point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(Forms.hodge(form), element_idx, ξ)[1]...)'[:, I_ref]
+                    point_data[:, vertex_offset .+ (1:n_vertices_per_subcell)] .= @view hcat(Forms.evaluate(Forms.Hodge(form), element_idx, ξ)[1]...)'[:, I_ref]
 
                 elseif form_rank == 1
                     if range_dim == 2
