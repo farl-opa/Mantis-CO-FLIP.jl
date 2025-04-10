@@ -33,7 +33,10 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
     regularity::Vector{Int}
 
     function GTBSplineSpace(
-        patch_spaces::T, regularity::Vector{Int}
+        patch_spaces::T,
+        regularity::Vector{Int},
+        num_dofs_left::Int = -1,
+        num_dofs_right::Int = -1
     ) where {num_patches, S <: Union{BSplineSpace, RationalFiniteElementSpace}, T <: NTuple{num_patches, S}}
         # Check if the number of regularity conditions matches the number of interfaces
         if length(regularity) != num_patches
@@ -68,28 +71,82 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
 
         # Create the extraction operator
         extraction_op = extract_gtbspline_to_bspline(patch_spaces, regularity)
+        # number of element offsets per patch
+        num_elements_offset = cumsum([0; collect(get_num_elements.(patch_spaces))])
+
+
+        function _get_boundary_dof_inds(patch_id::Int, right_bnd::Bool)
+            # get dof partitioning of the first patch space
+            dof_partition_loc = get_dof_partition(patch_spaces[patch_id])
+            # get all non-zero basis function indices at boundary
+            patch_el_id = 1
+            bnd_id = 1
+            if right_bnd
+                patch_el_id = get_num_elements(patch_spaces[patch_id])
+                bnd_id = 3
+            end
+            # get indices as per local numbering
+            dof_inds_loc = get_basis_indices(patch_spaces[patch_id], patch_el_id)
+            nnz_loc = [
+                findfirst(dof_inds_loc .== i) for i in dof_partition_loc[1][bnd_id]
+            ]
+            # find all non-zero basis function indices at left end of first element
+            el_id = num_elements_offset[patch_id] + 1
+            if right_bnd
+                el_id = num_elements_offset[patch_id + 1]
+            end
+            dof_inds_global = get_basis_indices(extraction_op, el_id)
+            nnz_global = findall(
+                get_extraction_coefficients(extraction_op, el_id)[nnz_loc, :] .!= 0
+            )
+            return unique([dof_inds_global[nnz_global[i][2]] for i in eachindex(nnz_global)])
+        end
 
         # Allocate memory for degree of freedom partitioning: note, even if the 1D space is
         # implemented as a multipatch object, the dof partition treats it as a single patch!
-        dof_partition = Vector{Vector{Vector{Int}}}(undef, 1)
-        dof_partition[1] = Vector{Vector{Int}}(undef, 3)
-        # get the number of boundary dofs
-        n_dofs_left = 1
-        n_dofs_right = 1
-        if regularity[num_patches] > -1 # periodic space: non-default dof partitioning
-            n_dofs_left = 0
-            n_dofs_right = 0
+        dof_partition = Vector{Vector{Vector{Int}}}(undef, num_patches)
+        for i in 1:num_patches
+            dof_partition[i] = Vector{Vector{Int}}(undef, 3)
         end
-        # First, store the left dofs ...
-        dof_partition[1][1] = collect(1:n_dofs_left)
-        # ... then the interior dofs ...
-        dof_partition[1][2] = collect(
-            (n_dofs_left + 1):(get_num_basis(extraction_op) - n_dofs_right)
-        )
-        # ... and then finally the right dofs.
-        dof_partition[1][3] = collect(
-            (get_num_basis(extraction_op) - n_dofs_right + 1):get_num_basis(extraction_op)
-        )
+        # Construct the dof-partitioning at the beginning and end of the patch.
+        if num_dofs_left >= 0 # the number of dofs has been manually set
+            dof_partition[1][1] = collect(1:num_dofs_left)
+        else
+            dof_partition[1][1] = _get_boundary_dof_inds(1, false)
+        end
+        if num_dofs_right >= 0 # the number of dofs has been manually set
+            dof_partition[num_patches][3] = collect(
+                (get_num_basis(extraction_op) - num_dofs_right + 1):get_num_basis(extraction_op)
+            )
+        else
+            dof_partition[num_patches][3] = _get_boundary_dof_inds(num_patches, true)
+        end
+
+        # Then build the dof-partitioning at the interior patch interfaces ...
+        for i in 2:(num_patches)
+            dof_partition[i-1][3] = _get_boundary_dof_inds(i-1, true)
+            dof_partition[i][1] = _get_boundary_dof_inds(i, false)
+        end
+        # ... and then the interiors.
+        for i in 1:num_patches
+            nel1 = num_elements_offset[i]
+            nel2 = num_elements_offset[i+1]
+            bnd_dofs = vcat(dof_partition[i][1], dof_partition[i][3])
+            dof_partition[i][2] = setdiff(
+                get_basis_indices(extraction_op, nel1+1),
+                bnd_dofs
+            )
+            for j in nel1+1:nel2
+                append!(
+                    dof_partition[i][2],
+                    setdiff(
+                        get_basis_indices(extraction_op, j),
+                        bnd_dofs
+                    )
+                )
+            end
+            dof_partition[i][2] = unique(dof_partition[i][2])
+        end
 
         new{num_patches, T}(
             patch_spaces,
