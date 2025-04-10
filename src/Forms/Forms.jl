@@ -10,6 +10,7 @@ using ..Geometry
 using ..Quadrature
 
 import LinearAlgebra
+import SparseArrays
 import Subscripts
 
 ############################################################################################
@@ -40,7 +41,7 @@ abstract type AbstractFormExpression{manifold_dim, form_rank, expression_rank, G
     AbstractFormField{manifold_dim, form_rank, G} <:
     AbstractFormExpression{manifold_dim, form_rank, 0, G}
 
-Supertype for all form fields. 
+Supertype for all form fields.
 
 # Type parameters
 - `manifold_dim`: Dimension of the manifold

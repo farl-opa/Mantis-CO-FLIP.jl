@@ -9,7 +9,7 @@ Represents the inner product between two differential forms.
 
 # Fields
 - `form_1 <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The first
-    form. 
+    form.
 - `form_2 <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The second
     form.
 
@@ -41,13 +41,13 @@ struct InnerProduct{manifold_dim, F1, F2, G} <: AbstractRealValuedOperator{manif
     }
         if expression_rank_1 > 1
             throw(ArgumentError(
-                "Inner product only valid between expressions with expression rank < 2, got: 
+                "Inner product only valid between expressions with expression rank < 2, got:
                 $expression_rank_1",
             ))
         end
         if expression_rank_2 > 1
             throw(ArgumentError(
-                "Inner product only valid between expressions with expression rank < 2, got: 
+                "Inner product only valid between expressions with expression rank < 2, got:
                 $expression_rank_2",
             ))
         end
@@ -63,7 +63,7 @@ end
 """
     get_forms(inner_product::InnerProduct)
 
-Returns the forms to which the inner product is applied. 
+Returns the forms to which the inner product is applied.
 
 # Arguments
 - `inner_product::InnerProduct`: The inner product structure.
@@ -93,7 +93,7 @@ get_geometry(inner_product::InnerProduct) = get_geometry(get_forms(inner_product
     evaluate(
         inner_product::InnerProduct{F1, F2, G},
         element_id::Int,
-        quad_rule::Quadrature.QuadratureRule{manifold_dim},
+        quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
     ) where {manifold_dim, F1, F2, G <: Geometry.AbstractGeometry{manifold_dim}}
 
 Computes the inner product at the element given by `element_id`, and canonical points given
@@ -102,24 +102,24 @@ by `quad_rule`.
 # Arguments
 - `inner_product::InnerProduct`: The inner product structure.
 - `element_id::Int`: The element identifier.
-- `quad_rule::Quadrature.QuadratureRule{manifold_dim}`: The quadrature rule used for
+- `quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim}`: The quadrature rule used for
     integration.
 
 # Returns
-- `prod_form_rows::Vector{Int}`: Indices of the first form for each index of the 
-    linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of 
-    basis functions in the first form expression and `i` and `j` are the local basis indices 
-    of the first and second expression, respectively. I.e., `prod_form_rows[l(i,j)]` stores 
+- `prod_form_rows::Vector{Int}`: Indices of the first form for each index of the
+    linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of
+    basis functions in the first form expression and `i` and `j` are the local basis indices
+    of the first and second expression, respectively. I.e., `prod_form_rows[l(i,j)]` stores
     the global basis index of the local basis `i` when integrated against local basis `j`.
-- `prod_form_cols::Vector{Int}`: Indices of the second form for each index of the 
-    linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of 
-    basis functions in the first form expression and `i` and `j` are the local basis indices 
-    of the first and second expression, respectively. I.e., `prod_form_cols[l(i,j)]` stores 
+- `prod_form_cols::Vector{Int}`: Indices of the second form for each index of the
+    linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of
+    basis functions in the first form expression and `i` and `j` are the local basis indices
+    of the first and second expression, respectively. I.e., `prod_form_cols[l(i,j)]` stores
     the global basis index of the local basis `j` when integrated against local basis `i`.
-- `prod_form_eval::Vector{Float64}`: Evaluation of the inner product for each index of the 
-    linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of 
-    basis functions in the first form expression and `i` and `j` are the local basis indices 
-    of the first and second expression, respectively. I.e., `prod_form_eval[l(i,j)]` stores 
+- `prod_form_eval::Vector{Float64}`: Evaluation of the inner product for each index of the
+    linear indexing `l(i,j) = i + (j-1)*n_indices_1` where `n_indices_1` is the number of
+    basis functions in the first form expression and `i` and `j` are the local basis indices
+    of the first and second expression, respectively. I.e., `prod_form_eval[l(i,j)]` stores
     the result of local basis `i` integrated against local basis `j`.
 - `::Vector{Array{Float64, expression_rank + 1}}`: The evaluated inner product. The number of
     entries in the `Vector` is `binomial(manifold_dim, manifold_dim - form_rank)`. The size
@@ -131,7 +131,7 @@ by `quad_rule`.
 function evaluate(
     inner_product::InnerProduct{F1, F2, G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {manifold_dim, F1, F2, G <: Geometry.AbstractGeometry{manifold_dim}}
     forms = get_forms(inner_product)
 
@@ -145,7 +145,7 @@ function _evaluate_inner_product(
     form_1::AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
     form_2::AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     form_rank_1,
@@ -168,7 +168,7 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim, 0, expression_rank_1, G},
     form_expression2::AbstractFormExpression{manifold_dim, 0, expression_rank_2, G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     expression_rank_1,
@@ -179,18 +179,18 @@ function _evaluate_inner_product(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
 
-    # evaluate both the form expressions; it is assumed that the output is of the following 
+    # evaluate both the form expressions; it is assumed that the output is of the following
     # form:
-    # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number 
+    # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number
     # of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
 
     # Get dimension of each form expression
-    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of 
+    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of
     # indices
-    # If we wish to have inner product between expressions with higher ranks, this needs to 
+    # If we wish to have inner product between expressions with higher ranks, this needs to
     # be changed
     n_indices_1 = length(form1_indices[1])
     n_indices_2 = length(form2_indices[1])
@@ -261,7 +261,7 @@ function _evaluate_inner_product(
         manifold_dim, manifold_dim, expression_rank_2, G
     },
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     expression_rank_1,
@@ -272,16 +272,16 @@ function _evaluate_inner_product(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
 
-    # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number 
+    # form_eval::Vector{Matrix{Float64}} of length 1, where each matrix is of size (number
     # of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
 
     # Get dimension of each form expression
-    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of 
+    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of
     # indices
-    # If we wish to have inner product between expressions with higher ranks, this needs to 
+    # If we wish to have inner product between expressions with higher ranks, this needs to
     # be changed
     n_indices_1 = length(form1_indices[1])
     n_indices_2 = length(form2_indices[1])
@@ -348,7 +348,7 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{manifold_dim, 1, expression_rank_1, G},
     form_expression2::AbstractFormExpression{manifold_dim, 1, expression_rank_2, G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{manifold_dim},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{manifold_dim},
 ) where {
     manifold_dim,
     expression_rank_1,
@@ -359,16 +359,16 @@ function _evaluate_inner_product(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
 
-    # form_eval::Vector{Matrix{Float64}} of length manifold_dim, where each matrix is of 
+    # form_eval::Vector{Matrix{Float64}} of length manifold_dim, where each matrix is of
     # size (number of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
 
     # Get dimension of each form expression
-    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of 
+    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of
     # indices
-    # If we wish to have inner product between expressions with higher ranks, this needs to 
+    # If we wish to have inner product between expressions with higher ranks, this needs to
     # be changed
     n_indices_1 = length(form1_indices[1])
     n_indices_2 = length(form2_indices[1])
@@ -390,7 +390,7 @@ function _evaluate_inner_product(
 
     for i in 1:manifold_dim
         for j in 1:manifold_dim
-            prod_form_rows, prod_form_cols, prod_form_eval = 
+            prod_form_rows, prod_form_cols, prod_form_eval =
             _inner_product_1_form_component!(
                 prod_form_rows,
                 prod_form_cols,
@@ -455,23 +455,23 @@ function _evaluate_inner_product(
     form_expression1::AbstractFormExpression{3, 2, expression_rank_1, G},
     form_expression2::AbstractFormExpression{3, 2, expression_rank_2, G},
     element_id::Int,
-    quad_rule::Quadrature.QuadratureRule{3},
+    quad_rule::Quadrature.AbstractElementQuadratureRule{3},
 ) where {expression_rank_1, expression_rank_2, G <: Geometry.AbstractGeometry{3}}
     inv_g, _, sqrt_g = Geometry.inv_metric(
         get_geometry(form_expression1, form_expression2), element_id, quad_rule.nodes
     )
 
     # assumes that the output is of the following form:
-    # form_eval::Vector{Matrix{Float64}} of length 3, where each matrix is of size (number 
+    # form_eval::Vector{Matrix{Float64}} of length 3, where each matrix is of size (number
     # of evaluation points)x(dimension of form_expression on this element)
     # form_indices::Vector{Int} of length (dimension of form_expression on this element)
     form1_eval, form1_indices = evaluate(form_expression1, element_id, quad_rule.nodes)
     form2_eval, form2_indices = evaluate(form_expression2, element_id, quad_rule.nodes)
 
     # Get dimension of each form expression
-    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of 
+    # Since we restrict to expresions with expression rank 0 or 1, we only have one set of
     # indices
-    # If we wish to have inner product between expressions with higher ranks, this needs to 
+    # If we wish to have inner product between expressions with higher ranks, this needs to
     # be changed
     n_indices_1 = length(form1_indices[1])
     n_indices_2 = length(form2_indices[1])
@@ -488,7 +488,7 @@ function _evaluate_inner_product(
 
     for i in 1:3
         for j in 1:3
-            prod_form_rows, prod_form_cols, prod_form_eval = 
+            prod_form_rows, prod_form_cols, prod_form_eval =
             _inner_product_2_form_component!(
                 prod_form_rows,
                 prod_form_cols,

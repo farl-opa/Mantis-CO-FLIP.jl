@@ -59,7 +59,7 @@ function build_form_fields(
             return nothing
         end
     end
-    
+
     start_id = 1
     form_fields = ntuple(num_forms) do i
         num_coeffs = get_num_basis(form_spaces[i])
@@ -373,11 +373,11 @@ function update_hierarchical_de_rham_complex(
 
     return zero_form, one_form, two_form
 end
+
+
 ################################################################################
 # Polar B-spline de Rham complex
 ################################################################################
-
-import SparseArrays
 
 """
     create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, section_spaces::NTuple{2, F}, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::NTuple{2, Vector{Float64}}=undef, form_rank::Int=0) where {F <: FunctionSpaces.AbstractCanonicalSpace}
@@ -417,7 +417,7 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, secti
     end
 
     # polar spline geometry
-    geometry = Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
+    geometry = Geometry.FEGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
@@ -487,7 +487,7 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degre
     end
 
     # polar spline geometry
-    geometry = Geometry.FEMGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
+    geometry = Geometry.FEGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
 
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
@@ -524,61 +524,52 @@ end
 ############################################################################################
 
 """
-    null_tangential_boundary_conditions(
-        form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
-    ) where {manifold_dim, expression_rank, G}
+    zero_trace_boundary_conditions(
+        form::AbstractFormExpression
 
-Creates a dictionary of null-tangential boundary conditions for a given form expression.
-These are the boundary conditions of the space ``H_{0}(\\text{curl}; \\Omega)``.
+Creates a dictionary of zero-trace boundary conditions for a given form expression.
+These correspond to:
+1. zero value boundary conditions for 0-forms
+2. zero tangential boundary conditions for the space
+``H_{0}(\\text{curl}; \\Omega)``
+3. zero normal boundary conditions for the space
+``H_{0}(\\text{div}; \\Omega)``
 
 # Arguments
-- `form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}`: The one-form for
-    which to compute the boundary conditions.
+- `form::AbstractFormExpression`: The form for which to compute the boundary conditions.
 
 # Returns
-- `Dict{Int, Float64}`: The dictionary of null-tangential boundary conditions.
+- `Dict{Int, Float64}`: The dictionary of zero-trace boundary conditions.
 """
-function null_tangential_boundary_conditions(
-    form::AbstractFormExpression{2, 1, expression_rank, G}
-) where {expression_rank, G}
-    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
-    bc_H_zero_curl_1 = Dict{Int, Float64}(
-        i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[1][1][j]
+function zero_trace_boundary_conditions(form::AbstractFormSpace)
+    return Dict{Int, Float64}(
+        i => 0.0 for i in trace_basis_idxs(form)
     )
-    bc_H_zero_curl_2 = Dict{Int, Float64}(
-        i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[2][1][j]
-    )
-    bc_H_zero_curl = merge(bc_H_zero_curl_1, bc_H_zero_curl_2)
-
-    return bc_H_zero_curl
 end
 
 """
-    null_normal_boundary_conditions(
-        form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}
-    ) where {manifold_dim, expression_rank, G}
+    trace_basis_idxs(
+        form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+    ) where {manifold_dim, form_rank, expression_rank, G}
 
-Creates a dictionary of null-normal boundary conditions for a given form expression.
-These are the boundary conditions of the space ``H_{0}(\\text{div}; \\Omega)``.
+Creates a list of basis function idxs which control the trace of the form on the boundary.
 
 # Arguments
-- `form::AbstractFormExpression{manifold_dim, 1, expression_rank, G}`: The one-form for
-    which to compute the boundary conditions.
+- `form::AbstractFormExpression`: The form for which to compute the boundary conditions.
 
 # Returns
-- `Dict{Int, Float64}`: The dictionary of null-normal boundary conditions.
+- `Vector{Int}`: The list of basis idxs.
 """
-function null_normal_boundary_conditions(
-    form::AbstractFormExpression{2, 1, expression_rank, G}
-) where {expression_rank, G}
+function trace_basis_idxs(
+    form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+) where {manifold_dim, form_rank, expression_rank, G}
     dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
-    bc_H_zero_div_1 = Dict{Int, Float64}(
-        i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[1][1][j]
-    )
-    bc_H_zero_div_2 = Dict{Int, Float64}(
-        i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[2][1][j]
-    )
-    bc_H_zero_div = merge(bc_H_zero_div_1, bc_H_zero_div_2)
-
-    return bc_H_zero_div
+    num_sides = 3^manifold_dim
+    basis_idxs = [
+        i
+        for k in eachindex(dof_partition)
+        for j in setdiff(1:num_sides, Int((num_sides+1) / 2))
+        for i in dof_partition[k][1][j]  # TODO: is this general enough for multipatch?
+    ]
+    return basis_idxs
 end

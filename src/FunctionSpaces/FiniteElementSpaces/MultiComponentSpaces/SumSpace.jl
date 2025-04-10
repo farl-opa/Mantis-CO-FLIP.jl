@@ -19,6 +19,13 @@ struct SumSpace{manifold_dim, num_components, F} <:
         num_components,
         F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}},
     }
+        num_elements = get_num_elements(component_spaces[1])
+        for i = 2:num_components
+            if num_elements != get_num_elements(component_spaces[i])
+                throw(ArgumentError("All component spaces must have the same number of elements"))
+            end
+        end
+
         return new{manifold_dim, num_components, F}(component_spaces, space_dim)
     end
 end
@@ -172,4 +179,8 @@ function get_max_local_dim(space::SumSpace)
         max_local_dim += max(max_local_dim, get_max_local_dim(space))
     end
     return max_local_dim
+end
+
+function get_num_elements(space::SumSpace)
+    return get_num_elements(space.component_spaces[1])
 end

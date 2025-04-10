@@ -10,7 +10,7 @@ include("../HelperFunctions.jl")
 ############################################################################################
 #                                      Problem setup                                       #
 ############################################################################################
-# Mesh 
+# Mesh
 starting_point = (0.0, 0.0)
 box_size = (fpi, fpi) #(π, π)
 num_elements = (2, 2) .^ 3 # Ininital mesh size.
@@ -31,16 +31,16 @@ eigenfunc = 1 # Eigenfunction to use for adaptive refinement.
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-∫ₐ, ∫ₑ = Mantis.Quadrature.get_quadrature_rules(
+∫ₐ, ∫ₑ = Mantis.Quadrature.get_canonical_quadrature_rules(
     Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
 )
 
 # Number of eigenvalues to compute
-num_eig = 10 
+num_eig = 10
 # Scaling form maxwell eigenfunctions.
 scale_factors = ntuple(2) do k
     return pi /(box_size[k] - starting_point[k])
-end 
+end
 
 verbose = true # Set to true for problem information.
 export_csv = false # Set to true to export the computed eigenvalues.
@@ -49,7 +49,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ############################################################################################
 #                                       Run problem                                        #
 ############################################################################################
-# Hierarchical de Rham complex 
+# Hierarchical de Rham complex
 ℌ = Mantis.Forms.create_hierarchical_de_rham_complex(
     starting_point, box_size, num_elements, p, k, num_sub, truncate, simplified
 )
