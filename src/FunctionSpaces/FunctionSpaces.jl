@@ -58,7 +58,7 @@ function get_num_components(
 end
 
 include("FiniteElementSpaces/FiniteElementSpaces.jl")
-#include("AdaptiveRefinement/AdaptiveRefinement.jl")
+include("AdaptiveRefinement/AdaptiveRefinement.jl")
 
 # helper functions for convenience
 include("./FunctionSpaceHelpers.jl")

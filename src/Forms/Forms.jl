@@ -5,111 +5,214 @@ Contains all definitions of forms, including form fields, form spaces, and form 
 """
 module Forms
 
-import .. FunctionSpaces
-import .. Geometry
-import .. Quadrature
+import ..FunctionSpaces
+import ..Geometry
+import ..Quadrature
 
+import LinearAlgebra
+import Subscripts
+
+############################################################################################
+#                                      Abstract Types                                      #
+############################################################################################
+
+"""
+    AbstractFormExpression{manifold_dim, form_rank, G}
+
+Supertype for all form expressions representing differential forms.
+
+# Type parameters
+- `manifold_dim`: Dimension of the manifold.
+- `form_rank`: Rank of the differential form.
+- `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0,
+    with one single set of basis forms have rank 1, with two sets of basis forms have rank
+    2. Higher ranks are not possible.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
+"""
 abstract type AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
-abstract type AbstractFormField{manifold_dim, form_rank, expression_rank, G} <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
 
-@doc raw"""
-    AbstractFormSpace{manifold_dim, form_rank, G} <: AbstractFormField{manifold_dim, form_rank, expression_rank, G}
+"""
+    AbstractFormField{manifold_dim, form_rank, G} <:
+    AbstractFormExpression{manifold_dim, form_rank, 0, G}
 
-Supertype for all function spaces representing differential forms.
+Supertype for all form fields. 
 
 # Type parameters
 - `manifold_dim`: Dimension of the manifold
 - `form_rank`: Rank of the differential form
-- `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0, with one single set of basis forms have rank 1, with two sets of basis forms have rank 2. Higher ranks are not possible.
-- `G`: Type of the underlying geometry
-
-# Inner Constructors
-- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F})`: Constructor for 0-forms and n-forms
-- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη})`: Constructor for 1-forms in 2D
-- `FormSpace(form_rank::Int, geometry::G, fem_space::Tuple{F_dξ, F_dη, F_dζ})`: Constructor for 1-forms and 2-forms in 3D
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry
 """
-abstract type AbstractFormSpace{manifold_dim, form_rank, G} <: AbstractFormField{manifold_dim, form_rank, 1, G} end
+abstract type AbstractFormField{manifold_dim, form_rank, G} <:
+              AbstractFormExpression{manifold_dim, form_rank, 0, G} end
 
+"""
+    AbstractFormSpace{manifold_dim, form_rank, G} <:
+    AbstractFormExpression{manifold_dim, form_rank, 1, G}
 
+Supertype for all form spaces. These all have expression rank 1, as they have a single set
+of basis functions.
 
+# Type parameters
+- `manifold_dim`: Dimension of the manifold.
+- `form_rank`: Rank of the differential form.
+- `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
+"""
+abstract type AbstractFormSpace{manifold_dim, form_rank, G} <:
+              AbstractFormExpression{manifold_dim, form_rank, 1, G} end
 
-# General getters involving forms. These are general enough to work on all subtypes.
-@doc raw"""
-    get_form_rank(form::FE) where {FE <: AbstractFormExpression{manifold_dim, form_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+############################################################################################
+#                                     Abstract Methods                                     #
+############################################################################################
 
-Returns the form rank for the given `form` (expression).
+"""
+    get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifold_dim}
+
+Returns the manifold dimension of the given form expression.
 
 # Arguments
-- `form::AbstractFormExpression`: The form of which to get the rank.
+- `::AbstractFormExpression{manifold_dim}`: The form expression.
+
+# Returns
+- `manifold_dim::Int`: The manifold dimension.
 """
-function get_form_rank(form::FE) where {FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifold_dim}
+    return manifold_dim
+end
+
+"""
+    get_geometry(form_expression::AbstractFormExpression)
+
+Returns the geometry of the given form expression.
+
+# Arguments
+- `form_expression::AbstractFormExpression`: The form expression.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the form expression.
+"""
+get_geometry(form_expression::AbstractFormExpression) = form_expression.geometry
+
+"""
+    get_geometry(
+        single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
+    )
+
+If, a single form is given, returns the geometry of that form. If additional forms are
+given, checks if all the geometries of the different forms refer to the same object in
+memory, and then returns it.
+
+# Arguments
+- `single_form::AbstractFormExpression`: The first form.
+- `additional_forms::AbstractFormExpression...`: Arbitrary number of additional forms.
+
+# Returns
+- `<:Geometry.AbstractGeometry`: The geometry of the given form(s).
+"""
+function get_geometry(
+    single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
+)
+    all_forms = tuple(single_form, additional_forms...)
+
+    for i in 1:(length(all_forms) - 1)
+        if !(get_geometry(all_forms[i]) == get_geometry(all_forms[i+1]))
+            msg1 = "Not all forms share a common geometry. "
+            msg2 = "The geometries of form number(i) and form number(i+1) differ."
+            throw(ArgumentError(msg1 * msg2))
+        end
+    end
+
+    return get_geometry(single_form)
+end
+
+
+"""
+    get_num_elements(form::AbstractFormExpression)
+
+Returns the number of elements in the geometry of the given form expression.
+
+# Arguments
+- `form::AbstractFormExpression`: The form expression.
+
+# Returns
+- `Int`: The number of elements in the geometry of the form expression.
+"""
+function get_num_elements(form::AbstractFormExpression)
+    return Geometry.get_num_elements(get_geometry(form))
+end
+
+"""
+    get_form_rank(::FE) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    }
+
+Returns the form rank of the given form expression.
+
+# Arguments
+- `::FE`: The form expression.
+
+# Returns
+- `::Int`: The form rank of the form.
+"""
+function get_form_rank(::FE) where {
+    manifold_dim,
+    form_rank,
+    expression_rank,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+}
     return form_rank
 end
 
-@doc raw"""
-    get_expression_rank(form::FE) where {FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+"""
+    get_expression_rank(::FE) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+        FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    }
 
-Returns the expression rank for the given `form` (expression).
+Returns the `expression_rank`
 
 # Arguments
-- `form::AbstractFormExpression`: The form of which to get the expression rank. Expressions without basis forms have rank 0, 
-      with one single set of basis forms have rank 1, with two sets of basis forms have rank 2. Higher ranks are not possible.
+- `::FE`: The form expression.
+
+# Returns
+- `::Int`: The expression rank of the form.
 """
-function get_expression_rank(form::FE) where {FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+function get_expression_rank(::FE) where {
+    manifold_dim,
+    form_rank,
+    expression_rank,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+}
     return expression_rank
 end
 
-@doc raw"""
-    get_geometry(form::FS) where {FS <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
+"""
+    get_label(form::AbstractFormExpression)
 
-Returns the geometry associated with the `form_space`.
+Returns the label of the form expression.
 
 # Arguments
-- `form::AbstractFormExpression`: The Form to get the geometry of.
+- `form::AbstractFormExpression`: The form expression.
+
+# Returns
+- `String`: The label of the form expression.
 """
-function get_geometry(form::FS) where {FS <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}} where {manifold_dim, form_rank, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
-    return form.geometry
-end
+get_label(form::AbstractFormExpression) = form.label
 
-# TODO get_geometry should return the geometry of a form expression, not compare.
-#      I agree we must enforce this, but then we should add the enforcement explicitly
-#      when needed, not in this function.
-@doc raw"""
-    get_geometry(form_1::FS1, form_2::FS2) where {FS1 <: AbstractFormExpression{manifold_dim1, form_rank1, expression_rank_1, G1}, FS2 <: AbstractFormExpression{manifold_dim2, form_rank2, expression_rank_2, G2}} where {manifold_dim1, form_rank1, expression_rank_1, G1 <: Geometry.AbstractGeometry{manifold_dim1}, manifold_dim2, form_rank2, , expression_rank_2, G2 <: Geometry.AbstractGeometry{manifold_dim2}}
+############################################################################################
+#                                         Includes                                         #
+############################################################################################
 
-Returns the geometry associated with `form_1` if it is the same as `form_2`.
-
-# Arguments
-- `form_1::AbstractFormExpression`: The frist Form to get the geometry of, if the same as `form_2`.
-- `form_2::AbstractFormExpression`: The second Form to get the geometry of, if the same as `form_1`.
-"""
-function get_geometry(form_1::FS1, form_2::FS2) where {FS1 <: AbstractFormExpression{manifold_dim1, form_rank1, expression_rank_1, G1}, FS2 <: AbstractFormExpression{manifold_dim2, form_rank2, expression_rank_2, G2}} where {manifold_dim1, form_rank1, expression_rank_1, G1 <: Geometry.AbstractGeometry{manifold_dim1}, manifold_dim2, form_rank2, expression_rank_2, G2 <: Geometry.AbstractGeometry{manifold_dim2}}
-    if form_1.geometry === form_2.geometry
-        return form_1.geometry
-    else
-        geom1 = get_geometry(form_1)
-        tpg1 = typeof(geom1)
-        geom2 = get_geometry(form_2)
-        tpg2 = typeof(geom2)
-        msg1 = "The given forms do not have the same geometry. "
-        msg2 = "The first has geometry: $geom1 of type $tpg1. "
-        msg3 = "The second has geometry: $geom2 of type $tpg2."
-        throw(ArgumentError(msg1*msg2*msg3))
-    end
-end
-
-# core functionality
-include("./FormSpaces.jl")
-include("./FormExpressions.jl") # Requires FormSpaces
-include("./FormOperators.jl") # Mind the order, FormOperators requires FormSpaces and FormExpressions
-include("./MixedFormSpace.jl")
-
-# helper functions for convenience
-include("./FormHelpers.jl")
-
-# 0-form: no basis
-# 1-forms: (dx1, dx2, dx3)
-# 2-forms: (dx2dx3, dx3dx1, dx1dx2)
-# 3-forms: dx1dx2d3
+include("./FormExpressions/FormExpressions.jl")
+include("./FormOperators/FormOperators.jl")
+include("./FormsHelpers.jl")
 
 end
