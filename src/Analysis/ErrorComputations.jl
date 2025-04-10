@@ -1,9 +1,9 @@
 
-function L2_norm(u, ∫)
+function L2_norm(u, quad_rule)
     norm = 0.0
-    inner_prod = u * u
+    inner_prod = ∫(u ∧ ★(u))
     for el_id in 1:Forms.get_num_elements(u)
-        norm += Forms.evaluate(inner_prod, el_id, ∫)[3][1]
+        norm += Forms.evaluate(inner_prod, el_id, quad_rule)[1][1]
     end
 
     return sqrt(norm)

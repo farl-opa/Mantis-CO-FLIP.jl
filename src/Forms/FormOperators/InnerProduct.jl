@@ -3,7 +3,7 @@
 ############################################################################################
 
 """
-    InnerProduct{F1, F2, G}
+    InnerProduct{F1, F2, G} <: AbstractRealValuedOperator
 
 Represents the inner product between two differential forms.
 
@@ -22,7 +22,7 @@ Represents the inner product between two differential forms.
 # Inner Constructors
 - `InnerProduct(form_1::F1, form_2::F2)`: General constructor.
 """
-struct InnerProduct{F1, F2, G}
+struct InnerProduct{manifold_dim, F1, F2, G} <: AbstractRealValuedOperator{manifold_dim}
     form_1::F1
     form_2::F2
 
@@ -52,7 +52,7 @@ struct InnerProduct{F1, F2, G}
             ))
         end
 
-        return new{F1, F2, G}(form_1, form_2)
+        return new{manifold_dim, F1, F2, G}(form_1, form_2)
     end
 end
 

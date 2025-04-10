@@ -4,7 +4,7 @@ The exported names are:
 """
 module FunctionSpaces
 
-import ..Mesh
+using ..Mesh
 
 import Combinatorics
 import Graphs

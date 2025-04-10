@@ -5,9 +5,9 @@ Contains all definitions of forms, including form fields, form spaces, and form 
 """
 module Forms
 
-import ..FunctionSpaces
-import ..Geometry
-import ..Quadrature
+using ..FunctionSpaces
+using ..Geometry
+using ..Quadrature
 
 import LinearAlgebra
 import Subscripts
@@ -64,6 +64,16 @@ of basis functions.
 """
 abstract type AbstractFormSpace{manifold_dim, form_rank, G} <:
               AbstractFormExpression{manifold_dim, form_rank, 1, G} end
+
+"""
+    AbstractRealValuedOperator{manifold_dim}
+
+Supertype for all real-valued operators defined over a manifold.
+
+# Type parameters
+- `manifold_dim`: Dimension of the manifold.
+"""
+abstract type AbstractRealValuedOperator{manifold_dim} end
 
 ############################################################################################
 #                                     Abstract Methods                                     #

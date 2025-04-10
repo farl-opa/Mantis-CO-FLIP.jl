@@ -7,8 +7,8 @@ The exported names are:
 module Plot
 import WriteVTK
 
-import .. Geometry
-import .. Forms
+using ..Geometry
+using ..Forms
 
 # core functionality
 include("./PlotKernel.jl")

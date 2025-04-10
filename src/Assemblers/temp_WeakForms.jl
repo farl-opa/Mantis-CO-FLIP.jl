@@ -2,91 +2,120 @@
 #                                        Structure                                         #
 ############################################################################################
 
-struct WeakForm{manifold_dim, LHS_E, RHS_E, LHS_O, RHS_O}
-    lhs_expressions::LHS_E
-    rhs_expressions::RHS_E
-    lhs_offsets::LHS_O
-    rhs_offsets::RHS_O
-    inputs::WeakFormInputs{manifold_dim}
-    sparse_lhs::Bool
-    sparse_rhs::Bool
+"""
+    WeakForm{manifold_dim, LHS, RHS, I}
+
+Structure representing the weak-formulation of a continuous Petrov-Galerking method. Both
+the left and right-hand sides of the formulation are given as blocks of real-valued
+operators; these are defined from a set of inputs holding the test, trial and forcing terms,
+and a constructor method that defines where the blocks are placed.
+
+# Fields 
+- `lhs_expressions::LHS`: The left-hand side blocks of the weak-formulation.
+- `rhs_expressions::RHS`: The right-hand side blocks of the weak-formulation.
+- `inputs::I`: The inputs for the weak-formulation, which include the test and trial spaces,
+    and forcing terms.
+# Type parameters
+- `manifold_dim::Int`: The dimension of the manifold where the weak-formulation is defined.
+- `LHS`: The type of the left-hand side expressions. Each row-column entry should be a
+    subtype of  `AbstractRealValuedOperator`.
+- `RHS`: The type of the right-hand side expressions. Each row-column entry should be a
+    subtype of  `AbstractRealValuedOperator`.
+- `I`: The type of the inputs. It should be a subtype of `WeakFormInputs{manifold_dim}`.
+# Inner constructors
+- `WeakForm(inputs::I, constructor::F)`: Creates a new `WeakForm` instance with the given
+    inputs and constructor function. The constructor function is used to generate the
+    left-hand side and right-hand side blocks of real-valued operators.
+"""
+struct WeakForm{manifold_dim, LHS, RHS, I}
+    lhs_expressions::LHS
+    rhs_expressions::RHS
+    inputs::I
     function WeakForm(
-        inputs::I, expression::E; sparse_lhs::Bool=true, sparse_rhs::Bool=false
-    ) where {manifold_dim, I <: WeakFormInputs{manifold_dim}, E <: Function}
-        lhs_expressions, rhs_expressions, lhs_offsets, rhs_offsets = expression(inputs)
-        num_lhs = length(lhs_expressions)
-        num_rhs = length(rhs_expressions)
-        LHS_E = typeof(lhs_expressions)
-        RHS_E = typeof(rhs_expressions)
-        LHS_O = typeof(lhs_offsets)
-        RHS_O = typeof(rhs_offsets)
-        if num_lhs != length(lhs_offsets[1]) || num_lhs != length(lhs_offsets[2])
+        inputs::I, constructor::F
+    ) where {manifold_dim, I <: WeakFormInputs{manifold_dim}, F <: Function}
+        lhs_expressions, rhs_expressions = constructor(inputs)
+        lhs_num_rows = length(lhs_expressions)
+        rhs_num_rows = length(rhs_expressions)
+        lhs_num_cols = length(lhs_expressions[1])
+        rhs_num_cols = length(rhs_expressions[1])
+        for row in 2:lhs_num_rows
+            if length(lhs_expressions[row]) != lhs_num_cols
+                throw(
+                    ArgumentError(
+                        """The number of columns on each row of the left-hand side must \
+                        match. The first row has $(lhs_num_cols) columns and the $(row)-th \
+                        row has $(length(lhs_expressions[row])) columns."""
+                    ),
+                )
+            end
+        end
+
+        for row in 2:rhs_num_rows
+            if length(rhs_expressions[row]) != rhs_num_cols
+                throw(
+                    ArgumentError(
+                        """The number of columns on each row of the right-hand side must \
+                        match. The first row has $(rhs_num_cols) columns and the $(row)-th \
+                        row has $(length(rhs_expressions[row])) columns."""
+                    ),
+                )
+            end
+        end
+
+        if lhs_num_rows != rhs_num_rows
             throw(
                 ArgumentError(
-                    "Mismatch between the given left-hand side expressions and offsets. " *
-                    "The given numbers were $(num_lhs), $(length(lhs_offsets[1])) and " *
-                    "$(length(lhs_offsets[2])), respectively.",
+                    """"The number of rows on the left-hand side must match the number \
+                    of rows on the right-hand side. The left-hand side has $(lhs_num_rows) \
+                    rows and the right-hand side has $(rhs_num_rows) rows."""
                 ),
             )
         end
 
-        if num_rhs != length(rhs_offsets[1]) || num_rhs != length(rhs_offsets[2])
+        num_test = get_num_test(inputs)
+        num_trial = get_num_trial(inputs)
+        if num_test != lhs_num_rows
             throw(
                 ArgumentError(
-                    "Mismatch between the given right-hand side expressions and offsets. " *
-                    "The given numbers were $(num_rhs), $(length(rhs_offsets[1])) and " *
-                    "$(length(rhs_offsets[2])), respectively.",
+                    """The number of rows on the left-hand side must match the number \
+                    of test forms. The left-hand side has $(lhs_num_rows) rows and the \
+                    inputs have $(num_test) test spaces."""
                 ),
             )
         end
 
-        if ~(LHS_E <: NTuple{num_lhs, Forms.AbstractFormExpression})
+        if num_trial != lhs_num_cols
             throw(
                 ArgumentError(
-                    "The left-hand side expressions must be a tuple of elements of the " *
-                    "type Forms.AbstractFormExpression. The given type was $(LHS_E).",
+                    """The number of columns on the left-hand side must match the number \
+                    of trial forms. The left-hand side has $(lhs_num_cols) columns and \
+                    the inputs have $(num_trial) trial spaces."""
                 ),
             )
         end
 
-        if ~(RHS_E <: NTuple{num_rhs, Forms.AbstractFormExpression})
-            throw(
-                ArgumentError(
-                    "The right-hand side expressions must be a tuple of elements of the " *
-                    "type Forms.AbstractFormExpression. The given type was $(RHS_E).",
-                ),
-            )
+        for row in 1:lhs_num_rows
+            for col in 1:lhs_num_cols
+                if ~(typeof(lhs_expressions[row][col]) <: Forms.AbstractRealValuedOperator)
+                    if lhs_expressions[row][col] != 0
+                        throw(
+                            ArgumentError(
+                                """The left-hand side expressions must be either of type \
+                                AbstractRealValuedOperator or 0. The expression at \
+                                row $(row) and column $(col) is of type \
+                                $(typeof(lhs_expressions[row][col]))."""
+                            ),
+                        )
+                    end
+                end
+            end
         end
 
-        if ~(LHS_O <: Tuple{NTuple{num_lhs, Int}, NTuple{num_lhs, Int}})
-            throw(
-                ArgumentError(
-                    "The left-hand side offsets must be a tuple row and column offsets " *
-                    "for each left-hand side expression. The given type was $(LHS_O) and " *
-                    "the number of left-hand side expressions was $(num_lhs).",
-                ),
-            )
-        end
+        LHS = typeof(lhs_expressions)
+        RHS = typeof(rhs_expressions)
 
-        if ~(RHS_O <: Tuple{NTuple{num_rhs, Int}, NTuple{num_rhs, Int}})
-            throw(
-                ArgumentError(
-                    "The right-hand side offsets must be a tuple row and column offsets " *
-                    "for each right-hand side expression. The given type was $(RHS_O) " *
-                    "and the number of right-hand side expressions was $(num_rhs).",
-                ),
-            )
-        end
-
-        return new{manifold_dim, LHS_E, RHS_E, LHS_O, RHS_O}(
-            lhs_expressions,
-            rhs_expressions,
-            lhs_offsets,
-            rhs_offsets,
-            inputs,
-            sparse_lhs,
-            sparse_rhs,
-        )
+        return new{manifold_dim, LHS, RHS, I}(lhs_expressions, rhs_expressions, inputs)
     end
 end
 
@@ -96,89 +125,98 @@ end
 
 get_lhs_expressions(wf::WeakForm) = wf.lhs_expressions
 get_rhs_expressions(wf::WeakForm) = wf.rhs_expressions
-get_lhs_offsets(wf::WeakForm) = wf.lhs_offsets
-get_rhs_offsets(wf::WeakForm) = wf.rhs_offsets
 get_inputs(wf::WeakForm) = wf.inputs
+get_test_forms(wf::WeakForm) = get_test_forms(get_inputs(wf))
+get_trial_forms(wf::WeakForm) = get_trial_forms(get_inputs(wf))
+get_forcings(wf::WeakForm) = get_forcings(get_inputs(wf))
+get_forcing(wf::WeakForm, id::Int=1) = get_forcing(get_inputs(wf), id)
+get_test_sizes(wf::WeakForm) = Forms.get_num_basis.(get_test_forms(wf))
+get_trial_sizes(wf::WeakForm) = Forms.get_num_basis.(get_trial_forms(wf))
+get_test_offsets(wf::WeakForm) = [0; cumsum(get_test_sizes(wf)[1:(end - 1)])...]
+get_trial_offsets(wf::WeakForm) = [0; cumsum(get_trial_sizes(wf)[1:(end - 1)])...]
+get_test_size(wf::WeakForm) = sum(get_test_sizes(wf))
+get_trial_size(wf::WeakForm) = sum(get_trial_sizes(wf))
+get_problem_size(wf::WeakForm) = get_test_size(wf), get_trial_size(wf)
+get_test_max_local_dim(wf::WeakForm) = sum(Forms.get_max_local_dim.(get_test_forms(wf)))
+get_trial_max_local_dim(wf::WeakForm) = sum(Forms.get_max_local_dim.(get_trial_forms(wf)))
+get_num_rhs_cols(wf::WeakForm) = length(get_rhs_expressions(wf)[1])
 
-function get_trial_forms(wf::WeakForm)
+"""
+    get_num_lhs_blocks(wf::WeakForm)
+
+Returns a tuple containing the number of row and column blocks, respectively, for the
+left-hand side of the weak-formulation.
+
+# Arguments
+- `wf::WeakForm`: The weak-formulation for which the number of blocks is to be determined.
+
+# Returns
+- `Tuple(Int, Int)`: The number of row and column blocks for the left-hand side of the weak
+    formulation.
+"""
+function get_num_lhs_blocks(wf::WeakForm)
     inputs = get_inputs(wf)
 
-    return get_trial_forms(inputs)
+    return (get_num_test(inputs), get_num_trial(inputs))
 end
 
-function get_test_forms(wf::WeakForm)
+"""
+    get_num_rhs_blocks(wf::WeakForm)
+
+Returns a tuple containing the number of row and column blocks, respectively, for the
+right-hand side of the weak-formulation.
+
+# Arguments
+- `wf::WeakForm`: The weak-formulation for which the number of blocks is to be determined.
+
+# Returns
+- `Tuple(Int, Int)`: The number of row and column blocks for the right-hand side of the weak
+    formulation.
+"""
+function get_num_rhs_blocks(wf::WeakForm)
     inputs = get_inputs(wf)
 
-    return get_test_forms(inputs)
+    return (get_num_test(inputs), get_num_rhs_cols(wf))
 end
 
-function get_forcing(wf::WeakForm)
-    inputs = get_inputs(wf)
+"""
+    get_estimated_nnz_per_elem(wf::WeakForm)
 
-    return get_forcing(inputs)
-end
+Returns the estimated number of non-zero entries per element for the left- and right-hand
+sides of the weak-formulation.
 
-function get_trial_size(wf::WeakForm)
-    inputs = get_inputs(wf)
-    trial_size = 0
-    for form in get_trial_forms(inputs)
-        trial_size += Forms.get_num_basis(form)
-    end
+# Arguments
+- `wf::WeakForm`: The weak-formulation for which the estimated number of non-zero entries is
+    to be determined.
 
-    return trial_size
-end
-
-function get_test_size(wf::WeakForm)
-    inputs = get_inputs(wf)
-    test_size = 0
-    for form in get_test_forms(inputs)
-        test_size += Forms.get_num_basis(form)
-    end
-
-    return test_size
-end
-
-function get_problem_size(wf::WeakForm)
-    return get_trial_size(wf), get_test_size(wf)
-end
-
-function get_trial_max_local_dim(wf::WeakForm)
-    trial_max_local_dim = 0
-    for form in get_trial_forms(wf)
-        trial_max_local_dim += Forms.get_max_local_dim(form)
-    end
-
-    return trial_max_local_dim
-end
-
-function get_test_max_local_dim(wf::WeakForm)
-    test_max_local_dim = 0
-    for form in get_test_forms(wf)
-        test_max_local_dim += Forms.get_max_local_dim(form)
-    end
-
-    return test_max_local_dim
-end
-
+# Returns
+- `Tupe(Int, Int)`: The estimated number of non-zero entries per element for the left-hand
+    side and right-hand side of the weak-formulation, respectively.
+"""
 function get_estimated_nnz_per_elem(wf::WeakForm)
     trial_max_local_dim = get_trial_max_local_dim(wf)
     test_max_local_dim = get_test_max_local_dim(wf)
-    left_hand_nnz = trial_max_local_dim * test_max_local_dim
+    left_hand_nnz = test_max_local_dim * trial_max_local_dim
     right_hand_nnz = test_max_local_dim
-    if typeof(get_forcing(wf)) == Nothing
+    if isnothing(get_forcings(wf))
         right_hand_nnz *= trial_max_local_dim
     end
 
-    return left_hand_nnz, right_hand_nnz
+    return (left_hand_nnz, right_hand_nnz)
 end
 
+"""
+    get_num_elements(wf::WeakForm)
+
+Returns the number of elements over which the discrete weak-formulation is defined.
+
+# Arguments
+- `wf::WeakForm`: The weak-formulation for which the number of elements is to be determined.
+
+# Returns
+- `::Int`: The number of elements.
+"""
 function get_num_elements(wf::WeakForm)
-    return Geometry.get_num_elements(Forms.get_geometry(get_trial_forms(wf)))
+    # TODO: Deprecated once global quadrature is used in assembly.
+    return Geometry.get_num_elements(Forms.get_geometry(get_trial_forms(wf)...))
 end
-
-############################################################################################
-#                                          Checks                                          #
-############################################################################################
-
-lhs_is_sparse(wf::WeakForm) = wf.sparse_lhs
-rhs_is_sparse(wf::WeakForm) = wf.sparse_rhs

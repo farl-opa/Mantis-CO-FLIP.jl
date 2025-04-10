@@ -100,6 +100,37 @@ struct Minus{manifold_dim, form_rank, expression_rank, F1, F2, G} <:
     end
 end
 
+"""
+    Inverse{manifold_dim, R} <: AbstractRealValuedOperator{manifold_dim}
+
+Structure representing the additive inverse of a given real-valued operator.
+
+# Fields
+- `operator`: The operator to be inverted.
+
+# Type parameters
+- `manifold_dim`: Dimension of the manifold on which the operator acts.
+- `R`: Type of the operator. Must be a subtype of `AbstractRealValuedOperator`.
+
+# Inner Constructors
+- `Inverse(operator::O)`: Creates a new `Inverse` instance with the given operator.
+- `Base.:-(operator::AbstractRealValuedOperator)`: Symbolic wrapper for the inverse
+    operator.
+"""
+struct Inverse{manifold_dim, O} <: AbstractRealValuedOperator{manifold_dim}
+    operator::O
+
+    function Inverse(
+        operator::O
+    ) where {manifold_dim, O <: AbstractRealValuedOperator{manifold_dim}}
+        return new{manifold_dim, O}(operator)
+    end
+
+    function Base.:-(operator::AbstractRealValuedOperator)
+        return Inverse(operator)
+    end
+end
+
 ############################################################################################
 #                                         Getters                                          #
 ############################################################################################
@@ -108,31 +139,108 @@ get_forms(form_expression::Plus) = form_expression.form_1, form_expression.form_
 get_forms(form_expression::Minus) = form_expression.form_1, form_expression.form_2
 get_geometry(form_expression::Plus) = get_geometry(get_forms(form_expression)...)
 get_geometry(form_expression::Minus) = get_geometry(get_forms(form_expression)...)
+get_operator(inverse::Inverse) = inverse.operator
 
 ############################################################################################
 #                                     Evaluate methods                                     #
 ############################################################################################
 
+"""
+    evaluate(
+        form_expression::Plus{manifold_dim},
+        element_id::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+    ) where {manifold_dim}
+
+Evaluates the sum of two differential forms at a given element and canonical points `xi`.
+
+# Arguments
+- `form_expression::Plus{manifold_dim}`: The form expression resulting from a sum of form
+    expressions to be evaluated.
+- `element_id::Int`: The identifier of the element where the evaluation takes place.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: The canonical points where the evaluation is
+    performed.
+
+# Returns
+- `::Vector{Matrix{Float64}}`: The result of the evaluation of the sum of
+    the two forms.
+- `[[1]]::Vector{Vector{Int}}`: The indices of the evaluated forms.
+"""
 function evaluate(
     form_expression::Plus{manifold_dim},
-    elem_id::Int,
+    element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
     forms = get_forms(form_expression)
-    form_1_eval, _ = evaluate(forms[1], elem_id, xi)
-    form_2_eval, _ = evaluate(forms[2], elem_id, xi)
+    form_1_eval, _ = evaluate(forms[1], element_id, xi)
+    form_2_eval, _ = evaluate(forms[2], element_id, xi)
 
     return form_1_eval + form_2_eval, [[1]]
 end
 
+"""
+    evaluate(
+        form_expression::Minus{manifold_dim},
+        element_id::Int,
+        xi::NTuple{manifold_dim, Vector{Float64}},
+    ) where {manifold_dim}
+
+Evaluates the difference of two differential forms at a given element and canonical points
+`xi`.
+
+# Arguments
+- `form_expression::Minus{manifold_dim}`: The form expression resulting from a difference
+    of form expressions to be evaluated.
+- `element_id::Int`: The identifier of the element where the evaluation takes place.
+- `xi::NTuple{manifold_dim, Vector{Float64}}`: The canonical points where the evaluation
+    is performed.
+
+# Returns
+- `::Vector{Matrix{Float64}}`: The result of the evaluation of the difference of
+    the two forms.
+- `[[1]]::Vector{Vector{Int}}`: The indices of the evaluated forms.
+"""
 function evaluate(
     form_expression::Minus{manifold_dim},
-    elem_id::Int,
+    element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
     forms = get_forms(form_expression)
-    form_1_eval, _ = evaluate(forms[1], elem_id, xi)
-    form_2_eval, _ = evaluate(forms[2], elem_id, xi)
+    form_1_eval, _ = evaluate(forms[1], element_id, xi)
+    form_2_eval, _ = evaluate(forms[2], element_id, xi)
 
     return form_1_eval - form_2_eval, [[1]]
+end
+
+"""
+    evaluate(
+        inverse::Inverse{manifold_dim},
+        element_id::Int,
+        quad_rule::Quadrature.AbstractQuadratureRule{manifold_dim},
+    ) where {manifold_dim}
+
+Evaluates the additive inverse of a given operator at a specified element using a quadrature
+rule.
+
+# Arguments
+- `inverse::Inverse{manifold_dim}`: The inverse operator to evaluate.
+- `element_id::Int`: The element over which to evaluate the inverse operator.
+- `quad_rule::Quadrature.AbstractQuadratureRule{manifold_dim}`: The quadrature rule to use
+    for evaluating the underlying operator.
+
+# Returns
+- `eval::Vector{Float64}`: The additive inverse of the evaluated operator.
+- `indices::Vector{Vector{Int}}`: The indices of the evaluated operator. The length of the
+    outer vector depends on the `expression_rank` of the form expression.
+"""
+function evaluate(
+    inverse::Inverse{manifold_dim},
+    element_id::Int,
+    quad_rule::Quadrature.AbstractQuadratureRule{manifold_dim},
+) where {manifold_dim} 
+    operator = get_operator(inverse)
+    eval, indices = evaluate(operator, element_id, quad_rule)
+    eval .*= -1.0
+
+    return eval, indices
 end
