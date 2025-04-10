@@ -62,3 +62,6 @@ Manifest.toml
 
 # Ignore compressed files
 *.zip
+
+# Ignore LaTeX files (especially since we can export meshes to tikz)
+*.tex

@@ -60,7 +60,7 @@ function get_basis_indices_w_components(
             component_basis_indices[component_idx] .+ dof_offset_component[component_idx]
     end
 
-    return reduce(vcat, multivalued_basis_indices), multivalued_basis_indices#component_basis_indices
+    return reduce(vcat, multivalued_basis_indices), multivalued_basis_indices
 end
 
 function get_basis_indices(space::DirectSumSpace, element_id::Int)

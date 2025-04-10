@@ -16,8 +16,14 @@ Compute the Greville points for a `TensorProductSpace` composed of `BSplineSpace
 - `::NTuple{manifold_dim, Vector{Float64}}`: A tuple of vectors containing the Greville
     points for each dimension of the tensor product space.
 """
-function get_greville_points(tp_space::TensorProductSpace{manifold_dim, T}) where {
-    manifold_dim, num_spaces, T <: NTuple{num_spaces, BSplineSpace}
+function get_greville_points(
+    tp_space::TensorProductSpace{manifold_dim, num_components, num_patches, T}
+) where {
+    manifold_dim,
+    num_components,
+    num_patches,
+    num_spaces,
+    T <: NTuple{num_spaces, BSplineSpace},
 }
     space_points = map(get_greville_points, tp_space.fem_spaces)
 

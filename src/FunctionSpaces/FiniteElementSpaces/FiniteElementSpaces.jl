@@ -43,16 +43,6 @@ function get_component_space(space::AbstractFESpace, component_idx::Int)
     return get_component_spaces(space)[component_idx]
 end
 
-function get_component_space(
-    space::AbstractFESpace{manifold_dim, 1, num_patches}, component_idx::Int
-) where {manifold_dim, num_patches}
-    if component_idx == 1
-        return space
-    else
-        throw(ArgumentError("Component $component_idx requested, but $space only has 1 component."))
-    end
-end
-
 """
     get_patch_spaces(space::AbstractFESpace)
 
@@ -95,16 +85,6 @@ For a single patch space, this function will return the original space if
 """
 function get_patch_space(space::AbstractFESpace, patch_id::Int)
     return get_patch_spaces(space)[patch_id]
-end
-
-function get_patch_space(
-    space::AbstractFESpace{manifold_dim, num_components, 1}, patch_id::Int
-) where {manifold_dim, num_components}
-    if patch_id == 1
-        return space
-    else
-        throw(ArgumentError("Space on patch $patch_id requested, but $space only has 1 patch."))
-    end
 end
 
 """
@@ -496,9 +476,6 @@ function evaluate(
         indexin(component_basis_indices[i], basis_indices) for i in 1:num_components
     ]
 
-    # Generate keys for all possible derivative combinations
-    der_keys = integer_sums(nderivatives, manifold_dim + 1)
-
     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         # number of derivatives of order j
@@ -515,14 +492,12 @@ function evaluate(
         component_space = get_component_space(space, component_idx)
         extraction_coefficients, _ = get_extraction(component_space, element_id)
         component_basis = get_local_basis(component_space, element_id, xi, nderivatives)
-        for key in der_keys
-            key = key[1:manifold_dim]
-            j = sum(key)  # order of derivative
-            der_idx = get_derivative_idx(key)
-
-            evaluations[j + 1][der_idx][component_idx][
-                :, column_indices_per_component[component_idx]
-            ] .= @views component_basis[j + 1][der_idx][1] * extraction_coefficients
+        for der_order in eachindex(evaluations)
+            for der_idx in eachindex(evaluations[der_order])
+                evaluations[der_order][der_idx][component_idx][
+                    :, column_indices_per_component[component_idx]
+                ] .= @views component_basis[der_order][der_idx][1] * extraction_coefficients
+            end
         end
     end
 

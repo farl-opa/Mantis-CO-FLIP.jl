@@ -19,11 +19,13 @@ struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <:
     twoscale_operators::TS
 
     function TensorProductTwoScaleOperator(
-        coarse_space::TensorProductSpace{manifold_dim, T},
-        fine_space::TensorProductSpace{manifold_dim, T},
+        coarse_space::TensorProductSpace{manifold_dim, num_components, num_patches, T},
+        fine_space::TensorProductSpace{manifold_dim, num_components, num_patches, T},
         twoscale_operators::TS,
     ) where {
         manifold_dim,
+        num_components,
+        num_patches,
         num_spaces,
         T <: NTuple{num_spaces, AbstractFESpace},
         TS <: NTuple{num_spaces, AbstractTwoScaleOperator},
@@ -192,14 +194,21 @@ end
 
 """
     subdivide_space(
-        space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}
-    ) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+        space::TensorProductSpace{manifold_dim, num_components, num_patches, T},
+        nsubdivisions::NTuple{num_spaces, Int}
+    ) where {
+        manifold_dim,
+        num_components,
+        num_patches,
+        num_spaces,
+        T <: NTuple{num_spaces, AbstractFESpace},
+    }
 
 Subdivide the finite element spaces within a tensor product space and return the resulting
 finer tensor product space.
 
 # Arguments
-- `space::TensorProductSpace{manifold_dim, T}`: The tensor product space containing finite
+- `space::TensorProductSpace`: The tensor product space containing finite
     element spaces to be subdivided.
 - `nsubdivisions::NTuple{num_spaces, Int}`: A tuple specifying the number of subdivisions
     for each finite element space.
@@ -208,8 +217,15 @@ finer tensor product space.
 - `::TensorProductSpace`: The resulting finer tensor product space after subdivision.
 """
 function subdivide_space(
-    space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}
-) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+    space::TensorProductSpace{manifold_dim, num_components, num_patches, T},
+    nsubdivisions::NTuple{num_spaces, Int}
+) where {
+    manifold_dim,
+    num_components,
+    num_patches,
+    num_spaces,
+    T <: NTuple{num_spaces, AbstractFESpace},
+}
     new_spaces = map(subdivide_space, space.fem_spaces, nsubdivisions)
 
     return TensorProductSpace(new_spaces)
@@ -217,14 +233,21 @@ end
 
 """
     build_two_scale_operator(
-        space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}
-    ) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+        space::TensorProductSpace{manifold_dim, num_components, num_patches, T},
+        nsubdivisions::NTuple{num_spaces, Int}
+    ) where {
+        manifold_dim,
+        num_components,
+        num_patches,
+        num_spaces,
+        T <: NTuple{num_spaces, AbstractFESpace},
+    }
 
 Build a two-scale operator for a tensor product space by subdividing each constituent
 finite element space.
 
 # Arguments
-- `space::TensorProductSpace{manifold_dim, T}`: The tensor product space to be subdivided.
+- `space::TensorProductSpace`: The tensor product space to be subdivided.
 - `nsubdivisions::NTuple{num_spaces, Int}`: A tuple specifying the number of subdivisions
     for each constituent finite element space.
 
@@ -233,8 +256,15 @@ finite element space.
 - `::TensorProductSpace`: The resulting finer tensor product space after subdivision.
 """
 function build_two_scale_operator(
-    space::TensorProductSpace{manifold_dim, T}, nsubdivisions::NTuple{num_spaces, Int}
-) where {manifold_dim, num_spaces, T <: NTuple{num_spaces, AbstractFESpace}}
+    space::TensorProductSpace{manifold_dim, num_components, num_patches, T},
+    nsubdivisions::NTuple{num_spaces, Int}
+) where {
+    manifold_dim,
+    num_components,
+    num_patches,
+    num_spaces,
+    T <: NTuple{num_spaces, AbstractFESpace},
+}
     fine_spaces = Vector{AbstractFESpace}(undef, num_spaces)
     twoscale_operators = Vector{AbstractTwoScaleOperator}(undef, num_spaces)
     for space_id in 1:num_spaces
