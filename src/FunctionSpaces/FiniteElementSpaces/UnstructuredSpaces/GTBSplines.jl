@@ -18,6 +18,10 @@ with `r > -1`.
 - `patch_spaces::NTuple{num_patches, T}`: A tuple of `num_patches` NURBS or B-spline spaces.
 - `regularity::Vector{Int}`: A vector of regularity conditions at the interfaces between
     the spaces.
+- `num_dofs_left::Int`: The number of degrees of freedom at the left boundary. Default is -1,
+    which means it will be computed automatically.
+- `num_dofs_right::Int`: The number of degrees of freedom at the right boundary. Default is -1,
+    which means it will be computed automatically.
 
 # Throws
 - `ArgumentError`: If the number of regularity conditions does not match the number of
@@ -72,8 +76,8 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
         # Create the extraction operator
         extraction_op = extract_gtbspline_to_bspline(patch_spaces, regularity)
         # number of element offsets per patch
+        num_elements_per_patch = collect(get_num_elements.(patch_spaces))
         num_elements_offset = cumsum([0; collect(get_num_elements.(patch_spaces))])
-
 
         function _get_boundary_dof_inds(patch_id::Int, right_bnd::Bool)
             # get dof partitioning of the first patch space
@@ -152,7 +156,7 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
             patch_spaces,
             extraction_op,
             dof_partition,
-            collect(map(get_num_elements, patch_spaces)),
+            num_elements_per_patch,
             regularity)
     end
 end
