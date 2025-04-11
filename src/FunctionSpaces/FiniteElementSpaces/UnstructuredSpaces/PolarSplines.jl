@@ -16,9 +16,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
             space_r::AbstractFESpace{1, 1},
             degenerate_control_points::NTuple{2, Matrix{Float64}},
             two_poles::Bool=false,
-            zero_at_poles::Bool=false,
-            dspace_p::Union{Nothing, AbstractFESpace{1, 1}}=nothing,
-            dspace_r::Union{Nothing, AbstractFESpace{1, 1}}=nothing
+            zero_at_poles::Bool=false
         )
 
     Build a polar spline space from the given poloidal and radial spaces.
@@ -29,8 +27,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
     - `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
     - `two_poles::Bool=false`: Whether the polar spline space has two poles.
     - `zero_at_poles::Bool=false`: Whether functions are constrained to zero at poles.
-    - `dspace_p::Union{Nothing, AbstractFESpace{1, 1}}=nothing`: The derivative space for the poloidal space.
-    - `dspace_r::Union{Nothing, AbstractFESpace{1, 1}}=nothing`: The derivative space for the radial space.
+
 
     # Returns
     - `polar_splines::AbstractFESpace`: The polar spline space.
@@ -40,21 +37,17 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
         space_p::AbstractFESpace{1, 1},
         space_r::AbstractFESpace{1, 1},
         degenerate_control_points::NTuple{2, Matrix{Float64}},
-        dspace_p::Union{Nothing, AbstractFESpace{1, 1}}=nothing,
-        dspace_r::Union{Nothing, AbstractFESpace{1, 1}}=nothing,
         two_poles::Bool=false,
         zero_at_poles::Bool=false
     )
 
-        if zero_at_poles
-            if isnothing(dspace_p) || isnothing(dspace_r)
-                throw(ArgumentError("Derivative spaces are required for zero_at_poles=true."))
-            end
-        end
-
         # number of dofs for the poloidal and radial spaces
         n_p = get_num_basis(space_p)
         n_r = get_num_basis(space_r)
+
+        if zero_at_poles
+            n_r += 1
+        end
 
         # first, build extraction operator and control triangle
         E, control_triangle = extract_scalar_polar_splines_to_tensorproduct(
@@ -65,13 +58,10 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
             zero_at_poles,
         )
 
-        # build underlying tensor-product space
+        tp_space = TensorProductSpace((space_p, space_r))
+        regularity = 1
         if zero_at_poles
-            tp_space = TensorProductSpace((dspace_p, dspace_r))
             regularity = -1
-        else
-            tp_space = TensorProductSpace((space_p, space_r))
-            regularity = 1
         end
 
         # build polar spline space and return along with the extraction matrix
@@ -126,7 +116,7 @@ struct VectorPolarSplineSpace{T} <: AbstractFESpace{2, 2, 1}
     - `polar_splines::AbstractFESpace`: The polar spline space.
     - `E::ExtractionOperator`: The extraction operator.
     """
-    function PolarSplineVectors(
+    function VectorPolarSplineSpace(
         space_p::AbstractFESpace{1, 1},
         space_r::AbstractFESpace{1, 1},
         degenerate_control_points::NTuple{2, Matrix{Float64}},
