@@ -1,4 +1,7 @@
-# structures for storing inputs for weak formulations
+############################################################################################
+#                                         Includes                                         #
+############################################################################################
+
 include("./WeakFormInputs.jl")
-# some standard weak formulations
+include("./WeakForm.jl")
 include("./StandardWeakFormulations.jl")

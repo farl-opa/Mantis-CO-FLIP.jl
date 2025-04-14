@@ -1,42 +1,33 @@
-function maxwell_eigenvalue(
-    inputs::WeakFormInputs{manifold_dim, TrF, TeF}, element_id
-) where {manifold_dim, TrF, TeF}
-    # The weak form in question is:
-    #  (du, dv) = ω²(u,v), ∀v ∈ H(curl; Ω).
+############################################################################################
+#                                    Maxwell Eigenvalue                                    #
+############################################################################################
 
-    trial_forms = get_trial_forms(inputs)
-    test_forms = get_test_forms(inputs)
+"""
+    maxwell_eigenvalue(inputs::WeakFormInputs)
 
-    # Left-hand side
-    # A term = (du, dv)
-    A = Forms.Wedge(
-        Forms.ExteriorDerivative(test_forms[1]),
-        Forms.Hodge(Forms.ExteriorDerivative(trial_forms[1]))
-    )
-    A_elem, A_idx = Analysis.integrate(
-        inputs.quad_rule,
-        element_id,
-        A
-    )
+Function for assembling the weak form of the Maxwell eigenvalue problem.
 
-    # Right-hand side
-    # B term = (u, v)
-    B = Forms.Wedge(
-        test_forms[1],
-        Forms.Hodge(trial_forms[1])
-    )
-    B_elem, B_idx = Analysis.integrate(
-        inputs.quad_rule,
-        element_id,
-        B
-    )
+# Arguments
+- `inputs::WeakFormInputs`: The inputs for the weak form assembly, including test and trial
+    spaces.
 
-    # The output should be the contribution to the left-hand-side matrix
-    # A and right-hand-side vector b. The outputs are tuples of
-    # row_indices, column_indices, values for the matrix part and
-    # row_indices, values for the vector part. For this case, no shifts
-    # or offsets are needed.
-    return (A_idx[1], A_idx[2], A_elem), (B_idx[1], B_idx[2], B_elem)
+# Returns
+- `lhs_expression<:NTuple{num_lhs_rows, NTuple{num_lhs_cols, AbstractRealValuedOperator}}`:
+    The left-hand side of the weak form, which is a tuple of tuples contain all the blocks
+    of the left-hand side matrix.
+- `rhs_expression<:NTuple{num_rhs_rows, NTuple{num_rhs_cols, AbstractRealValuedOperator}}`:
+    The right-hand side of the weak form, which is a tuple of tuples contain all the blocks
+    of the right-hand side matrix.
+"""
+function maxwell_eigenvalue(inputs::WeakFormInputs)
+    v¹ = get_test_form(inputs)
+    u¹ = get_trial_form(inputs)
+    A = ∫(d(v¹) ∧ ★(d(u¹)))
+    lhs_expression = ((A,),)
+    B = ∫(v¹ ∧ ★(u¹))
+    rhs_expression = ((B,),)
+
+    return lhs_expression, rhs_expression
 end
 
 """
@@ -59,10 +50,8 @@ function analytical_maxwell_eigenfunction(
     m::Int, n::Int, scale_factors::NTuple{2, Float64}, x::Matrix{Float64}
 )
     num_points = size(x, 1)
-
     x_component = Vector{Float64}(undef, num_points)
     y_component = Vector{Float64}(undef, num_points)
-
     for point in axes(x, 1)
         x_component[point] =
             cos(m * scale_factors[1] * x[point, 1]) *
@@ -92,83 +81,130 @@ Returns the first `num_eig` eigenvalues and 1-form eigenfunctions on the geometr
 function get_analytical_maxwell_eig(
     num_eig::Int, geom::G, scale_factors::NTuple{2, Float64}
 ) where {G <: Geometry.AbstractGeometry{2}}
-    eig_vals = Vector{Float64}(undef, (num_eig+1)^2)
+    eig_vals = Vector{Float64}(undef, (num_eig + 1)^2)
     eig_funcs = Vector{Forms.AnalyticalFormField{2, 1, typeof(geom)}}(
-        undef, (num_eig+1)^2
+        undef, (num_eig + 1)^2
     )
-
     eig_count = 1
     for m in 0:num_eig
         for n in 0:num_eig
             curr_val = (scale_factors[1] * m)^2 + (scale_factors[2] * n)^2
             eig_vals[eig_count] = curr_val
             eig_func_expr = x -> analytical_maxwell_eigenfunction(m, n, scale_factors, x)
-            eig_funcs[eig_count] = Forms.AnalyticalFormField(
-                1, eig_func_expr, geom, "u"
-            )
+            eig_funcs[eig_count] = Forms.AnalyticalFormField(1, eig_func_expr, geom, "u")
             eig_count += 1
         end
     end
 
     sort_inds = sortperm(eig_vals)
-    eig_vals = (eig_vals[sort_inds])[2:num_eig+1]
-    eig_funcs = (eig_funcs[sort_inds])[2:num_eig+1]
+    eig_vals = (eig_vals[sort_inds])[2:(num_eig + 1)]
+    eig_funcs = (eig_funcs[sort_inds])[2:(num_eig + 1)]
 
     return eig_vals, eig_funcs
 end
 
+"""
+    solve_maxwell_eig(
+        X⁰::Forms.AbstractFormSpace{2, 0, G},
+        X¹::Forms.AbstractFormSpace{2, 1, G},
+        Σ::Quadrature.AbstractGlobalQuadratureRule{2},
+        num_eig::Int;
+        verbose::Bool=false,
+    ) where {G}
+
+Returns the first `num_eig` eigenvalues and 1-form eigenfunctions of the Maxwell eigenvalue
+problem.
+
+# Arguments
+- `X⁰::Forms.AbstractFormSpace{2, 0, G}`: The 0-form space to use as trial and test space.
+- `X¹::Forms.AbstractFormSpace{2, 1, G}`: The 1-form space to use as trial and test space.
+- `Σ::Quadrature.AbstractGlobalQuadratureRule{2}`: The quadrature rule to use for the assembly.
+- `num_eig::Int`: The number of eigenvalues and eigenfunctions to compute.
+- `verbose::Bool=false`: Whether to print the nullspace offset.
+
+# Returns
+- `ω²ₕ::Vector{Float64}`: The first `num_eig` eigenvalues.
+- `u¹ₕ::Vector{Forms.FormField{2, 1, G}}`: The first `num_eig` eigenfunctions.
+"""
 function solve_maxwell_eig(
-    W::Forms.AbstractFormSpace{2, 0, G},
-    X::Forms.AbstractFormSpace{2, 1, G},
-    q_rule::Quadrature.AbstractGlobalQuadratureRule{2},
+    X⁰::Forms.AbstractFormSpace{2, 0, G},
+    X¹::Forms.AbstractFormSpace{2, 1, G},
+    Σ::Quadrature.AbstractGlobalQuadratureRule{2},
     num_eig::Int;
     verbose::Bool=false,
 ) where {G}
-    # H₀(curl; Ω) boundary conditions
-    bc_H_zero_curl = Forms.zero_trace_boundary_conditions(X)
-
-    # Assemble matrices
-    weak_form = maxwell_eigenvalue
-    weak_form_inputs = WeakFormInputs(q_rule, X, X)
-    A, B = assemble_eigenvalue(
-        weak_form, weak_form_inputs, bc_H_zero_curl
-    )
-
+    weak_form_inputs = WeakFormInputs(X¹, X¹)
+    weak_form = WeakForm(weak_form_inputs, maxwell_eigenvalue)
+    bc = Forms.zero_trace_boundary_conditions(X¹)
+    A, B = assemble(weak_form, Σ, bc; sparse_lhs=false, sparse_rhs=false)
     ωₕ², eig_vecs = LinearAlgebra.eigen(A, B)
     ωₕ² = real.(ωₕ²)
     sort_ids = sortperm(ωₕ²)
     ωₕ² = ωₕ²[sort_ids]
     eig_vecs = eig_vecs[:, sort_ids]
-
-    nullspace_offset = Forms.get_num_basis(W) - length(bc_H_zero_curl)
+    nullspace_offset = Forms.get_num_basis(X⁰) - length(bc)
     if verbose
         println("""
             The nullspace offset is:
-            \t$(nullspace_offset) = dim(ℜ⁰) - (dim(ℜ¹) - dim(ℜ¹ ∩ H₀(curl; Ω)) .
-            """
-        )
+            \t$(nullspace_offset) = dim(X⁰) - (dim(X¹) - dim(x¹ ∩ H₀(curl; Ω)) .
+            """)
     end
-    ωₕ² = (ωₕ²[(nullspace_offset + 1):end])[1:num_eig]
 
-    uₕ = Vector{Forms.FormField{2, 1, G}}(undef, num_eig)
-    non_boundary_rows_cols = setdiff(1:Forms.get_num_basis(X), keys(bc_H_zero_curl))
+    ωₕ² = (ωₕ²[(nullspace_offset + 1):end])[1:num_eig]
+    u¹ₕ = Vector{Forms.FormField{2, 1, G}}(undef, num_eig)
+    non_boundary_rows_cols = setdiff(1:Forms.get_num_basis(X¹), keys(bc))
     for eig_id in 1:num_eig
         subscript_str = join(Char(0x2080 + d) for d in reverse(digits(eig_id)))
-        uₕ[eig_id] = Forms.FormField(X, "uₕ" * subscript_str)
-        uₕ[eig_id].coefficients[non_boundary_rows_cols] .=
+        u¹ₕ[eig_id] = Forms.FormField(X¹, "uₕ" * subscript_str)
+        u¹ₕ[eig_id].coefficients[non_boundary_rows_cols] .=
             real.(eig_vecs[:, nullspace_offset + eig_id])
     end
 
-    return ωₕ², uₕ
+    return ωₕ², u¹ₕ
 end
 
+"""
+    solve_maxwell_eig(
+        complex::C,
+        Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+        num_steps::Int,
+        dorfler_parameter::Float64,
+        Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+        Lchains::Bool,
+        eigenfunction::Int,
+        num_eig::Int,
+        scale_factors::NTuple{manifold_dim, Float64};
+        verbose::Bool=false,
+    ) where {manifold_dim, num_forms, C <: NTuple{num_forms, Forms.AbstractFormSpace}}
+
+Returns the first `num_eig` eigenvalues and 1-form eigenfunctions of the Maxwell eigenvalue
+problem for an adaptive loop.
+
+# Arguments
+- `complex::C`: The initial de Rham complex to use for the problem.
+- `Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}`: The quadrature rule to use for the
+    assembly.
+- `num_steps::Int`: The number of adaptive steps to perform.
+- `dorfler_parameter::Float64`: The Dörfler marking parameter.
+- `Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}`: The quadrature rule to use for the
+    error estimation.
+- `Lchains::Bool`: Whether to use L-chains for the refinement.
+- `eigenfunction::Int`: The index of the eigenfunction to use for the error estimation.
+- `num_eig::Int`: The number of eigenvalues and eigenfunctions to compute.
+- `scale_factors::NTuple{manifold_dim, Float64}`: The scaling factors for the geometry.
+- `verbose::Bool=false`: Whether to print the progress of the adaptive loop.
+
+# Returns
+- `ω²ₕ::Vector{Float64}`: The first `num_eig` eigenvalues.
+- `u¹ₕ::Vector{Forms.FormField{manifold_dim, 1, G}}`: The first `num_eig` eigenfunctions.
+"""
 function solve_maxwell_eig(
     complex::C,
+    Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
     num_steps::Int,
     dorfler_parameter::Float64,
+    Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
     Lchains::Bool,
-    q_rule_assembly::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
-    q_rule_error::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
     eigenfunction::Int,
     num_eig::Int,
     scale_factors::NTuple{manifold_dim, Float64};
@@ -178,75 +214,51 @@ function solve_maxwell_eig(
         println("Solving the problem on initial step...")
     end
 
-    # Exact solution on initial step
-    exact_eigvals, exact_eigfuncs = get_analytical_maxwell_eig(
+    ω², u¹ = get_analytical_maxwell_eig(
         num_eig, Forms.get_geometry(complex[1]), scale_factors
     )
-
-    # Solve problem on initial step
-    compt_eigvals, compt_eigfuncs = solve_maxwell_eig(
-        complex[1], complex[2], q_rule_assembly, num_eig
-    )
-
-    # Calculate element-wise error
+    ω²ₕ, u¹ₕ = solve_maxwell_eig(complex[1], complex[2], Σₐ, num_eig)
     err_per_element = Analysis.compute_error_per_element(
-        compt_eigfuncs[eigenfunction], exact_eigfuncs[eigenfunction], q_rule_error
+        u¹ₕ[eigenfunction], u¹[eigenfunction], Σₑ
     )
-
     for step in 1:num_steps
         if verbose
             println("Solving the problem on step $step...")
         end
 
-        zero_form_space = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
-
-        L = FunctionSpaces.get_num_levels(zero_form_space)
-
+        X⁰ = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
+        L = FunctionSpaces.get_num_levels(X⁰)
         new_operator, new_space = FunctionSpaces.build_two_scale_operator(
-            FunctionSpaces.get_space(zero_form_space, L),
-            FunctionSpaces.get_num_subdivisions(zero_form_space),
+            FunctionSpaces.get_space(X⁰, L), FunctionSpaces.get_num_subdivisions(X⁰)
         )
-
         dorfler_marking = FunctionSpaces.get_dorfler_marking(
             err_per_element, dorfler_parameter
         )
-
         # Get domains to be refined in current step
         marked_elements_per_level = FunctionSpaces.get_padding_per_level(
-            zero_form_space, dorfler_marking
+            X⁰, dorfler_marking
         )
-
-        # Add Lchains if needed
         if Lchains
             FunctionSpaces.add_Lchains_supports!(
-                marked_elements_per_level, zero_form_space, new_operator
+                marked_elements_per_level, X⁰, new_operator
             )
         end
-        # Get children of marked elements
-        refinement_domains = FunctionSpaces.get_refinement_domains(
-            zero_form_space, marked_elements_per_level, new_operator
-        )
 
-        # Update the hierarchical complex based on the refinement domains and the 0-form space
+        refinement_domains = FunctionSpaces.get_refinement_domains(
+            X⁰, marked_elements_per_level, new_operator
+        )
         complex = Forms.update_hierarchical_de_rham_complex(
             complex, refinement_domains, new_operator, new_space
         )
-
-        # Update exact solution
-        exact_eigvals, exact_eigfuncs = get_analytical_maxwell_eig(
+        ω², u¹ = get_analytical_maxwell_eig(
             num_eig, Forms.get_geometry(complex[1]), scale_factors
         )
-
-        # Solve problem on current step
-        compt_eigvals, compt_eigfuncs = solve_maxwell_eig(
-            complex[1], complex[2], q_rule_assembly, num_eig; verbose
-        )
+        ω²ₕ, u¹ₕ = solve_maxwell_eig(complex[1], complex[2], Σₐ, num_eig; verbose)
 
         err_per_element = Analysis._compute_square_error_per_element(
-            compt_eigfuncs[eigenfunction], exact_eigfuncs[eigenfunction], q_rule_error
+            u¹ₕ[eigenfunction], u¹[eigenfunction], Σₑ
         )
-
     end
 
-    return compt_eigvals, compt_eigfuncs
+    return ω²ₕ, u¹ₕ
 end

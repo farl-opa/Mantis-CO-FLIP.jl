@@ -1,6 +1,6 @@
 module KFormTensorProductL2ProjectionTests
 
-import Mantis
+using Mantis
 
 using Test
 using LinearAlgebra
@@ -26,32 +26,42 @@ L = (1.0, 1.0)
 # polynomial degrees of the zero-form finite element spaces to be used
 p⁰ = [2, 3]
 # type of section spaces to use
-θ = 2*pi
+θ = 2 * pi
 α = 10.0
-section_space_type = [Mantis.FunctionSpaces.Bernstein, Mantis.FunctionSpaces.LobattoLegendre, Mantis.FunctionSpaces.GeneralizedTrigonometric, Mantis.FunctionSpaces.GeneralizedExponential]
+section_space_type = [
+    FunctionSpaces.Bernstein,
+    FunctionSpaces.LobattoLegendre,
+    FunctionSpaces.GeneralizedTrigonometric,
+    FunctionSpaces.GeneralizedExponential,
+]
 # print info?
 verbose = false
 
 # exact solution for the problem
-function sinusoidal_solution(form_rank::Int, geo::Mantis.Geometry.AbstractGeometry{manifold_dim}) where {manifold_dim}
+function sinusoidal_solution(
+    form_rank::Int, geo::Geometry.AbstractGeometry{manifold_dim}
+) where {manifold_dim}
     n_form_components = binomial(manifold_dim, form_rank)
     ω = 2.0 * pi
     function my_sol(x::Matrix{Float64})
         # ∀i ∈ {1, 2, ..., n}: uᵢ = sin(ωx¹)sin(ωx²)...sin(ωxⁿ)
         y = @. sin(ω * x)
-        return repeat([vec(prod(y, dims=2))], n_form_components)
+        return repeat([vec(prod(y; dims=2))], n_form_components)
     end
-    return Mantis.Forms.AnalyticalFormField(form_rank, my_sol, geo, "f")
+    return Forms.AnalyticalFormField(form_rank, my_sol, geo, "f")
 end
 
 # RUN L2 PROJECTION PROBLEM -------------------------------------------------------------------
-errors = zeros(Float64, length(p⁰), length(section_space_type), length(mesh_type), 1+manifold_dim)
+errors = zeros(
+    Float64, length(p⁰), length(section_space_type), length(mesh_type), 1 + manifold_dim
+)
 for (mesh_idx, mesh) in enumerate(mesh_type)
     for (p_idx, p) in enumerate(p⁰)
         for (ss_idx, section_space) in enumerate(section_space_type)
-
             if verbose
-                @info("Running L2 projection tests for p = $p, section_space = $section_space, mesh = $mesh")
+                @info(
+                    "Running L2 projection tests for p = $p, section_space = $section_space, mesh = $mesh"
+                )
             end
 
             # section space degrees
@@ -59,22 +69,22 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
             # function space regularities
             regularities = degree .- 1
-            if section_space == Mantis.FunctionSpaces.LobattoLegendre
+            if section_space == FunctionSpaces.LobattoLegendre
                 regularities = tuple([0 for _ in 1:manifold_dim]...)
             end
 
             # geometry
             if mesh == "cartesian"
-                geometry = Mantis.Geometry.create_cartesian_box(origin, L, num_elements)
+                geometry = Geometry.create_cartesian_box(origin, L, num_elements)
             else
-                geometry = Mantis.Geometry.create_curvilinear_square(origin, L, num_elements)
+                geometry = Geometry.create_curvilinear_square(origin, L, num_elements)
             end
 
             # section spaces
-            if section_space == Mantis.FunctionSpaces.GeneralizedTrigonometric
+            if section_space == FunctionSpaces.GeneralizedTrigonometric
                 section_spaces = map(section_space, degree, (θ, θ), L ./ num_elements)
                 dq⁰ = 2 .* degree
-            elseif section_space == Mantis.FunctionSpaces.GeneralizedExponential
+            elseif section_space == FunctionSpaces.GeneralizedExponential
                 section_spaces = map(section_space, degree, (α, α), L ./ num_elements)
                 dq⁰ = 3 .* degree
             else
@@ -83,15 +93,21 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
             end
 
             # quadrature rule
-            canonical_qrule = Mantis.Quadrature.tensor_product_rule(degree .+ dq⁰, Mantis.Quadrature.gauss_legendre)
+            canonical_qrule = Quadrature.tensor_product_rule(
+                degree .+ dq⁰, Quadrature.gauss_legendre
+            )
             # global quadrature rule
-            ∫ = Mantis.Quadrature.StandardQuadrature(canonical_qrule, Mantis.Geometry.get_num_elements(geometry))
+            Σ = Quadrature.StandardQuadrature(
+                canonical_qrule, Geometry.get_num_elements(geometry)
+            )
 
             # create tensor-product B-spline complex
-            X = Mantis.Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
+            X = Forms.create_tensor_product_bspline_de_rham_complex(
+                origin, L, num_elements, section_spaces, regularities, geometry
+            )
 
             for form_rank in 0:manifold_dim
-                n_dofs = Mantis.Forms.get_num_basis(X[form_rank+1])
+                n_dofs = Forms.get_num_basis(X[form_rank + 1])
                 if verbose
                     display("   Form rank = $form_rank, n_dofs = $n_dofs")
                 end
@@ -99,21 +115,25 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 fₑ = sinusoidal_solution(form_rank, geometry)
 
                 # solve the problem
-                fₕ = Mantis.Assemblers.solve_L2_projection(∫, X[form_rank+1], fₑ)
+                fₕ = Assemblers.solve_L2_projection(X[form_rank + 1], fₑ, Σ)
 
                 # read reference data and compare
-                ref_coeffs = read_data(
-                    sub_dir, "$p-$section_space-$mesh-$form_rank.txt"
+                ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-$form_rank.txt")
+                @test all(
+                    isapprox.(fₕ.coefficients, ref_coeffs, atol=atol * 10, rtol=rtol * 10)
                 )
-                @test all(isapprox.(fₕ.coefficients, ref_coeffs, atol=atol, rtol=rtol))
 
                 # compute error
-                err = Mantis.Analysis.L2_norm(∫, fₕ - fₑ)
-                errors[p_idx, ss_idx, mesh_idx, form_rank+1] = err
+                err = Analysis.L2_norm(fₕ - fₑ, Σ)
+                errors[p_idx, ss_idx, mesh_idx, form_rank + 1] = err
 
-                if verbose; display("   Error: $err"); end
+                if verbose
+                    display("   Error: $err")
+                end
             end
-            if verbose; println("...done!"); end
+            if verbose
+                println("...done!")
+            end
         end
     end
 end

@@ -1,17 +1,14 @@
-function _L2_norm_square(∫, element_idx, u)
-    u² = Forms.Wedge(u, Forms.Hodge(u))
-    return integrate(
-        ∫,
-        element_idx,
-        u²
-    )[1]
+function _L2_norm_square(u, element_id, Σ)
+    integral = ∫(u ∧ ★(u))
+
+    return Forms.evaluate(integral, element_id, Σ)[1][1]
 end
 
-function L2_norm(u, quad_rule)
+function L2_norm(u, Σ)
     norm = 0.0
     inner_prod = ∫(u ∧ ★(u))
     for el_id in 1:Forms.get_num_elements(u)
-        norm += Forms.evaluate(inner_prod, el_id, quad_rule)[1][1]
+        norm += Forms.evaluate(inner_prod, el_id, Σ)[1][1]
     end
 
     return sqrt(norm)

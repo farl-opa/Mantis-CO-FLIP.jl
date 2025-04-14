@@ -1,92 +1,98 @@
 ############################################################################################
-#                              1-form Hodge Laplacian                                      #
+#                                  1-form Hodge Laplacian                                  #
 ############################################################################################
 
-function one_form_hodge_laplacian(inputs::AbstractInputs, element_id::Int)
+"""
+    one_form_hodge_laplacian(inputs::AbstractInputs)
 
-    ∫ = Assemblers.get_global_quadrature_rule(inputs)
-    trial_forms = Assemblers.get_trial_forms(inputs)
-    test_forms = Assemblers.get_test_forms(inputs)
-    forcing = Assemblers.get_forcing(inputs)
+Function for assembling the weak form of the 1-form Hodge Laplacian problem.
 
-    # The mixed weak form in question is:
-    #  (τ, σ) - (dτ, u) = 0, ∀τ ∈ V⁰,
-    #  (v, dσ) + (dv, du) = (v, f), ∀v ∈ V¹.
+# Arguments
+- `inputs::AbstractInputs`: The inputs for the weak form assembly, including test, trial and
+    forcing terms.
 
-    # Left-hand side
+# Returns
+- `lhs_expressions<:NTuple{num_lhs_rows, NTuple{num_lhs_cols, AbstractRealValuedOperator}}`:
+    The left-hand side of the weak form, which is a tuple of tuples contain all the blocks
+    of the left-hand side matrix.
+- `rhs_expressions<:NTuple{num_rhs_rows, NTuple{num_rhs_cols, AbstractRealValuedOperator}}`:
+    The right-hand side of the weak form, which is a tuple of tuples contain all the blocks
+    of the right-hand side matrix.
+"""
+function one_form_hodge_laplacian(inputs::AbstractInputs)
+    τ⁰, v¹ = Assemblers.get_test_forms(inputs)
+    σ⁰, u¹ = Assemblers.get_trial_forms(inputs)
+    f¹ = Assemblers.get_forcing(inputs)
+    A_11 = ∫(τ⁰ ∧ ★(σ⁰))
+    A_12 = -∫(d(τ⁰) ∧ ★(u¹))
+    A_21 = ∫(v¹ ∧ ★(d(σ⁰)))
+    A_22 = ∫(d(v¹) ∧ ★(d(u¹)))
+    lhs_expressions = ((A_11, A_12), (A_21, A_22))
+    b_21 = ∫(v¹ ∧ ★(f¹))
+    rhs_expressions = ((0,), (b_21,))
 
-    # A11 term = (τ, σ)
-    A_11 = Forms.Wedge(test_forms[1], Forms.Hodge(trial_forms[1]))
-    # A12 term = -(dτ, u)
-    A_12 = Forms.Wedge(Forms.ExteriorDerivative(test_forms[1]), Forms.Hodge(trial_forms[2]))
-    # A21 term = (v, dσ)
-    A_21 = Forms.Wedge(test_forms[2], Forms.Hodge(Forms.ExteriorDerivative(trial_forms[1])))
-    # A22 term = (dv, du)
-    A_22 = Forms.Wedge(
-        Forms.ExteriorDerivative(test_forms[2]),
-        Forms.Hodge(Forms.ExteriorDerivative(trial_forms[2]))
-    )
-    # b1 term = 0
-    # b2 term = (v, f)
-    b_2 = Forms.Wedge(test_forms[2], Forms.Hodge(forcing[1]))
-
-    # integrate terms
-    A_elem_11, A_idx_11 = Analysis.integrate(
-        ∫, element_id, A_11
-    )
-    A_elem_12, A_idx_12 = Analysis.integrate(
-        ∫, element_id, A_12
-    )
-    A_elem_21, A_idx_21 = Analysis.integrate(
-        ∫, element_id, A_21
-    )
-    A_elem_22, A_idx_22 = Analysis.integrate(
-        ∫, element_id, A_22
-    )
-    b_elem_2, b_idx_2 = Analysis.integrate(
-        ∫, element_id, b_2
-    )
-
-    # Add offsets.
-    trial_offset = Forms.get_num_basis(trial_forms[1])
-    test_offset = Forms.get_num_basis(test_forms[1])
-    A_idx_21[1] .+= test_offset
-    A_idx_12[2] .+= trial_offset
-    A_idx_22[1] .+= test_offset
-    A_idx_22[2] .+= trial_offset
-    b_idx_2[1] .+= test_offset
-
-    # Put all variables together.
-    A_row_idx = vcat(A_idx_11[1], A_idx_12[1], A_idx_21[1], A_idx_22[1]) #A_row_idx_12, A_row_idx_21, A_row_idx_22)
-    A_col_idx = vcat(A_idx_11[2], A_idx_12[2], A_idx_21[2], A_idx_22[2])
-    A_elem = vcat(A_elem_11, -A_elem_12, A_elem_21, A_elem_22)
-
-    return (A_row_idx, A_col_idx, A_elem), (b_idx_2[1], b_elem_2)
+    return lhs_expressions, rhs_expressions
 end
 
-function solve_one_form_hodge_laplacian(zero_form, one_form, qr_assembly, forcing)
-    weak_form_inputs = Assemblers.WeakFormInputs(
-        qr_assembly, (zero_form, one_form), (zero_form, one_form), (forcing,)
-    )
-    weak_form = one_form_hodge_laplacian
-    A, b = Assemblers.assemble(weak_form, weak_form_inputs, Dict{Int, Float64}())
-    sol = A \ b
-    # Create solutions as forms and return.
-    compt_zero_form, compt_one_form = Forms.build_form_fields(
-        (zero_form, one_form), sol; labels=("δuₕ", "uₕ")
-    )
+"""
+    solve_one_form_hodge_laplacian(X⁰, X¹, f¹, Σ)
 
-    return compt_one_form, compt_zero_form, LinearAlgebra.cond(Array(A))
+Returns the solution of the weak form of the 1-form Hodge Laplacian.
+
+# Arguments
+- `X⁰`: The 0-form space to use as trial and test space.
+- `X¹`: The 1-form space to use as trial and test space.
+- `f¹`: The forcing term to use for the right-hand side of the weak formulation.
+- `Σ`: The quadrature rule to use for the assembly.
+
+# Returns
+- `δu¹ₕ::Forms.FormField`: The 0-form solution of the weak-formulation.
+- `u¹ₕ::Forms.FormField`: The 1-form solution of the weak-formulation.
+"""
+function solve_one_form_hodge_laplacian(X⁰, X¹, f¹, Σ)
+    weak_form_inputs = Assemblers.WeakFormInputs((X⁰, X¹), (f¹,))
+    weak_form = WeakForm(weak_form_inputs, one_form_hodge_laplacian)
+    A, b = Assemblers.assemble(weak_form, Σ)
+    sol = vec(A \ b)
+    δu¹ₕ, u¹ₕ = Forms.build_form_fields((X⁰, X¹), sol; labels=("δu¹ₕ", "u¹ₕ"))
+
+    return δu¹ₕ, u¹ₕ
 end
 
+"""
+    solve_one_form_hodge_laplacian(
+        complex::C,
+        forcing_function::Function,
+        Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+        num_steps::Int,
+        dorfler_parameter::Float64,
+        Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+        Lchains::Bool;
+        verbose::Bool=false
+    ) where {manifold_dim, num_forms, C <: NTuple{num_forms, Forms.AbstractFormSpace}}
+
+Returns the solution of the weak form of the 1-form Hodge Laplacian from an adaptive loop.
+
+# Arguments
+- `complex::C`: The initial de Rham complex to use for the problem.
+- `forcing_function::Function`: The function to use for the forcing term.
+- `Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}`: The quadrature rule to use
+    for the assembly.
+- `num_steps::Int`: The number of steps to use for the adaptive loop.
+- `dorfler_parameter::Float64`: The parameter to use for the Dörfler marking.
+- `Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}`: The quadrature rule to use
+    for the error estimation.
+- `Lchains::Bool`: Whether to use L-chains for the refinement.
+- `verbose::Bool=false`: Whether to print the progress of the adaptive loop.
+"""
 function solve_one_form_hodge_laplacian(
     complex::C,
     forcing_function::Function,
+    Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
     num_steps::Int,
     dorfler_parameter::Float64,
-    Lchains::Bool,
-    ∫_assembly::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
-    ∫_error::Quadrature.AbstractGlobalQuadratureRule{manifold_dim};
+    Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    Lchains::Bool;
     verbose::Bool=false,
 ) where {manifold_dim, num_forms, C <: NTuple{num_forms, Forms.AbstractFormSpace}}
     if verbose
@@ -94,74 +100,43 @@ function solve_one_form_hodge_laplacian(
     end
 
     # Exact solution on initial step
-    exact_one_form, exact_zero_form, forcing = forcing_function(
-        1, Forms.get_geometry(complex[1])
-    )
-
-    # Solve problem on initial step
-    compt_one_form, compt_zero_form = solve_one_form_hodge_laplacian(
-        complex[1], complex[2], ∫_assembly, forcing
-    )
-
-    # Calculate element-wise error
-    err_per_element = Analysis.compute_error_per_element(
-        compt_one_form, exact_one_form, ∫_error
-    )
-
+    δu¹, u¹, f¹ = forcing_function(1, Forms.get_geometry(complex)...)
+    δu¹ₕ, u¹ₕ = solve_one_form_hodge_laplacian(complex[1], complex[2], f¹, Σₐ)
+    err_per_element = Analysis.compute_error_per_element(δu¹ₕ, δu¹, Σₑ)
     for step in 1:num_steps
         if verbose
             println("Solving the problem on step $step...")
         end
 
-        zero_form_space = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
-
-        L = FunctionSpaces.get_num_levels(zero_form_space)
-
+        X⁰ = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
+        L = FunctionSpaces.get_num_levels(X⁰)
         new_operator, new_space = FunctionSpaces.build_two_scale_operator(
-            FunctionSpaces.get_space(zero_form_space, L),
-            FunctionSpaces.get_num_subdivisions(zero_form_space),
+            FunctionSpaces.get_space(X⁰, L), FunctionSpaces.get_num_subdivisions(X⁰)
         )
-
         dorfler_marking = FunctionSpaces.get_dorfler_marking(
             err_per_element, dorfler_parameter
         )
-
         # Get domains to be refined in current step
         marked_elements_per_level = FunctionSpaces.get_padding_per_level(
-            zero_form_space, dorfler_marking
+            X⁰, dorfler_marking
         )
-
-        # Add Lchains if needed
         if Lchains
             FunctionSpaces.add_Lchains_supports!(
-                marked_elements_per_level, zero_form_space, new_operator
+                marked_elements_per_level, X⁰, new_operator
             )
         end
-        # Get children of marked elements
         refinement_domains = FunctionSpaces.get_refinement_domains(
-            zero_form_space, marked_elements_per_level, new_operator
+            X⁰, marked_elements_per_level, new_operator
         )
-
-        # Update the hierarchical complex based on the refinement domains and the 0-form space
         complex = Forms.update_hierarchical_de_rham_complex(
             complex, refinement_domains, new_operator, new_space
         )
-
         # Update exact solution
-        exact_one_form, exact_zero_form, forcing = forcing_function(
-            1, Forms.get_geometry(complex[1])
-        )
-
+        δu¹, u¹, f¹ = forcing_function(1, Forms.get_geometry(complex)...)
         # Solve problem on current step
-        compt_one_form, compt_zero_form = solve_one_form_hodge_laplacian(
-            complex[1], complex[2], ∫_assembly, forcing
-        )
-
-        # Calculate element-wise error
-        err_per_element = Analysis.compute_error_per_element(
-            compt_one_form, exact_one_form, ∫_error
-        )
+        δu¹ₕ, u¹ₕ = solve_one_form_hodge_laplacian(complex[1], complex[2], f¹, Σₐ)
+        err_per_element = Analysis.compute_error_per_element(δu¹ₕ, δu¹, Σₑ)
     end
 
-    return compt_one_form, compt_zero_form
+    return δu¹ₕ, u¹ₕ
 end

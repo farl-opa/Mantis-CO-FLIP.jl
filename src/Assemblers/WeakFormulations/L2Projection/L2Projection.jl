@@ -2,56 +2,53 @@
 #                                     Global L2 projection                                 #
 ############################################################################################
 
-@doc raw"""
-    L2_projection(inputs::Mantis.Assemblers.WeakFormInputs{manifold_dim, 1, Frhs, Ttrial, Ttest}, element_id) where {manifold_dim, Frhs, Ttrial, Ttest}
-
-Weak form for the computation of the ``L^2``-projection on the given element. The associated weak formulation is:
-
-For given ``f^k \in L^2 \Lambda^k (\Omega)``, find ``\phi^k_h \in X^k`` such that
-```math
-\int_{\Omega} \phi^k_h \wedge \star \varphi^k_h = -\int_{\Omega} f^k \wedge \star \varphi^k_h \quad \forall \ \varphi^k_h \in X^k\;,
-```
-where ``X`` is the discrete de Rham complex.
 """
-function L2_projection(inputs::AbstractInputs, element_id)
+    L2_projection(inputs::AbstractInputs)
 
-    trial_forms = get_trial_forms(inputs)
-    test_forms = get_test_forms(inputs)
-    forcing = get_forcing(inputs)
-    ∫ = get_global_quadrature_rule(inputs)
+Function to compute the L2 projection of a function onto a discrete form space.
 
-    # The l.h.s. is the inner product between the test and trial functions.
-    A = Forms.Wedge(test_forms[1], Forms.Hodge(trial_forms[1]))
-    # The r.h.s. is the inner product between the test and forcing functions.
-    b = Forms.Wedge(test_forms[1], Forms.Hodge(forcing[1]))
+# Arguments
+- `inputs::AbstractInputs`: The inputs for the weak form assembly, including test, trial and
+    forcing terms.
 
-    # compute contributions
-    A_elem, A_idx = Analysis.integrate(
-        ∫, element_id, A
-    )
-    b_elem, b_idx = Analysis.integrate(
-        ∫, element_id, b
-    )
+# Returns
+- `lhs_expression<:NTuple{num_lhs_rows, NTuple{num_lhs_cols, AbstractRealValuedOperator}}`:
+    The left-hand side of the weak form, which is a tuple of tuples contain all the blocks
+    of the left-hand side matrix.
+- `rhs_expression<:NTuple{num_rhs_rows, NTuple{num_rhs_cols, AbstractRealValuedOperator}}`:
+    The right-hand side of the weak form, which is a tuple of tuples contain all the blocks
+    of the right-hand side matrix.
+"""
+function L2_projection(inputs::AbstractInputs)
+    vᵏ = get_test_form(inputs)
+    uᵏ = get_trial_form(inputs)
+    fᵏ = get_forcing(inputs)
+    A = ∫(vᵏ ∧ ★(uᵏ))
+    lhs_expression = ((A,),)
+    b = ∫(vᵏ ∧ ★(fᵏ))
+    rhs_expression = ((b,),)
 
-    # The output should be the contribution to the left-hand-side matrix
-    # A and right-hand-side vector b. The outputs are tuples of
-    # row_indices, column_indices, values for the matrix part and
-    # column_indices, values for the vector part.
-    return (A_idx[1], A_idx[2], A_elem), (b_idx[1], b_elem)
-
+    return lhs_expression, rhs_expression
 end
 
-function solve_L2_projection(∫, Xᵏ, fₑ)
-    # inputs for the mixed weak form
-    weak_form_inputs = WeakFormInputs(∫, Xᵏ, fₑ)
+"""
+    solve_L2_projection(Xᵏ, fₑ, Σ)
 
-    # assemble all matrices
-    A, b = assemble(L2_projection, weak_form_inputs, Dict{Int, Float64}())
+Returns the solution of the weak form of the L2 projection.
 
-    # solve for coefficients of solution
-    sol = A \ b
+# Arguments
+- `Xᵏ`: The k-form space to use as trial and test space.
+- `fₑ`: The forcing term to use for the right-hand side of the weak formulation.
+- `Σ`: The quadrature rule to use for the assembly.
 
-    # create the form field from the solution coefficients
+# Returns
+- `fₕ::FormField`: The projection of `fₑ` onto `Xᵏ`.
+"""
+function solve_L2_projection(Xᵏ, fₑ, Σ)
+    weak_form_inputs = WeakFormInputs(Xᵏ, fₑ)
+    weak_form = WeakForm(weak_form_inputs, L2_projection)
+    A, b = assemble(weak_form, Σ)
+    sol = vec(A \ b)
     fₕ = Forms.build_form_field(Xᵏ, sol; label="fₕ")
 
     return fₕ

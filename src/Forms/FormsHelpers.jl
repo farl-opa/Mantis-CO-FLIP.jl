@@ -43,7 +43,7 @@ function build_form_fields(
     end
 
     form_fields = ntuple(num_forms) do i
-        return build_form_field(form_spaces[i]; label = labels[i])
+        return build_form_field(form_spaces[i]; label=labels[i])
     end
 
     return form_fields
@@ -64,7 +64,9 @@ function build_form_fields(
     form_fields = ntuple(num_forms) do i
         num_coeffs = get_num_basis(form_spaces[i])
         ff = build_form_field(
-            form_spaces[i], coeffs[start_id:(start_id + num_coeffs - 1)]; label = labels[i]
+            form_spaces[i],
+            coeffs[start_id:(start_id + num_coeffs - 1)];
+            label=labels[i],
         )
         start_id += num_coeffs
 
@@ -99,7 +101,9 @@ function get_basis_index_combinations(manifold_dim::Int, form_rank::Int)
         # canonical ordering of the degree-deficit combinations
         return ([2, 3], [1, 3], [1, 2])::NTuple{3, Vector{Int}}
     else
-        return tuple(Combinatorics.combinations(1:manifold_dim, form_rank)...)::NTuple{binomial(manifold_dim, form_rank), Vector{Int}}
+        return tuple(
+            Combinatorics.combinations(1:manifold_dim, form_rank)...
+        )::NTuple{binomial(manifold_dim, form_rank), Vector{Int}}
     end
 end
 
@@ -120,14 +124,27 @@ Create a tensor-product B-spline de Rham complex.
 - `::Tuple{<:AbstractFormSpace{manifold_dim, form_rank, geometry}}`: Tuple with the form
     spaces of the complex, for each `form_rank` from `0` to `manifold_dim+1`.
 """
-function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}, geometry::G) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace, G <: Geometry.AbstractGeometry{manifold_dim}}
+function create_tensor_product_bspline_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    section_spaces::NTuple{manifold_dim, F},
+    regularities::NTuple{manifold_dim, Int},
+    geometry::G,
+) where {
+    manifold_dim,
+    F <: FunctionSpaces.AbstractCanonicalSpace,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+}
 
     # number of dofs on the left and right boundary of the domain
     n_dofs_left = tuple((1 for _ in 1:manifold_dim)...)
     n_dofs_right = tuple((1 for _ in 1:manifold_dim)...)
 
     # store all univariate FEM spaces helper
-    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFESpace{1, 1}}}(undef, 2)
+    fem_spaces = Vector{NTuple{manifold_dim, FunctionSpaces.AbstractFESpace{1, 1}}}(
+        undef, 2
+    )
     # first, create all univariate FEM spaces corresponding to directional-zero forms
     fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(
         starting_points,
@@ -163,9 +180,7 @@ function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{m
 
         direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces)
 
-        return FormSpace(
-            k, geometry, direct_sum_space, "ω_$k"
-        )
+        return FormSpace(k, geometry, direct_sum_space, "ω_$k")
     end
 
     return form_spaces
@@ -186,12 +201,20 @@ Create a tensor-product B-spline de Rham complex.
 # Returns
 - `Vector{AbstractFormSpace}`: the `manifold_dim+1` form spaces of the complex.
 """
-function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
+function create_tensor_product_bspline_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    section_spaces::NTuple{manifold_dim, F},
+    regularities::NTuple{manifold_dim, Int},
+) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
 
     # create underlying box geometry
     geometry = Geometry.create_cartesian_box(starting_points, box_sizes, num_elements)
 
-    return create_tensor_product_bspline_de_rham_complex(starting_points, box_sizes, num_elements, section_spaces, regularities, geometry)
+    return create_tensor_product_bspline_de_rham_complex(
+        starting_points, box_sizes, num_elements, section_spaces, regularities, geometry
+    )
 end
 
 """
@@ -209,9 +232,99 @@ Create a tensor-product B-spline de Rham complex.
 # Returns
 - `Vector{AbstractFormSpace}`: the `manifold_dim+1` form spaces of the complex.
 """
-function create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim}
+function create_tensor_product_bspline_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    degrees::NTuple{manifold_dim, Int},
+    regularities::NTuple{manifold_dim, Int},
+) where {manifold_dim}
+    return create_tensor_product_bspline_de_rham_complex(
+        starting_points,
+        box_sizes,
+        num_elements,
+        map(FunctionSpaces.Bernstein, degrees),
+        regularities,
+    )
+end
 
-    return create_tensor_product_bspline_de_rham_complex(starting_points, box_sizes, num_elements, map(FunctionSpaces.Bernstein, degrees), regularities)
+"""
+    create_curvilinear_tensor_product_bspline_de_rham_complex(
+        starting_points::NTuple{manifold_dim, Float64},
+        box_sizes::NTuple{manifold_dim, Float64},
+        num_elements::NTuple{manifold_dim, Int},
+        section_spaces::NTuple{manifold_dim, F},
+        regularities::NTuple{manifold_dim, Int},
+    ) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
+
+Create a tensor-product B-spline de Rham complex on a crazy mesh.
+
+# Arguments
+- `starting_points::NTuple{manifold_dim, Float64}`: the starting points of the domain.
+- `box_sizes::NTuple{manifold_dim, Float64}`: the sizes of the domain.
+- `num_elements::NTuple{manifold_dim, Int}`: the number of elements in each direction.
+- `section_spaces::NTuple{manifold_dim, F}`: the section spaces.
+- `regularities::NTuple{manifold_dim, Int}`: the regularities of the B-spline spaces.
+
+# Returns
+- `Vector{AbstractFormSpace}`: the `manifold_dim+1` form spaces of the complex.
+"""
+function create_curvilinear_tensor_product_bspline_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    section_spaces::NTuple{manifold_dim, F},
+    regularities::NTuple{manifold_dim, Int};
+    crazy_c::Float64=0.1,
+) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
+
+    # create underlying box geometry
+    geometry = Geometry.create_curvilinear_square(
+        starting_points, box_sizes, num_elements; crazy_c=crazy_c
+    )
+
+    return create_tensor_product_bspline_de_rham_complex(
+        starting_points, box_sizes, num_elements, section_spaces, regularities, geometry
+    )
+end
+
+"""
+    create_curvilinear_tensor_product_bspline_de_rham_complex(
+        starting_points::NTuple{manifold_dim, Float64},
+        box_sizes::NTuple{manifold_dim, Float64},
+        num_elements::NTuple{manifold_dim, Int},
+        degrees::NTuple{manifold_dim, Int},
+        regularities::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
+
+Create a tensor-product B-spline de Rham complex on a crazy geometry.
+
+# Arguments
+- `starting_points::NTuple{manifold_dim, Float64}`: the starting points of the domain.
+- `box_sizes::NTuple{manifold_dim, Float64}`: the sizes of the domain.
+- `num_elements::NTuple{manifold_dim, Int}`: the number of elements in each direction.
+- `degrees::NTuple{manifold_dim, Int}`: the degrees of the B-spline spaces.
+- `regularities::NTuple{manifold_dim, Int}`: the regularities of the B-spline spaces.
+
+# Returns
+- `Vector{AbstractFormSpace}`: the `manifold_dim+1` form spaces of the complex.
+"""
+function create_curvilinear_tensor_product_bspline_de_rham_complex(
+    starting_points::NTuple{manifold_dim, Float64},
+    box_sizes::NTuple{manifold_dim, Float64},
+    num_elements::NTuple{manifold_dim, Int},
+    degrees::NTuple{manifold_dim, Int},
+    regularities::NTuple{manifold_dim, Int};
+    crazy_c::Float64=0.1,
+) where {manifold_dim}
+    return create_curvilinear_tensor_product_bspline_de_rham_complex(
+        starting_points,
+        box_sizes,
+        num_elements,
+        map(FunctionSpaces.Bernstein, degrees),
+        regularities;
+        crazy_c = crazy_c,
+    )
 end
 
 ############################################################################################
@@ -238,7 +351,9 @@ function create_hierarchical_de_rham_complex(
     n_dofs_right = tuple((1 for _ in 1:manifold_dim)...)
 
     # store all univariate FEM spaces helper
-    fem_spaces = Vector{NTuple{manifold_dim,FunctionSpaces.AbstractFESpace{1, 1}}}(undef, 2)
+    fem_spaces = Vector{NTuple{manifold_dim, FunctionSpaces.AbstractFESpace{1, 1}}}(
+        undef, 2
+    )
     # first, create all univariate FEM spaces corresponding to directional-zero forms
     fem_spaces[1] = FunctionSpaces.create_dim_wise_bspline_spaces(
         starting_points,
@@ -322,10 +437,7 @@ function update_hierarchical_de_rham_complex(
     refinement_domains::Vector{Vector{Int}},
     new_zero_form_ts::FunctionSpaces.AbstractTwoScaleOperator{2},
     new_zero_form_space::FunctionSpaces.AbstractFESpace{2, 1},
-) where {
-    num_forms,
-    C <: NTuple{num_forms, AbstractFormSpace},
-}
+) where {num_forms, C <: NTuple{num_forms, AbstractFormSpace}}
     zero_form_space = FunctionSpaces.get_component_spaces(complex[1].fem_space)[1]
     one_form_space_x, one_form_space_y = FunctionSpaces.get_component_spaces(
         complex[2].fem_space
@@ -374,7 +486,6 @@ function update_hierarchical_de_rham_complex(
     return zero_form, one_form, two_form
 end
 
-
 ################################################################################
 # Polar B-spline de Rham complex
 ################################################################################
@@ -398,22 +509,43 @@ Create a polar B-spline de Rham complex.
 - `::Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}`: the global extraction operators.
 - `::NTuple{2, Array{Float64,3}}`: the geometry coefficients for the underlying tensor-product B-spline spaces.
 """
-function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, section_spaces::F, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::Union{Nothing, Array{Float64,3}}=nothing) where {F <: NTuple{2, FunctionSpaces.AbstractCanonicalSpace}}
-
+function create_polar_spline_de_rham_complex(
+    num_elements::NTuple{2, Int},
+    section_spaces::F,
+    regularities::NTuple{2, Int},
+    R::Float64;
+    refine::Bool=false,
+    geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+) where {F <: NTuple{2, FunctionSpaces.AbstractCanonicalSpace}}
     form_spaces = Vector{AbstractFormSpace}(undef, 3)
-    global_extraction_operators = Vector{NTuple{N,SparseArrays.SparseMatrixCSC{Float64,Int}} where {N}}(undef,3)
+    global_extraction_operators = Vector{
+        NTuple{N, SparseArrays.SparseMatrixCSC{Float64, Int}} where {N}
+    }(
+        undef, 3
+    )
 
     ##############################
     # 0-Forms
     ##############################
 
     # 0-form FEM space (and possibly refined control points)
-    (P_sol_0, E_sol_0), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ_0, ts_r_0) = FunctionSpaces.create_polar_spline_space_and_geometry(num_elements, section_spaces, regularities, R; refine=refine, geom_coeffs_tp=geom_coeffs_tp, form_rank=0)
+    (P_sol_0, E_sol_0), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ_0, ts_r_0) = FunctionSpaces.create_polar_spline_space_and_geometry(
+        num_elements,
+        section_spaces,
+        regularities,
+        R;
+        refine=refine,
+        geom_coeffs_tp=geom_coeffs_tp,
+        form_rank=0,
+    )
     global_extraction_operators[1] = E_sol_0
 
     if !isnothing(ts_r_0) && !isnothing(ts_θ_0)
         # update number of elements
-        num_elements = (FunctionSpaces.get_num_elements(ts_θ_0.fine_space), FunctionSpaces.get_num_elements(ts_r_0.fine_space))
+        num_elements = (
+            FunctionSpaces.get_num_elements(ts_θ_0.fine_space),
+            FunctionSpaces.get_num_elements(ts_r_0.fine_space),
+        )
     end
 
     # polar spline geometry
@@ -422,25 +554,37 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, secti
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
 
-
     ##############################
     # 1-Forms
     ##############################
 
     # 1-form FEM space
-    (P_sol_1, E_sol_1), _ = FunctionSpaces.create_polar_spline_space_and_geometry(num_elements, section_spaces, regularities, R; geom_coeffs_tp=geom_coeffs_tp, form_rank=1)
+    (P_sol_1, E_sol_1), _ = FunctionSpaces.create_polar_spline_space_and_geometry(
+        num_elements,
+        section_spaces,
+        regularities,
+        R;
+        geom_coeffs_tp=geom_coeffs_tp,
+        form_rank=1,
+    )
     global_extraction_operators[2] = E_sol_1
 
     # 1-form space
     form_spaces[2] = FormSpace(1, geometry, P_sol_1, "ω_1")
-
 
     ##############################
     # 2-Forms
     ##############################
 
     # 2-form FEM space
-    (P_sol_2, E_sol_2), _ = FunctionSpaces.create_polar_spline_space_and_geometry(num_elements, section_spaces, regularities, R; geom_coeffs_tp=geom_coeffs_tp, form_rank=2)
+    (P_sol_2, E_sol_2), _ = FunctionSpaces.create_polar_spline_space_and_geometry(
+        num_elements,
+        section_spaces,
+        regularities,
+        R;
+        geom_coeffs_tp=geom_coeffs_tp,
+        form_rank=2,
+    )
     global_extraction_operators[3] = E_sol_2
 
     # 2-form space
@@ -468,22 +612,41 @@ Create a polar B-spline de Rham complex.
 - `::Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}`: the global extraction operators.
 - `::NTuple{2, Array{Float64,3}}`: the geometry coefficients for the underlying tensor-product B-spline spaces.
 """
-function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degrees::NTuple{2, Int}, regularities::NTuple{2, Int}, R::Float64; refine::Bool=false, geom_coeffs_tp::Union{Nothing, Array{Float64,3}}=nothing)
-
+function create_polar_spline_de_rham_complex(
+    num_elements::NTuple{2, Int},
+    degrees::NTuple{2, Int},
+    regularities::NTuple{2, Int},
+    R::Float64;
+    refine::Bool=false,
+    geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+)
     form_spaces = Vector{AbstractFormSpace}(undef, 3)
-    global_extraction_operators = Vector{NTuple{N,SparseMatrixCSC{Float64,Int}} where {N}}(undef,3)
+    global_extraction_operators = Vector{NTuple{N, SparseMatrixCSC{Float64, Int}} where {N}}(
+        undef, 3
+    )
 
     ##############################
     # 0-Forms
     ##############################
 
     # 0-form FEM space (and possibly refined control points)
-    (P_sol_0, E_sol_0), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ_0, ts_r_0) = FunctionSpaces.create_polar_spline_space_and_geometry(num_elements, degrees, regularities, R; refine=refine, geom_coeffs_tp=geom_coeffs_tp, form_rank=0)
+    (P_sol_0, E_sol_0), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ_0, ts_r_0) = FunctionSpaces.create_polar_spline_space_and_geometry(
+        num_elements,
+        degrees,
+        regularities,
+        R;
+        refine=refine,
+        geom_coeffs_tp=geom_coeffs_tp,
+        form_rank=0,
+    )
     global_extraction_operators[1] = E_sol_0
 
     if !isnothing(ts_r_0) && !isnothing(ts_θ_0)
         # update number of elements
-        num_elements = (FunctionSpaces.get_num_elements(ts_θ_0.fine_space), FunctionSpaces.get_num_elements(ts_r_0.fine_space))
+        num_elements = (
+            FunctionSpaces.get_num_elements(ts_θ_0.fine_space),
+            FunctionSpaces.get_num_elements(ts_r_0.fine_space),
+        )
     end
 
     # polar spline geometry
@@ -492,31 +655,60 @@ function create_polar_spline_de_rham_complex(num_elements::NTuple{2, Int}, degre
     # 0-form space
     form_spaces[1] = FormSpace(0, geometry, P_sol_0, "ω_0")
 
-
     ##############################
     # 1-Forms
     ##############################
 
     # 1-form FEM space
-    (P_sol_1, E_sol_1), _ = FunctionSpaces.create_polar_spline_space_and_geometry(num_elements, degrees, regularities, R; geom_coeffs_tp=geom_coeffs_tp, form_rank=1)
+    (P_sol_1, E_sol_1), _ = FunctionSpaces.create_polar_spline_space_and_geometry(
+        num_elements, degrees, regularities, R; geom_coeffs_tp=geom_coeffs_tp, form_rank=1
+    )
     global_extraction_operators[2] = E_sol_1
 
     # 1-form space
     form_spaces[2] = FormSpace(1, geometry, P_sol_1, "ω_1")
-
 
     ##############################
     # 2-Forms
     ##############################
 
     # 2-form FEM space
-    (P_sol_2, E_sol_2), _ = FunctionSpaces.create_polar_spline_space_and_geometry(num_elements, degrees, regularities, R; geom_coeffs_tp=geom_coeffs_tp, form_rank=2)
+    (P_sol_2, E_sol_2), _ = FunctionSpaces.create_polar_spline_space_and_geometry(
+        num_elements, degrees, regularities, R; geom_coeffs_tp=geom_coeffs_tp, form_rank=2
+    )
     global_extraction_operators[3] = E_sol_2
 
     # 2-form space
     form_spaces[3] = FormSpace(2, geometry, P_sol_2, "ω_2")
 
     return form_spaces, global_extraction_operators, geom_coeffs_tp
+end
+
+############################################################################################
+#                                      Form Operators                                      #
+############################################################################################
+
+"""
+    ⋅(
+        form_1::AbstractFormExpression{manifold_dim},
+        form_2::AbstractFormExpression{manifold_dim},
+    ) where {manifold_dim}
+
+Symbolic wrapper for the inner product between two forms `f¹` and `f²`, returning `∫f¹∧★f²`.
+The unicode character command is `\\cdot`.
+
+# Arguments
+- `form_1::AbstractFormExpression{manifold_dim}`: The first form to be used.
+- `form_2::AbstractFormExpression{manifold_dim}`: The second form to be used.
+
+# Returns
+- `::Integral{manifold_dim}`: The integral operator equivalent to the inner product.
+"""
+function ⋅(
+    form_1::AbstractFormExpression{manifold_dim},
+    form_2::AbstractFormExpression{manifold_dim},
+) where {manifold_dim}
+    return ∫(form_1 ∧ ★(form_2))
 end
 
 ############################################################################################
@@ -542,9 +734,7 @@ These correspond to:
 - `Dict{Int, Float64}`: The dictionary of zero-trace boundary conditions.
 """
 function zero_trace_boundary_conditions(form::AbstractFormSpace)
-    return Dict{Int, Float64}(
-        i => 0.0 for i in trace_basis_idxs(form)
-    )
+    return Dict{Int, Float64}(i => 0.0 for i in trace_basis_idxs(form))
 end
 
 """
@@ -566,10 +756,8 @@ function trace_basis_idxs(
     dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
     num_sides = 3^manifold_dim
     basis_idxs = [
-        i
-        for k in eachindex(dof_partition)
-        for j in setdiff(1:num_sides, Int((num_sides+1) / 2))
-        for i in dof_partition[k][1][j]  # TODO: is this general enough for multipatch?
+        i for k in eachindex(dof_partition) for
+        j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[k][1][j]  # TODO: is this general enough for multipatch?
     ]
     return basis_idxs
 end
