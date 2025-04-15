@@ -50,7 +50,7 @@ struct TwoScaleOperator{manifold_dim, S} <: AbstractTwoScaleOperator{manifold_di
             )]
         end
         for i in 1:1:dims[1]
-            fine_to_coarse_functions[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(
+            fine_to_coarse_functions[i] = transpose_matrix.rowval[SparseArrays.nzrange(
                 transpose_matrix, i
             )]
         end
