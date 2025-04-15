@@ -56,6 +56,19 @@ Returns the form associated with the integral operator.
 """
 get_form(integral::Integral) = integral.form
 
+"""
+    get_expression_rank(integral::Integral)
+
+Returns the rank of the expression associated with the integral operator.
+
+# Arguments
+- `integral::Integral`: The integral operator.
+
+# Returns
+- `::Int`: The rank of the expression associated with the integral operator.
+"""
+get_expression_rank(integral::Integral) = get_expression_rank(get_form(integral))
+
 ############################################################################################
 #                                        Evaluate                                          #
 ############################################################################################
