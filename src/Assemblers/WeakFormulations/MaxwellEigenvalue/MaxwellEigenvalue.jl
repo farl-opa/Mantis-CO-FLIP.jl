@@ -133,10 +133,28 @@ function solve_maxwell_eig(
     num_eig::Int;
     verbose::Bool=false,
 ) where {G}
+    function null_tangential_boundary_conditions(
+        form::Forms.AbstractFormExpression{2, 1, expression_rank, G}
+    ) where {expression_rank, G}
+        dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
+        bc_H_zero_curl_1 = Dict{Int, Float64}(
+            i => 0.0 for j in [1, 2, 3, 7, 8, 9] for i in dof_partition[1][1][j]
+        )
+        bc_H_zero_curl_2 = Dict{Int, Float64}(
+            i => 0.0 for j in [1, 3, 4, 6, 7, 9] for i in dof_partition[2][1][j]
+        )
+        bc_H_zero_curl = merge(bc_H_zero_curl_1, bc_H_zero_curl_2)
+
+        return bc_H_zero_curl
+    end
     weak_form_inputs = WeakFormInputs(X¹, X¹)
     weak_form = WeakForm(weak_form_inputs, maxwell_eigenvalue)
-    bc = Forms.zero_trace_boundary_conditions(X¹)
-    A, B = assemble(weak_form, Σ, bc; sparse_lhs=false, sparse_rhs=false)
+    # bc = Forms.zero_trace_boundary_conditions(X¹)
+    bc = null_tangential_boundary_conditions(X¹)
+    A, B = assemble(weak_form, Σ, bc; lhs_type=Matrix{Float64}, rhs_type=Matrix{Float64})
+    non_boundary_rows_cols = setdiff(1:Forms.get_num_basis(X¹), keys(bc))
+    A = A[non_boundary_rows_cols, non_boundary_rows_cols]
+    B = B[non_boundary_rows_cols, non_boundary_rows_cols]
     ωₕ², eig_vecs = LinearAlgebra.eigen(A, B)
     ωₕ² = real.(ωₕ²)
     sort_ids = sortperm(ωₕ²)
@@ -152,7 +170,6 @@ function solve_maxwell_eig(
 
     ωₕ² = (ωₕ²[(nullspace_offset + 1):end])[1:num_eig]
     u¹ₕ = Vector{Forms.FormField{2, 1, G}}(undef, num_eig)
-    non_boundary_rows_cols = setdiff(1:Forms.get_num_basis(X¹), keys(bc))
     for eig_id in 1:num_eig
         subscript_str = join(Char(0x2080 + d) for d in reverse(digits(eig_id)))
         u¹ₕ[eig_id] = Forms.FormField(X¹, "uₕ" * subscript_str)
@@ -249,6 +266,14 @@ function solve_maxwell_eig(
         )
         complex = Forms.update_hierarchical_de_rham_complex(
             complex, refinement_domains, new_operator, new_space
+        )
+        Σₐ = Quadrature.StandardQuadrature(
+            Quadrature.get_canonical_rule(Σₐ),
+            Geometry.get_num_elements(Forms.get_geometry(complex...)),
+        )
+        Σₑ = Quadrature.StandardQuadrature(
+            Quadrature.get_canonical_rule(Σₑ),
+            Geometry.get_num_elements(Forms.get_geometry(complex...)),
         )
         ω², u¹ = get_analytical_maxwell_eig(
             num_eig, Forms.get_geometry(complex[1]), scale_factors

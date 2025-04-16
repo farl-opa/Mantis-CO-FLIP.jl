@@ -3,8 +3,8 @@
         weak_form::WeakForm,
         quad_rule::Q,
         dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
-        sparse_lhs::Bool=true,
-        sparse_rhs::Bool=false,
+        lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
+        rhs_type::Type=Matrix{Float64},
     ) where {Q <: Quadrature.AbstractQuadratureRule}
 
 Assemble the left- and right-hand sides of a discrete Petrov-Galerkin problem for the given
@@ -16,12 +16,13 @@ weak-formulation and Dirichlet boundary conditions.
 - `dirichlet_bcs::Dict{Int, Float64}`: A dictionary containing the Dirichlet boundary
     conditions, where the key is the index of the boundary condition and the value is the
     boundary condition value.
-- `sparse_lhs::Bool`: Whether to use a sparse matrix for the left-hand side.
-- `sparse_rhs::Bool`: Whether to use a sparse matrix for the right-hand side.
+- `lhs_type::Type`: The type of the left-hand side matrix. Default is
+    `SparseMatrixCSC{Float64, Int}`.
+- `rhs_type::Type`: The type of the right-hand side matrix. Default is `Matrix{Float64}`.
 
 # Returns
-- `lhs::SparseMatrixCSC{Float64, Int}`: The assembled left-hand side matrix.
-- `rhs::Matrix{Float64}`: The assembled right-hand side vector.
+- `lhs::lhs_type`: The assembled left-hand side matrix.
+- `rhs::rhs_type`: The assembled right-hand side vector.
 """
 function assemble(
     weak_form::WeakForm,
@@ -36,36 +37,69 @@ function assemble(
     rhs_expressions = get_rhs_expressions(weak_form)
     test_offsets = get_test_offsets(weak_form)
     trial_offsets = get_trial_offsets(weak_form)
-    lhs_row_ids, lhs_col_ids, lhs_vals = get_pre_allocation(weak_form, "lhs")
-    rhs_row_ids, rhs_col_ids, rhs_vals = get_pre_allocation(weak_form, "rhs")
+    lhs_rows, lhs_cols, lhs_vals = get_pre_allocation(weak_form, "lhs")
+    rhs_rows, rhs_cols, rhs_vals = get_pre_allocation(weak_form, "rhs")
     lhs_counts, rhs_counts = 0, 0
     for elem_id in 1:Quadrature.get_num_elements(quad_rule)
         for block_id in CartesianIndices(num_lhs_blocks)
-            lhs_row_ids, lhs_col_ids, lhs_vals, lhs_counts = add_element_block_contributions!(
-                lhs_row_ids, lhs_col_ids, lhs_vals, lhs_counts, elem_id, block_id,
-                lhs_expressions, quad_rule, test_offsets, trial_offsets
+            lhs_rows, lhs_cols, lhs_vals, lhs_counts = add_block_contributions!(
+                lhs_rows,
+                lhs_cols,
+                lhs_vals,
+                lhs_counts,
+                elem_id,
+                block_id,
+                lhs_expressions,
+                quad_rule,
+                test_offsets,
+                trial_offsets,
             )
         end
 
         for block_id in CartesianIndices(num_rhs_blocks)
-            rhs_row_ids, rhs_col_ids, rhs_vals, rhs_counts = add_element_block_contributions!(
-                rhs_row_ids, rhs_col_ids, rhs_vals, rhs_counts, elem_id, block_id,
-                rhs_expressions, quad_rule, test_offsets, trial_offsets
+            rhs_rows, rhs_cols, rhs_vals, rhs_counts = add_block_contributions!(
+                rhs_rows,
+                rhs_cols,
+                rhs_vals,
+                rhs_counts,
+                elem_id,
+                block_id,
+                rhs_expressions,
+                quad_rule,
+                test_offsets,
+                trial_offsets,
             )
         end
     end
 
-    lhs_row_ids, lhs_col_ids, lhs_vals, rhs_row_ids, rhs_col_ids, rhs_vals = add_boundary_conditions!(
-        lhs_row_ids, lhs_col_ids, lhs_vals, rhs_row_ids, rhs_col_ids, rhs_vals,
-        dirichlet_bcs
+    lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals = add_bc!(
+        lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals, dirichlet_bcs
     )
     problem_size = get_problem_size(weak_form)
-    lhs = build_matrix(lhs_type, lhs_row_ids[1:lhs_counts], lhs_col_ids[1:lhs_counts], lhs_vals[1:lhs_counts], problem_size)
+    lhs = build_matrix(
+        lhs_type,
+        lhs_rows[1:lhs_counts],
+        lhs_cols[1:lhs_counts],
+        lhs_vals[1:lhs_counts],
+        problem_size,
+    )
     matrix_rhs = isnothing(get_forcing(weak_form))
     if matrix_rhs
-        rhs = build_matrix(rhs_type, rhs_row_ids[1:rhs_counts], rhs_col_ids[1:rhs_counts], rhs_vals[1:rhs_counts], problem_size)
+        rhs = build_matrix(
+            rhs_type,
+            rhs_rows[1:rhs_counts],
+            rhs_cols[1:rhs_counts],
+            rhs_vals[1:rhs_counts],
+            problem_size,
+        )
     else
-        rhs = build_matrix(rhs_type, rhs_row_ids[1:rhs_counts], ones(Int, rhs_counts), rhs_vals[1:rhs_counts], (problem_size[1], 1))
+        rhs = build_matrix(
+            rhs_type,
+            rhs_rows[1:rhs_counts],
+            ones(Int, rhs_counts),
+            rhs_vals[1:rhs_counts],
+            (problem_size[1], 1),
+        )
     end
 
     return lhs, rhs
@@ -82,8 +116,8 @@ right-hand side (rhs) matrix.
 - `side::String`: The side of the matrix to pre-allocate. Must be either "lhs" or "rhs".
 
 # Returns
-- `row_ids::Vector{Int}`: The pre-allocated row indices.
-- `col_ids::Vector{Int}`: The pre-allocated column indices.
+- `rows::Vector{Int}`: The pre-allocated row indices.
+- `cols::Vector{Int}`: The pre-allocated column indices.
 - `vals::Vector{Float64}`: The pre-allocated values.
 """
 function get_pre_allocation(weak_form::WeakForm, side::String)
@@ -96,15 +130,60 @@ function get_pre_allocation(weak_form::WeakForm, side::String)
         throw(ArgumentError("Invalid side: $(side). Must be 'lhs' or 'rhs'."))
     end
 
-    row_ids = Vector{Int}(undef, nvals)
-    col_ids = Vector{Int}(undef, nvals)
+    rows = Vector{Int}(undef, nvals)
+    cols = Vector{Int}(undef, nvals)
     vals = Vector{Float64}(undef, nvals)
 
-    return row_ids, col_ids, vals
+    return rows, cols, vals
 end
 
-function add_element_block_contributions!(
-    row_ids::Vector{Int}, col_ids::Vector{Int}, vals::Vector{Float64}, counts::Int, element_id::Int, block_id::CartesianIndex{2}, expressions, quad_rule, test_offsets, trial_offsets
+"""
+    add_block_contributions!(
+        rows::Vector{Int},
+        cols::Vector{Int},
+        vals::Vector{Float64},
+        counts::Int,
+        element_id::Int,
+        block_id::CartesianIndex{2},
+        expressions,
+        quad_rule,
+        test_offsets,
+        trial_offsets,
+    )
+
+Updates the row, column, and value vectors with contributions from the specified real-valued
+expression block at the element given by `element_id`.
+
+# Arguments
+- `rows::Vector{Int}`: The row indices of the matrix.
+- `cols::Vector{Int}`: The column indices of the matrix.
+- `vals::Vector{Float64}`: The values of the matrix.
+- `counts::Int`: The current count of non-zero entries in the matrix.
+- `element_id::Int`: The identifier of the element.
+- `block_id::CartesianIndex{2}`: The identifier of the block in the expression.
+- `expressions`: The expressions to evaluate.
+- `quad_rule::Quadrature.AbstractGlobalQuadratureRule`: The quadrature rule to use for the
+    evaluation.
+- `test_offsets::Vector{Int}`: The offsets for the test functions.
+- `trial_offsets::Vector{Int}`: The offsets for the trial functions.
+
+# Returns
+- `rows::Vector{Int}`: The updated row indices of the matrix.
+- `cols::Vector{Int}`: The updated column indices of the matrix.
+- `vals::Vector{Float64}`: The updated values of the matrix.
+- `counts::Int`: The updated count of non-zero entries in the matrix.
+"""
+function add_block_contributions!(
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    counts::Int,
+    element_id::Int,
+    block_id::CartesianIndex{2},
+    expressions,
+    quad_rule::Quadrature.AbstractGlobalQuadratureRule,
+    test_offsets::Vector{Int},
+    trial_offsets::Vector{Int},
 )
     if expressions[block_id[1]][block_id[2]] != 0
         block_eval, block_indices = Forms.evaluate(
@@ -114,9 +193,9 @@ function add_element_block_contributions!(
             counts += 1
             for (id, indices) in enumerate(block_indices)
                 if id == 1
-                    row_ids[counts] = indices[eval_id] + test_offsets[block_id[1]]
+                    rows[counts] = indices[eval_id] + test_offsets[block_id[1]]
                 elseif id == 2
-                    col_ids[counts] = indices[eval_id] + trial_offsets[block_id[2]]
+                    cols[counts] = indices[eval_id] + trial_offsets[block_id[2]]
                 end
             end
 
@@ -124,15 +203,54 @@ function add_element_block_contributions!(
         end
     end
 
-    return row_ids, col_ids, vals, counts
+    return rows, cols, vals, counts
 end
 
-function add_boundary_conditions!(lhs_row_ids::Vector{Int}, lhs_col_ids::Vector{Int}, lhs_vals::Vector{Float64}, rhs_row_ids::Vector{Int}, rhs_col_ids::Vector{Int}, rhs_vals::Vector{Float64}, dirichlet_bcs::Dict{Int, Float64})
+"""
+    add_bc!(
+        lhs_rows::Vector{Int},
+        lhs_cols::Vector{Int},
+        lhs_vals::Vector{Float64},
+        rhs_rows::Vector{Int},
+        rhs_cols::Vector{Int},
+        rhs_vals::Vector{Float64},
+        dirichlet_bcs::Dict{Int, Float64},
+    )
+
+Adds Dirichlet boundary conditions to the left-hand side and right-hand side matrices.
+
+# Arguments
+- `lhs_rows::Vector{Int}`: The row indices of the left-hand side matrix.
+- `lhs_cols::Vector{Int}`: The column indices of the left-hand side matrix.
+- `lhs_vals::Vector{Float64}`: The values of the left-hand side matrix.
+- `rhs_rows::Vector{Int}`: The row indices of the right-hand side matrix.
+- `rhs_cols::Vector{Int}`: The column indices of the right-hand side matrix.
+- `rhs_vals::Vector{Float64}`: The values of the right-hand side matrix.
+- `dirichlet_bcs::Dict{Int, Float64}`: The Dirichlet boundary conditions, where the key is
+    the index of the boundary condition and the value is the boundary condition value.
+
+# Returns
+- `lhs_rows::Vector{Int}`: The updated row indices of the left-hand side matrix.
+- `lhs_cols::Vector{Int}`: The updated column indices of the left-hand side matrix.
+- `lhs_vals::Vector{Float64}`: The updated values of the left-hand side matrix.
+- `rhs_rows::Vector{Int}`: The updated row indices of the right-hand side matrix.
+- `rhs_cols::Vector{Int}`: The updated column indices of the right-hand side matrix.
+- `rhs_vals::Vector{Float64}`: The updated values of the right-hand side matrix.
+"""
+function add_bc!(
+    lhs_rows::Vector{Int},
+    lhs_cols::Vector{Int},
+    lhs_vals::Vector{Float64},
+    rhs_rows::Vector{Int},
+    rhs_cols::Vector{Int},
+    rhs_vals::Vector{Float64},
+    dirichlet_bcs::Dict{Int, Float64},
+)
     if ~isempty(dirichlet_bcs)
-        for id in eachindex(lhs_row_ids, lhs_col_ids, lhs_vals)
+        for id in eachindex(lhs_rows, lhs_cols, lhs_vals)
             # Check if the row index is also a boundary index.
-            if haskey(dirichlet_bcs, lhs_row_ids[id])
-                if lhs_col_ids[id] == lhs_row_ids[id]
+            if haskey(dirichlet_bcs, lhs_rows[id])
+                if lhs_cols[id] == lhs_rows[id]
                     # Diagonal term, set to 1.0.
                     lhs_vals[id] = 1.0
                 else
@@ -141,35 +259,73 @@ function add_boundary_conditions!(lhs_row_ids::Vector{Int}, lhs_col_ids::Vector{
                 end
             end
         end
-        
 
-        for id in eachindex(rhs_row_ids, rhs_col_ids, rhs_vals)
+        for id in eachindex(rhs_rows, rhs_cols, rhs_vals)
             # Check if the row index is also a boundary index.
-            if haskey(dirichlet_bcs, rhs_row_ids[id])
-            # Set the value to the Dirichlet boundary condition value.
-                rhs_vals[id] = dirichlet_bcs[rhs_row_ids[id]]
+            if haskey(dirichlet_bcs, rhs_rows[id])
+                # Set the value to the Dirichlet boundary condition value.
+                rhs_vals[id] = dirichlet_bcs[rhs_rows[id]]
             end
         end
-
     end
 
-    return lhs_row_ids, lhs_col_ids, lhs_vals, rhs_row_ids, rhs_col_ids, rhs_vals
+    return lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals
 end
 
-function build_matrix(matrix_type::Type, row_ids::Vector{Int}, col_ids::Vector{Int}, vals::Vector{Float64}, size::Tuple{Int, Int})
-    throw(ArgumentError("Assembly of matrix type `$(matrix_type)` not currently implemented."))
+"""
+    build_matrix(
+        matrix_type::Type,
+        rows::Vector{Int},
+        cols::Vector{Int},
+        vals::Vector{Float64},
+        size::Tuple{Int, Int},
+    )
+
+Returns a matrix of the specified type with the given row and column indices and values.
+
+# Arguments
+- `matrix_type::Type`: The type of matrix to build.
+- `rows::Vector{Int}`: The row indices of the matrix.
+- `cols::Vector{Int}`: The column indices of the matrix.
+- `vals::Vector{Float64}`: The values of the matrix.
+- `size::Tuple{Int, Int}`: The size of the matrix.
+
+# Returns
+- `::matrix_type`: The constructed matrix of the specified type.
+"""
+function build_matrix(
+    matrix_type::Type,
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    size::Tuple{Int, Int},
+)
+    throw(
+        ArgumentError("Assembly of matrix type `$(matrix_type)` not currently implemented.")
+    )
 end
 
-function build_matrix(matrix_type::Type{SM}, row_ids::Vector{Int}, col_ids::Vector{Int}, vals::Vector{Float64}, size::Tuple{Int, Int}) where {SM<: spa.AbstractSparseMatrix}
-    return spa.sparse(row_ids, col_ids, vals, size...)
+function build_matrix(
+    ::Type{SM},
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    size::Tuple{Int, Int},
+) where {SM <: spa.AbstractSparseMatrix}
+    return spa.sparse(rows, cols, vals, size...)
 end
 
-function build_matrix(matrix_type::Type{Matrix{Float64}}, row_ids::Vector{Int}, col_ids::Vector{Int}, vals::Vector{Float64}, size::Tuple{Int, Int})
+function build_matrix(
+    ::Type{Matrix{Float64}},
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    size::Tuple{Int, Int},
+)
     matrix = zeros(Float64, size)
-    for (row, col, val) in zip(row_ids, col_ids, vals)
+    for (row, col, val) in zip(rows, cols, vals)
         matrix[row, col] += val
     end
 
     return matrix
 end
-

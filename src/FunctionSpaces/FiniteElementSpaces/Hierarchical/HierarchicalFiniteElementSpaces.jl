@@ -45,7 +45,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
     }
-        function _compute_dof_partition(spaces, active_basis)
+        function _compute_dof_partition(spaces, active_basis, num_levels)
             level_partition = get_dof_partition.(spaces)
             n_patches = length(level_partition[1])
             n_partitions = [length(level_partition[1][i]) for i in 1:n_patches]
@@ -100,7 +100,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
             spaces, two_scale_operators, active_elements, active_basis, truncated
         )
 
-        dof_partition = _compute_dof_partition(spaces, active_basis)
+        dof_partition = _compute_dof_partition(spaces, active_basis, num_levels)
 
         # Creates the structure
         return new{manifold_dim, S, T}(

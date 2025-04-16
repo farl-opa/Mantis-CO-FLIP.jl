@@ -323,7 +323,7 @@ function create_curvilinear_tensor_product_bspline_de_rham_complex(
         num_elements,
         map(FunctionSpaces.Bernstein, degrees),
         regularities;
-        crazy_c = crazy_c,
+        crazy_c=crazy_c,
     )
 end
 

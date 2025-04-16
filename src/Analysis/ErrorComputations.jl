@@ -32,9 +32,9 @@ function _compute_square_error_per_element(
     for elem_id in 1:1:num_elements
         difference = computed_sol - exact_sol
         if norm == "L2"
-            result[elem_id] = _L2_norm_square(quad_rule, elem_id, difference)
+            result[elem_id] = _L2_norm_square(difference, elem_id, quad_rule)
         elseif norm == "H1"
-            Error("Computing the H1 norm still needs to be updated.")
+            throw(ArgumentError("Computing the H1 norm still needs to be updated."))
             # d_difference = Forms.ExteriorDerivative(difference)
             # result[elem_id] = sum(
             #     Forms.evaluate_inner_product(

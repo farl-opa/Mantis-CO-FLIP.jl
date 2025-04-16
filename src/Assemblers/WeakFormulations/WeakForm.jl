@@ -198,7 +198,7 @@ function get_estimated_nnz_per_elem(wf::WeakForm)
     test_max_local_dim = get_test_max_local_dim(wf)
     left_hand_nnz = test_max_local_dim * trial_max_local_dim
     right_hand_nnz = test_max_local_dim
-    if isnothing(get_forcings(wf))
+    if isnothing(get_forcing(wf))
         right_hand_nnz *= trial_max_local_dim
     end
 
@@ -217,6 +217,5 @@ Returns the number of elements over which the discrete weak-formulation is defin
 - `::Int`: The number of elements.
 """
 function get_num_elements(wf::WeakForm)
-    # TODO: Deprecated once global quadrature is used in assembly.
     return Geometry.get_num_elements(Forms.get_geometry(get_trial_forms(wf)...))
 end
