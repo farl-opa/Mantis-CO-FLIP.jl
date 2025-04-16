@@ -70,6 +70,30 @@ function export_form_fields_to_vtk(form_sols, var_names, filename; n_subcells::I
 end
 
 """
+    export_form_fields_to_vtk(form_sols::Vector{Forms.AbstractForm}, var_names::Vector{String}, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
+
+Export the form solutions to VTK files.
+
+# Arguments
+- `form_sols::Vector{Forms.AbstractForm}`: The form solutions to be exported.
+- `filename::String`: The name of the output file.
+- `n_subcells::Int`: The number of subcells to be used in the visualization.
+- `degree::Int`: The degree of the basis functions used in the visualization.
+- `output_directory_tree::Vector{String}`: A vector of strings representing the directory tree.
+"""
+function export_form_fields_to_vtk(form_sols, filename; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
+
+    for form in form_sols
+        label = form.label
+        println("Writing form '$label' to file ...")
+        output_file = export_path(output_directory_tree, "$filename-$label")
+        plot(form; vtk_filename = output_file, n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
+    end
+
+    return nothing
+end
+
+"""
     visualize_tensor_product_controlnet(control_points::Array{Float64}, manifold_dim::Int, range_dim::Int, periodic::Vector{Bool}, filename::String; output_directory_tree::Vector{String} = ["examples", "data", "output"])
 
 Given a tensor-product control net, create a `manifold_dim`-linear geometry and use it to visualize the control net connectivity.

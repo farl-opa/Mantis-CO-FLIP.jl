@@ -10,8 +10,8 @@ include("Quadrature/Quadrature.jl")  # Creates Module Quadrature
 include("FunctionSpaces/FunctionSpaces.jl")  # Creates Module FunctionSpaces
 include("Geometry/Geometry.jl")  # Creates Module Geometry
 include("Forms/Forms.jl")  # Creates Module Forms
+include("Analysis/Analysis.jl")  # Creates Module Analysis
 include("Assemblers/Assemblers.jl")  # Creates Module Assemblers
 include("Plot/Plot.jl")  # Creates Module Plot
-include("Analysis/Analysis.jl")  # Creates Module Analysis
 
 end

@@ -67,3 +67,10 @@ These methods use the following internal function to compute the tensor product 
 ```@docs
 _compute_tensor_product
 ```
+
+
+### Helper Functions
+Create several tensor-product rules of the same type:
+```@docs
+get_quadrature_rules
+```
