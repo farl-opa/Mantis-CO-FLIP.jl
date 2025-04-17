@@ -20,7 +20,7 @@ function test_inner_prod_equality(
         ∫ϵ = ∫(ϵ ∧ ★(ϵ))
         integral_triple = ∫((ϵ ∧ ★(ϵ)) ∧ α⁰)
         inner_prod = ϵ ⋅ ϵ
-        for element_id in 1:Quadrature.get_num_elements(q_rule)
+        for element_id in 1:Quadrature.get_num_base_elements(q_rule)
             # Compare the inner product
             #   <ϵ, ϵ>
             # with

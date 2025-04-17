@@ -1,14 +1,14 @@
 function _L2_norm_square(u, element_id, Σ)
-    integral = ∫(u ∧ ★(u))
+    integral = ∫(u ∧ ★(u), Σ)
 
-    return Forms.evaluate(integral, element_id, Σ)[1][1]
+    return Forms.evaluate(integral, element_id)[1][1]
 end
 
 function L2_norm(u, Σ)
     norm = 0.0
-    inner_prod = ∫(u ∧ ★(u))
+    inner_prod = ∫(u ∧ ★(u), Σ)
     for el_id in 1:Forms.get_num_elements(u)
-        norm += Forms.evaluate(inner_prod, el_id, Σ)[1][1]
+        norm += Forms.evaluate(inner_prod, el_id)[1][1]
     end
 
     return sqrt(norm)
@@ -26,7 +26,7 @@ function _compute_square_error_per_element(
     TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
     Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
 }
-    num_elements = Quadrature.get_num_elements(quad_rule)
+    num_elements = Quadrature.get_num_base_elements(quad_rule)
     result = Vector{Float64}(undef, num_elements)
 
     for elem_id in 1:1:num_elements

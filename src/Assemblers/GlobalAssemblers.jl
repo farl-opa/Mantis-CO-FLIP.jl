@@ -26,11 +26,10 @@ weak-formulation and Dirichlet boundary conditions.
 """
 function assemble(
     weak_form::WeakForm,
-    quad_rule::Q,
     dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
     lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
     rhs_type::Type=Matrix{Float64},
-) where {Q <: Quadrature.AbstractGlobalQuadratureRule}
+)
     num_lhs_blocks = get_num_lhs_blocks(weak_form)
     num_rhs_blocks = get_num_rhs_blocks(weak_form)
     lhs_expressions = get_lhs_expressions(weak_form)
@@ -40,7 +39,7 @@ function assemble(
     lhs_rows, lhs_cols, lhs_vals = get_pre_allocation(weak_form, "lhs")
     rhs_rows, rhs_cols, rhs_vals = get_pre_allocation(weak_form, "rhs")
     lhs_counts, rhs_counts = 0, 0
-    for elem_id in 1:Quadrature.get_num_elements(quad_rule)
+    for elem_id in 1:get_num_elements(weak_form)
         for block_id in CartesianIndices(num_lhs_blocks)
             lhs_rows, lhs_cols, lhs_vals, lhs_counts = add_block_contributions!(
                 lhs_rows,
@@ -50,7 +49,6 @@ function assemble(
                 elem_id,
                 block_id,
                 lhs_expressions,
-                quad_rule,
                 test_offsets,
                 trial_offsets,
             )
@@ -65,7 +63,6 @@ function assemble(
                 elem_id,
                 block_id,
                 rhs_expressions,
-                quad_rule,
                 test_offsets,
                 trial_offsets,
             )
@@ -112,11 +109,11 @@ right-hand side (rhs) matrix.
 """
 function get_pre_allocation(weak_form::WeakForm, side::String)
     nnz_elem = get_estimated_nnz_per_elem(weak_form)
-    # TODO: Update `get_num_elements` to `get_num_quadrature_elements`
+    # TODO: Update `get_num_elements` to `get_num_evaluation_elements`
     if side == "lhs"
-        nvals = nnz_elem[1] * get_num_elements(weak_form)
+        nvals = nnz_elem[1] * get_num_evaluation_elements(weak_form)
     elseif side == "rhs"
-        nvals = nnz_elem[2] * get_num_elements(weak_form)
+        nvals = nnz_elem[2] * get_num_evaluation_elements(weak_form)
     else
         throw(ArgumentError("Invalid side: $(side). Must be 'lhs' or 'rhs'."))
     end
@@ -142,7 +139,6 @@ end
         element_id::Int,
         block_id::CartesianIndex{2},
         expressions,
-        quad_rule,
         test_offsets,
         trial_offsets,
     )
@@ -177,13 +173,12 @@ function add_block_contributions!(
     element_id::Int,
     block_id::CartesianIndex{2},
     expressions,
-    quad_rule::Quadrature.AbstractGlobalQuadratureRule,
     test_offsets::Vector{Int},
     trial_offsets::Vector{Int},
 )
     if expressions[block_id[1]][block_id[2]] != 0
         block_eval, block_indices = Forms.evaluate(
-            expressions[block_id[1]][block_id[2]], element_id, quad_rule
+            expressions[block_id[1]][block_id[2]], element_id
         )
         for eval_id in eachindex(block_eval)
             counts += 1

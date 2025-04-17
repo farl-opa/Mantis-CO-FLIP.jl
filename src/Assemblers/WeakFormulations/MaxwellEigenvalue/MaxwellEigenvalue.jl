@@ -202,10 +202,10 @@ problem for an adaptive loop.
 """
 function solve_maxwell_eig(
     complex::C,
-    Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    Σₐ::Quadrature.StandardQuadrature{manifold_dim},
     num_steps::Int,
     dorfler_parameter::Float64,
-    Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    Σₑ::Quadrature.StandardQuadrature{manifold_dim},
     Lchains::Bool,
     eigenfunction::Int,
     num_eig::Int,
@@ -253,11 +253,11 @@ function solve_maxwell_eig(
             complex, refinement_domains, new_operator, new_space
         )
         Σₐ = Quadrature.StandardQuadrature(
-            Quadrature.get_canonical_rule(Σₐ),
+            Quadrature.get_canonical_quadrature_rule(Σₐ),
             Geometry.get_num_elements(Forms.get_geometry(complex...)),
         )
         Σₑ = Quadrature.StandardQuadrature(
-            Quadrature.get_canonical_rule(Σₑ),
+            Quadrature.get_canonical_quadrature_rule(Σₑ),
             Geometry.get_num_elements(Forms.get_geometry(complex...)),
         )
         ω², u¹ = get_analytical_maxwell_eig(

@@ -10,7 +10,7 @@ the left and right-hand sides of the formulation are given as blocks of real-val
 operators; these are defined from a set of inputs holding the test, trial and forcing terms,
 and a constructor method that defines where the blocks are placed.
 
-# Fields 
+# Fields
 - `lhs_expressions::LHS`: The left-hand side blocks of the weak-formulation.
 - `rhs_expressions::RHS`: The right-hand side blocks of the weak-formulation.
 - `inputs::I`: The inputs for the weak-formulation, which include the test and trial spaces,
@@ -225,5 +225,48 @@ Returns the number of elements over which the discrete weak-formulation is defin
 - `::Int`: The number of elements.
 """
 function get_num_elements(wf::WeakForm)
-    return Geometry.get_num_elements(Forms.get_geometry(get_trial_forms(wf)...))
+    for lhs in get_lhs_expressions(wf)
+        for block in lhs
+            if block != 0
+                return Forms.get_num_elements(lhs[block])
+            end
+        end
+    end
+end
+
+"""
+    get_num_evaluation_elements(wf::WeakForm)
+
+Returns the maximum number of elements over which the weak form blocks are evaluated. This
+is the max over all lhs and rhs expression blocks.
+
+# Arguments
+- `wf::WeakForm`: The weak-formulation for which the number of quadrature elements is to be determined.
+
+# Returns
+- `::Int`: The number of quadrature elements.
+"""
+function get_num_evaluation_elements(wf::WeakForm)
+    num_eval_elements = 0
+    for lhs in get_lhs_expressions(wf)
+        for block in lhs
+            if block != 0
+                num_eval_elements = max(
+                    num_eval_elements,
+                    Forms.get_num_evaluation_elements(lhs[block])
+                )
+            end
+        end
+    end
+    for rhs in get_rhs_expressions(wf)
+        for block in rhs
+            if block != 0
+                num_eval_elements = max(
+                    num_eval_elements,
+                    Forms.get_num_evaluation_elements(rhs[block])
+                )
+            end
+        end
+    end
+    return num_eval_elements
 end

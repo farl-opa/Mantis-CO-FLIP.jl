@@ -28,27 +28,26 @@ struct StandardQuadrature{manifold_dim, Q} <: AbstractGlobalQuadratureRule{manif
     end
 end
 
-function get_canonical_rule(standard_quadrature::StandardQuadrature)
+"""
+    get_canonical_quadrature_rule(standard_quadrature::StandardQuadrature)
+
+Get the canonical quadrature rule of the standard quadrature.
+
+# Arguments
+- `standard_quadrature::StandardQuadrature`: The standard quadrature rule.
+
+# Returns
+- `CanonicalQuadratureRule`: The canonical quadrature rule of the standard quadrature.
+"""
+function get_canonical_quadrature_rule(standard_quadrature::StandardQuadrature)
     return standard_quadrature.canonical_qrule
 end
 
-function get_parametric_nodes(standard_quadrature::StandardQuadrature)
-    return get_nodes(get_canonical_rule(standard_quadrature))
-end
-
-function get_parametric_weights(standard_quadrature::StandardQuadrature)
-    return get_weights(get_canonical_rule(standard_quadrature))
-end
-
-function get_label(standard_quadrature::StandardQuadrature)
-    return get_label(get_canonical_rule(standard_quadrature))
-end
-
-function get_num_elements_mask(standard_quadrature::StandardQuadrature)
+function get_num_evaluation_elements(standard_quadrature::StandardQuadrature)
     return standard_quadrature.num_elements
 end
 
-function get_num_elements(standard_quadrature::StandardQuadrature)
+function get_num_base_elements(standard_quadrature::StandardQuadrature)
     return standard_quadrature.num_elements
 end
 
@@ -57,5 +56,5 @@ function get_element_idxs(::StandardQuadrature, element_idx::Int)
 end
 
 function get_element_quadrature_rule(standard_quadrature::StandardQuadrature, ::Int)
-    return get_canonical_rule(standard_quadrature)
+    return get_canonical_quadrature_rule(standard_quadrature)
 end
