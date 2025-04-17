@@ -24,17 +24,23 @@ where ``N`` is the number of quadrature nodes, ``w_i`` are the weights, and ``x_
 quadrature nodes. Note that the integral is computed on the interval [0, 1].
 
 ## Overview of all types and functions from Mantis.Quadrature
-The Quadrature modules defines one abstract type:
+The Quadrature modules defines three abstract types:
 ```@docs
 AbstractQuadratureRule
+AbstractElementQuadratureRule
+AbstractGlobalQuadratureRule
 ```
-and a corresponding concrete type:
-```@docs
-QuadratureRule
-```
-All quadrature rules are instances of this type.
 
-For every quadrature rule, the following getters are defined:
+Currently, there are two concrete subtypes of `AbstractElementQuadratureRule`:
+```@docs
+ElementQuadratureRule
+CanonicalQuadratureRule
+```
+and one subtype of `AbstractGlobalQuadratureRule`
+```@docs
+StandardQuadrature
+```
+For every element quadrature rule, the following getters are defined:
 ```@docs
 get_label
 get_nodes

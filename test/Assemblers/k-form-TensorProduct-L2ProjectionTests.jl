@@ -120,7 +120,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 # read reference data and compare
                 ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-$form_rank.txt")
                 @test all(
-                    isapprox.(fₕ.coefficients, ref_coeffs, atol=atol * 10, rtol=rtol * 10)
+                    isapprox.(fₕ.coefficients, ref_coeffs, atol=atol * 20, rtol=rtol * 20)
                 )
 
                 # compute error

@@ -1,3 +1,22 @@
+"""
+    StandardQuadrature{manifold_dim, Q} <: AbstractGlobalQuadratureRule{manifold_dim}
+
+Represents a standard quadrature rule for a given manifold dimension, where each element has
+the same canonical rule `Q`.
+
+# Fields
+- `canonical_qrule::Q`: The canonical quadrature rule used for the elements.
+- `num_elements::Int`: The number of elements in the quadrature rule.
+
+# Type parameters
+- `manifold_dim`: Dimension of the domain
+- `Q`: Type of the canonical quadrature rule.
+
+# Inner Constructors
+- `StandardQuadrature(canonical_qrule::Q, num_elements::Int)`: Creates a new
+    `StandardQuadrature` instance with the specified canonical quadrature rule and number of
+    elements.
+"""
 struct StandardQuadrature{manifold_dim, Q} <: AbstractGlobalQuadratureRule{manifold_dim}
     canonical_qrule::Q
     num_elements::Int
