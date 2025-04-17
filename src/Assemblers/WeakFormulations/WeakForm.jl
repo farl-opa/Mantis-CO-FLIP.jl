@@ -136,10 +136,18 @@ get_test_offsets(wf::WeakForm) = [0; cumsum(get_test_sizes(wf)[1:(end - 1)])...]
 get_trial_offsets(wf::WeakForm) = [0; cumsum(get_trial_sizes(wf)[1:(end - 1)])...]
 get_test_size(wf::WeakForm) = sum(get_test_sizes(wf))
 get_trial_size(wf::WeakForm) = sum(get_trial_sizes(wf))
-get_problem_size(wf::WeakForm) = get_test_size(wf), get_trial_size(wf)
 get_test_max_local_dim(wf::WeakForm) = sum(Forms.get_max_local_dim.(get_test_forms(wf)))
 get_trial_max_local_dim(wf::WeakForm) = sum(Forms.get_max_local_dim.(get_trial_forms(wf)))
 get_num_rhs_cols(wf::WeakForm) = length(get_rhs_expressions(wf)[1])
+get_lhs_size(wf::WeakForm) = get_test_size(wf), get_trial_size(wf)
+
+function get_rhs_size(wf::WeakForm)
+    if isnothing(get_forcing(wf))
+        return get_test_size(wf), get_trial_size(wf)
+    end
+
+    return get_test_size(wf), 1
+end
 
 """
     get_num_lhs_blocks(wf::WeakForm)

@@ -30,7 +30,7 @@ function assemble(
     dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
     lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
     rhs_type::Type=Matrix{Float64},
-) where {Q <: Quadrature.AbstractQuadratureRule}
+) where {Q <: Quadrature.AbstractGlobalQuadratureRule}
     num_lhs_blocks = get_num_lhs_blocks(weak_form)
     num_rhs_blocks = get_num_rhs_blocks(weak_form)
     lhs_expressions = get_lhs_expressions(weak_form)
@@ -75,32 +75,22 @@ function assemble(
     lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals = add_bc!(
         lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals, dirichlet_bcs
     )
-    problem_size = get_problem_size(weak_form)
+    lhs_size = get_lhs_size(weak_form)
+    rhs_size = get_rhs_size(weak_form)
     lhs = build_matrix(
         lhs_type,
         lhs_rows[1:lhs_counts],
         lhs_cols[1:lhs_counts],
         lhs_vals[1:lhs_counts],
-        problem_size,
+        lhs_size,
     )
-    matrix_rhs = isnothing(get_forcing(weak_form))
-    if matrix_rhs
-        rhs = build_matrix(
-            rhs_type,
-            rhs_rows[1:rhs_counts],
-            rhs_cols[1:rhs_counts],
-            rhs_vals[1:rhs_counts],
-            problem_size,
-        )
-    else
-        rhs = build_matrix(
-            rhs_type,
-            rhs_rows[1:rhs_counts],
-            ones(Int, rhs_counts),
-            rhs_vals[1:rhs_counts],
-            (problem_size[1], 1),
-        )
-    end
+    rhs = build_matrix(
+        rhs_type,
+        rhs_rows[1:rhs_counts],
+        rhs_cols[1:rhs_counts],
+        rhs_vals[1:rhs_counts],
+        rhs_size,
+    )
 
     return lhs, rhs
 end
@@ -122,16 +112,22 @@ right-hand side (rhs) matrix.
 """
 function get_pre_allocation(weak_form::WeakForm, side::String)
     nnz_elem = get_estimated_nnz_per_elem(weak_form)
+    # TODO: Update `get_num_elements` to `get_num_quadrature_elements`
     if side == "lhs"
-        nvals = 9 * nnz_elem[1] * get_num_elements(weak_form)
+        nvals = nnz_elem[1] * get_num_elements(weak_form)
     elseif side == "rhs"
-        nvals = 9 * nnz_elem[2] * get_num_elements(weak_form)
+        nvals = nnz_elem[2] * get_num_elements(weak_form)
     else
         throw(ArgumentError("Invalid side: $(side). Must be 'lhs' or 'rhs'."))
     end
 
     rows = Vector{Int}(undef, nvals)
-    cols = Vector{Int}(undef, nvals)
+    if side == "rhs" && ~isnothing(get_forcing(weak_form))
+        cols = ones(Int, nvals)
+    else
+        cols = Vector{Int}(undef, nvals)
+    end
+
     vals = Vector{Float64}(undef, nvals)
 
     return rows, cols, vals
