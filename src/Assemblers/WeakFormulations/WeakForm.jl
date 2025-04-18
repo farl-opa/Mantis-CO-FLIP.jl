@@ -202,12 +202,27 @@ sides of the weak-formulation.
     side and right-hand side of the weak-formulation, respectively.
 """
 function get_estimated_nnz_per_elem(wf::WeakForm)
-    trial_max_local_dim = get_trial_max_local_dim(wf)
-    test_max_local_dim = get_test_max_local_dim(wf)
-    left_hand_nnz = test_max_local_dim * trial_max_local_dim
-    right_hand_nnz = test_max_local_dim
-    if isnothing(get_forcing(wf))
-        right_hand_nnz *= trial_max_local_dim
+    left_hand_nnz = 0
+    for lhs in get_lhs_expressions(wf)
+        for block in lhs
+            if block != 0
+                left_hand_nnz = max(
+                    left_hand_nnz,
+                    Forms.get_estimated_nnz_per_elem(lhs[block])
+                )
+            end
+        end
+    end
+    right_hand_nnz = 0
+    for rhs in get_rhs_expressions(wf)
+        for block in rhs
+            if block != 0
+                right_hand_nnz = max(
+                    right_hand_nnz,
+                    Forms.get_estimated_nnz_per_elem(rhs[block])
+                )
+            end
+        end
     end
 
     return (left_hand_nnz, right_hand_nnz)
