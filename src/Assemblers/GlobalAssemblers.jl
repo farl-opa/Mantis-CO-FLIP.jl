@@ -36,6 +36,7 @@ function assemble(
     lhs_rows, lhs_cols, lhs_vals = get_pre_allocation(weak_form, "lhs")
     rhs_rows, rhs_cols, rhs_vals = get_pre_allocation(weak_form, "rhs")
     lhs_counts, rhs_counts = 0, 0
+    # TODO: The loop over elements should also handle boundary integrals.
     for elem_id in 1:get_num_elements(weak_form)
         for block_id in CartesianIndices(num_lhs_blocks)
             lhs_rows, lhs_cols, lhs_vals, lhs_counts = add_block_contributions!(

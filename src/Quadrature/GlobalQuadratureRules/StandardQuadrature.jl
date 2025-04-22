@@ -47,6 +47,17 @@ function get_num_evaluation_elements(standard_quadrature::StandardQuadrature)
     return standard_quadrature.num_elements
 end
 
+"""
+    get_num_base_elements(standard_quadrature::StandardQuadrature)
+
+Returns the number of base elements in the standard quadrature.
+
+# Arguments
+- `standard_quadrature::StandardQuadrature`: The standard quadrature rule.
+
+# Returns
+- `::Int`: The number of base elements in the standard quadrature.
+"""
 function get_num_base_elements(standard_quadrature::StandardQuadrature)
     return standard_quadrature.num_elements
 end
