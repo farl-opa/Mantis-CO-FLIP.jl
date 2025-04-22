@@ -12,7 +12,7 @@ using SparseArrays
 
 function test_evaluations(
     complex,
-    Σ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    dΩ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
     one_valued_func::Function,
     two_valued_func::Function,
 ) where {manifold_dim}
@@ -32,19 +32,19 @@ function test_evaluations(
         f³ = Forms.AnalyticalFormField(3, one_valued_func, geometry, "f³")
     end
 
-    ∫⁰ = ∫(u⁰ ∧ ★(u⁰))
-    ∫¹ = ∫(v¹ ∧ ★(v¹))
-    ∫² = ∫(σ2 ∧ ★(σ2))
-    ∫d⁰ = ∫(d(u⁰) ∧ ★(d(u⁰)))
-    ∫d¹ = ∫(d(v¹) ∧ ★(d(v¹)))
-    ∫★⁰ = ∫(★(u⁰) ∧ ★(★(u⁰)))
-    ∫★¹ = ∫(★(v¹) ∧ ★(★(v¹)))
-    ∫★² = ∫(★(σ2) ∧ ★(★(σ2)))
-    ∫f⁰ = ∫(f⁰ ∧ ★(f⁰))
-    ∫f¹ = ∫(f¹ ∧ ★(f¹))
-    ∫f² = ∫(f² ∧ ★(f²))
+    ∫⁰ = ∫(u⁰ ∧ ★(u⁰), dΩ)
+    ∫¹ = ∫(v¹ ∧ ★(v¹), dΩ)
+    ∫² = ∫(σ2 ∧ ★(σ2), dΩ)
+    ∫d⁰ = ∫(d(u⁰) ∧ ★(d(u⁰)), dΩ)
+    ∫d¹ = ∫(d(v¹) ∧ ★(d(v¹)), dΩ)
+    ∫★⁰ = ∫(★(u⁰) ∧ ★(★(u⁰)), dΩ)
+    ∫★¹ = ∫(★(v¹) ∧ ★(★(v¹)), dΩ)
+    ∫★² = ∫(★(σ2) ∧ ★(★(σ2)), dΩ)
+    ∫f⁰ = ∫(f⁰ ∧ ★(f⁰), dΩ)
+    ∫f¹ = ∫(f¹ ∧ ★(f¹), dΩ)
+    ∫f² = ∫(f² ∧ ★(f²), dΩ)
     if manifold_dim == 3
-        ∫f³ = ∫(f³ ∧ ★(f³))
+        ∫f³ = ∫(f³ ∧ ★(f³), dΩ)
     end
 
     ∫⁰_eval = 0.0
@@ -53,68 +53,67 @@ function test_evaluations(
     ∫f²_eval = 0.0
     ∫f³_eval = 0.0
     for element_id in 1:Forms.get_num_elements(u⁰)
-        Σₑ = Quadrature.get_element_quadrature_rule(Σ, element_id)
+        dΩₑ = Quadrature.get_element_quadrature_rule(dΩ, element_id)
         inv_g, g, det_g = Geometry.inv_metric(
-            geometry, element_id, Quadrature.get_nodes(Σₑ)
+            geometry, element_id, Quadrature.get_nodes(dΩₑ)
         )
-        integrated_metric_0 = sum(Quadrature.get_weights(Σₑ) .* det_g)
-        curr_eval = sum(Forms.evaluate(∫⁰, element_id, Σ)[1])
+        integrated_metric_0 = sum(Quadrature.get_weights(dΩₑ) .* det_g)
+        curr_eval = sum(Forms.evaluate(∫⁰, element_id)[1])
         @test isapprox(integrated_metric_0, curr_eval, atol=1e-12)
         ∫⁰_eval += curr_eval
         element_lengths = [Geometry.get_element_lengths(geometry, element_id)...]
         integrated_metric_1 = zeros((manifold_dim, manifold_dim))
-        for id in eachindex(Quadrature.get_weights(Σₑ))
+        for id in eachindex(Quadrature.get_weights(dΩₑ))
             integrated_metric_1 .+=
-                Quadrature.get_weights(Σₑ)[id] .* ((inv_g[id, :, :]) .* det_g[id])
+                Quadrature.get_weights(dΩₑ)[id] .* ((inv_g[id, :, :]) .* det_g[id])
         end
-
         reference_result = dot(element_lengths, integrated_metric_1 * element_lengths)
         @test isapprox(
-            sum(Forms.evaluate(∫¹, element_id, Σ)[1]), reference_result, atol=1e-12
+            sum(Forms.evaluate(∫¹, element_id)[1]), reference_result, atol=1e-12
         )
         reference_result = 0.0
         @test isapprox(
-            sum(Forms.evaluate(∫d⁰, element_id, Σ)[1]), reference_result, atol=1e-12
+            sum(Forms.evaluate(∫d⁰, element_id)[1]), reference_result, atol=1e-12
         )
         if manifold_dim == 2
-            integrated_metric_2 = sum(Quadrature.get_weights(Σₑ) .* (1.0 ./ det_g))
+            integrated_metric_2 = sum(Quadrature.get_weights(dΩₑ) .* (1.0 ./ det_g))
             reference_result = integrated_metric_2 * prod(element_lengths .^ 2)
             @test isapprox(
-                sum(Forms.evaluate(∫², element_id, Σ)[1]), reference_result, atol=1e-12
+                sum(Forms.evaluate(∫², element_id)[1]), reference_result, atol=1e-12
             )
             reference_result = 0.0
             @test isapprox(
-                sum(Forms.evaluate(∫d¹, element_id, Σ)[1]), reference_result, atol=1e-12
+                sum(Forms.evaluate(∫d¹, element_id)[1]), reference_result, atol=1e-12
             )
         end
 
         @test all(
             isapprox.(
-                Forms.evaluate(∫★⁰, element_id, Σ)[1],
-                Forms.evaluate(∫⁰, element_id, Σ)[1],
+                Forms.evaluate(∫★⁰, element_id)[1],
+                Forms.evaluate(∫⁰, element_id)[1],
                 atol=1e-12,
             ),
         )
         @test all(
             isapprox.(
-                Forms.evaluate(∫★¹, element_id, Σ)[1],
-                Forms.evaluate(∫¹, element_id, Σ)[1],
+                Forms.evaluate(∫★¹, element_id)[1],
+                Forms.evaluate(∫¹, element_id)[1],
                 atol=1e-12,
             ),
         )
         @test all(
             isapprox.(
-                Forms.evaluate(∫★², element_id, Σ)[1],
-                Forms.evaluate(∫², element_id, Σ)[1],
+                Forms.evaluate(∫★², element_id)[1],
+                Forms.evaluate(∫², element_id)[1],
                 atol=1e-12,
             ),
         )
-        ∫f⁰_eval += Forms.evaluate(∫f⁰, element_id, Σ)[1][1]
-        ∫f¹_eval += Forms.evaluate(∫f¹, element_id, Σ)[1][1]
+        ∫f⁰_eval += Forms.evaluate(∫f⁰, element_id)[1][1]
+        ∫f¹_eval += Forms.evaluate(∫f¹, element_id)[1][1]
         if manifold_dim == 2
-            ∫f²_eval += Forms.evaluate(∫f², element_id, Σ)[1][1]
+            ∫f²_eval += Forms.evaluate(∫f², element_id)[1][1]
         else
-            ∫f³_eval += Forms.evaluate(∫f³, element_id, Σ)[1][1]
+            ∫f³_eval += Forms.evaluate(∫f³, element_id)[1][1]
         end
     end
 
@@ -184,14 +183,14 @@ curv_complex_2d = Forms.create_curvilinear_tensor_product_bspline_de_rham_comple
 canonical_qrule_2d = Quadrature.tensor_product_rule(
     degrees_2d .+ 12, Quadrature.gauss_legendre
 )
-Σ₂ = Quadrature.StandardQuadrature(
+dΩ₂ = Quadrature.StandardQuadrature(
     canonical_qrule_2d, Geometry.get_num_elements(Forms.get_geometry(cart_complex_2d...))
 )
 
 # Test the different geometries.
 for complex in (cart_complex_2d, curv_complex_2d)
     test_evaluations(
-        complex, Σ₂, analytical_1valued_form_func, analytical_2valued_form_func
+        complex, dΩ₂, analytical_1valued_form_func, analytical_2valued_form_func
     )
 end
 
@@ -226,14 +225,14 @@ curv_complex_3d = Forms.create_tensor_product_bspline_de_rham_complex(
 canonical_qrule_3d = Quadrature.tensor_product_rule(
     degrees_3d .+ 4, Quadrature.gauss_legendre
 )
-Σ₃ = Quadrature.StandardQuadrature(
+dΩ₃ = Quadrature.StandardQuadrature(
     canonical_qrule_3d, Geometry.get_num_elements(Forms.get_geometry(cart_complex_3d...))
 )
 
 # Test the different geometries.
 for complex in (cart_complex_3d, curv_complex_3d)
     test_evaluations(
-        complex, Σ₃, analytical_1valued_form_func, analytical_2valued_form_func
+        complex, dΩ₃, analytical_1valued_form_func, analytical_2valued_form_func
     )
 end
 

@@ -34,8 +34,8 @@ nq_error = nq_assembly .* 2
 ∫ₐ, ∫ₑ = Quadrature.get_canonical_quadrature_rules(
     Quadrature.gauss_legendre, nq_assembly, nq_error
 )
-Σₐ = Quadrature.StandardQuadrature(∫ₐ, prod(num_elements))
-Σₑ = Quadrature.StandardQuadrature(∫ₑ, prod(num_elements))
+dΩₐ = Quadrature.StandardQuadrature(∫ₐ, prod(num_elements))
+dΩₑ = Quadrature.StandardQuadrature(∫ₑ, prod(num_elements))
 
 # Number of eigenvalues to compute
 num_eig = 10
@@ -57,7 +57,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 )
 # Solve problem
 ωₕ², uₕ = Assemblers.solve_maxwell_eig(
-    ℌ, Σₐ, num_steps, θ, Σₑ, Lchains, eigenfunc, num_eig, scale_factors; verbose
+    ℌ, dΩₐ, num_steps, θ, dΩₑ, Lchains, eigenfunc, num_eig, scale_factors; verbose
 )
 
 ############################################################################################

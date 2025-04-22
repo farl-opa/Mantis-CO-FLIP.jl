@@ -47,8 +47,7 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ℜ⁰, ℜ¹  = ℜ[1], ℜ[2]
 
 # Geometry
-# TODO: ⊞ = Mantis.Forms.get_geometry(ℜ) (from forms overhaul)
-⊞ = Mantis.Forms.get_geometry(ℜ⁰)
+⊞ = Mantis.Forms.get_geometry(ℜ...)
 
 # Solve problem
 ωₕ², uₕ = Mantis.Assemblers.solve_maxwell_eig(ℜ⁰, ℜ¹, ∫ₐ, num_eig; verbose)

@@ -103,7 +103,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
             # quadrature rule
             canonical_qrule = Quadrature.tensor_product_rule(degree .+ dq⁰, Quadrature.gauss_legendre)
             # global quadrature rule
-            Σ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
+            dΩ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
 
             # create tensor-product B-spline complex
             X = Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
@@ -117,15 +117,15 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
             uₑ, duₑ, fₑ = sinusoidal_solution(geometry)
 
             # solve the problem
-            uₕ = Assemblers.solve_zero_form_hodge_laplacian(X[1], fₑ, Σ)
+            uₕ = Assemblers.solve_zero_form_hodge_laplacian(X[1], fₑ, dΩ)
             ref_coeffs = read_data(
                 sub_dir, "$p-$section_space-$mesh.txt"
             )
             @test all(isapprox.(uₕ.coefficients, ref_coeffs, atol=atol, rtol=rtol))
 
             # compute error
-            error = Analysis.L2_norm(uₕ - uₑ, Σ)
-            derror = Analysis.L2_norm(Forms.ExteriorDerivative(uₕ) - duₑ, Σ)
+            error = Analysis.L2_norm(uₕ - uₑ, dΩ)
+            derror = Analysis.L2_norm(Forms.ExteriorDerivative(uₕ) - duₑ, dΩ)
             errors[p_idx, ss_idx, mesh_idx, 1] = error
             errors[p_idx, ss_idx, mesh_idx, 2] = derror
 

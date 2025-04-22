@@ -3,13 +3,15 @@
 ############################################################################################
 
 """
-    maxwell_eigenvalue(inputs::WeakFormInputs)
+    maxwell_eigenvalue(inputs::WeakFormInputs, dΩ::Quadrature.AbstractGlobalQuadratureRule)
 
 Function for assembling the weak form of the Maxwell eigenvalue problem.
 
 # Arguments
 - `inputs::WeakFormInputs`: The inputs for the weak form assembly, including test and trial
     spaces.
+- `dΩ::Quadrature.AbstractGlobalQuadratureRule`: The quadrature rule to use for the integral
+    evaluation.
 
 # Returns
 - `lhs_expression<:NTuple{num_lhs_rows, NTuple{num_lhs_cols, AbstractRealValuedOperator}}`:
@@ -19,12 +21,14 @@ Function for assembling the weak form of the Maxwell eigenvalue problem.
     The right-hand side of the weak form, which is a tuple of tuples contain all the blocks
     of the right-hand side matrix.
 """
-function maxwell_eigenvalue(inputs::WeakFormInputs)
+function maxwell_eigenvalue(
+    inputs::WeakFormInputs, dΩ::Quadrature.AbstractGlobalQuadratureRule
+)
     v¹ = get_test_form(inputs)
     u¹ = get_trial_form(inputs)
-    A = ∫(d(v¹) ∧ ★(d(u¹)))
+    A = ∫(d(v¹) ∧ ★(d(u¹)), dΩ)
     lhs_expression = ((A,),)
-    B = ∫(v¹ ∧ ★(u¹))
+    B = ∫(v¹ ∧ ★(u¹), dΩ)
     rhs_expression = ((B,),)
 
     return lhs_expression, rhs_expression
@@ -107,7 +111,7 @@ end
     solve_maxwell_eig(
         X⁰::Forms.AbstractFormSpace{2, 0, G},
         X¹::Forms.AbstractFormSpace{2, 1, G},
-        Σ::Quadrature.AbstractGlobalQuadratureRule{2},
+        dΩ::Quadrature.AbstractGlobalQuadratureRule{2},
         num_eig::Int;
         verbose::Bool=false,
     ) where {G}
@@ -118,7 +122,7 @@ problem.
 # Arguments
 - `X⁰::Forms.AbstractFormSpace{2, 0, G}`: The 0-form space to use as trial and test space.
 - `X¹::Forms.AbstractFormSpace{2, 1, G}`: The 1-form space to use as trial and test space.
-- `Σ::Quadrature.AbstractGlobalQuadratureRule{2}`: The quadrature rule to use for the assembly.
+- `dΩ::Quadrature.AbstractGlobalQuadratureRule{2}`: The quadrature rule to use for the assembly.
 - `num_eig::Int`: The number of eigenvalues and eigenfunctions to compute.
 - `verbose::Bool=false`: Whether to print the nullspace offset.
 
@@ -129,14 +133,15 @@ problem.
 function solve_maxwell_eig(
     X⁰::Forms.AbstractFormSpace{2, 0, G},
     X¹::Forms.AbstractFormSpace{2, 1, G},
-    Σ::Quadrature.AbstractGlobalQuadratureRule{2},
+    dΩ::Quadrature.AbstractGlobalQuadratureRule{2},
     num_eig::Int;
     verbose::Bool=false,
 ) where {G}
     weak_form_inputs = WeakFormInputs(X¹, X¹)
-    weak_form = WeakForm(weak_form_inputs, maxwell_eigenvalue)
-    bc = Forms.zero_trace_boundary_conditions(X¹)
-    A, B = assemble(weak_form, Σ, bc; lhs_type=Matrix{Float64}, rhs_type=Matrix{Float64})
+    lhs_expressions, rhs_expressions = maxwell_eigenvalue(weak_form_inputs, dΩ)
+    weak_form = WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
+    bc = Forms.set_dirichlet_boundary_conditions(X¹, 0.0)
+    A, B = assemble(weak_form, bc; lhs_type=Matrix{Float64}, rhs_type=Matrix{Float64})
     non_boundary_rows_cols = setdiff(1:Forms.get_num_basis(X¹), keys(bc))
     A = A[non_boundary_rows_cols, non_boundary_rows_cols]
     B = B[non_boundary_rows_cols, non_boundary_rows_cols]
@@ -168,10 +173,10 @@ end
 """
     solve_maxwell_eig(
         complex::C,
-        Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+        dΩₐ::Quadrature.StandardQuadrature{manifold_dim},
         num_steps::Int,
         dorfler_parameter::Float64,
-        Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+        dΩₑ::Quadrature.StandardQuadrature{manifold_dim},
         Lchains::Bool,
         eigenfunction::Int,
         num_eig::Int,
@@ -184,11 +189,11 @@ problem for an adaptive loop.
 
 # Arguments
 - `complex::C`: The initial de Rham complex to use for the problem.
-- `Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}`: The quadrature rule to use for the
+- `dΩₐ::Quadrature.StandardQuadrature{manifold_dim}`: The quadrature rule to use for the
     assembly.
 - `num_steps::Int`: The number of adaptive steps to perform.
 - `dorfler_parameter::Float64`: The Dörfler marking parameter.
-- `Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}`: The quadrature rule to use for the
+- `dΩₑ::Quadrature.StandardQuadrature{manifold_dim}`: The quadrature rule to use for the
     error estimation.
 - `Lchains::Bool`: Whether to use L-chains for the refinement.
 - `eigenfunction::Int`: The index of the eigenfunction to use for the error estimation.
@@ -202,10 +207,10 @@ problem for an adaptive loop.
 """
 function solve_maxwell_eig(
     complex::C,
-    Σₐ::Quadrature.StandardQuadrature{manifold_dim},
+    dΩₐ::Quadrature.StandardQuadrature{manifold_dim},
     num_steps::Int,
     dorfler_parameter::Float64,
-    Σₑ::Quadrature.StandardQuadrature{manifold_dim},
+    dΩₑ::Quadrature.StandardQuadrature{manifold_dim},
     Lchains::Bool,
     eigenfunction::Int,
     num_eig::Int,
@@ -219,9 +224,9 @@ function solve_maxwell_eig(
     ω², u¹ = get_analytical_maxwell_eig(
         num_eig, Forms.get_geometry(complex[1]), scale_factors
     )
-    ω²ₕ, u¹ₕ = solve_maxwell_eig(complex[1], complex[2], Σₐ, num_eig)
+    ω²ₕ, u¹ₕ = solve_maxwell_eig(complex[1], complex[2], dΩₐ, num_eig)
     err_per_element = Analysis.compute_error_per_element(
-        u¹ₕ[eigenfunction], u¹[eigenfunction], Σₑ
+        u¹ₕ[eigenfunction], u¹[eigenfunction], dΩₑ
     )
     for step in 1:num_steps
         if verbose
@@ -252,21 +257,20 @@ function solve_maxwell_eig(
         complex = Forms.update_hierarchical_de_rham_complex(
             complex, refinement_domains, new_operator, new_space
         )
-        Σₐ = Quadrature.StandardQuadrature(
-            Quadrature.get_canonical_quadrature_rule(Σₐ),
-            Geometry.get_num_elements(Forms.get_geometry(complex...)),
+        geom = Forms.get_geometry(complex...)
+        dΩₐ = Quadrature.StandardQuadrature(
+            Quadrature.get_canonical_quadrature_rule(dΩₐ), Geometry.get_num_elements(geom)
         )
-        Σₑ = Quadrature.StandardQuadrature(
-            Quadrature.get_canonical_quadrature_rule(Σₑ),
-            Geometry.get_num_elements(Forms.get_geometry(complex...)),
+        dΩₑ = Quadrature.StandardQuadrature(
+            Quadrature.get_canonical_quadrature_rule(dΩₑ), Geometry.get_num_elements(geom)
         )
         ω², u¹ = get_analytical_maxwell_eig(
             num_eig, Forms.get_geometry(complex[1]), scale_factors
         )
-        ω²ₕ, u¹ₕ = solve_maxwell_eig(complex[1], complex[2], Σₐ, num_eig; verbose)
+        ω²ₕ, u¹ₕ = solve_maxwell_eig(complex[1], complex[2], dΩₐ, num_eig; verbose)
 
         err_per_element = Analysis._compute_square_error_per_element(
-            u¹ₕ[eigenfunction], u¹[eigenfunction], Σₑ
+            u¹ₕ[eigenfunction], u¹[eigenfunction], dΩₑ
         )
     end
 

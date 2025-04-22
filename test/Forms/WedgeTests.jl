@@ -10,31 +10,27 @@ using SparseArrays
 ##                                       Testing methods                                  ##
 ############################################################################################
 function test_inner_prod_equality(
-    complex, q_rule::Q
+    complex, dΩ::Q
 ) where {manifold_dim, Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim}}
     for rank in 0:manifold_dim
         # Generate the form space ϵᵏ, or form rank k, and matching hodge and form field.
         ϵ = complex[rank + 1]
         ★ϵ = ★(ϵ)
         α⁰ = Forms.AnalyticalFormField(0, zero_form_expression, Forms.get_geometry(ϵ), "α⁰")
-        ∫ϵ = ∫(ϵ ∧ ★(ϵ))
-        integral_triple = ∫((ϵ ∧ ★(ϵ)) ∧ α⁰)
-        inner_prod = ϵ ⋅ ϵ
-        for element_id in 1:Quadrature.get_num_base_elements(q_rule)
+        ∫ϵ = ∫(ϵ ∧ ★(ϵ), dΩ)
+        integral_triple = ∫((ϵ ∧ ★(ϵ)) ∧ α⁰, dΩ)
+
+        for element_id in 1:Quadrature.get_num_base_elements(dΩ)
             # Compare the inner product
             #   <ϵ, ϵ>
             # with
             #   ∫ ϵ ∧ ★ϵ
 
-            # Compute the inner product: <ϵ, ϵ>
-            inner_product_eval, _ = Forms.evaluate(inner_prod, element_id, q_rule)
             # Compute the integral: ∫ ϵ ∧ ★ϵ
-            integral_eval, _ = Forms.evaluate(∫ϵ, element_id, q_rule)
+            integral_eval, _ = Forms.evaluate(∫ϵ, element_id)
             # Test if ϵ ∧ ★ϵ == ϵ ∧ ★ϵ ∧ α⁰ (since α⁰ = 1)
-            integral_triple_eval, _ = Forms.evaluate(integral_triple, element_id, q_rule)
+            integral_triple_eval, _ = Forms.evaluate(integral_triple, element_id)
             @test all(isapprox.(integral_eval, integral_triple_eval; atol=1e-12))
-            # Test if the integral is the same as the inner product
-            @test all(isapprox.(integral_eval, inner_product_eval; atol=1e-12))
 
             # Test if the wedge product expression has the correct expression rank
             @test Forms.get_expression_rank(Forms.get_form(∫ϵ)) == 2
@@ -288,14 +284,14 @@ curv_complex_2d = Forms.create_curvilinear_tensor_product_bspline_de_rham_comple
 canonical_qrule_2d = Quadrature.tensor_product_rule(
     degrees_2d .+ 2, Quadrature.gauss_legendre
 )
-Σ₂ = Quadrature.StandardQuadrature(
+dΩ₂ = Quadrature.StandardQuadrature(
     canonical_qrule_2d, Geometry.get_num_elements(Forms.get_geometry(cart_complex_2d...))
 )
 
 # Test the different geometries.
 for complex in (cart_complex_2d, curv_complex_2d)
-    test_inner_prod_equality(complex, Σ₂)
-    test_combinations_2d(complex, Σ₂)
+    test_inner_prod_equality(complex, dΩ₂)
+    test_combinations_2d(complex, dΩ₂)
 end
 
 ############################################################################################
@@ -329,14 +325,14 @@ curv_complex_3d = Forms.create_tensor_product_bspline_de_rham_complex(
 canonical_qrule_3d = Quadrature.tensor_product_rule(
     degrees_3d .+ 2, Quadrature.gauss_legendre
 )
-Σ₃ = Quadrature.StandardQuadrature(
+dΩ₃ = Quadrature.StandardQuadrature(
     canonical_qrule_3d, Geometry.get_num_elements(Forms.get_geometry(cart_complex_3d...))
 )
 
 # Test the different geometries.
 for complex in (cart_complex_3d, curv_complex_3d)
-    test_inner_prod_equality(complex, Σ₃)
-    test_combinations_3d(complex, Σ₃)
+    test_inner_prod_equality(complex, dΩ₃)
+    test_combinations_3d(complex, dΩ₃)
 end
 
 end

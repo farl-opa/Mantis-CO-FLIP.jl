@@ -91,7 +91,7 @@ for (p_idx, p) in enumerate(p⁰)
         # quadrature rule
         canonical_qrule = Quadrature.tensor_product_rule(degree .+ dq⁰, Quadrature.gauss_legendre)
         # global quadrature rule
-        Σ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
+        dΩ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
 
         for form_rank in 0:manifold_dim
             n_dofs = Forms.get_num_basis(X[form_rank+1])
@@ -102,14 +102,14 @@ for (p_idx, p) in enumerate(p⁰)
             fₑ = sinusoidal_solution(form_rank, geometry)
 
             # solve the problem
-            fₕ = Assemblers.solve_L2_projection(X[form_rank+1], fₑ, Σ)
+            fₕ = Assemblers.solve_L2_projection(X[form_rank+1], fₑ, dΩ)
             ref_coeffs = read_data(
                 sub_dir, "$p-$section_space-$form_rank.txt"
             )
             @test all(isapprox.(fₕ.coefficients, ref_coeffs, atol=atol*10, rtol=rtol*10))
 
             # compute error
-            error = Analysis.L2_norm(fₕ - fₑ, Σ)
+            error = Analysis.L2_norm(fₕ - fₑ, dΩ)
             errors[p_idx, ss_idx, form_rank+1] = error
 
             if verbose; display("   Error: $error"); end

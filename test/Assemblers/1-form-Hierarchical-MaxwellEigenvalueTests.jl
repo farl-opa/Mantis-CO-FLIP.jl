@@ -34,8 +34,8 @@ nq_error = nq_assembly .* 2
 qrule_assembly, qrule_error = Quadrature.get_canonical_quadrature_rules(
     Quadrature.gauss_legendre, nq_assembly, nq_error
 )
-Σₐ = Quadrature.StandardQuadrature(qrule_assembly, prod(num_elements))
-Σₑ = Quadrature.StandardQuadrature(qrule_error, prod(num_elements))
+dΩₐ = Quadrature.StandardQuadrature(qrule_assembly, prod(num_elements))
+dΩₑ = Quadrature.StandardQuadrature(qrule_error, prod(num_elements))
 
 # Number of eigenvalues to compute
 const num_eig = 5
@@ -49,10 +49,10 @@ end
 ############################################################################################
 function run_problems(
     complex::C,
-    Σₐ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    dΩₐ::Quadrature.StandardQuadrature{manifold_dim},
     num_steps::Int,
     dorfler_parameter::Float64,
-    Σₑ::Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    dΩₑ::Quadrature.StandardQuadrature{manifold_dim},
     Lchains::Bool,
     eigenfunction::Int,
     num_eig::Int,
@@ -61,10 +61,10 @@ function run_problems(
 ) where {manifold_dim, num_forms, C <: NTuple{num_forms, Forms.AbstractFormSpace}}
     compt_eigvals, compt_eigfuncs = Assemblers.solve_maxwell_eig(
         complex,
-        Σₐ,
+        dΩₐ,
         num_steps,
         dorfler_parameter,
-        Σₑ,
+        dΩₑ,
         Lchains,
         eigenfunction,
         num_eig,
@@ -72,12 +72,15 @@ function run_problems(
         verbose=verbose,
     )
     geom = Forms.get_geometry(compt_eigfuncs[1])
+    dΩₑ = Quadrature.StandardQuadrature(
+        Quadrature.get_canonical_quadrature_rule(dΩₑ), Geometry.get_num_elements(geom)
+    )
     exact_eigvals, exact_eigfuncs = Assemblers.get_analytical_maxwell_eig(
         num_eig, geom, scale_factors
     )
     eigval_errors = compt_eigvals - exact_eigvals
     eigfunc_errors = Analysis.compute_error_total.(
-        compt_eigfuncs, exact_eigfuncs, Ref(Σₑ), Ref("L2")
+        compt_eigfuncs, exact_eigfuncs, Ref(dΩₑ), Ref("L2")
     )
 
     return eigval_errors, eigfunc_errors
@@ -96,10 +99,10 @@ R_complex = Forms.create_hierarchical_de_rham_complex(
 )
 eigval_errors, eigfunc_errors = run_problems(
     R_complex,
-    Σₐ,
+    dΩₐ,
     num_steps,
     dorfler_parameter,
-    Σₑ,
+    dΩₑ,
     Lchains,
     eigenfunc,
     num_eig,

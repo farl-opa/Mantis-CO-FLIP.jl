@@ -464,7 +464,6 @@ function _compute_Lchain_basis(
         )
     end
 
-    #TODO: check if Set can be used.
     basis_to_check = collect(basis_to_check)
     inactive_basis = collect(inactive_basis)
 

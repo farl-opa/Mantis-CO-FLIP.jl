@@ -685,56 +685,23 @@ function create_polar_spline_de_rham_complex(
 end
 
 ############################################################################################
-#                                      Form Operators                                      #
-############################################################################################
-
-"""
-    ⋅(
-        form_1::AbstractFormExpression{manifold_dim},
-        form_2::AbstractFormExpression{manifold_dim},
-    ) where {manifold_dim}
-
-Symbolic wrapper for the inner product between two forms `f¹` and `f²`, returning `∫f¹∧★f²`.
-The unicode character command is `\\cdot`.
-
-# Arguments
-- `form_1::AbstractFormExpression{manifold_dim}`: The first form to be used.
-- `form_2::AbstractFormExpression{manifold_dim}`: The second form to be used.
-
-# Returns
-- `::Integral{manifold_dim}`: The integral operator equivalent to the inner product.
-"""
-function ⋅(
-    form_1::AbstractFormExpression{manifold_dim},
-    form_2::AbstractFormExpression{manifold_dim},
-) where {manifold_dim}
-    return ∫(form_1 ∧ ★(form_2))
-end
-
-############################################################################################
 #                                   Boundary conditions                                    #
 ############################################################################################
 
 """
-    zero_trace_boundary_conditions(
-        form::AbstractFormExpression
+    set_dirichlet_boundary_conditions(form::AbstractFormSpace, value::Float64)
 
-Creates a dictionary of zero-trace boundary conditions for a given form expression.
-These correspond to:
-1. zero value boundary conditions for 0-forms
-2. zero tangential boundary conditions for the space
-``H_{0}(\\text{curl}; \\Omega)``
-3. zero normal boundary conditions for the space
-``H_{0}(\\text{div}; \\Omega)``
+Creates a dictionary of Dirichlet boundary conditions for a given form space.
 
 # Arguments
-- `form::AbstractFormExpression`: The form for which to compute the boundary conditions.
+- `form::AbstractFormSpace`: The form for which to compute the boundary conditions.
+- `value::Float64`: The value of the Dirichlet boundary condition.
 
 # Returns
-- `Dict{Int, Float64}`: The dictionary of zero-trace boundary conditions.
+- `::Dict{Int, Float64}`: The dictionary of Dirichlet boundary conditions.
 """
-function zero_trace_boundary_conditions(form::AbstractFormSpace)
-    return Dict{Int, Float64}(i => 0.0 for i in trace_basis_idxs(form))
+function set_dirichlet_boundary_conditions(form::AbstractFormSpace, value::Float64)
+    return Dict{Int, Float64}(i => value for i in trace_basis_idxs(form))
 end
 
 """

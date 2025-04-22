@@ -1,12 +1,12 @@
-function _L2_norm_square(u, element_id, Σ)
-    integral = ∫(u ∧ ★(u), Σ)
+function _L2_norm_square(u, element_id, dΩ)
+    integral = ∫(u ∧ ★(u), dΩ)
 
     return Forms.evaluate(integral, element_id)[1][1]
 end
 
-function L2_norm(u, Σ)
+function L2_norm(u, dΩ)
     norm = 0.0
-    inner_prod = ∫(u ∧ ★(u), Σ)
+    inner_prod = ∫(u ∧ ★(u), dΩ)
     for el_id in 1:Forms.get_num_elements(u)
         norm += Forms.evaluate(inner_prod, el_id)[1][1]
     end

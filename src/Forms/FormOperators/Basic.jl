@@ -101,7 +101,7 @@ struct Minus{manifold_dim, form_rank, expression_rank, F1, F2, G} <:
 end
 
 """
-    Inverse{manifold_dim, R} <: AbstractRealValuedOperator{manifold_dim}
+    AdditiveInverse{manifold_dim, R} <: AbstractRealValuedOperator{manifold_dim}
 
 Structure representing the additive inverse of a given real-valued operator.
 
@@ -113,21 +113,21 @@ Structure representing the additive inverse of a given real-valued operator.
 - `R`: Type of the operator. Must be a subtype of `AbstractRealValuedOperator`.
 
 # Inner Constructors
-- `Inverse(operator::O)`: Creates a new `Inverse` instance with the given operator.
+- `AdditiveInverse(operator::O)`: Creates a new `AdditiveInverse` instance with the given operator.
 - `Base.:-(operator::AbstractRealValuedOperator)`: Symbolic wrapper for the inverse
     operator.
 """
-struct Inverse{manifold_dim, O} <: AbstractRealValuedOperator{manifold_dim}
+struct AdditiveInverse{manifold_dim, O} <: AbstractRealValuedOperator{manifold_dim}
     operator::O
 
-    function Inverse(
+    function AdditiveInverse(
         operator::O
     ) where {manifold_dim, O <: AbstractRealValuedOperator{manifold_dim}}
         return new{manifold_dim, O}(operator)
     end
 
     function Base.:-(operator::AbstractRealValuedOperator)
-        return Inverse(operator)
+        return AdditiveInverse(operator)
     end
 end
 
@@ -139,7 +139,15 @@ get_forms(form_expression::Plus) = form_expression.form_1, form_expression.form_
 get_forms(form_expression::Minus) = form_expression.form_1, form_expression.form_2
 get_geometry(form_expression::Plus) = get_geometry(get_forms(form_expression)...)
 get_geometry(form_expression::Minus) = get_geometry(get_forms(form_expression)...)
-get_operator(inverse::Inverse) = inverse.operator
+get_operator(add_inverse::AdditiveInverse) = add_inverse.operator
+
+function get_estimated_nnz_per_elem(add_inverse::AdditiveInverse)
+    return get_estimated_nnz_per_elem(get_operator(add_inverse))
+end
+
+function get_num_evaluation_elements(add_inverse::AdditiveInverse)
+    return get_num_evaluation_elements(get_operator(add_inverse))
+end
 
 ############################################################################################
 #                                     Evaluate methods                                     #
@@ -214,19 +222,16 @@ end
 
 """
     evaluate(
-        inverse::Inverse{manifold_dim},
+        add_inverse::AdditiveInverse{manifold_dim},
         element_id::Int,
-        quad_rule::Quadrature.AbstractQuadratureRule{manifold_dim},
     ) where {manifold_dim}
 
 Evaluates the additive inverse of a given operator at a specified element using a quadrature
 rule.
 
 # Arguments
-- `inverse::Inverse{manifold_dim}`: The inverse operator to evaluate.
+- `add_inverse::AdditiveInverse{manifold_dim}`: The inverse operator to evaluate.
 - `element_id::Int`: The element over which to evaluate the inverse operator.
-- `quad_rule::Quadrature.AbstractQuadratureRule{manifold_dim}`: The quadrature rule to use
-    for evaluating the underlying operator.
 
 # Returns
 - `eval::Vector{Float64}`: The additive inverse of the evaluated operator.
@@ -234,12 +239,10 @@ rule.
     outer vector depends on the `expression_rank` of the form expression.
 """
 function evaluate(
-    inverse::Inverse{manifold_dim},
-    element_id::Int,
-    quad_rule::Quadrature.AbstractQuadratureRule{manifold_dim},
-) where {manifold_dim} 
-    operator = get_operator(inverse)
-    eval, indices = evaluate(operator, element_id, quad_rule)
+    add_inverse::AdditiveInverse{manifold_dim}, element_id::Int
+) where {manifold_dim}
+    operator = get_operator(add_inverse)
+    eval, indices = evaluate(operator, element_id)
     eval .*= -1.0
 
     return eval, indices

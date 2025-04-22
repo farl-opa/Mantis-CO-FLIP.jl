@@ -1,7 +1,6 @@
 """
     assemble(
         weak_form::WeakForm,
-        quad_rule::Q,
         dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
         lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
         rhs_type::Type=Matrix{Float64},
@@ -12,7 +11,6 @@ weak-formulation and Dirichlet boundary conditions.
 
 # Arguments
 - `weak_form::WeakForm`: The weak form to assemble.
-- `quad_rule::Q`: The quadrature rule to use for the assembly.
 - `dirichlet_bcs::Dict{Int, Float64}`: A dictionary containing the Dirichlet boundary
     conditions, where the key is the index of the boundary condition and the value is the
     boundary condition value.
@@ -34,8 +32,7 @@ function assemble(
     num_rhs_blocks = get_num_rhs_blocks(weak_form)
     lhs_expressions = get_lhs_expressions(weak_form)
     rhs_expressions = get_rhs_expressions(weak_form)
-    test_offsets = get_test_offsets(weak_form)
-    trial_offsets = get_trial_offsets(weak_form)
+    test_offsets, trial_offsets = get_test_offsets(weak_form), get_trial_offsets(weak_form)
     lhs_rows, lhs_cols, lhs_vals = get_pre_allocation(weak_form, "lhs")
     rhs_rows, rhs_cols, rhs_vals = get_pre_allocation(weak_form, "rhs")
     lhs_counts, rhs_counts = 0, 0
@@ -109,7 +106,6 @@ right-hand side (rhs) matrix.
 """
 function get_pre_allocation(weak_form::WeakForm, side::String)
     nnz_elem = get_estimated_nnz_per_elem(weak_form)
-    # TODO: Update `get_num_elements` to `get_num_evaluation_elements`
     if side == "lhs"
         nvals = nnz_elem[1] * get_num_evaluation_elements(weak_form)
     elseif side == "rhs"

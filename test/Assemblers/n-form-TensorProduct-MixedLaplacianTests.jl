@@ -26,9 +26,14 @@ L = (1.0, 1.0)
 # polynomial degrees of the zero-form finite element spaces to be used
 p⁰ = [3]
 # type of section spaces to use
-θ = 2*pi
+θ = 2 * pi
 α = 10.0
-section_space_type = [FunctionSpaces.Bernstein, FunctionSpaces.LobattoLegendre, FunctionSpaces.GeneralizedTrigonometric, FunctionSpaces.GeneralizedExponential]
+section_space_type = [
+    FunctionSpaces.Bernstein,
+    FunctionSpaces.LobattoLegendre,
+    FunctionSpaces.GeneralizedTrigonometric,
+    FunctionSpaces.GeneralizedExponential,
+]
 # print info?
 verbose = false
 
@@ -38,7 +43,7 @@ function sinusoidal_solution(geo::Geometry.AbstractGeometry)
     function my_sol(x::Matrix{Float64})
         # [u] = [sin(ωx¹)sin(ωx²)...sin(ωxⁿ)]
         y = @. sin(ω * x)
-        return [vec(prod(y, dims=2))]
+        return [vec(prod(y; dims=2))]
     end
 
     function grad_my_sol(x::Matrix{Float64})
@@ -46,8 +51,8 @@ function sinusoidal_solution(geo::Geometry.AbstractGeometry)
         y = sin.(ω .* x)
         z = ω .* cos.(ω .* x)
         w = Vector{Vector{Float64}}(undef, size(x, 2))
-        for i ∈ 1:size(x,2)
-            w[i] = z[:,i] .* prod(y[:,setdiff(1:size(x,2), i)], dims=2)[:,1]
+        for i in 1:size(x, 2)
+            w[i] = z[:, i] .* prod(y[:, setdiff(1:size(x, 2), i)]; dims=2)[:, 1]
         end
         return w
     end
@@ -55,16 +60,16 @@ function sinusoidal_solution(geo::Geometry.AbstractGeometry)
     function flux_my_sol(x::Matrix{Float64})
         # [u₁, u₂, ...] = ⋆[ω*cos(ωx¹)sin(ωx²)...sin(ωxⁿ), ω*sin(ωx¹)cos(ωx²)...sin(ωxⁿ), ...]
         w = grad_my_sol(x)
-        if size(x,2) == 1
+        if size(x, 2) == 1
             # (a) -> (a)
             return [w[1]]
 
-        elseif size(x,2) == 2
+        elseif size(x, 2) == 2
             # (a, b) -> (b, -a)
             w = [w[2], -w[1]]
             return w
 
-        elseif size(x,2) == 3
+        elseif size(x, 2) == 3
             # (a, b, c) -> (a, b, c)
             return [w[1], w[2], w[3]]
 
@@ -75,7 +80,7 @@ function sinusoidal_solution(geo::Geometry.AbstractGeometry)
 
     function laplace_my_sol(x::Matrix{Float64})
         # [-(u₁₁+u₂₂+...uₙₙ)] = [2ω²*sin(ωx¹)sin(ωx²)...sin(ωxⁿ)]
-        y = prod(sin.(ω * x), dims=2)
+        y = prod(sin.(ω * x); dims=2)
         y = @. 2 * ω * ω * y
         return [vec(y)]
     end
@@ -92,9 +97,11 @@ errors = zeros(Float64, length(p⁰), length(section_space_type), length(mesh_ty
 for (mesh_idx, mesh) in enumerate(mesh_type)
     for (p_idx, p) in enumerate(p⁰)
         for (ss_idx, section_space) in enumerate(section_space_type)
-
             if verbose
-                @info("Running volume-form Hodge-Laplace tests for p = $p, section_space = $section_space, mesh = $mesh")
+                @info(
+                    """Running volume-form Hodge-Laplace tests for p = $p, \
+                    section_space = $section_space, mesh = $mesh."""
+                )
             end
 
             # section space degrees
@@ -126,13 +133,15 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
             end
 
             # quadrature rule
-            canonical_qrule = Quadrature.tensor_product_rule(degree .+ dq⁰, Quadrature.gauss_legendre)
-            Σ = Quadrature.StandardQuadrature(
-                canonical_qrule, prod(num_elements)
+            canonical_qrule = Quadrature.tensor_product_rule(
+                degree .+ dq⁰, Quadrature.gauss_legendre
             )
+            dΩ = Quadrature.StandardQuadrature(canonical_qrule, prod(num_elements))
 
             # create tensor-product B-spline complex
-            X = Forms.create_tensor_product_bspline_de_rham_complex(origin, L, num_elements, section_spaces, regularities, geometry)
+            X = Forms.create_tensor_product_bspline_de_rham_complex(
+                origin, L, num_elements, section_spaces, regularities, geometry
+            )
 
             # number of dofs
             n_dofs = Forms.get_num_basis(X[2]) + Forms.get_num_basis(X[3])
@@ -143,24 +152,24 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
             ϕₑ, δϕₑ, fₑ = sinusoidal_solution(geometry)
 
             # solve the problem
-            uₕ, ϕₕ = Assemblers.solve_volume_form_hodge_laplacian(X[2], X[3], fₑ, Σ)
+            uₕ, ϕₕ = Assemblers.solve_volume_form_hodge_laplacian(X[2], X[3], fₑ, dΩ)
             # if verbose
             #     display("   cond_num = $cond_num")
             # end
             # display([n_dofs cond_num])
 
-            ref_coeffs = read_data(
-                sub_dir, "$p-$section_space-$mesh-uh.txt"
+            ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-uh.txt")
+            @test all(
+                isapprox.(uₕ.coefficients, ref_coeffs, atol=atol * 30, rtol=rtol * 30)
             )
-            @test all(isapprox.(uₕ.coefficients, ref_coeffs, atol=atol*30, rtol=rtol*30))
-            ref_coeffs = read_data(
-                sub_dir, "$p-$section_space-$mesh-phih.txt"
+            ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-phih.txt")
+            @test all(
+                isapprox.(ϕₕ.coefficients, ref_coeffs, atol=atol * 10, rtol=rtol * 10)
             )
-            @test all(isapprox.(ϕₕ.coefficients, ref_coeffs, atol=atol*10, rtol=rtol*10))
 
             # compute error
-            error = Analysis.L2_norm(ϕₕ - ϕₑ, Σ)
-            δerror = Analysis.L2_norm(uₕ - δϕₑ, Σ)
+            error = Analysis.L2_norm(ϕₕ - ϕₑ, dΩ)
+            δerror = Analysis.L2_norm(uₕ - δϕₑ, dΩ)
             errors[p_idx, ss_idx, mesh_idx, 1] = error
             errors[p_idx, ss_idx, mesh_idx, 2] = δerror
 
@@ -168,7 +177,9 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 display("   L2-Error in ϕ: $error")
                 display("   L2-Error in δϕ: $δerror")
             end
-            if verbose; println("...done!"); end
+            if verbose
+                println("...done!")
+            end
         end
     end
 end

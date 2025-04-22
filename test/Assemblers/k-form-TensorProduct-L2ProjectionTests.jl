@@ -97,7 +97,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 degree .+ dq⁰, Quadrature.gauss_legendre
             )
             # global quadrature rule
-            Σ = Quadrature.StandardQuadrature(
+            dΩ = Quadrature.StandardQuadrature(
                 canonical_qrule, Geometry.get_num_elements(geometry)
             )
 
@@ -115,7 +115,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 fₑ = sinusoidal_solution(form_rank, geometry)
 
                 # solve the problem
-                fₕ = Assemblers.solve_L2_projection(X[form_rank + 1], fₑ, Σ)
+                fₕ = Assemblers.solve_L2_projection(X[form_rank + 1], fₑ, dΩ)
 
                 # read reference data and compare
                 ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-$form_rank.txt")
@@ -124,7 +124,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
                 )
 
                 # compute error
-                err = Analysis.L2_norm(fₕ - fₑ, Σ)
+                err = Analysis.L2_norm(fₕ - fₑ, dΩ)
                 errors[p_idx, ss_idx, mesh_idx, form_rank + 1] = err
 
                 if verbose

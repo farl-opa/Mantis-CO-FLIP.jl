@@ -18,9 +18,9 @@ and a constructor method that defines where the blocks are placed.
 # Type parameters
 - `manifold_dim::Int`: The dimension of the manifold where the weak-formulation is defined.
 - `LHS`: The type of the left-hand side expressions. Each row-column entry should be a
-    subtype of  `AbstractRealValuedOperator`.
+    subtype of  `AbstractRealValuedOperator` or `0`.
 - `RHS`: The type of the right-hand side expressions. Each row-column entry should be a
-    subtype of  `AbstractRealValuedOperator`.
+    subtype of  `AbstractRealValuedOperator` or `0`.
 - `I`: The type of the inputs. It should be a subtype of `WeakFormInputs{manifold_dim}`.
 # Inner constructors
 - `WeakForm(inputs::I, constructor::F)`: Creates a new `WeakForm` instance with the given
@@ -32,37 +32,20 @@ struct WeakForm{manifold_dim, LHS, RHS, I}
     rhs_expressions::RHS
     inputs::I
     function WeakForm(
-        inputs::I, constructor::F
-    ) where {manifold_dim, I <: WeakFormInputs{manifold_dim}, F <: Function}
-        lhs_expressions, rhs_expressions = constructor(inputs)
-        lhs_num_rows = length(lhs_expressions)
-        rhs_num_rows = length(rhs_expressions)
-        lhs_num_cols = length(lhs_expressions[1])
-        rhs_num_cols = length(rhs_expressions[1])
-        for row in 2:lhs_num_rows
-            if length(lhs_expressions[row]) != lhs_num_cols
-                throw(
-                    ArgumentError(
-                        """The number of columns on each row of the left-hand side must \
-                        match. The first row has $(lhs_num_cols) columns and the $(row)-th \
-                        row has $(length(lhs_expressions[row])) columns."""
-                    ),
-                )
-            end
-        end
-
-        for row in 2:rhs_num_rows
-            if length(rhs_expressions[row]) != rhs_num_cols
-                throw(
-                    ArgumentError(
-                        """The number of columns on each row of the right-hand side must \
-                        match. The first row has $(rhs_num_cols) columns and the $(row)-th \
-                        row has $(length(rhs_expressions[row])) columns."""
-                    ),
-                )
-            end
-        end
-
+        lhs_expressions::LHS, rhs_expressions::RHS, inputs::I
+    ) where {
+        lhs_num_rows,
+        lhs_num_cols,
+        rhs_num_rows,
+        rhs_num_cols,
+        LHS <: NTuple{
+            lhs_num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        RHS <: NTuple{
+            rhs_num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        I <: WeakFormInputs,
+    }
         if lhs_num_rows != rhs_num_rows
             throw(
                 ArgumentError(
@@ -95,25 +78,48 @@ struct WeakForm{manifold_dim, LHS, RHS, I}
             )
         end
 
+        manifold_dim = 0
         for row in 1:lhs_num_rows
             for col in 1:lhs_num_cols
-                if ~(typeof(lhs_expressions[row][col]) <: Forms.AbstractRealValuedOperator)
-                    if lhs_expressions[row][col] != 0
-                        throw(
-                            ArgumentError(
-                                """The left-hand side expressions must be either of type \
-                                AbstractRealValuedOperator or 0. The expression at \
-                                row $(row) and column $(col) is of type \
-                                $(typeof(lhs_expressions[row][col]))."""
-                            ),
-                        )
-                    end
+                expression_type = typeof(lhs_expressions[row][col])
+                if expression_type <: Forms.AbstractRealValuedOperator
+                    manifold_dim = max(
+                        manifold_dim, Forms.get_manifold_dim(lhs_expressions[row][col])
+                    )
+                end
+
+                if expression_type == Int && lhs_expressions[row][col] != 0
+                    throw(
+                        ArgumentError(
+                            """The only supported integer value for the entry of a \
+                            weak-form is 0. The entry at row $(row), column $(col) of \
+                            the left-hand side has value $(lhs_expressions[row][col])."""
+                        ),
+                    )
                 end
             end
         end
 
-        LHS = typeof(lhs_expressions)
-        RHS = typeof(rhs_expressions)
+        for row in 1:rhs_num_rows
+            for col in 1:rhs_num_cols
+                expression_type = typeof(rhs_expressions[row][col])
+                if expression_type <: Forms.AbstractRealValuedOperator
+                    manifold_dim = max(
+                        manifold_dim, Forms.get_manifold_dim(rhs_expressions[row][col])
+                    )
+                end
+
+                if expression_type == Int && rhs_expressions[row][col] != 0
+                    throw(
+                        ArgumentError(
+                            """The only supported integer value for the entry of a \
+                            weak-form is 0. The entry at row $(row), column $(col) of \
+                            the right-hand side has value $(rhs_expressions[row][col])."""
+                        ),
+                    )
+                end
+            end
+        end
 
         return new{manifold_dim, LHS, RHS, I}(lhs_expressions, rhs_expressions, inputs)
     end
@@ -203,25 +209,24 @@ sides of the weak-formulation.
 """
 function get_estimated_nnz_per_elem(wf::WeakForm)
     left_hand_nnz = 0
-    for lhs in get_lhs_expressions(wf)
-        for block in lhs
-            if block != 0
-                left_hand_nnz = max(
-                    left_hand_nnz,
-                    Forms.get_estimated_nnz_per_elem(lhs[block])
-                )
+    for lhs_row in get_lhs_expressions(wf)
+        for expression in lhs_row
+            if expression == 0
+                continue
             end
+
+            left_hand_nnz += Forms.get_estimated_nnz_per_elem(expression)
         end
     end
+
     right_hand_nnz = 0
-    for rhs in get_rhs_expressions(wf)
-        for block in rhs
-            if block != 0
-                right_hand_nnz = max(
-                    right_hand_nnz,
-                    Forms.get_estimated_nnz_per_elem(rhs[block])
-                )
+    for rhs_row in get_rhs_expressions(wf)
+        for expression in rhs_row
+            if expression == 0
+                continue
             end
+
+            right_hand_nnz += Forms.get_estimated_nnz_per_elem(expression)
         end
     end
 
@@ -240,13 +245,17 @@ Returns the number of elements over which the discrete weak-formulation is defin
 - `::Int`: The number of elements.
 """
 function get_num_elements(wf::WeakForm)
-    for lhs in get_lhs_expressions(wf)
-        for block in lhs
-            if block != 0
-                return Forms.get_num_elements(lhs[block])
+    for lhs_row in get_lhs_expressions(wf)
+        for expression in lhs_row
+            if expression == 0
+                continue
             end
+
+            return Forms.get_num_elements(expression)
         end
     end
+
+    throw(ArgumentError("No elements found in the left-hand side of the weak-formulation."))
 end
 
 """
@@ -256,32 +265,37 @@ Returns the maximum number of elements over which the weak form blocks are evalu
 is the max over all lhs and rhs expression blocks.
 
 # Arguments
-- `wf::WeakForm`: The weak-formulation for which the number of quadrature elements is to be determined.
+- `wf::WeakForm`: The weak-formulation for which the number of quadrature elements is to be
+    determined.
 
 # Returns
 - `::Int`: The number of quadrature elements.
 """
 function get_num_evaluation_elements(wf::WeakForm)
     num_eval_elements = 0
-    for lhs in get_lhs_expressions(wf)
-        for block in lhs
-            if block != 0
-                num_eval_elements = max(
-                    num_eval_elements,
-                    Forms.get_num_evaluation_elements(lhs[block])
-                )
+    for lhs_row in get_lhs_expressions(wf)
+        for expression in lhs_row
+            if expression == 0
+                continue
             end
+
+            num_eval_elements = max(
+                num_eval_elements, Forms.get_num_evaluation_elements(expression)
+            )
         end
     end
-    for rhs in get_rhs_expressions(wf)
-        for block in rhs
-            if block != 0
-                num_eval_elements = max(
-                    num_eval_elements,
-                    Forms.get_num_evaluation_elements(rhs[block])
-                )
+
+    for rhs_row in get_rhs_expressions(wf)
+        for expression in rhs_row
+            if expression == 0
+                continue
             end
+
+            num_eval_elements = max(
+                num_eval_elements, Forms.get_num_evaluation_elements(expression)
+            )
         end
     end
+
     return num_eval_elements
 end
