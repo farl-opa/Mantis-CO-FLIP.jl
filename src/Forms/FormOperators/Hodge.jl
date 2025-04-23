@@ -140,17 +140,16 @@ function _evaluate_hodge(
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     _, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
-
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
     # We restrict the evaluation of hodge-star to expression of rank 1 and lower, therefore
     # we can select just the first index of the vector of indices, for higher rank
     # expression we will need to change this
-    n_indices = length(form_indices[1])
-
-    hodge_eval = Vector{Matrix{Float64}}(undef, 1)
-
+    mat_size = (size(form_eval[1], 1), size(form_eval[1], 2))
+    hodge_eval = [Matrix{Float64}(undef, mat_size)]
     # ⋆α₁⁰ = α₁⁰√det(gᵢⱼ) dξ₁∧…∧dξₙ.
-    hodge_eval[1] = reshape(form_eval[1] .* sqrt_g, (:, n_indices)) # TODO: is this reshape needed?
+    for id in CartesianIndices(mat_size)
+        hodge_eval[1][id] = form_eval[1][id] * sqrt_g[id[1]]
+    end
 
     return hodge_eval, form_indices
 end
@@ -162,17 +161,16 @@ function _evaluate_hodge(
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim, expression_rank, G <: Geometry.AbstractGeometry{manifold_dim}}
     _, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
-
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
     # Because we restrict ourselves to expression with rank 0 or 1, we can
     # extract the first set of indices (only set), for higher ranks, we need
     # to change this
-    n_indices = length(form_indices[1])
-
-    hodge_eval = Vector{Matrix{Float64}}(undef, 1)
-
+    mat_size = (size(form_eval[1], 1), size(form_eval[1], 2))
+    hodge_eval = [Matrix{Float64}(undef, mat_size)]
     # ⋆α₁ⁿdξ₁∧…∧dξₙ = α₁ⁿ(√det(gᵢⱼ))⁻¹.
-    hodge_eval[1] = reshape(form_eval[1] .* (sqrt_g .^ (-1)), (:, n_indices)) # TODO: is this reshape needed?
+    for id in CartesianIndices(mat_size)
+        hodge_eval[1][id] = form_eval[1][id] * (1 / sqrt_g[id[1]])
+    end
 
     return hodge_eval, form_indices
 end
@@ -184,28 +182,24 @@ function _evaluate_hodge(
     xi::NTuple{2, Vector{Float64}},
 ) where {expression_rank, G <: Geometry.AbstractGeometry{2}}
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression), element_id, xi)
-
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
-
-    n_eval_points = length(sqrt_g)
     # Because we restrict ourselves to expression with rank 0 or 1, we can
     # extract the first set of indices (only set), for higher ranks, we need
     # to change this
-    n_indices = length(form_indices[1])
-    hodge_eval = [zeros(n_eval_points, n_indices) for _ in 1:2]
-
+    mat_size = (size(form_eval[1], 1), size(form_eval[1], 2))
+    hodge_eval = [zeros(mat_size) for _ in 1:2]
     # ⋆(α₁¹dξ₁+α₂¹dξ₂) = [-(α₁¹g²¹+α₂¹g²²)dξ₁ + (α₁¹g¹¹+α₂¹g¹²)dξ₂]√det(gᵢⱼ).
-    # First: -(α₁¹g²¹+α₂¹g²²)dξ₁
-    for i in 1:2
-        hodge_eval[1] .+= @views -form_eval[i] .* inv_g[:, 2, i]
-    end
-    hodge_eval[1] .*= sqrt_g
+    for id in CartesianIndices(mat_size)
+        for component in 1:2
+            # First: -(α₁¹g²¹+α₂¹g²²)dξ₁
+            hodge_eval[1][id] += -form_eval[component][id] * inv_g[id[1], 2, component]
+            # Second: (α₁¹g¹¹+α₂¹g¹²)dξ₂
+            hodge_eval[2][id] += form_eval[component][id] * inv_g[id[1], 1, component]
+        end
 
-    # Second: (α₁¹g¹¹+α₂¹g¹²)dξ₂
-    for i in 1:2
-        hodge_eval[2] .+= @views form_eval[i] .* inv_g[:, 1, i]
+        hodge_eval[1][id] *= sqrt_g[id[1]]
+        hodge_eval[2][id] *= sqrt_g[id[1]]
     end
-    hodge_eval[2] .*= sqrt_g
 
     return hodge_eval, form_indices
 end
@@ -216,42 +210,30 @@ function _evaluate_hodge(
     element_id::Int,
     xi::NTuple{3, Vector{Float64}},
 ) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
-    # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
-    n_expression_components = 3
-    n_hodge_components = 3
-
     # Compute the metric terms
     inv_g, _, sqrt_g = Geometry.inv_metric(get_geometry(form_expression), element_id, xi)
-
     # Evaluate the form expression to which we wish to apply the Hodge-⋆
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
-
     # Preallocate memory for the Hodge evaluation matrix
-    n_eval_points = prod(size.(xi, 1))  # number of points where the forms are evaluated (tensor product)
     # Because we restrict ourselves to expression with rank 0 or 1, we can
     # extract the first set of indices (only set), for higher ranks, we need
     # to change this
-    n_active_basis = length(form_indices[1])
-    hodge_eval = [zeros(n_eval_points, n_active_basis) for _ in 1:n_hodge_components]
-
+    mat_size = (size(form_eval[1], 1), size(form_eval[1], 2))
+    hodge_eval = [zeros(mat_size) for _ in 1:3]
     # Compute the Hodge-⋆ following the analytical expression
     # ⋆(α₁¹dξ₁+α₂¹dξ₂+α₃¹dξ₃) = [(α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃ + (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁ + (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂]√det(gᵢⱼ).
-
     # First: (α₁¹g¹¹+α₂¹g¹²+α₃¹g¹³)dξ₂∧dξ₃  --> component 1
     # Second: (α₁¹g²¹+α₂¹g²²+α₃¹g²³)dξ₃∧dξ₁ --> component 2
     # Third: (α₁¹g³¹+α₂¹g³²+α₃¹g³³)dξ₁∧dξ₂  --> component 3
-    # Done in a double for loop
-    for k_hodge_component in 1:n_hodge_components
-        # (α₁¹gᵏ¹+α₂gᵏ²+α₃gᵏ³)  --> to be added to the component k of the Hodge
-        for k_expression_component in 1:n_expression_components
-            hodge_eval[k_hodge_component] .+= @views form_eval[k_expression_component] .*
-                inv_g[
-                :, k_hodge_component, k_expression_component
-            ]
-        end
+    for id in CartesianIndices(mat_size)
+        for h_component in 1:3
+            for x_component in 1:3
+                hodge_eval[h_component][id] +=
+                    form_eval[x_component][id] * inv_g[id[1], h_component, x_component]
+            end
 
-        # Multiply by √det(gᵢⱼ) to get (α₁¹gᵏ¹+α₂gᵏ²+α₃gᵏ³) √det(gᵢⱼ)
-        hodge_eval[k_hodge_component] .*= sqrt_g
+            hodge_eval[h_component][id] *= sqrt_g[id[1]]
+        end
     end
 
     return hodge_eval, form_indices
@@ -263,46 +245,31 @@ function _evaluate_hodge(
     element_id::Int,
     xi::NTuple{3, Vector{Float64}},
 ) where {expression_rank, G <: Geometry.AbstractGeometry{3}}
-    # Set the number of components of the original expression and the Hodge-⋆ (3 in this case)
-    n_expression_components = 3
-    n_hodge_components = 3
-
     # The Hodge-⋆ of a 2-form in 3D is the inverse of the Hodge-⋆ of a 1-form in 3D
     # Therefore we can use the metric tensor instead of the inverse metric tensor
     # and use the same expression as for the Hodge-⋆ of 1-forms but now using the
     # metric tensor instead of the inverse of the metric tensor.
-
     # Compute the metric terms
     g, sqrt_g = Geometry.metric(get_geometry(form_expression), element_id, xi)
-
     # Evaluate the form expression to which we wish to apply the Hodge-⋆
     form_eval, form_indices = evaluate(form_expression, element_id, xi)
-
     # Preallocate memory for the Hodge evaluation matrix
-    n_eval_points = prod(size.(xi, 1))  # number of points where the forms are evaluated (tensor product)
-    # Because we restrict ourselves to expression with rank 0 or 1, we can
-    # extract the first set of indices (only set), for higher ranks, we need
-    # to change this
-    n_active_basis = length(form_indices[1])
-    hodge_eval = [zeros(n_eval_points, n_active_basis) for _ in 1:n_hodge_components]
-
+    mat_size = (size(form_eval[1], 1), size(form_eval[1], 2))
+    hodge_eval = [zeros(mat_size) for _ in 1:3]
     # Compute the Hodge-⋆ following the analytical expression
     # ⋆(α₁dξ²∧dξ³+α₂dξ³∧dξ¹+α₃dξ¹∧dξ²) = [(α₁g₁₁+α₂¹g₁₂+α₃¹g₁₃)dξ₁ + (α₁g₂₁+α₂g₂₂+α₃g₂₃)dξ₂ + (α₁g₃₁+α₂g₃₂+α₃g₃₃)dξ₃]/√det(gᵢⱼ).
-
     # First: (α₁g₁₁+α₂¹g₁₂+α₃¹g₁₃)dξ₁  --> component 1
     # Second: (α₁g₂₁+α₂g₂₂+α₃g₂₃)dξ₂   --> component 2
     # Third: (α₁g₃₁+α₂g₃₂+α₃g₃₃)dξ₃    --> component 3
-    # Done in a double for loop
-    for k_hodge_component in 1:n_hodge_components
-        # (α₁gₖ₁+α₂gₖ₂+α₃gₖ₃)  --> to be added to the component k of the Hodge
-        for k_expression_component in 1:n_expression_components
-            hodge_eval[k_hodge_component] .+= @views form_eval[k_expression_component] .* g[
-                :, k_hodge_component, k_expression_component
-            ]
-        end
+    for id in CartesianIndices(mat_size)
+        for h_component in 1:3
+            for x_component in 1:3
+                hodge_eval[h_component][id] +=
+                    form_eval[x_component][id] * g[id[1], h_component, x_component]
+            end
 
-        # Divide by √det(gᵢⱼ) to get (α₁gₖ₁+α₂gₖ₂+α₃gₖ₃) / √det(gᵢⱼ)
-        hodge_eval[k_hodge_component] ./= sqrt_g
+            hodge_eval[h_component][id] /= sqrt_g[id[1]]
+        end
     end
 
     return hodge_eval, form_indices
