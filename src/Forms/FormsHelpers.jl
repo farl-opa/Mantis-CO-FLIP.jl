@@ -288,6 +288,8 @@ function create_curvilinear_tensor_product_bspline_de_rham_complex(
     )
 end
 
+# TODO: These methods should work for more general mappings.
+
 """
     create_curvilinear_tensor_product_bspline_de_rham_complex(
         starting_points::NTuple{manifold_dim, Float64},

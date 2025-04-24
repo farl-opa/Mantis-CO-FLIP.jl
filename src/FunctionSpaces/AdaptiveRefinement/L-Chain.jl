@@ -499,6 +499,8 @@ function _compute_Lchain_basis(
     return Lchain_basis_ids
 end
 
+# TODO: This file should be changed to match the L-chain paper algorithm.
+
 function add_Lchains_supports!(
     marked_elements_per_level::Vector{Vector{Int}},
     hier_space::HierarchicalFiniteElementSpace{manifold_dim, S, T},
