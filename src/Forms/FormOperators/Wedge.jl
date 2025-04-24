@@ -95,27 +95,8 @@ function get_forms(wedge::Wedge)
     return wedge.form_1, wedge.form_2
 end
 
-"""
-    get_geometry(wedge::Wedge)
-
-Returns the geometry of the forms associated with the wedge.
-
-# Arguments
-- `wedge::Wedge`: The wedge structure.
-
-# Returns
-- `<:Geometry.AbstractGeometry`: The geometry of the forms.
-"""
-get_geometry(wedge::Wedge) = get_geometry(get_forms(wedge)...)
-
-function get_estimated_nnz_per_elem(
-    wedge::Wedge{manifold_dim, form_rank, 1}
-) where {manifold_dim, form_rank}
-    for form in get_forms(wedge)
-        if get_expression_rank(form) == 1
-            return get_estimated_nnz_per_elem(form)
-        end
-    end
+function get_geometry(wedge::Wedge)
+    return get_geometry(get_forms(wedge)...)
 end
 
 ############################################################################################

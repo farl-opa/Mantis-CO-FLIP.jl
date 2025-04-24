@@ -249,7 +249,7 @@ end
 function get_estimated_nnz_per_elem(
     ::AbstractFormExpression{manifold_dim, form_rank, 0}
 ) where {manifold_dim, form_rank}
-    return 0
+    return 1
 end
 
 function get_estimated_nnz_per_elem(
