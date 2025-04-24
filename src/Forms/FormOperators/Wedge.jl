@@ -95,6 +95,42 @@ function get_forms(wedge::Wedge)
     return wedge.form_1, wedge.form_2
 end
 
+"""
+    get_forms(wedge::Wedge, id::Int)
+
+Returns the `id`-th form in the `Wedge` structure.
+
+# Arguments
+- `wedge::Wedge`: The wedge structure.
+- `id::Int`: The id of the form to be returned.
+
+# Returns
+- `<:AbstractFormExpression`: The `id`-th form to which the wedge is applied.
+"""
+get_form(wedge::Wedge, id::Int) = get_forms(wedge)[id]
+
+"""
+    get_form(wedge::Wedge)
+
+Returns the form with expression rank 1 in the `Wedge` structure.
+
+# Arguments
+- `wedge::Wedge`: The wedge structure.
+
+# Returns
+- `<:AbstractFormSpace`: The form with expression rank 1.
+"""
+function get_form(wedge::Wedge)
+    for form in get_forms(wedge)
+        if get_expression_rank(form) == 1
+            return form
+        end
+    end
+
+    throw(ArgumentError("""The Wedge structure does not contain any form with subtype of \
+                        `AbstractFormSpace`."""))
+end
+
 function get_geometry(wedge::Wedge)
     return get_geometry(get_forms(wedge)...)
 end
