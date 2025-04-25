@@ -67,7 +67,7 @@ number of ancestor levels.
 # Arguments
 - `two_scale_operators`: A collection of operators that define the parent-child
     relationships between elements at different levels.
-- `child_element_id::Int`: The identifier of the child element.
+- `child_element_id::Int`: The identifier of the child element w.r.t. `child_level`.
 - `child_level::Int`: The level of the child element.
 - `num_ancestor_levels::Int`: The number of ancestor levels to traverse.
 

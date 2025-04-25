@@ -1,3 +1,4 @@
+# TODO: rewrite this file to use Cartesian Indices
 """
     struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <: AbstractTwoScaleOperator{manifold_dim}
 

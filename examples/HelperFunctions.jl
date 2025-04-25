@@ -25,13 +25,13 @@ function unit_square_biquadratic(num_ref::Int=0)
         1.0 1.0
     ]
     if num_ref == 0
-        return Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
+        return Mantis.Geometry.FEGeometry(TP, geom_coeffs)
     else
         ts_TP, TP_refined = Mantis.FunctionSpaces.build_two_scale_operator(
             TP, (2^num_ref, 2^num_ref)
         )
         geom_coeffs_refined = ts_TP.global_subdiv_matrix * geom_coeffs
-        return Mantis.Geometry.FEMGeometry(TP_refined, geom_coeffs_refined)
+        return Mantis.Geometry.FEGeometry(TP_refined, geom_coeffs_refined)
     end
 end
 
@@ -45,13 +45,13 @@ function bilinear_wedge(num_ref::Int=0)
         1.5 1.75
     ]
     if num_ref == 0
-        return Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
+        return Mantis.Geometry.FEGeometry(TP, geom_coeffs)
     else
         ts_TP, TP_refined = Mantis.FunctionSpaces.build_two_scale_operator(
             TP, (2^num_ref, 2^num_ref)
         )
         geom_coeffs_refined = ts_TP.global_subdiv_matrix * geom_coeffs
-        return Mantis.Geometry.FEMGeometry(TP_refined, geom_coeffs_refined)
+        return Mantis.Geometry.FEGeometry(TP_refined, geom_coeffs_refined)
     end
 end
 
@@ -76,7 +76,7 @@ function quarter_annulus_nurbs(radius_inner::Float64, radius_outer::Float64)
     radii = LinRange(radius_inner, radius_outer, deg + 1)
     geom_coeffs = vcat([geom_coeffs_sector .* radii[i] for i in eachindex(radii)]...)
 
-    return Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
+    return Mantis.Geometry.FEGeometry(TP, geom_coeffs)
 end
 
 function quarter_annulus_trigonometric_bspline(radius_inner::Float64, radius_outer::Float64)
@@ -101,7 +101,7 @@ function quarter_annulus_trigonometric_bspline(radius_inner::Float64, radius_out
     radii = LinRange(radius_inner, radius_outer, deg + 1)
     geom_coeffs = vcat([geom_coeffs_sector .* radii[i] for i in eachindex(radii)]...)
 
-    return Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
+    return Mantis.Geometry.FEGeometry(TP, geom_coeffs)
 end
 
 function quarter_bulging_annulus_trigonometric_bspline(
@@ -128,7 +128,7 @@ function quarter_bulging_annulus_trigonometric_bspline(
     radii = LinRange(radius_inner, radius_outer, deg + 1)
     geom_coeffs = vcat([geom_coeffs_sector .* radii[i] for i in eachindex(radii)]...)
 
-    return Mantis.Geometry.FEMGeometry(TP, geom_coeffs)
+    return Mantis.Geometry.FEGeometry(TP, geom_coeffs)
 end
 
 ############################################################################################

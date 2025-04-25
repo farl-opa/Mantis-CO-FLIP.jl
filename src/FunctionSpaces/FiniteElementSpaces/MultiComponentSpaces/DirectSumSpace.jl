@@ -20,6 +20,13 @@ struct DirectSumSpace{manifold_dim, num_components, F} <:
         num_components,
         F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1}},
     }
+        num_elements = get_num_elements(component_spaces[1])
+        for i = 2:num_components
+            if num_elements != get_num_elements(component_spaces[i])
+                throw(ArgumentError("All component spaces must have the same number of elements"))
+            end
+        end
+
         return new{manifold_dim, num_components, F}(component_spaces)
     end
 end
@@ -229,6 +236,10 @@ function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
     end
 
     return component_dof_partition
+end
+
+function get_num_elements(space::DirectSumSpace)
+    return get_num_elements(space.component_spaces[1])
 end
 
 function get_dof_partition(

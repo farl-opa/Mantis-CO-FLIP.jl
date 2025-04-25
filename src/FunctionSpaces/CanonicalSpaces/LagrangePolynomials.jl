@@ -62,6 +62,10 @@ function EdgeLobattoLegendre(p::Int)
     return EdgeLobattoLegendre(p, nodes, ll_polynomials)
 end
 
+function get_derivative_space(elem_loc_basis::LobattoLegendre)
+    return EdgeLobattoLegendre(max(elem_loc_basis.p - 1, 0))
+end
+
 @doc raw"""
     evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64)
 

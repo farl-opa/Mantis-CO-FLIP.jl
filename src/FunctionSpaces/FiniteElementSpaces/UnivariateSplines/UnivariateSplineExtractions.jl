@@ -88,6 +88,40 @@ function extract_bspline_to_section_space(
     )
 end
 
+function extract_bspline_to_section_space(
+    knot_vector::KnotVector, canonical_space::AbstractEdgePolynomials
+)
+    # Number of elements in the knot vector
+    nel = size(knot_vector.patch_1d)
+
+    # Ensure that regularities at all breakpoints are either 0 or -1
+    for el in 1:(nel - 1)
+        # Get multiplicity of the knot at the end of the current element
+        mult = knot_vector.multiplicity[el + 1]
+        if mult < knot_vector.polynomial_degree+1
+            throw(
+                ArgumentError(
+                    "The Edge-polynomial extraction is only implemented for regularity -1."
+                ),
+            )
+        end
+    end
+
+    # Initialize extraction matrices for each element
+    E = create_identity(nel, knot_vector.polynomial_degree + 1)
+
+    # Compute indices of supported basis functions on each element
+    basis_indices = Vector{Vector{Int}}(undef, nel)
+    basis_indices[1] = 1:(knot_vector.polynomial_degree + 1)
+    for el in 2:nel
+        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
+    end
+
+    return ExtractionOperator(
+        E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree + 1]
+    )
+end
+
 """
     extract_bspline_to_bernstein(knot_vector::KnotVector) -> ExtractionOperator
 
@@ -272,7 +306,7 @@ function extract_bspline_to_section_space(
 end
 
 """
-    extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Vector{Int}) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
+    extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Vector{Int}) where {m, F <: Union{BSplineSpace, RationalFESpace}}
 
 Compute the extraction coefficients of GTB-Spline basis functions in terms of (rational) B-spline basis functions.
 
@@ -285,7 +319,7 @@ Compute the extraction coefficients of GTB-Spline basis functions in terms of (r
 """
 function extract_gtbspline_to_bspline(
     spline_spaces::NTuple{m, F}, regularity::Vector{Int}
-) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
+) where {m, F <: Union{BSplineSpace, RationalFESpace}}
     # Construct cumulative sum of all B-spline dimensions
     spl_dims = zeros(Int, m + 1)
     for i in 2:(m + 1)

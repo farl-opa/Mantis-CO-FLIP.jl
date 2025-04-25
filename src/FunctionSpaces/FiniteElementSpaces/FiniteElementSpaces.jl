@@ -158,7 +158,7 @@ Evaluates the local basis functions used to construct the finite element space `
 - `::Vector{Vector{Matrix{Float64}}}`: A nested vector structure containing the local basis
     functions and their derivatives. The first level of nesting corresponds to the order of
     the derivatives. The second level corresponds to a specific derivative. The matrix
-    contains the actual evaluations. See [`get_derivative_idx(der_key::Vector{Int})`](@ref)
+    contains the actual evaluations. See [`get_derivative_idx(der_key::Vector{Int})`]
     for more details on the order in which the derivatives are stored.
 """
 function get_local_basis(
@@ -194,7 +194,7 @@ the evaluation of:
 - of the `k`-th component ...
 - at the `a`-th evaluation point ...
 - for `f₀`.
-See [`get_derivative_idx(der_key::Vector{Int})`](@ref) for more details on the order in
+See [`get_derivative_idx(der_key::Vector{Int})`] for more details on the order in
 which all the mixed derivatives of order `i-1` are stored.
 
 # Arguments
@@ -369,11 +369,10 @@ function _compute_parametric_geometry_coeffs(
     return coeffs
 end
 
-include("FiniteElementSpacesHelpers.jl")
 # Extraction operator: functionaly for extraction operator
 include("ExtractionOperator.jl")
 # rational version of finite element spaces
-include("RationalFiniteElementSpaces.jl")
+include("RationalFESpaces.jl")
 # univariate function spaces
 include("UnivariateSplines/UnivariateSplines.jl")
 # composite function spaces

@@ -5,9 +5,9 @@ Contains all analysis-related structs and functions.
 """
 module Analysis
 
-import .. Geometry
-import .. Forms
-import .. Quadrature
+using ..Geometry
+using ..Forms
+using ..Quadrature
 
 include("ErrorComputations.jl")
 

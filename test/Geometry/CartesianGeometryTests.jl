@@ -42,7 +42,7 @@ for nx in 1:3
 
         # Set file name and path
         file_name = "cartesian_test_nx_$(nx)_ny_$(ny).vtu"
-        output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+        output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
         # Generate the vtk file
         Mantis.Plot.plot(
             geometry;
