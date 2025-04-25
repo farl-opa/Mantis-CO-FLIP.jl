@@ -2,7 +2,7 @@
 #                                        Structure                                         #
 ############################################################################################
 """
-    Integral{manifold_dim, F} <: AbstractRealValuedOperator{manifold_dim}
+    Integral{manifold_dim, F, Q} <: AbstractRealValuedOperator{manifold_dim}
 
 Structure representing the integral of a form over a manifold.
 
@@ -19,12 +19,14 @@ Structure representing the integral of a form over a manifold.
 # Outer Constructors
 - `∫`: Symbolic wrapper for the integral operator.
 """
-struct Integral{manifold_dim, F} <: AbstractRealValuedOperator{manifold_dim}
-    form::AbstractFormExpression{manifold_dim}
-    quad_rule::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}
+struct Integral{manifold_dim, F, Q} <: AbstractRealValuedOperator{manifold_dim}
+    # form::AbstractFormExpression{manifold_dim}
+    # quad_rule::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}
+    form::F
+    quad_rule::Q
     function Integral(
-        form::F, quad_rule::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}
-    ) where {manifold_dim, F <: AbstractFormExpression{manifold_dim, manifold_dim}}
+        form::F, quad_rule::Q
+    ) where {manifold_dim, F <: AbstractFormExpression{manifold_dim, manifold_dim}, Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim}}
         geom = get_geometry(form)
         if Geometry.get_num_elements(geom) != Quadrature.get_num_base_elements(quad_rule)
             throw(
@@ -37,7 +39,7 @@ struct Integral{manifold_dim, F} <: AbstractRealValuedOperator{manifold_dim}
             )
         end
 
-        return new{manifold_dim, F}(form, quad_rule)
+        return new{manifold_dim, F, Q}(form, quad_rule)
     end
 end
 
@@ -153,7 +155,7 @@ end
 
 """
     evaluate(
-        integral::Integral{manifold_dim, F},
+        integral::Integral{manifold_dim, F, Q},
         global_element_id::Int,
     ) where {
         manifold_dim,
@@ -166,7 +168,7 @@ Evaluates the integral of a form over a given global element using a specified q
 rule.
 
 # Arguments
-- `integral::Integral{manifold_dim, F}`: The integral operator to evaluate.
+- `integral::Integral{manifold_dim, F, Q}`: The integral operator to evaluate.
 - `global_element_id::Int`: The global element over which to evaluate the integral.
 
 # Returns
@@ -175,12 +177,13 @@ rule.
     of the outer vector depends on the `expression_rank` of the form expression.
 """
 function evaluate(
-    integral::Integral{manifold_dim, F}, global_element_id::Int
+    integral::Integral{manifold_dim, F, Q}, global_element_id::Int
 ) where {
     manifold_dim,
     form_rank,
     expression_rank,
     F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank},
+    Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
 }
     quad_rule = get_quadrature_rule(integral)
     quadrature_elements = Quadrature.get_element_idxs(quad_rule, global_element_id)
