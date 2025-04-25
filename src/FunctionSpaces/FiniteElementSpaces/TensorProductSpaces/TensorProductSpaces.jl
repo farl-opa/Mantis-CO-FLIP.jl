@@ -191,14 +191,14 @@ function _get_element_vertices_per_space(tp_space::TensorProductSpace, element_i
     return map(get_element_vertices, tp_space.fem_spaces, ordered_index)
 end
 
-function _get_element_dimensions_per_space(tp_space::TensorProductSpace, element_id::Int)
+function _get_element_lengths_per_space(tp_space::TensorProductSpace, element_id::Int)
     # Get number of elements in each constituent space
     max_ind_el = _get_num_elements_per_space(tp_space)
 
     # Convert linear element ID to ordered index
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
-    return map(get_element_dimensions, tp_space.fem_spaces, ordered_index)
+    return map(get_element_lengths, tp_space.fem_spaces, ordered_index)
 end
 
 # Basic getters for the tensor product space
@@ -300,7 +300,7 @@ function get_element_vertices(
 end
 
 """
-    get_element_dimensions(
+    get_element_lengths(
         space::TensorProductSpace{manifold_dim, num_components, num_patches, T}, element_id::Int
     ) where {
         manifold_dim,
@@ -321,7 +321,7 @@ manifold dim.
 - `::NTuple{manifold_dim, Float64}`: The size of the specified element per manifold
     dimension.
 """
-function get_element_dimensions(
+function get_element_lengths(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, T}, element_id::Int
 ) where {
     manifold_dim,
@@ -330,7 +330,7 @@ function get_element_dimensions(
     num_spaces,
     T <: NTuple{num_spaces, AbstractFESpace},
 }
-    element_dimensions_per_space = _get_element_dimensions_per_space(space, element_id)
+    element_dimensions_per_space = _get_element_lengths_per_space(space, element_id)
     element_dimensions = Vector{Float64}(undef, manifold_dim)
 
     manifold_dim_per_space = map(get_manifold_dim, space.fem_spaces)

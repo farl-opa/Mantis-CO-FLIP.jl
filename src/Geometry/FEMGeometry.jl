@@ -62,11 +62,11 @@ function compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFESpace)
 end
 
 function get_element_measure(geometry::FEMGeometry, element_id::Int)
-    return FunctionSpaces.get_element_size(geometry.fem_space, element_id)
+    return FunctionSpaces.get_element_measure(geometry.fem_space, element_id)
 end
 
 function get_element_lengths(geometry::FEMGeometry, element_id::Int)
-    return FunctionSpaces.get_element_dimensions(geometry.fem_space, element_id)
+    return FunctionSpaces.get_element_lengths(geometry.fem_space, element_id)
 end
 
 function get_image_dim(geometry::FEMGeometry)

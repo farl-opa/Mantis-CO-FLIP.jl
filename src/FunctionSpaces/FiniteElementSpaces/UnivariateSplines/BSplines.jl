@@ -220,7 +220,7 @@ function get_num_elements(bspline::BSplineSpace)
 end
 
 """
-    get_element_size(bspline::BSplineSpace, element_id::Int)
+    get_element_measure(bspline::BSplineSpace, element_id::Int)
 
 Returns the size of the element specified by `element_id`.
 
@@ -231,12 +231,12 @@ Returns the size of the element specified by `element_id`.
 # Returns
 - `::Float64`: The size of the element.
 """
-function get_element_size(bspline::BSplineSpace, element_id::Int)
-    return get_element_size(get_knot_vector(bspline), element_id)
+function get_element_measure(bspline::BSplineSpace, element_id::Int)
+    return get_element_measure(get_knot_vector(bspline), element_id)
 end
 
-function get_element_dimensions(bspline::BSplineSpace, element_id::Int)
-    return get_element_size(get_knot_vector(bspline), element_id)
+function get_element_lengths(bspline::BSplineSpace, element_id::Int)
+    return get_element_measure(get_knot_vector(bspline), element_id)
 end
 
 """

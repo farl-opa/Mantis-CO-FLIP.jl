@@ -165,10 +165,10 @@ function get_num_elements_per_patch(space::GTBSplineSpace)
     return space.num_elements_per_patch
 end
 
-function get_element_dimensions(space::GTBSplineSpace, element_id::Int)
+function get_element_lengths(space::GTBSplineSpace, element_id::Int)
     patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
 
-    return get_element_dimensions(space.patch_spaces[patch_id], local_element_id)
+    return get_element_lengths(space.patch_spaces[patch_id], local_element_id)
 end
 
 function get_local_basis(

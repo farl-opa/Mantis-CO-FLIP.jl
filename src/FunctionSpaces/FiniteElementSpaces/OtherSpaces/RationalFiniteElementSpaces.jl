@@ -153,7 +153,7 @@ function get_extraction(space::RationalFiniteElementSpace, element_id::Int)
 end
 
 """
-    get_element_size(rat_space::RationalFiniteElementSpace, element_id::Int)
+    get_element_measure(rat_space::RationalFiniteElementSpace, element_id::Int)
 
 Returns the size of the element for the rational finite element space.
 
@@ -164,10 +164,10 @@ Returns the size of the element for the rational finite element space.
 # Returns
 The size of the element for the rational finite element space.
 """
-function get_element_size(rat_space::RationalFiniteElementSpace, element_id::Int)
-    return get_element_size(rat_space.function_space, element_id)
+function get_element_measure(rat_space::RationalFiniteElementSpace, element_id::Int)
+    return get_element_measure(rat_space.function_space, element_id)
 end
 
-function get_element_dimensions(rat_space::RationalFiniteElementSpace, element_id::Int)
-    return get_element_dimensions(rat_space.function_space, element_id)
+function get_element_lengths(rat_space::RationalFiniteElementSpace, element_id::Int)
+    return get_element_lengths(rat_space.function_space, element_id)
 end

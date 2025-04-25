@@ -82,11 +82,11 @@ struct AbstractMultiPatchFESpace{manifold_dim, num_patches} <:
     end
 end
 
-function get_element_dimensions(us_space::AbstractMultiPatchFESpace, element_id::Int)
+function get_element_lengths(us_space::AbstractMultiPatchFESpace, element_id::Int)
     # Find the space ID and local element ID
     space_id, space_element_id = get_patch_and_element_id(us_space, element_id)
 
-    return get_element_dimensions(us_space.function_spaces[space_id], space_element_id)
+    return get_element_lengths(us_space.function_spaces[space_id], space_element_id)
 end
 
 """

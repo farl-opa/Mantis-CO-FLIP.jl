@@ -23,10 +23,10 @@ function get_polynomial_degree(mp_space::AbstractMultiPatchFESpace, element_id::
     return get_polynomial_degree(mp_space.patch_spaces[patch_id], patch_element_id)
 end
 
-function get_element_dimensions(mp_space::AbstractMultiPatchFESpace, element_id::Int)
+function get_element_lengths(mp_space::AbstractMultiPatchFESpace, element_id::Int)
     # Find the space ID and local element ID
     patch_id, patch_element_id = get_patch_and_element_id(mp_space, element_id)
-    return get_element_dimensions(mp_space.patch_spaces[patch_id], patch_element_id)
+    return get_element_lengths(mp_space.patch_spaces[patch_id], patch_element_id)
 end
 
 function get_element_vertices(mp_space::AbstractMultiPatchFESpace, element_id::Int)

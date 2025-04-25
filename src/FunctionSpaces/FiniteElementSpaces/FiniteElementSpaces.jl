@@ -318,8 +318,11 @@ function get_num_elements(space::AbstractFESpace)
     return get_num_elements(get_extraction_operator(space))
 end
 
+# Getting the element lengths or measure should be handled by the underlying geometry. With
+# the upcoming rewrite and reordering of geometry and function spaces, this should make more
+# sense.
 # """
-#     get_element_dimensions(space::AbstractFESpace, element_id::Int)
+#     get_element_lengths(space::AbstractFESpace, element_id::Int)
 
 # Returns the size of the element specified by `element_id`.
 
@@ -330,10 +333,10 @@ end
 # # Returns
 # - `::Float64`: The size of the element.
 # """
-# function get_element_dimensions(space::AbstractFESpace, element_id::Int)
+# function get_element_lengths(space::AbstractFESpace, element_id::Int)
 #     patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
 
-#     return get_element_dimensions(get_patch_space(space, patch_id), local_element_id)
+#     return get_element_lengths(get_patch_space(space, patch_id), local_element_id)
 # end
 
 """

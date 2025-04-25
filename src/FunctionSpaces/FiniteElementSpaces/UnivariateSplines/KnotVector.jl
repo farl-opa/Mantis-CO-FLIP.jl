@@ -105,7 +105,7 @@ function get_multiplicity(knot_vector::KnotVector)
 end
 
 """
-    get_element_size(knot_vector::KnotVector, element_id::Int)
+    get_element_measure(knot_vector::KnotVector, element_id::Int)
 
 Returns the size of the element specified by `element_id`.
 
@@ -116,8 +116,8 @@ Returns the size of the element specified by `element_id`.
 # Returns
 - `::Float64`: The size of the element.
 """
-function get_element_size(knot_vector::KnotVector, element_id::Int)
-    return Mesh.get_element_size(knot_vector.patch_1d, element_id)
+function get_element_measure(knot_vector::KnotVector, element_id::Int)
+    return Mesh.get_element_measure(knot_vector.patch_1d, element_id)
 end
 
 """

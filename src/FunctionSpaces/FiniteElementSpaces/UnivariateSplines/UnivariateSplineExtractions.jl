@@ -225,8 +225,8 @@ function extract_bspline_to_section_space(
         KR = _evaluate_all_at_point(canonical_space, 0.0, r)
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
         # element sizes where constraints are evaluated
-        h_L = get_element_size(knot_vector, el)
-        h_R = get_element_size(knot_vector, el + 1)
+        h_L = get_element_measure(knot_vector, el)
+        h_R = get_element_measure(knot_vector, el + 1)
         # scale the constraints by the element sizes and findnz values
         scaling_L = [h_L^(-j) for j in 0:r]
         scaling_R = [h_R^(-j) for j in 0:r]
@@ -316,8 +316,8 @@ function extract_gtbspline_to_bspline(
         KR = _evaluate_all_at_point(spline_spaces[i + 1], 1, 0.0, r)
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
         # element sizes where constraints are evaluated
-        h_L = get_element_size(spline_spaces[i], bspl_nels[i])
-        h_R = get_element_size(spline_spaces[i + 1], 1)
+        h_L = get_element_measure(spline_spaces[i], bspl_nels[i])
+        h_R = get_element_measure(spline_spaces[i + 1], 1)
         # scale the constraints by the element sizes and findnz values
         scaling_L = [h_L^(-j) for j in 0:r]
         scaling_R = [h_R^(-j) for j in 0:r]
@@ -350,8 +350,8 @@ function extract_gtbspline_to_bspline(
             KR = _evaluate_all_at_point(spline_spaces[1], 1, 0.0, r)
             SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KR)
             # element sizes where constraints are evaluated
-            h_L = get_element_size(spline_spaces[m], bspl_nels[m])
-            h_R = get_element_size(spline_spaces[1], 1)
+            h_L = get_element_measure(spline_spaces[m], bspl_nels[m])
+            h_R = get_element_measure(spline_spaces[1], 1)
             # scale the constraints by the element sizes and findnz values
             scaling_L = [h_L^(-j) for j in 0:r]
             scaling_R = [h_R^(-j) for j in 0:r]
