@@ -3,7 +3,9 @@
     get_component_spaces(space::AbstractFESpace)
 
 Get the component spaces of the (multi-)component finite element space. For a single
-component space, this function will return the original space.
+component space, this function will return the original space. Note that, in the most
+general case, the component spaces are not necessarily single-patch spaces, and the
+component spaces may contribute to multiple components.
 
 # Arguments
 - `space::AbstractFESpace`: A (multi-)component finite element space.
@@ -22,87 +24,38 @@ function get_component_spaces(
 end
 
 """
-    get_component_space(space::AbstractFESpace, component_idx::int)
+    get_num_elements_per_patch(space::AbstractFESpace)
 
-Get the `component_idx`th component space of the (multi-)component finite element space.
-For a single component space, this function will return the original space if
-`component_idx` is 1.
-
-# Arguments
-- `space::AbstractFESpace`: A (multi-)component finite element space.
-
-# Returns
-- `component_spaces::AbstractFESpace`: A single-component finite element space.
-
-# Exceptions
-- ArgumentError: When `component_idx` > 1 and there is only one component.
-- BoundsError: When `component_idx` larger than the number of components, and the FE space
-    has more than 1 component.
-"""
-function get_component_space(space::AbstractFESpace, component_idx::Int)
-    return get_component_spaces(space)[component_idx]
-end
-
-"""
-    get_patch_spaces(space::AbstractFESpace)
-
-Get the patch spaces of the (multi-)patch finite element space. For a single patch space,
-this function will return a length-1 tuple with `space`.
-
-# Arguments
-- `space::AbstractFESpace`: A (multi-)patch finite element space.
-
-# Returns
-- `<:Tuple{AbstractFESpace}`: Tuple of single-patch spaces of length `num_patches`.
-"""
-function get_patch_spaces_for_component(space::AbstractFESpace, component_id::Int)
-    return get_component_space(space, component_id).patch_spaces
-end
-
-function get_patch_spaces_for_component(space::AbstractFESpace{manifold_dim, num_components, 1}, component_id::Int)
-    return (get_component_space(space, component_id),)
-end
-
-"""
-    get_patch_space_for_component(space::AbstractFESpace, component_id::Int, patch_id::Int)
-
-Get the `patch_id`th patch space of the (multi-)patch finite element space.
-For a single patch space, this function will return the original space if
-`patch_id` is 1.
-
-# Arguments
-- `space::AbstractFESpace`: A (multi-)patch finite element space.
-
-# Returns
-- `<:AbstractFESpace`: A single-patch finite element space.
-
-# Exceptions
-- ArgumentError: When `patch_id` > 1 and there is only one patch.
-- BoundsError: When `patch_id` larger than the number of components, and the FE space
-    has more than 1 patch.
-"""
-function get_patch_space_for_component(space::AbstractFESpace, component_id::Int, patch_id::Int)
-    return get_patch_spaces_for_component(space, component_id)[patch_id]
-end
-
-"""
-    get_num_elements_per_patch_for_component(space::AbstractFESpace)
-
-Get the number of elements per patch in the multi-patch finite element space.
+Get the number of elements per patch in the multi-patch finite element space. Assumes that
+all component spaces have the same number of patches and elements (per patch).
 
 # Arguments
 - `space::AbstractFESpace`: The multi-patch space.
 
 # Returns
 - `::NTuple{num_patches, Int}`: The number of elements per patch.
+
+# Exceptions
+- Error "'get_num_elements_per_patch' not implemented": This error is thrown if no
+    'get_num_elements_per_patch' method is defined for a single-component space (which can
+    be a component of a multi-component space).
 """
-function get_num_elements_per_patch_for_component(
-    space::AbstractFESpace{manifold_dim, num_components, num_patches},
-    component_id::Int
+function get_num_elements_per_patch(
+    space::AbstractFESpace{manifold_dim, num_components, num_patches}
 ) where {manifold_dim, num_components, num_patches}
-    return ntuple(num_patches) do patch_id
-        return get_num_elements(get_patch_space_for_component(space, component_id, patch_id))
-    end
+    return get_num_elements_per_patch(get_component_spaces(space)[1])
+end
+
+function get_num_elements_per_patch(
+    space::AbstractFESpace{manifold_dim, 1, num_patches}
+) where {manifold_dim, num_patches}
+    return error("'get_num_elements_per_patch' not implemented for $(typeof(space))")
+end
+
+function get_num_elements_per_patch(
+    space::AbstractFESpace{manifold_dim, 1, 1}
+) where {manifold_dim}
+    return (get_num_elements(space),)
 end
 
 """
@@ -117,11 +70,11 @@ Get the ID of the patch to which the specified global element belongs.
 # Returns
 - `::Int`: ID of the patch to which the element belongs.
 """
-function get_patch_id_for_component(space::AbstractFESpace, component_id::Int, element_id::Int)
-    return findfirst(element_id .<= cumsum(get_num_elements_per_patch_for_component(space, component_id)))
+function get_patch_id(space::AbstractFESpace, element_id::Int)
+    return findfirst(element_id .<= cumsum(get_num_elements_per_patch(space)))
 end
 
-function get_patch_id_for_component(
+function get_patch_id(
     space::AbstractFESpace{manifold_dim, num_components, 1}, element_id::Int
 ) where {manifold_dim, num_components}
     return 1
@@ -140,10 +93,10 @@ Get the constituent patch ID and local element ID for the specified global eleme
 - `patch_id::Int`: The patch ID
 - `local_element_id::Int`: The local element ID.
 """
-function get_patch_and_local_element_id_for_component(space::AbstractFESpace, component_id::Int, element_id::Int)
-    patch_id = get_patch_id_for_component(space, component_id, element_id)
+function get_patch_and_local_element_id(space::AbstractFESpace, element_id::Int)
+    patch_id = get_patch_id(space, element_id)
     local_element_id = element_id - sum(
-        get_num_elements, get_patch_space_for_component(space, component_id, i) for i in 1:patch_id-1; init=0
+        get_num_elements_per_patch(space)[begin:patch_id-1]; init=0
     )
     return patch_id, local_element_id
 end
@@ -161,10 +114,8 @@ Get the global element ID for the specified constituent patch ID and local eleme
 # Returns
 - `::Int`: The global element ID.
 """
-function get_global_element_id_for_component(space::AbstractFESpace, component_id::Int, patch_id::Int, local_element_id::Int)
-    return sum(
-        get_num_elements, get_patch_space_for_component(space, component_id, i) for i in 1:patch_id-1; init=0
-    ) + local_element_id
+function get_global_element_id(space::AbstractFESpace, patch_id::Int, local_element_id::Int)
+    return sum(get_num_elements_per_patch(space)[begin:patch_id-1]; init=0) + local_element_id
 end
 
 """
@@ -367,23 +318,23 @@ function get_num_elements(space::AbstractFESpace)
     return get_num_elements(get_extraction_operator(space))
 end
 
-"""
-    get_element_size(bspline::BSplineSpace, element_id::Int)
+# """
+#     get_element_dimensions(space::AbstractFESpace, element_id::Int)
 
-Returns the size of the element specified by `element_id`.
+# Returns the size of the element specified by `element_id`.
 
-# Arguments
-- `bspline::BSplineSpace`: The B-Spline function space.
-- `element_id::Int`: The id of the element.
+# # Arguments
+# - `space::AbstractFESpace`: The finite element space.
+# - `element_id::Int`: The global id of the element.
 
-# Returns
-- `::Float64`: The size of the element.
-"""
-function get_element_dimensions(space::AbstractFESpace, element_id::Int)
-    patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
+# # Returns
+# - `::Float64`: The size of the element.
+# """
+# function get_element_dimensions(space::AbstractFESpace, element_id::Int)
+#     patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
 
-    return get_element_dimensions(get_patch_space(space, patch_id), local_element_id)
-end
+#     return get_element_dimensions(get_patch_space(space, patch_id), local_element_id)
+# end
 
 """
     get_local_basis(
@@ -487,8 +438,7 @@ function evaluate(
         end
     end
 
-    for component_idx in 1:num_components
-        component_space = get_component_space(space, component_idx)
+    for (component_idx, component_space) in pairs(get_component_spaces(space))
         extraction_coefficients, _ = get_extraction(component_space, element_id)
         component_basis = get_local_basis(component_space, element_id, xi, nderivatives)
         for der_order in eachindex(evaluations)

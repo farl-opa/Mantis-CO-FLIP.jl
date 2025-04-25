@@ -22,6 +22,13 @@ struct DirectSumSpace{manifold_dim, num_components, num_patches, F} <:
         num_patches,
         F <: NTuple{num_components, AbstractFESpace{manifold_dim, 1, num_patches}},
     }
+        num_elements_per_component_space = get_num_elements.(component_spaces)
+        if any(num_elements_per_component_space .!= num_elements_per_component_space[1])
+            throw(ArgumentError(
+                "All component spaces must have the same number of elements."
+            ))
+        end
+
         return new{manifold_dim, num_components, num_patches, F}(component_spaces)
     end
 end
@@ -29,16 +36,6 @@ end
 get_num_basis(space::DirectSumSpace) = sum(get_num_basis.(get_component_spaces(space)))
 function get_num_basis(space::DirectSumSpace, element_id::Int)
     return sum(get_num_basis.(get_component_spaces(space), element_id))
-end
-
-function get_component_space(
-    space::DirectSumSpace{manifold_dim, 1, F}, component_idx::Int
-) where {manifold_dim, F}
-    if component_idx == 1
-        return space.component_spaces[1]
-    else
-        throw(ArgumentError("Component $component_idx requested, but $space only has 1 component."))
-    end
 end
 
 function get_component_spaces(
@@ -100,7 +97,7 @@ offsetted by the (cumulative) dimension(s) of preceding section spaces.
 """
 function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
     component_dof_partition = deepcopy(
-        get_dof_partition(get_component_space(space, component_idx))
+        get_dof_partition(get_component_spaces(space)[component_idx])
     )
     dof_offset_component = _get_dof_offsets(space)[component_idx]
     for i in eachindex(component_dof_partition)

@@ -33,7 +33,7 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
     patch_spaces::T
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
-    num_elements_per_patch::Vector{Int}
+    num_elements_per_patch::NTuple{num_patches, Int}
     regularity::Vector{Int}
 
     function GTBSplineSpace(
@@ -76,7 +76,7 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
         # Create the extraction operator
         extraction_op = extract_gtbspline_to_bspline(patch_spaces, regularity)
         # number of element offsets per patch
-        num_elements_per_patch = collect(get_num_elements.(patch_spaces))
+        num_elements_per_patch = Tuple(get_num_elements(patch_spaces[i]) for i in 1:num_patches)
         num_elements_offset = cumsum([0; collect(get_num_elements.(patch_spaces))])
 
         function _get_boundary_dof_inds(patch_id::Int, right_bnd::Bool)
@@ -161,14 +161,14 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
     end
 end
 
-# Specialise for the single patch case, as the default get_patch_space for a single-patch
-# space returns itself, leading to an infinite recursion.
-function get_patch_space(space::GTBSplineSpace{1, T}, patch_id::Int) where {T}
-    if patch_id == 1
-        return space.patch_spaces[1]
-    else
-        throw(ArgumentError("Space on patch $patch_id requested, but $space only has 1 patch."))
-    end
+function get_num_elements_per_patch(space::GTBSplineSpace)
+    return space.num_elements_per_patch
+end
+
+function get_element_dimensions(space::GTBSplineSpace, element_id::Int)
+    patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
+
+    return get_element_dimensions(space.patch_spaces[patch_id], local_element_id)
 end
 
 function get_local_basis(
@@ -180,5 +180,5 @@ function get_local_basis(
     # We need space ID and local element ID to know which function space to evaluate.
     patch_id, patch_element_id = get_patch_and_local_element_id(space, element_id)
 
-    return evaluate(get_patch_space(space, patch_id), patch_element_id, xi, nderivatives)[1]
+    return evaluate(space.patch_spaces[patch_id], patch_element_id, xi, nderivatives)[1]
 end
