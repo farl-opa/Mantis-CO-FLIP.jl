@@ -127,6 +127,8 @@ function get_num_basis(form_space::AbstractFormSpace, element_id::Int)
     return FunctionSpaces.get_num_basis(get_fe_space(form_space), element_id)
 end
 
+get_estimated_nnz_per_elem(form_space::FormSpace) = get_max_local_dim(form_space)
+
 """
     get_max_local_dim(form_space::AbstractFormSpace)
 

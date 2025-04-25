@@ -25,14 +25,20 @@ struct Sharp{manifold_dim, G, F}
         form::F
     ) where {manifold_dim, G, F <: AbstractFormExpression{manifold_dim, 1, 0, G}}
         if manifold_dim < 2
-            throw(ArgumentError(
-                "Manifold dimension should be greater than 1. " * 
-                "Dimension $(manifold_dim) was given.",
-            ))
+            throw(
+                ArgumentError(
+                    "Manifold dimension should be greater than 1. " *
+                    "Dimension $(manifold_dim) was given.",
+                ),
+            )
         end
 
         return new{manifold_dim, G, F}(form)
     end
+end
+
+function ♯(form::AbstractFormExpression)
+    return Sharp(form)
 end
 
 ############################################################################################

@@ -8,7 +8,7 @@ include("../HelperFunctions.jl")
 ############################################################################################
 #                                      Problem setup                                       #
 ############################################################################################
-# Mesh 
+# Mesh
 starting_point = (0.0, 0.0)
 box_size = (1.0, 1.0)
 num_elements = (2, 2) .^ 3 # Ininital mesh size.
@@ -28,7 +28,7 @@ Lchains = true # Decide if Lchains are added to fix inexact refinements.
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-∫ₐ, ∫ₑ = Mantis.Quadrature.get_quadrature_rules(
+∫ₐ, ∫ₑ = Mantis.Quadrature.get_canonical_quadrature_rules(
     Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
 )
 
@@ -40,7 +40,7 @@ export_vtk = false # Set to true to export the computed solutions.
 ############################################################################################
 #                                       Run problem                                        #
 ############################################################################################
-# Hierarchical de Rham complex 
+# Hierarchical de Rham complex
 ℌ = Mantis.Forms.create_hierarchical_de_rham_complex(
     starting_point, box_size, num_elements, p, k, num_sub, truncate, simplified
 )
@@ -54,7 +54,7 @@ uₕ, δuₕ = Mantis.Assemblers.solve_one_form_hodge_laplacian(
 ############################################################################################
 #                                      Solution data                                       #
 ############################################################################################
-if export_vtk 
+if export_vtk
     println("Exporting computed solutions to VTK...")
     geometry = Mantis.Forms.get_geometry(uₕ)
     num_elements = Mantis.Geometry.get_num_elements(geometry)

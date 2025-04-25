@@ -114,7 +114,7 @@ deg = 2
 patch = Mantis.Mesh.Patch1D(breakpoints)
 Bsp_univariate = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, 1, 1, -1])
 weights = [1.0, 2.0, 2.0, 3.0, 1.0]
-Nurbs_univariate = Mantis.FunctionSpaces.RationalFiniteElementSpace(Bsp_univariate, weights)
+Nurbs_univariate = Mantis.FunctionSpaces.RationalFESpace(Bsp_univariate, weights)
 quad_rule = Mantis.Quadrature.gauss_legendre(deg+1)
 x = Mantis.Quadrature.get_nodes(quad_rule)[1]
 for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)

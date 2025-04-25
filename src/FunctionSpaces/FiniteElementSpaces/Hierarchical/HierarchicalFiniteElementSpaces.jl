@@ -40,12 +40,12 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         two_scale_operators::Vector{T},
         domains::HierarchicalActiveInfo,
         num_subdivisions::NTuple{manifold_dim, Int},
-        truncated::Bool=false,
+        truncated::Bool=true,
         simplified::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
     }
-        function _compute_dof_partition(spaces, active_basis)
+        function _compute_dof_partition(spaces, active_basis, num_levels)
             level_partition = get_dof_partition.(spaces)
             n_patches = length(level_partition[1])
             n_partitions = [length(level_partition[1][i]) for i in 1:n_patches]
@@ -100,7 +100,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
             spaces, two_scale_operators, active_elements, active_basis, truncated
         )
 
-        dof_partition = _compute_dof_partition(spaces, active_basis)
+        dof_partition = _compute_dof_partition(spaces, active_basis, num_levels)
 
         # Creates the structure
         return new{manifold_dim, S, T}(
@@ -125,7 +125,7 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
         two_scale_operators::Vector{T},
         domains_per_level::Vector{Vector{Int}},
         num_subdivisions::NTuple{manifold_dim, Int},
-        truncated::Bool=false,
+        truncated::Bool=true,
         simplified::Bool=false,
     ) where {
         manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator
@@ -173,7 +173,7 @@ function get_basis_indices(hier_space::HierarchicalFiniteElementSpace, hier_id::
         basis_indices = hier_space.multilevel_basis_indices[multilevel_id]
     end
 
-    return basis_indices 
+    return basis_indices
 end
 
 function get_num_basis(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
@@ -492,9 +492,11 @@ function get_multilevel_extraction(
         active_local_ids = findall(
             x -> x in get_level_ids(active_basis, level), full_level_indices
         )
+        num_basis = size(full_coeffs, 2)
+        active_basis_matrix = Matrix{Float64}(LinearAlgebra.I, (num_basis, num_basis))
+        active_basis_matrix = active_basis_matrix[:, active_local_ids]
 
-        return Matrix{Float64}(LinearAlgebra.I, size(full_coeffs))[:, active_local_ids],
-        active_local_ids
+        return active_basis_matrix, active_local_ids
     end
 
     multilevel_information = get_multilevel_information(
@@ -636,15 +638,11 @@ function get_refinement_data(
     truncated,
 )
     active_basis_size = size(active_basis_matrix)
-
     num_multilevel_basis = length(multilevel_information[(element_level, element_id)])
-
-    refinement_matrix = zeros(active_basis_size .+ (0, num_multilevel_basis))
-
-    refinement_matrix[:, 1:active_basis_size[2]] .= active_basis_matrix
-
+    refinement_matrix = hcat(
+        active_basis_matrix, zeros(active_basis_size[1], num_multilevel_basis)
+    )
     multilevel_basis_hier_ids = Vector{Int}(undef, num_multilevel_basis)
-
     ml_basis_count = 1
     for (basis_level, basis_level_id) in multilevel_information[(element_level, element_id)]
         refinement_matrix[:, active_basis_size[2] + ml_basis_count] .= get_multilevel_basis_evaluation(
@@ -701,11 +699,7 @@ function get_multilevel_basis_evaluation(
             current_subdiv_matrix[active_indices, :] .= 0.0
         end
 
-        if level == element_level
-            local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
-        else
-            local_subdiv_matrix .= local_subdiv_matrix * current_subdiv_matrix
-        end
+        local_subdiv_matrix = local_subdiv_matrix * current_subdiv_matrix
         current_child_element = current_parent_element
     end
 

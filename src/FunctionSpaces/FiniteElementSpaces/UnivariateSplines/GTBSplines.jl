@@ -1,5 +1,5 @@
 """
-    GTBSplineSpace(spline_spaces::NTuple{m,T}, regularity::Vector{Int}) where {m, T <: Union{BSplineSpace, RationalFiniteElementSpace}}
+    GTBSplineSpace(spline_spaces::NTuple{m,T}, regularity::Vector{Int}) where {m, T <: Union{BSplineSpace, RationalFESpace}}
 
 Constructs a GTBSplineSpace from a tuple of NURBS or B-spline spaces and a vector of
 regularity conditions.
@@ -20,7 +20,7 @@ regularity conditions.
 """
 function GTBSplineSpace(
     spline_spaces::NTuple{m, T}, regularity::Vector{Int}
-) where {m, T <: Union{BSplineSpace, RationalFiniteElementSpace}}
+) where {m, T <: Union{BSplineSpace, RationalFESpace}}
     # Check if the number of regularity conditions matches the number of interfaces
     if length(regularity) != m
         throw(ArgumentError("""\

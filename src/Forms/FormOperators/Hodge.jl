@@ -55,6 +55,21 @@ struct Hodge{manifold_dim, form_rank, expression_rank, G, F} <:
     end
 end
 
+"""
+    ★(form::AbstractFormExpression)
+
+Symbolic wrapper for the hodge star operator. The unicode character command is `\\bigstar`.
+
+# Arguments
+- `form::AbstractFormExpression`: The form to which the hodge star is applied.
+
+# Returns
+- `Hodge`: The hodge operator.
+"""
+function ★(form::AbstractFormExpression)
+    return Hodge(form)
+end
+
 ############################################################################################
 #                                         Getters                                          #
 ############################################################################################

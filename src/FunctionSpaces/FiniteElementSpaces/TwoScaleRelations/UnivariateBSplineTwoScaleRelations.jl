@@ -309,9 +309,16 @@ function subdivide_space(
     )
     p = coarse_bspline.knot_vector.polynomial_degree
     fine_polynomials = get_finer_canonical_space(coarse_bspline.polynomials, nsubdivisions)
+    dof_partition = get_dof_partition(coarse_bspline)
+    n_dofs_left = length(dof_partition[1][1])
+    n_dofs_right = length(dof_partition[1][3])
 
     return BSplineSpace(
-        fine_knot_vector.patch_1d, fine_polynomials, p .- fine_knot_vector.multiplicity
+        fine_knot_vector.patch_1d,
+        fine_polynomials,
+        p .- fine_knot_vector.multiplicity,
+        n_dofs_left,
+        n_dofs_right,
     )
 end
 
@@ -589,11 +596,12 @@ function build_two_scale_operator(
     coarse_bspline::BSplineSpace, nsubdivisions::Int, fine_multiplicity::Int
 )
     if nsubdivisions <= 0
-        throw(ArgumentError("""\
-            Number of subdivions must be greater than 0. nsubdivisions=$nsubdivisions was \
-            given.\
-            """
-        ))
+        throw(
+            ArgumentError("""\
+          Number of subdivions must be greater than 0. nsubdivisions=$nsubdivisions was \
+          given.\
+          """)
+        )
     end
 
     fine_bspline = subdivide_space(coarse_bspline, nsubdivisions, fine_multiplicity)
