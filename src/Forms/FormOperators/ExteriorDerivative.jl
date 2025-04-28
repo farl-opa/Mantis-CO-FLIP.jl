@@ -55,6 +55,10 @@ struct ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
     end
 end
 
+function d(form::AbstractFormExpression)
+    return ExteriorDerivative(form)
+end
+
 """
     get_form(ext_der::ExteriorDerivative)
 

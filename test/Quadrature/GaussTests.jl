@@ -27,7 +27,7 @@ for N in range(2, 17, step=3)
 
 
     # Constructor tests.
-    @test typeof(quad_rule) == Mantis.Quadrature.QuadratureRule{1}
+    @test typeof(quad_rule) == Mantis.Quadrature.CanonicalQuadratureRule{1}
 
 
     # Invalid constructor tests.
@@ -94,7 +94,7 @@ for N in range(1, 16, step=3)
 
 
     # Constructor tests.
-    @test typeof(quad_rule) == Mantis.Quadrature.QuadratureRule{1}
+    @test typeof(quad_rule) == Mantis.Quadrature.CanonicalQuadratureRule{1}
 
 
     # Invalid constructor tests.
