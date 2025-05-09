@@ -176,6 +176,7 @@ function get_local_basis(
     element_id::Int,
     xi::NTuple{1, Vector{Float64}},
     nderivatives::Int,
+    component_id::Int=1,
 )
     # We need space ID and local element ID to know which function space to evaluate.
     patch_id, patch_element_id = get_patch_and_local_element_id(space, element_id)

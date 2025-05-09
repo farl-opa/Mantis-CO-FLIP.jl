@@ -743,6 +743,7 @@ function get_local_basis(
     hier_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
+    component_id::Int=1,
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     element_level, element_level_id = convert_to_element_level_and_level_id(space, hier_id)
 
@@ -752,7 +753,9 @@ function get_local_basis(
 end
 
 function get_extraction(
-    space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int
+    space::HierarchicalFiniteElementSpace{manifold_dim, S, T},
+    hier_id::Int,
+    component_id::Int=1,
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1, 1}, T <: AbstractTwoScaleOperator}
     if space.multilevel_elements[hier_id] == 0
         element_level, element_level_id = convert_to_element_level_and_level_id(

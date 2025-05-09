@@ -144,7 +144,8 @@ function get_polynomials(bspline::BSplineSpace)
     return bspline.polynomials
 end
 
-function get_local_basis(space::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int)
+function get_local_basis(
+    space::BSplineSpace, ::Int, xi::Vector{Float64}, nderivatives::Int, component_id::Int=1)
     # The output of this function must correspond to the general evaluate function, so the
     # output must be a vector{vector{vector{Matrix{Float64}}}}. The output of the evaluate
     # on polynomials is a vector{vector{Matrix{Float64}}}, so we need to add an extra layer
@@ -162,7 +163,11 @@ function get_local_basis(space::BSplineSpace, ::Int, xi::Vector{Float64}, nderiv
 end
 
 function get_local_basis(
-    space::BSplineSpace, element_id::Int, xi::NTuple{1, Vector{Float64}}, nderivatives::Int
+    space::BSplineSpace,
+    element_id::Int,
+    xi::NTuple{1, Vector{Float64}},
+    nderivatives::Int,
+    component_id::Int=1,
 )
     return get_local_basis(space, element_id, xi[1], nderivatives)
 end

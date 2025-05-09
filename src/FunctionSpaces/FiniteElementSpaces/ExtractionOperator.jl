@@ -70,7 +70,9 @@ function get_num_basis(extraction_op::ExtractionOperator, element_id::Int)
     return length(get_basis_indices(extraction_op, element_id))
 end
 
-function get_extraction(extraction_op::ExtractionOperator, element_id::Int)
+function get_extraction(
+    extraction_op::ExtractionOperator, element_id::Int, component_id::Int=1
+)
     return (
         get_extraction_coefficients(extraction_op, element_id),
         get_basis_indices(extraction_op, element_id),

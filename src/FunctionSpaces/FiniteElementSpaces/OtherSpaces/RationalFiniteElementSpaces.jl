@@ -140,11 +140,14 @@ function get_local_basis(
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
+    component_id::Int=1,
 ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1, 1}}
     return evaluate(space, element_id, xi, nderivatives)[1]
 end
 
-function get_extraction(space::RationalFiniteElementSpace, element_id::Int)
+function get_extraction(
+    space::RationalFiniteElementSpace, element_id::Int, component_id::Int=1
+)
     # Get the basis indices for the underlying function space
     _, basis_indices = get_extraction(space.function_space, element_id)
     n_supp = length(basis_indices)

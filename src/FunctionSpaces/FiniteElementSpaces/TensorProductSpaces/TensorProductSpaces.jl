@@ -377,7 +377,7 @@ function get_support(tp_space::TensorProductSpace, basis_id::Int)
     return support
 end
 
-function get_extraction(space::TensorProductSpace, element_id::Int)
+function get_extraction(space::TensorProductSpace, element_id::Int, component_id::Int=1)
     num_spaces = get_num_spaces(space)
     max_ind_basis = _get_num_basis_per_space(space)
     extraction_per_space = _get_extraction_per_space(space, element_id)
@@ -405,6 +405,7 @@ function get_local_basis(
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
+    component_id::Int=1,
 ) where {
     manifold_dim,
     num_components,
