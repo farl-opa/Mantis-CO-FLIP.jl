@@ -1,4 +1,4 @@
-module UnivariateSplineTests
+module BSplineTests
 
 """
 Tests for the univariate spline spaces. These tests are based on the
