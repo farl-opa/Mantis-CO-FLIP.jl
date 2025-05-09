@@ -81,46 +81,52 @@ end
 
 # Basic getters per space
 
-_get_num_basis_per_space(tp_space::TensorProductSpace) =
-    map(get_num_basis, tp_space.fem_spaces)
+function _get_num_basis_per_space(tp_space::TensorProductSpace)
+    return ntuple(get_num_spaces(tp_space)) do space_i
+        return get_num_basis(tp_space.fem_spaces[space_i])
+    end
+end
 
-_get_num_elements_per_space(tp_space::TensorProductSpace) =
-    map(get_num_elements, tp_space.fem_spaces)
+function _get_num_elements_per_space(tp_space::TensorProductSpace)
+    return ntuple(get_num_spaces(tp_space)) do space_i
+        return get_num_elements(tp_space.fem_spaces[space_i])
+    end
+end
 
 function _get_basis_indices_per_space(tp_space::TensorProductSpace, element_id::Int)
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
-    return tuple(
-        map(get_basis_indices, tp_space.fem_spaces, ordered_index)...
-    )::NTuple{get_num_spaces(tp_space), Vector{Int}}
+    return ntuple(get_num_spaces(tp_space)) do space_i
+        return get_basis_indices(tp_space.fem_spaces[space_i], ordered_index[space_i])
+    end
 end
 
 function _get_num_basis_per_space(tp_space::TensorProductSpace, element_id::Int)
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
-    return tuple(
-        map(get_num_basis, tp_space.fem_spaces, ordered_index)...
-    )::NTuple{get_num_spaces(tp_space), Int}
+    return ntuple(get_num_spaces(tp_space)) do space_i
+        return get_num_basis(tp_space.fem_spaces[space_i], ordered_index[space_i])
+    end
 end
 
 function _get_support_per_space(tp_space::TensorProductSpace, basis_id::Int)
     max_ind_basis = _get_num_basis_per_space(tp_space)
     ordered_index = linear_to_ordered_index(basis_id, max_ind_basis)
 
-    return tuple(
-        map(get_support, tp_space.fem_spaces, ordered_index)...
-    )::NTuple{get_num_spaces(tp_space), Vector{Int}}
+    return ntuple(get_num_spaces(tp_space)) do space_i
+        return get_support(tp_space.fem_spaces[space_i], ordered_index[space_i])
+    end
 end
 
 function _get_extraction_per_space(tp_space::TensorProductSpace, element_id::Int)
     max_ind_el = _get_num_elements_per_space(tp_space)
     ordered_index = linear_to_ordered_index(element_id, max_ind_el)
 
-    return tuple(
-        map(get_extraction, tp_space.fem_spaces, ordered_index)...
-    )::NTuple{get_num_spaces(tp_space), Tuple{Matrix{Float64}, Vector{Int}}}
+    return ntuple(get_num_spaces(tp_space)) do space_i
+        return get_extraction(tp_space.fem_spaces[space_i], ordered_index[space_i])
+    end
 end
 
 """
@@ -161,24 +167,15 @@ function _get_local_basis_per_space(
     manifold_dim_per_space = map(get_manifold_dim, tp_space.fem_spaces)
     cum_manifold_dim_per_space = cumsum((0, manifold_dim_per_space...))
     # Split evaluation points for each constituent space
-    num_points = size(xi, 1)
-    xis = [
-        Tuple([Vector{Float64}(undef, num_points) for _ in 1:get_manifold_dim(space)]) for
-        space in tp_space.fem_spaces
-    ]
-    for i in 1:num_spaces
-        xis[i] = xi[(cum_manifold_dim_per_space[i] + 1):(cum_manifold_dim_per_space[i] + manifold_dim_per_space[i])]
+    xis = ntuple(num_spaces) do space_i
+        return xi[(cum_manifold_dim_per_space[space_i] + 1):(cum_manifold_dim_per_space[space_i] + manifold_dim_per_space[space_i])]
     end
 
-    return tuple(
-        map(
-            get_local_basis,
-            tp_space.fem_spaces,
-            ordered_index,
-            xis,
-            fill(nderivatives, num_spaces),
-        )...,
-    )::NTuple{num_spaces, Vector{Vector{Vector{Matrix{Float64}}}}}
+    return ntuple(num_spaces) do space_i
+        return get_local_basis(
+            tp_space.fem_spaces[space_i], ordered_index[space_i], xis[space_i], nderivatives
+        )
+    end
 end
 
 function _get_element_vertices_per_space(tp_space::TensorProductSpace, element_id::Int)
