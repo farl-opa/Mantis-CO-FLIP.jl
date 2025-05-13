@@ -1,16 +1,29 @@
+using InteractiveUtils
 """
     assemble(
-        weak_form::WeakForm,
+        weak_form::WeakForm{manifold_dim, LHS, RHS, I},
         dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
         lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
         rhs_type::Type=Matrix{Float64},
-    ) where {Q <: Quadrature.AbstractQuadratureRule}
+    ) where {
+        manifold_dim,
+        num_rows,
+        lhs_num_cols,
+        rhs_num_cols,
+        LHS <: NTuple{
+            num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        RHS <: NTuple{
+            num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        I,
+    }
 
 Assemble the left- and right-hand sides of a discrete Petrov-Galerkin problem for the given
 weak-formulation and Dirichlet boundary conditions.
 
 # Arguments
-- `weak_form::WeakForm`: The weak form to assemble.
+- `weak_form::WeakForm{manifold_dim, LHS, RHS, I}`: The weak form to assemble.
 - `dirichlet_bcs::Dict{Int, Float64}`: A dictionary containing the Dirichlet boundary
     conditions, where the key is the index of the boundary condition and the value is the
     boundary condition value.
@@ -23,13 +36,21 @@ weak-formulation and Dirichlet boundary conditions.
 - `rhs::rhs_type`: The assembled right-hand side vector.
 """
 function assemble(
-    weak_form::WeakForm,
+    weak_form::WeakForm{manifold_dim, LHS, RHS, I},
     dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
     lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
     rhs_type::Type=Matrix{Float64},
-)
-    num_lhs_blocks = get_num_lhs_blocks(weak_form)
-    num_rhs_blocks = get_num_rhs_blocks(weak_form)
+) where {
+    manifold_dim,
+    num_rows,
+    lhs_num_cols,
+    rhs_num_cols,
+    LHS <:
+    NTuple{num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    RHS <:
+    NTuple{num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    I,
+}
     lhs_expressions = get_lhs_expressions(weak_form)
     rhs_expressions = get_rhs_expressions(weak_form)
     test_offsets, trial_offsets = get_test_offsets(weak_form), get_trial_offsets(weak_form)
@@ -37,32 +58,32 @@ function assemble(
     rhs_rows, rhs_cols, rhs_vals = get_pre_allocation(weak_form, "rhs")
     lhs_counts, rhs_counts = 0, 0
     # TODO: The loop over elements should also handle boundary integrals.
-    for elem_id in 1:get_num_elements(weak_form)
-        for block_id in CartesianIndices(num_lhs_blocks)
-            lhs_rows, lhs_cols, lhs_vals, lhs_counts = add_block_contributions!(
+    # PERF: We might what to make the loop over elements the inner most one; that way we can
+    # skip the 0 expressions instead of checking them everytime.
+    for elem_id in 1:get_num_elements(weak_form), row in 1:num_rows
+        for col in 1:lhs_num_cols
+            lhs_rows, lhs_cols, lhs_vals, lhs_counts = add_expression_contributions!(
                 lhs_rows,
                 lhs_cols,
                 lhs_vals,
                 lhs_counts,
+                lhs_expressions[row][col],
                 elem_id,
-                block_id,
-                lhs_expressions,
-                test_offsets,
-                trial_offsets,
+                test_offsets[row],
+                trial_offsets[col],
             )
         end
 
-        for block_id in CartesianIndices(num_rhs_blocks)
-            rhs_rows, rhs_cols, rhs_vals, rhs_counts = add_block_contributions!(
+        for col in 1:rhs_num_cols
+            rhs_rows, rhs_cols, rhs_vals, rhs_counts = add_expression_contributions!(
                 rhs_rows,
                 rhs_cols,
                 rhs_vals,
                 rhs_counts,
+                rhs_expressions[row][col],
                 elem_id,
-                block_id,
-                rhs_expressions,
-                test_offsets,
-                trial_offsets,
+                test_offsets[row],
+                trial_offsets[col],
             )
         end
     end
@@ -128,33 +149,29 @@ function get_pre_allocation(weak_form::WeakForm, side::String)
 end
 
 """
-    add_block_contributions!(
+    add_expression_contributions!(
         rows::Vector{Int},
         cols::Vector{Int},
         vals::Vector{Float64},
         counts::Int,
+        expression,
         element_id::Int,
-        block_id::CartesianIndex{2},
-        expressions,
-        test_offsets,
-        trial_offsets,
+        test_offset::Int,
+        trial_offset::Int,
     )
 
 Updates the row, column, and value vectors with contributions from the specified real-valued
-expression block at the element given by `element_id`.
+expression at the element given by `element_id`.
 
 # Arguments
 - `rows::Vector{Int}`: The row indices of the matrix.
 - `cols::Vector{Int}`: The column indices of the matrix.
 - `vals::Vector{Float64}`: The values of the matrix.
 - `counts::Int`: The current count of non-zero entries in the matrix.
+- `expressions`: The expression to evaluate.
 - `element_id::Int`: The identifier of the element.
-- `block_id::CartesianIndex{2}`: The identifier of the block in the expression.
-- `expressions`: The expressions to evaluate.
-- `quad_rule::Quadrature.AbstractGlobalQuadratureRule`: The quadrature rule to use for the
-    evaluation.
-- `test_offsets::Vector{Int}`: The offsets for the test functions.
-- `trial_offsets::Vector{Int}`: The offsets for the trial functions.
+- `test_offsets::Int`: The offset for the test function.
+- `trial_offsets::Int`: The offset for the trial function.
 
 # Returns
 - `rows::Vector{Int}`: The updated row indices of the matrix.
@@ -162,33 +179,32 @@ expression block at the element given by `element_id`.
 - `vals::Vector{Float64}`: The updated values of the matrix.
 - `counts::Int`: The updated count of non-zero entries in the matrix.
 """
-function add_block_contributions!(
+function add_expression_contributions!(
     rows::Vector{Int},
     cols::Vector{Int},
     vals::Vector{Float64},
     counts::Int,
+    expression,
     element_id::Int,
-    block_id::CartesianIndex{2},
-    expressions,
-    test_offsets::Vector{Int},
-    trial_offsets::Vector{Int},
+    test_offset::Int,
+    trial_offset::Int,
 )
-    if expressions[block_id[1]][block_id[2]] != 0
-        block_eval, block_indices = Forms.evaluate(
-            expressions[block_id[1]][block_id[2]], element_id
-        )
-        for eval_id in eachindex(block_eval)
-            counts += 1
-            for (id, indices) in enumerate(block_indices)
-                if id == 1
-                    rows[counts] = indices[eval_id] + test_offsets[block_id[1]]
-                elseif id == 2
-                    cols[counts] = indices[eval_id] + trial_offsets[block_id[2]]
-                end
-            end
+    if expression == 0
+        return rows, cols, vals, counts
+    end
 
-            vals[counts] = block_eval[eval_id]
+    block_eval, block_indices = Forms.evaluate(expression, element_id)
+    for ord_id in CartesianIndices(block_eval)
+        counts += 1
+        for exp_id in eachindex(block_indices)
+            if exp_id == 1
+                rows[counts] = block_indices[1][ord_id[1]] + test_offset
+            elseif exp_id == 2
+                cols[counts] = block_indices[2][ord_id[2]] + trial_offset
+            end
         end
+
+        vals[counts] = block_eval[ord_id]
     end
 
     return rows, cols, vals, counts
