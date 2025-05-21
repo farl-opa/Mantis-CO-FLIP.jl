@@ -463,22 +463,20 @@ function evaluate(
     nderivatives::Int=0,
 ) where {manifold_dim, num_components, num_patches}
     basis_indices = get_basis_indices(space, element_id)
-    num_basis = length(basis_indices)
-    num_evaluation_points = prod(size.(xi, 1))
 
+    # Pre-allocation.
     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         # number of derivatives of order j
         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
         evaluations[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
         for der_idx in 1:num_j_ders
-            evaluations[j + 1][der_idx] = [
-                zeros(num_evaluation_points, num_basis) for _ in 1:num_components
-            ]
+            evaluations[j + 1][der_idx] = Vector{Matrix{Float64}}(undef, num_components)
         end
     end
 
-    for component_idx in 1:1:num_components
+    # Actually evaluate the basis functions.
+    for component_idx in 1:num_components
         extraction_coefficients, _ = get_extraction(space, element_id, component_idx)
         component_basis = get_local_basis(
             space, element_id, xi, nderivatives, component_idx
@@ -488,7 +486,7 @@ function evaluate(
             for der_idx in eachindex(evaluations[der_order])
                 evaluations[der_order][der_idx][
                     component_idx
-                ] .= @views component_basis[der_order][der_idx][1] * extraction_coefficients
+                ] = @views component_basis[der_order][der_idx][1] * extraction_coefficients
             end
         end
     end
