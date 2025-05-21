@@ -47,12 +47,10 @@ function create_multi_patch_c0_space(
         num_basis_per_patch[patch_idx] = Mantis.FunctionSpaces.get_num_basis(function_spaces[patch_idx])
     end
     elems_per_patch_offset = vcat(0, cumsum(elems_per_patch[1:end-1]))
-    num_basis_per_patch_offset = vcat(0, cumsum(num_basis_per_patch[1:end-1]))
 
     # Create the dof partition, accounting for shared dofs.
     global_dof = 1
     dof_partition = Vector{Vector{Vector{Int}}}(undef, num_patches)
-    global_interface_dofs = Int[]
     global_to_local_dof_dict = Dict{Int, Dict{Int, Int}}()
     local_to_global_dof_dict = Dict{Tuple{Int, Int}, Int}()
     local_dof_partition = [Mantis.FunctionSpaces.get_dof_partition(function_spaces[patch_i])[1] for patch_i in 1:1:num_patches]
@@ -185,6 +183,7 @@ end
 
 function extract_mcmp_to_tp(
     component_spaces::NTuple{num_components, Mantis.FunctionSpaces.AbstractFESpace},
+    global_extr_ops::NTuple{num_components, SparseArrays.SparseMatrixCSC{Float64, Int}},
 ) where {num_components}
     # All components have the same number of elements, so we can just take the first one.
     num_elements = Mantis.FunctionSpaces.get_num_elements(component_spaces[1])
@@ -194,28 +193,6 @@ function extract_mcmp_to_tp(
     num_basis_per_component = [Mantis.FunctionSpaces.get_num_basis(spaces) for spaces in component_spaces]
     max_global_dof = sum(num_basis_per_component)
     basis_offset = vcat(0, cumsum(num_basis_per_component[1:(end - 1)]))
-
-
-    global_extr_ops = ntuple(num_components) do component_idx
-        if component_idx == 1
-            return SparseArrays.sparse(vcat(
-                Matrix(LinearAlgebra.I,
-                    (Mantis.FunctionSpaces.get_num_basis(component_spaces[1]),
-                    Mantis.FunctionSpaces.get_num_basis(component_spaces[1]))),
-                Matrix(LinearAlgebra.I,
-                    (Mantis.FunctionSpaces.get_num_basis(component_spaces[2]),
-                    Mantis.FunctionSpaces.get_num_basis(component_spaces[1])))
-            ))
-        else
-            return SparseArrays.sparse(vcat(
-                Matrix(LinearAlgebra.I,
-                    (Mantis.FunctionSpaces.get_num_basis(component_spaces[1]),
-                    Mantis.FunctionSpaces.get_num_basis(component_spaces[2]))),
-                zeros(Mantis.FunctionSpaces.get_num_basis(component_spaces[2]),
-                    Mantis.FunctionSpaces.get_num_basis(component_spaces[2]))
-            ))
-        end
-    end
 
     # Convert the global extraction matrix to the local (per element) ones that the
     # ExtractionOperator expects.
@@ -229,15 +206,9 @@ function extract_mcmp_to_tp(
                 Mantis.FunctionSpaces.get_basis_indices(component_spaces[i], elem_id) for i in 1:num_components
             ]
 
-            num_support_per_space_offset = vcat(
-                0, [length(support_per_space[i]) for i in 1:num_components-1]
-            )
-
             basis_indices_all[elem_id] = reduce(
                 vcat, [support_per_space[i] .+ basis_offset[i] for i in 1:num_components]
             )
-
-            # println("Component ", component_idx, " Element ", elem_id)
 
             # The local indices are now column indices in the global extraction coefficient
             # matrix. The non-zero row indices are the global indices supported on this
@@ -245,54 +216,33 @@ function extract_mcmp_to_tp(
             # account for the most general case where the global extraction operator is not
             # a block-diagonal matrix.
             nz_row_idxs_per_component = ntuple(num_components) do i
-                (nz_row_idxs, _, _) = SparseArrays.findnz(
+                (nz_row_idxs_i, _, _) = SparseArrays.findnz(
                     global_extr_ops[i][:, support_per_space[i]]
                 )
-                return nz_row_idxs
+                return nz_row_idxs_i
             end
-            # (nz_row_idxs, _, _) = SparseArrays.findnz(
-            #     global_extr_ops[component_idx][:, support_per_space[component_idx]]
-            # )
 
             # Only the unique indices are needed. unique!(sort!()) is supposed to be more
             # efficient than unique alone.
-            nz_row_idxs = unique!(sort!(reduce(vcat, nz_row_idxs_per_component)))
+            # nz_row_idxs = unique!(sort!(reduce(vcat, nz_row_idxs_per_component)))
+            nz_row_idxs = unique!(reduce(vcat, nz_row_idxs_per_component))
             basis_indices[elem_id] = nz_row_idxs
-
 
             # Add zeros for the basis functions that are supported on this element but have
             # a zero value for the current component. These cannot be found through the
             # search above, so we need to add them manually. Note that the convention is
             # that [constituent_spaces] * [extraction] = [MCMP].
             coeffs = zeros(length(support_per_space[component_idx]), length(nz_row_idxs))
-            # row_idxs = broadcast(+, 1:length(support_per_space[component_idx]), num_support_per_space_offset[component_idx])
-            col_idxs = [i for i in eachindex(nz_row_idxs_per_component[component_idx]) if nz_row_idxs_per_component[component_idx][i] in nz_row_idxs]
-            # println("nz_row_idxs: ", nz_row_idxs)
-            # println("nz_row_idxs_per_component: ", nz_row_idxs_per_component)
-            # println("col_idxs: ", col_idxs)
-            # println("size coeffs: ", size(coeffs))
-            # row_idxs = 1:length(support_per_space[component_idx])
-            # println("Row indices: ", row_idxs)
+            col_idxs = zeros(Int, length(nz_row_idxs_per_component[component_idx]))
+            for j in eachindex(nz_row_idxs_per_component[component_idx])
+                for i in eachindex(nz_row_idxs)
+                    if nz_row_idxs[i] == nz_row_idxs_per_component[component_idx][j]
+                        col_idxs[j] = i
+                    end
+                end
+            end
             coeffs[:, col_idxs] = Matrix(transpose(global_extr_ops[component_idx][nz_row_idxs_per_component[component_idx], support_per_space[component_idx]]))
-            # for i in 1:length(support_per_space[component_idx])
-            #     coeffs[i, i+num_support_per_space_offset[component_idx]] = 1.0
-            # end
             extraction_coefficients[elem_id] = coeffs
-
-            # if component_idx == 2
-            #     display(coeffs)
-            #     display(Matrix(transpose(
-            #         global_extr_ops[component_idx][nz_row_idxs, support_per_space[component_idx]]
-            #     )))
-            # end
-
-
-
-            # Extract the local extraction coefficients from the global matrix. The
-            # transpose is needed to be in line with
-            # extraction_coefficients[elem_id] = Matrix(transpose(
-            #     global_extr_ops[component_idx][nz_row_idxs, support_per_space[component_idx]]
-            # ))
         end
 
         return Mantis.FunctionSpaces.ExtractionOperator(
@@ -303,12 +253,17 @@ function extract_mcmp_to_tp(
     return extr_ops
 end
 
-struct MCMP{T} <: Mantis.FunctionSpaces.AbstractFESpace{2, 2, 2} # manifold_dim, num_components, num_patches
+struct MCMP{T} <: Mantis.FunctionSpaces.AbstractFESpace{2, 2, 2}
     component_spaces::T
-    extraction_ops::NTuple{2, Mantis.FunctionSpaces.ExtractionOperator} # num_components extraction operators.
+    extraction_ops::NTuple{2, Mantis.FunctionSpaces.ExtractionOperator}
 
-    function MCMP(component_spaces::T) where {num_components, T <: NTuple{num_components, Mantis.FunctionSpaces.AbstractFESpace}}
-        extraction_operators = extract_mcmp_to_tp(component_spaces)
+    function MCMP(
+        component_spaces::T,
+        global_extraction_operators::NTuple{num_components, SparseArrays.SparseMatrixCSC{Float64, Int}},
+    ) where {
+        num_components, T <: NTuple{num_components, Mantis.FunctionSpaces.AbstractFESpace}
+    }
+        extraction_operators = extract_mcmp_to_tp(component_spaces, global_extraction_operators)
         new{T}(component_spaces, extraction_operators)
     end
 end
@@ -319,9 +274,6 @@ patch = Mantis.Mesh.Patch1D(breakpoints);
 p = (3, 2)
 B1 = Mantis.FunctionSpaces.BSplineSpace(patch, p[1], [-1, 2, 2, 2, -1])
 B2 = Mantis.FunctionSpaces.BSplineSpace(patch, p[2], [-1, 1, 1, 1, -1])
-# p = (1, 0)
-# B1 = Mantis.FunctionSpaces.BSplineSpace(patch, p[1], [-1, 0, 0, 0, -1])
-# B2 = Mantis.FunctionSpaces.BSplineSpace(patch, p[2], [-1, -1, -1, -1, -1])
 
 patch_1_con = ((0,0), (2,4), (0,0), (0,0))
 patch_2_con = ((0,0), (0,0), (0,0), (1,2))
@@ -342,7 +294,7 @@ function basic_tests(space, answers)
     @test Mantis.FunctionSpaces.get_component_spaces(space) == answers[4]
     @test Mantis.FunctionSpaces.get_num_elements_per_patch(space) == answers[5]
     @test Mantis.FunctionSpaces.get_num_basis(space) == answers[6]
-    #@test Mantis.FunctionSpaces.get_num_elements(space) == answers[7]
+    @test Mantis.FunctionSpaces.get_num_elements(space) == answers[7]
 end
 
 basic_tests(TP1, (2, 1, 1, (TP1,), (16,), Mantis.FunctionSpaces.get_num_basis(B1)^2, 16))
@@ -351,43 +303,121 @@ num_basis_C0TP1 = Mantis.FunctionSpaces.get_num_basis(TP1)*2 - Mantis.FunctionSp
 basic_tests(C0TP1, (2, 1, 2, (C0TP1,), (16, 16), num_basis_C0TP1, 32))
 num_basis_C0TP2 = Mantis.FunctionSpaces.get_num_basis(TP2)*2 - Mantis.FunctionSpaces.get_num_basis(B2)
 basic_tests(C0TP2, (2, 1, 2, (C0TP2,), (16, 16), num_basis_C0TP2, 32))
-# println(num_basis_C0TP1, " ", num_basis_C0TP2)
 
 
-mcmpC0 = MCMP((C0TP1, C0TP2))
-# println(Mantis.FunctionSpaces.get_num_basis(mcmpC0))
+
+component_spaces = (C0TP1, C0TP2)
+global_extr_ops = ntuple(2) do component_idx
+    if component_idx == 1
+        return SparseArrays.sparse(vcat(
+            Matrix{Float64}(2.0*LinearAlgebra.I,
+                (Mantis.FunctionSpaces.get_num_basis(component_spaces[1]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[1]))),
+            Matrix{Float64}(LinearAlgebra.I,
+                (Mantis.FunctionSpaces.get_num_basis(component_spaces[2]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[1])))
+        ))
+    else
+        return SparseArrays.sparse(vcat(
+            Matrix{Float64}(LinearAlgebra.I,
+                (Mantis.FunctionSpaces.get_num_basis(component_spaces[1]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[2]))),
+            zeros(Mantis.FunctionSpaces.get_num_basis(component_spaces[2]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[2]))
+        ))
+    end
+end
+mcmpC0 = MCMP(component_spaces, global_extr_ops)
 basic_tests(mcmpC0, (2, 2, 2, (C0TP1, C0TP2), (16, 16), num_basis_C0TP1+num_basis_C0TP2, 32))
 
+test_elem_id = 1
+mcmpC0_eval, mcmpC0_ind = Mantis.FunctionSpaces.evaluate(
+    mcmpC0, test_elem_id, ([0.0, 0.5, 1.0], [0.1, 0.7]), 1
+)
 
-mcmpC0_eval, mcmpC0_ind = Mantis.FunctionSpaces.evaluate(mcmpC0, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]), 1)
+C0TP1_eval, C0TP1_ind = Mantis.FunctionSpaces.evaluate(
+    C0TP1, test_elem_id, ([0.0, 0.5, 1.0], [0.1, 0.7]), 1
+)
+C0TP2_eval, C0TP2_ind = Mantis.FunctionSpaces.evaluate(
+    C0TP2, test_elem_id, ([0.0, 0.5, 1.0], [0.1, 0.7]), 1
+)
 
-D = Mantis.FunctionSpaces.DirectSumSpace((TP1, TP2))
-# println(Mantis.FunctionSpaces.get_num_basis(TP1))
-# println(Mantis.FunctionSpaces.get_num_basis(TP2))
-# println(Mantis.FunctionSpaces.get_num_basis(D))
-basic_tests(D, (2, 2, 1, (TP1, TP2), (16,), Mantis.FunctionSpaces.get_num_basis(TP1)+Mantis.FunctionSpaces.get_num_basis(TP2), 32))
-D_eval, D_ind = Mantis.FunctionSpaces.evaluate(D, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]), 1)
+# Verify that the evaluation of the sum space is the combination of the evaluations of the
+# component spaces per component and zero elsewhere.
+n_nonzero_basis_mcmpC0 = Mantis.FunctionSpaces.get_num_basis(mcmpC0, test_elem_id)
+n_nonzero_basis_C0TP1 = Mantis.FunctionSpaces.get_num_basis(C0TP1, test_elem_id)
+n_nonzero_basis_C0TP2 = Mantis.FunctionSpaces.get_num_basis(C0TP2, test_elem_id)
 
-# display(D_eval[1][1][1])
-# display(mcmp_eval[1][1][1])
-# println(D_eval[1][1][1] == mcmp_eval[1][1][1])
+# This way of computing the answer is probably only correct on the first element.
+answer1 = 2.0 .* C0TP1_eval[1][1][1]
+ans1_inds = C0TP1_ind
+answer2 = C0TP1_eval[1][1][1]
+ans2_inds = C0TP1_ind .+ Mantis.FunctionSpaces.get_num_basis(C0TP1)
+answer3 = C0TP2_eval[1][1][1]
+ans3_inds = C0TP2_ind .+ Mantis.FunctionSpaces.get_num_basis(C0TP1)
+answer_c1 = zeros(size(mcmpC0_eval[1][1][1]))
+for i in 1:1:n_nonzero_basis_mcmpC0-4
+    if mod(i, 2) == 1
+        answer_c1[:, i] = answer1[:, div(i, 2) + 1]
+    else
+        answer_c1[:, i] = answer2[:, div(i, 2)]
+    end
+end
+answer_c2 = zeros(size(mcmpC0_eval[1][1][2]))
+for i in eachindex(mcmpC0_ind)
+    if mcmpC0_ind[i] in C0TP2_ind
+        answer_c2[:, i] = answer3[:, indexin([mcmpC0_ind[i]], C0TP2_ind)]
+    end
+end
 
-# display(D_eval[1][1][2])
-# display(mcmp_eval[1][1][2])
-# println(D_eval[1][1][2] == mcmp_eval[1][1][2])
-
-C0TP1_eval, C0TP1_ind = Mantis.FunctionSpaces.evaluate(C0TP1, 1, ([0.0, 0.5, 1.0], [0.0, 0.5, 1.0]), 1)
-
-# println("C0TP1")
-# println(Mantis.FunctionSpaces.get_num_basis(C0TP1))
-# display(C0TP1_eval[1][1][1])
-# println(C0TP1_ind)
+@test all(isapprox(mcmpC0_eval[1][1][1], answer_c1, rtol=1e-14))
+@test all(isapprox(mcmpC0_eval[1][1][2], answer_c2, rtol=1e-14))
 
 
-# println("mcmpC0")
-# println(Mantis.FunctionSpaces.get_num_basis(mcmpC0))
-# display(mcmpC0_eval[1][1][1])
-# println(mcmpC0_ind)
 
+
+
+
+
+# This case of MCMP should be equivalent to a DirectSumSpace.
+component_spaces = (C0TP1, C0TP2)
+global_extr_ops = ntuple(2) do component_idx
+    if component_idx == 1
+        return SparseArrays.sparse(vcat(
+            Matrix{Float64}(LinearAlgebra.I,
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[1]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[1])),
+            zeros(
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[2]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[1]))
+        ))
+    else
+        return SparseArrays.sparse(vcat(
+            zeros(
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[1]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[2])
+            ),
+            Matrix{Float64}(LinearAlgebra.I,
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[2]),
+                Mantis.FunctionSpaces.get_num_basis(component_spaces[2])
+            )
+        ))
+    end
+end
+mcmpC0_like_DS = MCMP(component_spaces, global_extr_ops)
+basic_tests(mcmpC0_like_DS, (2, 2, 2, (C0TP1, C0TP2), (16, 16), num_basis_C0TP1+num_basis_C0TP2, 32))
+
+DS = Mantis.FunctionSpaces.DirectSumSpace(component_spaces)
+
+test_elem_id = 20
+mcmpC0_like_DS_eval, mcmpC0_like_DS_ind = Mantis.FunctionSpaces.evaluate(
+    mcmpC0_like_DS, test_elem_id, ([0.0, 0.5, 1.0], [0.1, 0.7]), 1
+)
+DS_eval, DS_ind = Mantis.FunctionSpaces.evaluate(
+    DS, test_elem_id, ([0.0, 0.5, 1.0], [0.1, 0.7]), 1
+)
+
+@test all(isapprox(mcmpC0_like_DS_eval[1][1][1], DS_eval[1][1][1], rtol=1e-14))
+@test all(isapprox(mcmpC0_like_DS_eval[1][1][2], DS_eval[1][1][2], rtol=1e-14))
 
 end
