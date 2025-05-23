@@ -16,7 +16,6 @@ function basic_tests(space, answers)
     @test Mantis.FunctionSpaces.get_num_elements_per_patch(space) == answers[5]
     @test Mantis.FunctionSpaces.get_num_basis(space) == answers[6]
     @test Mantis.FunctionSpaces.get_num_elements(space) == answers[7]
-    @test length(Mantis.FunctionSpaces.get_extraction_operators(space)) == answers[8]
 end
 
 
@@ -44,7 +43,7 @@ function test_direct_sum_space(breakpoints)
     num_basis_B2 = Mantis.FunctionSpaces.get_num_basis(B2)
     num_basis_D1 = num_basis_B1 + num_basis_B2
     basic_tests(
-        D1, (1, 2, 1, (B1, B2), (num_elements_B1,), num_basis_D1, num_elements_B1, 2)
+        D1, (1, 2, 1, (B1, B2), (num_elements_B1,), num_basis_D1, num_elements_B1)
     )
 
     # Verify that the evaluation of the direct sum space is indeed the evaluation of the
@@ -75,7 +74,7 @@ function test_direct_sum_space(breakpoints)
     num_basis_D2 = 2*Mantis.FunctionSpaces.get_num_basis(GB)
     elems_per_patch_D2 = (num_elements_B1, num_elements_B2)
     num_elems_D2 = sum(elems_per_patch_D2)
-    basic_tests(D2, (1, 2, 2, (GB, GB), elems_per_patch_D2, num_basis_D2, num_elems_D2, 2))
+    basic_tests(D2, (1, 2, 2, (GB, GB), elems_per_patch_D2, num_basis_D2, num_elems_D2))
 
     # Verify that the evaluation of the direct sum space is indeed the evaluation of the
     # component spaces per component and zero elsewhere.
@@ -108,7 +107,7 @@ function test_direct_sum_space(breakpoints)
     num_elements_TP1 = num_elements_B1^2
     num_elems_D3 = num_elements_TP1
     basic_tests(
-        D3, (2, 3, 1, (TP1, TP2, TP3), (num_elems_D3,), num_basis_D3, num_elems_D3, 3)
+        D3, (2, 3, 1, (TP1, TP2, TP3), (num_elems_D3,), num_basis_D3, num_elems_D3)
     )
 
     # Verify that the evaluation of the direct sum space is indeed the evaluation of the
@@ -173,7 +172,7 @@ function test_direct_sum_space(breakpoints)
     num_elements_TP6 = num_elements_B1 * num_elements_B2 * num_elements_B2
     num_elems_D4 = num_elements_TP4
     basic_tests(
-        D4, (3, 3, 1, (TP4, TP5, TP6), (num_elems_D4,), num_basis_D4, num_elems_D4, 3)
+        D4, (3, 3, 1, (TP4, TP5, TP6), (num_elems_D4,), num_basis_D4, num_elems_D4)
     )
 
     # Verify that the evaluation of the direct sum space is indeed the evaluation of the
@@ -181,6 +180,7 @@ function test_direct_sum_space(breakpoints)
     D4_eval, _ = Mantis.FunctionSpaces.evaluate(
         D4, num_elems_D4, ([0.0, 0.5, 1.0], [0.1, 0.7], [0.2]), 1
     )
+
     TP4_eval, _ = Mantis.FunctionSpaces.evaluate(
         TP4, num_elems_D4, ([0.0, 0.5, 1.0], [0.1, 0.7], [0.2]), 1
     )
@@ -231,7 +231,7 @@ function test_direct_sum_space(breakpoints)
     num_basis_D5 = Mantis.FunctionSpaces.get_num_basis(TP6)
     num_elems_D5 = num_elements_TP6
     basic_tests(
-        D5, (3, 1, 1, (TP6,), (num_elems_D5,), num_basis_D5, num_elems_D5, 1)
+        D5, (3, 1, 1, (TP6,), (num_elems_D5,), num_basis_D5, num_elems_D5)
     )
 
     # Verify that the evaluation of the direct sum space is indeed the evaluation of the

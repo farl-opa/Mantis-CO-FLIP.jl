@@ -9,11 +9,17 @@ the multi-component space.
 
 # Fields
 - `component_spaces::F`: Tuple of `num_components` scalar function spaces
+- `basis_offsets::NTuple{num_components, Int}`: Offsets of the basis functions of each
+    component space to get the global basis functions numbers.
+- `num_elements::Int`: Number of elements in the space.
+- `space_dim::Int`: Dimension of the space, i.e., the number of global d.o.f.s.
 """
 struct DirectSumSpace{manifold_dim, num_components, num_patches, F} <:
        AbstractFESpace{manifold_dim, num_components, num_patches}
     component_spaces::F
-    extraction_ops::NTuple{num_components, ExtractionOperator}
+    basis_offsets::NTuple{num_components, Int}
+    num_elements::Int
+    space_dim::Int
 
     function DirectSumSpace(
         component_spaces::F
@@ -29,58 +35,30 @@ struct DirectSumSpace{manifold_dim, num_components, num_patches, F} <:
                 "All component spaces must have the same number of elements."
             ))
         end
+        # All components have the same number of elements, so we can just take the first.
+        num_elements = get_num_elements(component_spaces[1])
 
-        extraction_ops = extract_directsum_to_constituent(component_spaces)
+        # Since each component in a direct sum space only contributes to its own component,
+        # the number of global d.o.f.s is the sum of the number of d.o.f.s in each component
+        # space.
+        num_basis_per_component = Vector{Int}(undef, num_components)
+        max_global_dof = 0
+        basis_offsets = zeros(Int, num_components)
+        for component_idx in 1:num_components
+            num_basis_component = get_num_basis(component_spaces[component_idx])
+            num_basis_per_component[component_idx] = num_basis_component
 
-        return new{manifold_dim, num_components, num_patches, F}(
-            component_spaces, extraction_ops
-        )
-    end
-end
+            max_global_dof += num_basis_component
 
-function extract_directsum_to_constituent(
-    component_spaces::NTuple{num_components, AbstractFESpace{manifold_dim, 1, num_patches}}
-) where {manifold_dim, num_components, num_patches}
-    # All components have the same number of elements, so we can just take the first one.
-    num_elements = get_num_elements(component_spaces[1])
-
-    # Since each component in a direct sum space only contributes to its own component, the
-    # number of global d.o.f.s is the sum of the number of d.o.f.s in each component space.
-    num_basis_per_component = [get_num_basis(spaces) for spaces in component_spaces]
-    max_global_dof = sum(num_basis_per_component)
-    basis_offset = vcat(0, cumsum(num_basis_per_component[1:(end - 1)]))
-
-    extraction_operators = ntuple(num_components) do component_idx
-
-        extraction_coefficients = Vector{Matrix{Float64}}(undef, num_elements)
-        basis_indices = Vector{Vector{Int}}(undef, num_elements)
-        for elem_id in 1:1:get_num_elements(component_spaces[component_idx])
-            support_per_space = [
-                get_basis_indices(component_spaces[i], elem_id) for i in 1:num_components
-            ]
-
-            num_support_per_space_offset = vcat(
-                0, cumsum([length(support_per_space[i]) for i in 1:num_components-1])
-            )
-
-            basis_indices[elem_id] = reduce(
-                vcat, [support_per_space[i] .+ basis_offset[i] for i in 1:num_components]
-            )
-
-            # The convention is that [constituent_spaces] * [extraction] = [MCMP].
-            coeffs = zeros(length(support_per_space[component_idx]), length(basis_indices[elem_id]))
-            for i in 1:length(support_per_space[component_idx])
-                coeffs[i, i+num_support_per_space_offset[component_idx]] = 1.0
+            if component_idx < num_components
+                basis_offsets[component_idx+1] = basis_offsets[component_idx] + num_basis_component
             end
-            extraction_coefficients[elem_id] = coeffs
         end
 
-        return ExtractionOperator(
-            extraction_coefficients, basis_indices, num_elements, max_global_dof
+        return new{manifold_dim, num_components, num_patches, F}(
+            component_spaces, NTuple{num_components, Int}(basis_offsets), num_elements, max_global_dof
         )
     end
-
-    return extraction_operators
 end
 
 function get_component_spaces(space::DirectSumSpace)
@@ -88,16 +66,36 @@ function get_component_spaces(space::DirectSumSpace)
 end
 
 function get_extraction_operators(space::DirectSumSpace)
-    return space.extraction_ops
+    throw(ArgumentError("Extraction operators are not implemented for DirectSumSpace."))
 end
 
-function _get_dof_offsets(
-    space::DirectSumSpace{manifold_dim, num_components, F}
-) where {manifold_dim, num_components, F}
-    num_dofs_component = FunctionSpaces.get_num_basis.(get_component_spaces(space))
-    dof_offset_component = zeros(Int, num_components)
-    dof_offset_component[2:end] .= cumsum(num_dofs_component[1:(num_components - 1)])
-    return dof_offset_component
+function get_num_basis(space::DirectSumSpace)
+    return space.space_dim
+end
+
+function get_num_basis(space::DirectSumSpace, element_id::Int)
+    num_basis = 0
+    for i in 1:get_num_components(space)
+        num_basis += get_num_basis(get_component_spaces(space)[i], element_id)
+    end
+    return num_basis
+end
+
+function get_num_elements(space::DirectSumSpace)
+    return space.num_elements
+end
+
+function get_basis_indices(space::DirectSumSpace, element_id::Int)
+    basis_indices_per_component = ntuple(get_num_components(space)) do i
+        return get_basis_indices(get_component_spaces(space)[i], element_id) .+
+            space.basis_offsets[i]
+    end
+
+    return reduce(vcat, basis_indices_per_component)
+end
+
+function get_dof_offsets(space::DirectSumSpace)
+    return space.basis_offsets
 end
 
 function get_max_local_dim(space::DirectSumSpace)
@@ -126,7 +124,7 @@ function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
     component_dof_partition = deepcopy(
         get_dof_partition(get_component_spaces(space)[component_idx])
     )
-    dof_offset_component = _get_dof_offsets(space)[component_idx]
+    dof_offset_component = get_dof_offsets(space)[component_idx]
     for i in eachindex(component_dof_partition)
         for j in eachindex(component_dof_partition[i])
             component_dof_partition[i][j] .+= dof_offset_component
@@ -136,16 +134,14 @@ function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
     return component_dof_partition
 end
 
-function get_dof_partition(
-    space::DirectSumSpace{manifold_dim, num_components, F}
-) where {manifold_dim, num_components, F}
+function get_dof_partition(space::DirectSumSpace)
     component_spaces = get_component_spaces(space)
-    dof_offsets = _get_dof_offsets(space)
+    dof_offsets = get_dof_offsets(space)
 
     dof_partition_per_component = FunctionSpaces.get_dof_partition.(component_spaces)
     dof_partition = deepcopy(dof_partition_per_component)
 
-    for component in 1:num_components
+    for component in 1:get_num_components(space)
         for patch in 1:length(dof_partition_per_component[component][1])
             dof_partition[component][1][patch] =
                 dof_partition_per_component[component][1][patch] .+ dof_offsets[component]
@@ -153,4 +149,59 @@ function get_dof_partition(
     end
 
     return dof_partition
+end
+
+function evaluate(
+    space::DirectSumSpace{manifold_dim, num_components, num_patches},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+    nderivatives::Int=0,
+) where {manifold_dim, num_components, num_patches}
+    basis_indices = get_basis_indices(space, element_id)
+
+    # Pre-allocation, including padding (see below).
+    num_points = prod(length.(xi))
+    evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
+    for j in 0:nderivatives
+        # number of derivatives of order j
+        num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
+        evaluations[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
+        for der_idx in 1:num_j_ders
+            evaluations[j + 1][der_idx] = [
+                zeros(num_points, length(basis_indices)) for _ in 1:num_components
+            ]
+        end
+    end
+
+    # Actually evaluate the basis functions. Since DirectSumSpace is a direct sum of
+    # component spaces, we can evaluate each component space independently and then store
+    # the results in the evaluations array. We do pad with zeros to ensure a consistent and
+    # correct size of the evaluations array.
+    local_offsets = zeros(Int, num_components+1)
+    for component_idx in 1:num_components
+        # Evaluation.
+        component_eval, component_basis_idxs = evaluate(
+            get_component_spaces(space)[component_idx],
+            element_id,
+            xi,
+            nderivatives,
+        )
+        local_offsets[component_idx+1] = local_offsets[component_idx] +
+            length(component_basis_idxs)
+
+        for der_order in eachindex(evaluations)
+            for der_idx in eachindex(evaluations[der_order])
+                # Padding + shift to the right position.
+                for i in eachindex(component_basis_idxs)
+                    for point_idx in 1:num_points
+                        evaluations[der_order][der_idx][component_idx][
+                            point_idx, i + local_offsets[component_idx]
+                        ] = component_eval[der_order][der_idx][1][point_idx,i]
+                    end
+                end
+            end
+        end
+    end
+
+    return evaluations, basis_indices
 end
