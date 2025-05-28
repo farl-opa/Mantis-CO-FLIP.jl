@@ -117,14 +117,20 @@ function get_metadata()
     date = string(readchomp(`date +%Y-%m-%d`))
     commit_hash = string(readchomp(`git rev-parse --short HEAD`))
     hostname_shasum = split(readchomp(`sh -c "hostname | sha256sum"`))[1]
-    if hostname_shasum == "56960c953864e4d3e91ebb242bb87fd03002c2c6e3a62c8da21c719226bd1860"
-        hostname = "DiogoCabanas"
+    # Mapping of SHA-256 hashes to hostnames
+    hostname_map = Dict(
+        "56960c953864e4d3e91ebb242bb87fd03002c2c6e3a62c8da21c719226bd1860" => "DiogoCabanas",
+        # Add more mappings here as needed
+    )
+
+    if haskey(hostname_map, hostname_shasum)
+        hostname = hostname_map[hostname_shasum]
     else
         throw(
             ArgumentError(
                 "Hostname sha256sum not recognized. " *
                 "Run `hostname | sha256sum` in your terminal to get the sha256sum and " *
-                "add it to this conditional block with the desired hostname.",
+                "add it to the `hostname_map` dictionary with the desired hostname.",
             ),
         )
     end
