@@ -4,7 +4,7 @@
 #=
     This should be the structure for every benchmark file. To add a new set of benchmarks or
     groups, just copy the contents after this note; a few changes are needed:
-        1. `include("BenchmarkHelpers.jl")` should be changed to corretly identify the
+        1. `include("BenchmarkHelpers.jl")` should be changed to correctly identify the
             helper file location relative to the benchmark file in question.
         2. Change `verbose`, `show`, and/or `save` to print runtime information, show the
             result of the benchmarks, and/or store them in a csv file, respectively.
