@@ -266,7 +266,7 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
         duplicate_rows, new_rows = get_duplicate_and_new_rows(old_dataframe, new_dataframe)
         num_duplicate = length(duplicate_rows)
         if num_duplicate != 0
-            println("Found duplicate $(num_duplicate) benchmarks.")
+            println("Found $(num_duplicate) duplicate benchmarks.")
         end
 
         cap = 1.0 + rtol
