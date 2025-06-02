@@ -120,6 +120,7 @@ function get_metadata()
     # Mapping of SHA-256 hashes to hostnames
     hostname_map = Dict(
         "56960c953864e4d3e91ebb242bb87fd03002c2c6e3a62c8da21c719226bd1860" => "DiogoCabanas",
+        "2b14f204f7c65a42a64568df8dc0179305ff91886e023977afef7561811ea920" => "JoeyDekker"
         # Add more mappings here as needed
     )
 
