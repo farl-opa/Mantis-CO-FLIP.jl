@@ -91,9 +91,17 @@ function run_benchmarks(
         end
     end
 
-    hostname, date, commit_hash = get_metadata()
+    hostname, date, commit_hash, julia_version = get_metadata()
     dataframe = _run_benchmarks!(
-        DataFrame(), group, String[], hostname, date, commit_hash; show=show, save=save
+        DataFrame(),
+        group,
+        String[],
+        hostname,
+        date,
+        commit_hash,
+        julia_version;
+        show=show,
+        save=save,
     )
     if save
         file_name = "host-$(hostname)-group-$(name).csv"
@@ -112,15 +120,17 @@ Returns useful metadata for CSV storage.
 - `hostname<:AbstractString`: The hostname of the device used to run the code.
 - `date<:AbstractString`: The current date in the format `YYYY-MM-DD`.
 - `commit_hash<:AbstractString`: The hash of latest commit in the current branch.
+- `julia_version<:AbstractString`: The current julia version.
 """
 function get_metadata()
     date = string(readchomp(`date +%Y-%m-%d`))
     commit_hash = string(readchomp(`git rev-parse --short HEAD`))
     hostname_shasum = split(readchomp(`sh -c "hostname | sha256sum"`))[1]
+    julia_version = string(VERSION)
     # Mapping of SHA-256 hashes to hostnames
     hostname_map = Dict(
         "56960c953864e4d3e91ebb242bb87fd03002c2c6e3a62c8da21c719226bd1860" => "DiogoCabanas",
-        "2b14f204f7c65a42a64568df8dc0179305ff91886e023977afef7561811ea920" => "JoeyDekker"
+        "2b14f204f7c65a42a64568df8dc0179305ff91886e023977afef7561811ea920" => "JoeyDekker",
         # Add more mappings here as needed
     )
 
@@ -136,7 +146,7 @@ function get_metadata()
         )
     end
 
-    return hostname, date, commit_hash
+    return hostname, date, commit_hash, julia_version
 end
 
 """
@@ -146,7 +156,8 @@ end
         path::Vector{String},
         hostname::String,
         date::String,
-        commit_hash::String;
+        commit_hash::String,
+        julia_version::String;
         show::Bool,
         save::Bool,
     )
@@ -161,6 +172,7 @@ Recursive method that runs `@benchmarkable` objects inside `group`. See
 - `hostname<:AbstractString`: The hostname of the device used to run the code.
 - `date<:AbstractString`: The current date in the format `YYYY-MM-DD`.
 - `commit_hash<:AbstractString`: The hash of latest commit in the current branch.
+- `julia_version<:AbstractString`: The current julia version.
 - `show=false`: Flag to display benchmark results.
 - `save=false`: Flag to store the benchmark results.
 
@@ -173,7 +185,8 @@ function _run_benchmarks!(
     path::Vector{String},
     hostname::String,
     date::String,
-    commit_hash::String;
+    commit_hash::String,
+    julia_version::String;
     show::Bool,
     save::Bool,
 )
@@ -184,7 +197,15 @@ function _run_benchmarks!(
         if val isa BenchmarkGroup
             println(indent * "Entering group: $(join(full_path, "/"))")
             _run_benchmarks!(
-                dataframe, val, full_path, hostname, date, commit_hash; show=show, save=save
+                dataframe,
+                val,
+                full_path,
+                hostname,
+                date,
+                commit_hash,
+                julia_version;
+                show=show,
+                save=save,
             )
         else
             println(indent * "Benchmark: $(join(full_path, "/"))")
@@ -219,6 +240,7 @@ function _run_benchmarks!(
                     (
                         benchmark=join(full_path, "/"),
                         commit_hash=commit_hash,
+                        julia_version=julia_version,
                         date=date,
                         med_time=BenchmarkTools.prettytime(median(result).time),
                         min_time=BenchmarkTools.prettytime(minimum(result).time),
