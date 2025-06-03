@@ -15,7 +15,6 @@ should be a module.
 - `group::BenchmarkGroup`: The benchmark group to which the sub-group will be appended.
 - `name::String`: The name of the appended sub-group.
 - `file_path::String`: The file containing the appended sub-group.
-
 # Returns
 - `group::BenchmarkGroup`: The given group with the appended sub-group.
 """
@@ -97,24 +96,26 @@ function run_benchmarks(
             "directory. Aborting.\n";
             color=:red,
         )
-    else
-        hostname, date, commit_hash, julia_version = get_metadata()
-        dataframe = _run_benchmarks!(
-            DataFrame(),
-            group,
-            String[],
-            hostname,
-            date,
-            commit_hash,
-            julia_version;
-            show=show,
-            save=save,
-        )
 
-        if save
-            file_name = "host-$(hostname)-group-$(name).csv"
-            save_results(dataframe, location * "/" * file_name; rtol=rtol)
-        end
+        return nothing
+    end
+
+    hostname, date, commit_hash, julia_version = get_metadata()
+    dataframe = _run_benchmarks!(
+        DataFrame(),
+        group,
+        String[],
+        hostname,
+        date,
+        commit_hash,
+        julia_version;
+        show=show,
+        save=save,
+    )
+
+    if save
+        file_name = "host-$(hostname)-group-$(name).csv"
+        save_results(dataframe, location * "/" * file_name; rtol=rtol)
     end
 
     return nothing
