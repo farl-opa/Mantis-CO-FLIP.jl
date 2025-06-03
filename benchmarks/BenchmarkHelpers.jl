@@ -91,21 +91,30 @@ function run_benchmarks(
         end
     end
 
-    hostname, date, commit_hash, julia_version = get_metadata()
-    dataframe = _run_benchmarks!(
-        DataFrame(),
-        group,
-        String[],
-        hostname,
-        date,
-        commit_hash,
-        julia_version;
-        show=show,
-        save=save,
-    )
-    if save
-        file_name = "host-$(hostname)-group-$(name).csv"
-        save_results(dataframe, location * "/" * file_name; rtol=rtol)
+    if location != "."
+        printstyled(
+            "Warning: You are not running the benchmark(s) from within the benchmark " *
+            "directory. Aborting.\n";
+            color=:red,
+        )
+    else
+        hostname, date, commit_hash, julia_version = get_metadata()
+        dataframe = _run_benchmarks!(
+            DataFrame(),
+            group,
+            String[],
+            hostname,
+            date,
+            commit_hash,
+            julia_version;
+            show=show,
+            save=save,
+        )
+
+        if save
+            file_name = "host-$(hostname)-group-$(name).csv"
+            save_results(dataframe, location * "/" * file_name; rtol=rtol)
+        end
     end
 
     return nothing

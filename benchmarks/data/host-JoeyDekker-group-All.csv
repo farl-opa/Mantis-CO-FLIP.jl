@@ -1,0 +1,6 @@
+benchmark,commit_hash,julia_version,date,med_time,min_time,min_gc,min_memory,min_allocs,tags
+"Assemblers/HodgeLaplace/1-form/3D/(""num_dofs=425"", ""p=3"", ""k=2"")",73638aa,1.11.5,2025-06-03,671.406 ms,637.321 ms,56.003 ms,579.06 MiB,5524878,"[""3D"", ""tensor-product"", ""B-splines""]"
+"Assemblers/HodgeLaplace/1-form/3D/(""num_dofs=1225"", ""p=3"", ""k=2"")",73638aa,1.11.5,2025-06-03,5.383 s,5.301 s,661.672 ms,4.61 GiB,50252520,"[""3D"", ""tensor-product"", ""B-splines""]"
+"Assemblers/HodgeLaplace/1-form/2D/(""num_dofs=341"", ""p=3"", ""k=2"")",73638aa,1.11.5,2025-06-03,206.216 ms,134.894 ms,9.576 ms,98.19 MiB,1449022,"[""2D"", ""tensor-product"", ""B-splines""]"
+"Assemblers/HodgeLaplace/1-form/2D/(""num_dofs=65"", ""p=3"", ""k=2"")",73638aa,1.11.5,2025-06-03,16.054 ms,6.374 ms,0.000 ns,6.18 MiB,89711,"[""2D"", ""tensor-product"", ""B-splines""]"
+"Assemblers/HodgeLaplace/1-form/2D/(""num_dofs=133"", ""p=3"", ""k=2"")",73638aa,1.11.5,2025-06-03,59.786 ms,26.771 ms,0.000 ns,24.60 MiB,361577,"[""2D"", ""tensor-product"", ""B-splines""]"

@@ -3,8 +3,8 @@ module HodgeLaplaceBenchmarks
 include("../../BenchmarkHelpers.jl")
 
 verbose = false
-show = true
-save = true
+show = false
+save = false
 
 group = BenchmarkGroup()
 
