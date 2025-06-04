@@ -61,7 +61,7 @@ for i in eachindex(manifold_dim)
     sub_group = BenchmarkGroup(["$(manifold_dim[i])D", "tensor-product", "B-splines"])
     for num_els in num_elements[i]
         num_dofs, benchmarkable = run_problem(manifold_dim[i], num_els, p, k)
-        name = ("num_dofs=$(num_dofs)", "p=$(p)", "k=$(k)")
+        name = "num_dofs=$(num_dofs), p=$(p), k=$(k)"
         sub_group[name] = benchmarkable
     end
 

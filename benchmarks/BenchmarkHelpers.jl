@@ -101,8 +101,22 @@ function run_benchmarks(
     end
 
     hostname, date, commit_hash, julia_version = get_metadata()
+    columns = [
+        :benchmark,
+        :commit_hash,
+        :julia_version,
+        :date,
+        :med_time,
+        :min_time,
+        :min_gc,
+        :min_memory,
+        :min_allocs,
+        :tags,
+    ]
+    # Initialize empty DataFrame with all columns typed as String
+    df = DataFrame((col => String[] for col in columns)...)
     dataframe = _run_benchmarks!(
-        DataFrame(),
+        df,
         group,
         String[],
         hostname,
@@ -244,7 +258,7 @@ function _run_benchmarks!(
                 else
                     print("Storing...")
                 end
-                tags = [tag for tag in group.tags]
+                tags = join(group.tags, ", ")
                 push!(
                     dataframe,
                     (
@@ -256,7 +270,7 @@ function _run_benchmarks!(
                         min_time=BenchmarkTools.prettytime(minimum(result).time),
                         min_gc=BenchmarkTools.prettytime(minimum(result).gctime),
                         min_memory=BenchmarkTools.prettymemory(minimum(result).memory),
-                        min_allocs=minimum(result).allocs,
+                        min_allocs=string(minimum(result).allocs),
                         tags=tags,
                     ),
                 )
@@ -292,44 +306,49 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
 
     data_prefix = "data/"
     if isfile(data_prefix * file_name)
-        csv_file = CSV.File(data_prefix * file_name; header=true)
-        header_syms = collect(keys(csv_file))
-        types_dict = Dict(col => String for col in header_syms)
+        types_dict = Dict(col => String for col in names(new_dataframe))
         old_dataframe = CSV.read(data_prefix * file_name, DataFrame; types=types_dict)
+        println(old_dataframe)
         duplicate_rows, new_rows = get_duplicate_and_new_rows(old_dataframe, new_dataframe)
         num_duplicate = length(duplicate_rows)
         if num_duplicate != 0
             println("Found $(num_duplicate) duplicate benchmarks.")
         end
 
-        cap = 1.0 + rtol
         for (old_id, new_row) in duplicate_rows
             old_row = old_dataframe[old_id, :]
             println("Comparing benchmark $(new_row.benchmark).")
-            old_time = get_number_in_string(old_row.min_time)
-            new_time = get_number_in_string(new_row.min_time)
-            if new_time < old_time
+            str_old_time = old_row.min_time
+            str_new_time = new_row.min_time
+            ratio = compare_times(str_old_time, str_new_time)
+            if ratio < 1.0
                 printstyled(
-                    "Minimum time improved! " *
-                    "Old time=$(old_time), new time=$(new_time), " *
-                    "ratio=$(new_time/old_time).\n";
+                    "Minimum time improved! Old time=" *
+                    str_old_time *
+                    ", new time=" *
+                    str_new_time *
+                    ", ratio=$(ratio).\n";
                     color=:green,
                 )
-                for col in keys(types_dict)
+                for col in names(new_row) 
                     old_dataframe[old_id, col] = new_row[col]
                 end
-            elseif new_time / old_time <= cap
+            elseif ratio <= 1.0 + rtol
                 printstyled(
-                    "Minimum time increased within $(rtol) tolerance. " *
-                    "Old time=$(old_time), new time=$(new_time), " *
-                    "ratio=$(new_time/old_time).\n";
+                    "Minimum time increased within $(rtol) tolerance. Old time=" *
+                    str_old_time *
+                    ", new time=" *
+                    str_new_time *
+                    ", ratio=$(ratio).\n";
                     color=:yellow,
                 )
             else
                 printstyled(
-                    "Minimum time increased outside $(rtol) tolerance! " *
-                    "Old time=$(old_time), new time=$(new_time), " *
-                    "ratio=$(new_time/old_time).\n";
+                    "Minimum time increased outside $(rtol) tolerance! Old time=" *
+                    str_old_time *
+                    ", new time=" *
+                    str_new_time *
+                    ", ratio=$(ratio).\n";
                     color=:red,
                 )
             end
@@ -412,23 +431,50 @@ function is_duplicate(old_row, new_row)
 end
 
 """
-    get_number_in_string(str::AbstractString)
+    compare_times(str_old_time::AbstractString, str_new_time::AbstractString)
 
-Returns the number found in `str` as a `Float64`. This method assumes the string is given in
-the pretty-print, number and unit, format used in `BenchmarkTools`, for example, `12.345
-ms`.
+Compares the times found in two strings using BenchmarkTools' pretty-print style.
+
+# Arguments
+- `str_old_time::AbstractString`: The old benchmark time.
+- `str_new_time::AbstractString`: The new benchmark time.
+
+# Returns
+- `ratio::Float64`: The ratio of the new time over the old time.
+"""
+function compare_times(str_old_time::AbstractString, str_new_time::AbstractString)
+    # Get the numbers as floats in the same unit
+    old_time = get_number_in_string(str_old_time; new_unit="s")
+    new_time = get_number_in_string(str_new_time; new_unit="s")
+    ratio = new_time / old_time
+
+    return ratio
+end
+
+"""
+    get_number_in_string(str::AbstractString; new_unit::String)
+
+Returns the number found in `str` as a `Float64`. The number is given in the same unit as
+found in the string, unless otherwise specified by `new_unit`. This method assumes the
+string is given in the pretty-print, number and unit, format used in `BenchmarkTools`, for
+example, `12.345 ms`.
 
 # Arguments
 - `str::AbstractString`: The pretty-print string.
+- `new_unit::String`: The new unit in which the time is returned.
 
 # Returns
 - `::Float64`: The number found in `str`.
 """
-function get_number_in_string(str::AbstractString)
-    m = match(r"\d+(?:\.\d+)?", str)
-    if isnothing(m)
-        throw(ArgumentError("Number not found in string \"$(str)\"."))
+function get_number_in_string(str::AbstractString; new_unit::Union{Nothing, String}=nothing)
+    # Conversion factors from different units to second
+    factors = Dict("ns" => 1e-9, "μs" => 1e-6, "ms" => 1e-3, "s" => 1)
+    str_number, str_unit = split(str) # Assumes "number unit" format of the string
+    number = parse(Float64, str_number)
+    if !isnothing(new_unit)
+        number_in_seconds = number * factors[str_unit]
+        number = number_in_seconds / factors[new_unit]
     end
 
-    return parse(Float64, m.match)
+    return number
 end

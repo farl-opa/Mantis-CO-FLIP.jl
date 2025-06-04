@@ -1,6 +1,0 @@
-benchmark,commit_hash,julia_version,date,med_time,min_time,min_gc,min_memory,min_allocs,tags
-"1-form/3D/(""num_dofs=425"", ""p=3"", ""k=2"")",d28bf65,1.11.5,2025-06-03,521.729 ms,461.859 ms,32.516 ms,579.02 MiB,5524878,"[""3D"", ""tensor-product"", ""B-splines""]"
-"1-form/3D/(""num_dofs=1225"", ""p=3"", ""k=2"")",d28bf65,1.11.5,2025-06-03,3.919 s,3.890 s,386.206 ms,4.61 GiB,50252520,"[""3D"", ""tensor-product"", ""B-splines""]"
-"1-form/2D/(""num_dofs=341"", ""p=3"", ""k=2"")",d28bf65,1.11.5,2025-06-03,107.716 ms,100.366 ms,0.000 ns,98.08 MiB,1449022,"[""2D"", ""tensor-product"", ""B-splines""]"
-"1-form/2D/(""num_dofs=65"", ""p=3"", ""k=2"")",d28bf65,1.11.5,2025-06-03,6.136 ms,5.933 ms,0.000 ns,6.18 MiB,89711,"[""2D"", ""tensor-product"", ""B-splines""]"
-"1-form/2D/(""num_dofs=133"", ""p=3"", ""k=2"")",d28bf65,1.11.5,2025-06-03,24.819 ms,24.249 ms,0.000 ns,24.57 MiB,361577,"[""2D"", ""tensor-product"", ""B-splines""]"

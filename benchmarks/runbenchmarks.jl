@@ -14,6 +14,9 @@
             desired group/benchmark name. DO NOT change `file_location`, to ensure the
             structure of the stored csv files matches the benchmark's folder structure.
 
+    Finally, note that benchmarks should always be performed directly after branching from
+    main in order to get the correct commit hash.
+
     For more information, read the documentation in `BenchmarkHelpers.jl`.
 =#
 
