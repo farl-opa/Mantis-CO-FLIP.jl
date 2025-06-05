@@ -308,7 +308,6 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
     if isfile(data_prefix * file_name)
         types_dict = Dict(col => String for col in names(new_dataframe))
         old_dataframe = CSV.read(data_prefix * file_name, DataFrame; types=types_dict)
-        println(old_dataframe)
         duplicate_rows, new_rows = get_duplicate_and_new_rows(old_dataframe, new_dataframe)
         num_duplicate = length(duplicate_rows)
         if num_duplicate != 0
