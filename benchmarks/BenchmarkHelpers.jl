@@ -3,6 +3,7 @@ using CSV
 using DataFrames
 
 const rtol = 0.05
+const mantis_dir = join(split(pwd(), "/")[1:(end - 1)], "/") * "/"
 
 """
     add_benchmark_group!(group::BenchmarkGroup, name::String, file_path::String)
@@ -27,24 +28,27 @@ function add_benchmark_group!(group::BenchmarkGroup, name::String, file_path::St
 end
 
 """
-    run_benchmarks(
-        group::BenchmarkGroup, location::String, name::String;
-        show=false, save=false, rtol=0.05
+    run_benchmark(
+        benchmark::BenchmarkTools.Benchmark,
+        location::String,
+        name::String;
+        show=false,
+        save=false,
+        rtol=rtol,
     )
 
-Runs the benchmarks from all nested `@benchmarkable` objects found in `group`. Optionally,
-the flags `show` and `save` can be set to `true` to display the ran benchmarks and/or store
-in a CSV file, respectively. In the latter case, `location` will be use to determine where
-the file is stored and `rtol` is the cutoff determining if a benchmark is worse than before.
-Note that `location` should almost always be set automatically with
-`relpath(dirname(@__FILE__), pwd())` in the file calling this function. This ensures that
-the folder structure in `data/` matches the benchmarks' folder structure.
+Runs the benchmarkable object `benchmark`. Optionally, the flags `show` and `save` can be
+set to `true` to display the ran benchmark and/or store in a CSV file, respectively. In the
+latter case, `location` will be used to determine where the file is stored and `rtol` is the
+cutoff determining if a benchmark is deemed worse than before. Note that `location` should
+almost always be set automatically with `relpath(dirname(@__FILE__), pwd())` in the file
+calling this function. This ensures that the folder structure in `data/` matches the
+benchmarks' folder structure.
 
 # Arguments
-- `group::BenchmarkGroup`: The benchmark group being used.
+- `benchmark::BenchmarkTools.Benchmark`: The benchmarkable object.
 - `location::String`: The file folder location.
-- `name::String`: The name of the stored file. This will be appended to the hostname
-    automatically.
+- `name::String`: The name of the benchmark. 
 - `show=false`: Flag to display benchmark results.
 - `save=false`: Flag to store the benchmark results.
 - `rtol=0.05`: Tolerance for benchmark performance comparison.
@@ -52,10 +56,14 @@ the folder structure in `data/` matches the benchmarks' folder structure.
 # Returns
 - `::Nothing`.
 """
-function run_benchmarks(
-    group::BenchmarkGroup, location::String, name::String; show=false, save=false, rtol=0.05
+function run_benchmark(
+    benchmark::BenchmarkTools.Benchmark,
+    location::String,
+    name::String;
+    show=false,
+    save=false,
+    rtol=rtol,
 )
-    println("Running benchmarks for group $(name)...")
     if !show && !save
         printstyled(
             "Warning: Both `show` and `save` are set to `false`. " *
@@ -90,16 +98,6 @@ function run_benchmarks(
         end
     end
 
-    if location != "."
-        printstyled(
-            "Warning: You are not running the benchmark(s) from within the benchmark " *
-            "directory. Aborting.\n";
-            color=:red,
-        )
-
-        return nothing
-    end
-
     hostname, date, commit_hash, julia_version = get_metadata()
     columns = [
         :benchmark,
@@ -111,15 +109,14 @@ function run_benchmarks(
         :min_gc,
         :min_memory,
         :min_allocs,
-        :tags,
     ]
     # Initialize empty DataFrame with all columns typed as String
     df = DataFrame((col => String[] for col in columns)...)
-    dataframe = _run_benchmarks!(
+    dataframe = _run_benchmark!(
         df,
-        group,
-        String[],
-        hostname,
+        benchmark,
+        name,
+        location,
         date,
         commit_hash,
         julia_version;
@@ -128,7 +125,7 @@ function run_benchmarks(
     )
 
     if save
-        file_name = "host-$(hostname)-group-$(name).csv"
+        file_name = "host-$(hostname)-$(name).csv"
         save_results(dataframe, location * "/" * file_name; rtol=rtol)
     end
 
@@ -174,7 +171,7 @@ function get_metadata()
 end
 
 """
-    _run_benchmarks(
+    _run_benchmark!(
         dataframe,
         group::BenchmarkGroup,
         path::Vector{String},
@@ -186,99 +183,62 @@ end
         save::Bool,
     )
 
-Recursive method that runs `@benchmarkable` objects inside `group`. See
-[`run_benchmarks`](@ref) for more details.
+Helper method to append a benchmark's results to `dataframe`.
 
 # Arguments
 - `dataframe`: The dataframe storing the benchmarks.
-- `group::BenchmarkGroup`: The benchmark group being used.
-- `path::Vector{String}`: The nested folder names.
-- `hostname<:AbstractString`: The hostname of the device used to run the code.
-- `date<:AbstractString`: The current date in the format `YYYY-MM-DD`.
-- `commit_hash<:AbstractString`: The hash of latest commit in the current branch.
-- `julia_version<:AbstractString`: The current julia version.
+- `benchmark::BenchmarkTools.Benchmark`: The benchmark being ran.
+- `name::String`: The benchmark's name.
+- `location::String`: The benchmark's location.
+- `date::String`: The current date in the format `YYYY-MM-DD`.
+- `commit_hash::String`: The hash of latest commit in the current branch.
+- `julia_version::String`: The current julia version.
 - `show=false`: Flag to display benchmark results.
 - `save=false`: Flag to store the benchmark results.
 
 # Returns
 - `dataframe`: Updated dataframe at current nest level.
 """
-function _run_benchmarks!(
+function _run_benchmark!(
     dataframe,
-    group::BenchmarkGroup,
-    path::Vector{String},
-    hostname::String,
+    benchmark::BenchmarkTools.Benchmark,
+    name::String,
+    location::String,
     date::String,
     commit_hash::String,
     julia_version::String;
     show::Bool,
     save::Bool,
 )
-    for (name, val) in group
-        full_path = push!(copy(path), string(name))
-        indent_level = length(full_path) - 1
-        indent = "  "^indent_level
-        if val isa BenchmarkGroup
-            println(indent * "Entering group: $(join(full_path, "/"))")
-            _run_benchmarks!(
-                dataframe,
-                val,
-                full_path,
-                hostname,
-                date,
-                commit_hash,
-                julia_version;
-                show=show,
-                save=save,
-            )
-        else
-            println(indent * "Benchmark: $(join(full_path, "/"))")
-            #= The tuning should be uncommented if the benchmarking parameters are not set.
-            print(indent * "Tuning...")
-            tune!(val)
-            print("Done! ") =#
-            print(indent * "Running...")
-            result = run(val)
-            print("Done! ")
-            if show
-                println()
-                io = IOBuffer()
-                Base.show(
-                    IOContext(io, :compact => false, :color => true), "text/plain", result
-                )
-                output = String(take!(io))
-                for line in split(output, '\n')
-                    println(indent * line)
-                end
-            end
+    full_name = location * "/" * name
+    println("Benchmark: $(full_name)")
+    #= The tuning should be uncommented if the benchmarking parameters are not set.
+    print(indent * "Tuning...")
+    tune!(val)
+    print("Done! ") =#
+    print("Running...")
+    result = run(benchmark)
+    print("Done! ")
+    if show
+        println()
+        display(result)
+    end
 
-            if save
-                if show
-                    print(indent * "Storing...")
-                else
-                    print("Storing...")
-                end
-                tags = join(group.tags, ", ")
-                push!(
-                    dataframe,
-                    (
-                        benchmark=join(full_path, "/"),
-                        commit_hash=commit_hash,
-                        julia_version=julia_version,
-                        date=date,
-                        med_time=BenchmarkTools.prettytime(median(result).time),
-                        min_time=BenchmarkTools.prettytime(minimum(result).time),
-                        min_gc=BenchmarkTools.prettytime(minimum(result).gctime),
-                        min_memory=BenchmarkTools.prettymemory(minimum(result).memory),
-                        min_allocs=string(minimum(result).allocs),
-                        tags=tags,
-                    ),
-                )
-                println("Done!")
-            end
-
-            println()
-        end
+    if save
+        push!(
+            dataframe,
+            (
+                benchmark=full_name,
+                commit_hash=commit_hash,
+                julia_version=julia_version,
+                date=date,
+                med_time=BenchmarkTools.prettytime(median(result).time),
+                min_time=BenchmarkTools.prettytime(minimum(result).time),
+                min_gc=BenchmarkTools.prettytime(minimum(result).gctime),
+                min_memory=BenchmarkTools.prettymemory(minimum(result).memory),
+                min_allocs=string(minimum(result).allocs),
+            ),
+        )
     end
 
     return dataframe
@@ -299,7 +259,7 @@ Stores the benchmark results in `new_dataframe` in the CSV file `file_name`. The
 - `::Nothing`.
 """
 function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
-    println("Exporting to CSV...")
+    print("Saving to CSV...")
     if !endswith(file_name, ".csv")
         throw(ArgumentError("Invalid file name. Must end with `.csv`."))
     end
@@ -311,12 +271,12 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
         duplicate_rows, new_rows = get_duplicate_and_new_rows(old_dataframe, new_dataframe)
         num_duplicate = length(duplicate_rows)
         if num_duplicate != 0
-            println("Found $(num_duplicate) duplicate benchmarks.")
+            print("Duplicate found. ")
         end
 
         for (old_id, new_row) in duplicate_rows
             old_row = old_dataframe[old_id, :]
-            println("Comparing benchmark $(new_row.benchmark).")
+            println("Comparing...")
             str_old_time = old_row.min_time
             str_new_time = new_row.min_time
             ratio = compare_times(str_old_time, str_new_time)
@@ -329,7 +289,7 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
                     ", ratio=$(ratio).\n";
                     color=:green,
                 )
-                for col in names(new_row) 
+                for col in names(new_row)
                     old_dataframe[old_id, col] = new_row[col]
                 end
             elseif ratio <= 1.0 + rtol

@@ -3,8 +3,8 @@ module OneFormTensorProductHodgeLaplaceBenchmarks
 using Mantis
 
 # Refer to the following file for method and variable definitions
-include("../../BenchmarkHelpers.jl")
-include("../../../examples/HelperFunctions.jl")
+include(pwd() * "/BenchmarkHelpers.jl")
+include(mantis_dir * "examples/HelperFunctions.jl")
 
 ############################################################################################
 #                                      Problem setup                                       #
@@ -58,10 +58,10 @@ num_elements = [2 .^ (1:3), 2 .^ (1:2)] # For each manifold_dim
 p = 3
 k = p - 1
 for i in eachindex(manifold_dim)
-    sub_group = BenchmarkGroup(["$(manifold_dim[i])D", "tensor-product", "B-splines"])
+    sub_group = BenchmarkGroup()
     for num_els in num_elements[i]
         num_dofs, benchmarkable = run_problem(manifold_dim[i], num_els, p, k)
-        name = "num_dofs=$(num_dofs), p=$(p), k=$(k)"
+        name = "num_dofs=$(num_dofs)-p=$(p)-k=$(k)"
         sub_group[name] = benchmarkable
     end
 
