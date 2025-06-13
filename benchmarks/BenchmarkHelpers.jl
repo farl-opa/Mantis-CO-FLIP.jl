@@ -3,7 +3,7 @@ using CSV
 using DataFrames
 
 const rtol = 0.05
-const mantis_dir = join(split(pwd(), "/")[1:(end - 1)], "/") * "/"
+const mantis_dir = joinpath(splitpath(pwd())[1:(end - 1)])
 
 """
     add_benchmark_group!(group::BenchmarkGroup, name::String, file_path::String)
@@ -48,7 +48,7 @@ benchmarks' folder structure.
 # Arguments
 - `benchmark::BenchmarkTools.Benchmark`: The benchmarkable object.
 - `location::String`: The file folder location.
-- `name::String`: The name of the benchmark. 
+- `name::String`: The name of the benchmark.
 - `show=false`: Flag to display benchmark results.
 - `save=false`: Flag to store the benchmark results.
 - `rtol=0.05`: Tolerance for benchmark performance comparison.
@@ -210,7 +210,7 @@ function _run_benchmark!(
     show::Bool,
     save::Bool,
 )
-    full_name = location * "/" * name
+    full_name = joinpath(location, name)
     println("Benchmark: $(full_name)")
     #= The tuning should be uncommented if the benchmarking parameters are not set.
     print(indent * "Tuning...")
@@ -264,10 +264,11 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
         throw(ArgumentError("Invalid file name. Must end with `.csv`."))
     end
 
-    data_prefix = "data/"
-    if isfile(data_prefix * file_name)
+    data_prefix = "data"
+    if isfile(joinpath(data_prefix, file_name))
         types_dict = Dict(col => String for col in names(new_dataframe))
-        old_dataframe = CSV.read(data_prefix * file_name, DataFrame; types=types_dict)
+        data_filename = joinpath(data_prefix, file_name)
+        old_dataframe = CSV.read(data_filename, DataFrame; types=types_dict)
         duplicate_rows, new_rows = get_duplicate_and_new_rows(old_dataframe, new_dataframe)
         num_duplicate = length(duplicate_rows)
         if num_duplicate != 0
@@ -317,10 +318,10 @@ function save_results(new_dataframe::DataFrame, file_name::String; rtol=0.05)
             append!(old_dataframe, new_rows)
         end
 
-        CSV.write(data_prefix * file_name, old_dataframe)
+        CSV.write(data_filename, old_dataframe)
     else
-        mkpath(data_prefix * dirname(file_name))
-        CSV.write(data_prefix * file_name, new_dataframe)
+        mkpath(joinpath(data_prefix, dirname(file_name)))
+        CSV.write(joinpath(data_prefix, file_name), new_dataframe)
     end
 
     println("Done!")

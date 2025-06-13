@@ -3,8 +3,8 @@ module OneFormTensorProductHodgeLaplaceBenchmarks
 using Mantis
 
 # Refer to the following file for method and variable definitions
-include(pwd() * "/BenchmarkHelpers.jl")
-include(mantis_dir * "examples/HelperFunctions.jl")
+include(joinpath(pwd(), "BenchmarkHelpers.jl"))
+include(joinpath(mantis_dir, "examples", "HelperFunctions.jl"))
 
 ############################################################################################
 #                                      Problem setup                                       #

@@ -1,6 +1,6 @@
 module TensorProductBSplinesBenchmarks
 
-include(pwd() * "/BenchmarkHelpers.jl")
+include(joinpath(pwd(), "BenchmarkHelpers.jl"))
 
 verbose = true
 show = true
