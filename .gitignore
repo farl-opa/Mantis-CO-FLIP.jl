@@ -38,6 +38,8 @@ Manifest.toml
 # Ignore all text files
 *.txt
 *.csv
+# Except benchmarks
+!benchmarks/data/**
 
 # Ignore all images by default
 *.png
