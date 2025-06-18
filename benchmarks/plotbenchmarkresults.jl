@@ -27,9 +27,6 @@ for file in readdir(benchmark; join=true)
     end
 end
 
-println(data)
-println(data[("JoeyDekker", "2D-num_dofs=133-p=3-k=2")])
-
 colours = Dict(
     "JoeyDekker" => :orange,
     "DiogoCabanas" => :blue,
@@ -59,5 +56,3 @@ for name in benchmark_names
     ax.xticks = 1:1:length(dates)
     ax.xtickformat = values -> [dates[Int(i)] for i in values]
 end
-
-display(figures["2D-num_dofs=133-p=3-k=2"])
