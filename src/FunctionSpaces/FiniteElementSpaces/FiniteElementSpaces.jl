@@ -234,7 +234,7 @@ function get_basis_indices(space::AbstractFESpace, element_id::Int)
         get_basis_indices(
             extraction_operator, element_id
         ) for extraction_operator in get_extraction_operators(space)
-    ]...)
+    ]...) # TODO : This is going to be problematic if the order of indices in the union does not correspond to the order in which basis function evaluations are stored.
 end
 
 """
@@ -475,7 +475,7 @@ function evaluate(
         end
     end
 
-    # Actually evaluate the basis functions.
+    # Evaluate the basis functions.
     for component_idx in 1:num_components
         extraction_coefficients, _ = get_extraction(space, element_id, component_idx)
         component_basis = get_local_basis(

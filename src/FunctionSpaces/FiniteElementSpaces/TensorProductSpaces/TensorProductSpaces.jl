@@ -565,7 +565,11 @@ function evaluate(
                 extraction_per_space[space_index][1]
         end
 
-        evaluation[j + 1][der_idx][1] = kron(evaluation_per_space...)
+        if manifold_dim > 1
+            evaluation[j + 1][der_idx][1] = kron(evaluation_per_space...)
+        else
+            evaluation[j + 1][der_idx][1] = evaluation_per_space[1]
+        end
     end
 
     return evaluation, basis_indices
