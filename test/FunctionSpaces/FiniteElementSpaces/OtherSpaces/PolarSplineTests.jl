@@ -33,13 +33,18 @@ P_scalar = Mantis.FunctionSpaces.ScalarPolarSplineSpace(
 @test Mantis.FunctionSpaces.get_num_elements(P_scalar) == num_elements_p * num_elements_r
 @test Mantis.FunctionSpaces.get_num_elements_per_patch(P_scalar)[1] == num_elements_p * num_elements_r
 
-# # evaluate basis functions
-# xi = ([0.0, 0.25, 0.5, 0.75, 1.0], [0.0, 0.33, 0.66, 1.0])
-# for element_id in 1:Mantis.FunctionSpaces.get_num_elements(P_scalar)
-#     evaluations, basis_indices = Mantis.FunctionSpaces.evaluate(
-#         P_scalar, element_id, xi
-#     )
-#     # @test size(evaluations[1][1][1]) == (prod(length.(xi)), length(basis_indices))
-# end
+# evaluate basis functions
+xi = ([0.0, 0.25, 0.5, 0.75, 1.0], [0.0, 0.33, 0.66, 1.0])
+for element_id in 1:Mantis.FunctionSpaces.get_num_elements(P_scalar)
+    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(P_scalar, element_id, 1)
+    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14))
+
+    evaluations, basis_indices = Mantis.FunctionSpaces.evaluate(
+        P_scalar, element_id, xi
+    )
+    @test size(evaluations[1][1][1]) == (prod(length.(xi)), length(basis_indices))
+    @test all(evaluations[1][1][1] .>= 0.0)
+    @test all(isapprox.(sum(evaluations[1][1][1], dims=2) .- 1.0, 0.0, atol=1e-14))
+end
 
 end

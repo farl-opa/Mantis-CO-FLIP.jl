@@ -357,6 +357,17 @@ function _get_scalar_polar_extraction_submatrix(
     return E0_1, E0_2
 end
 
+function get_local_basis(
+    space::ScalarPolarSplineSpace,
+    element_id::Int,
+    xi::NTuple{2, Vector{Float64}},
+    nderivatives::Int,
+    ::Int
+)
+    return evaluate(space.patch_spaces[1], element_id, xi, nderivatives)[1]
+end
+
+
 ############################################################################################
 # VectorPolarSplineSpace
 ############################################################################################
