@@ -125,7 +125,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
     patch_spaces::NTuple{1,T}
     extraction_op::ExtractionOperator
     dof_partition::Vector{Vector{Vector{Int}}}
-    num_elements_per_patch::Vector{Int}
+    num_elements_per_patch::NTuple{1, Int}
     regularity::Int
 
     global_extraction_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}
@@ -196,7 +196,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
             (tp_space,),
             extraction_op,
             dof_partition,
-            [get_num_elements(tp_space)],
+            (get_num_elements(tp_space),),
             regularity,
             E,
             control_triangle,
@@ -362,9 +362,18 @@ function get_local_basis(
     element_id::Int,
     xi::NTuple{2, Vector{Float64}},
     nderivatives::Int,
-    ::Int
+    component_id::Int
 )
+    if component_id != 1
+        throw(ArgumentError("ScalarPolarSplineSpace only has one component."))
+    end
     return evaluate(space.patch_spaces[1], element_id, xi, nderivatives)[1]
+end
+
+function get_num_elements_per_patch(
+    space::ScalarPolarSplineSpace
+)
+    return space.num_elements_per_patch
 end
 
 
@@ -376,7 +385,7 @@ struct VectorPolarSplineSpace{T} <: AbstractFESpace{2, 2, 1}
     patch_spaces::NTuple{2, T}
     extraction_ops::NTuple{2, ExtractionOperator}
     dof_partition::NTuple{2, Vector{Vector{Vector{Int}}}}
-    num_elements_per_patch::Vector{Int}
+    num_elements_per_patch::NTuple{1, Int}
     regularity::Int
 
     global_extraction_matrices::NTuple{2, SparseArrays.SparseMatrixCSC{Float64, Int}}
@@ -442,11 +451,12 @@ struct VectorPolarSplineSpace{T} <: AbstractFESpace{2, 2, 1}
                 )
         end
 
-        return new{typeof(tp_space[1])}(
+        regularity = 0
+        return new{typeof(tp_spaces[1])}(
             tp_spaces,
             (extraction_ops[1], extraction_ops[2]),
             (dof_partitions[1], dof_partitions[2]),
-            [get_num_elements(tp_space)],
+            (get_num_elements(tp_spaces[1]),),
             regularity,
             E,
             control_triangle,
@@ -628,4 +638,10 @@ function extract_vector_polar_splines_to_tensorproduct(
     SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E_h)
 
     return (E_h, E_v), tri
+end
+
+function get_num_elements_per_patch(
+    space::VectorPolarSplineSpace
+)
+    return space.num_elements_per_patch
 end

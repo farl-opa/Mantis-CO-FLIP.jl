@@ -22,6 +22,12 @@ n_r = Mantis.FunctionSpaces.get_num_basis(B_r)
 
 # degenerate control points for the polar spline space
 geom_coeffs_tp, _, _ = Mantis.FunctionSpaces._build_standard_degenerate_control_points(n_p, n_r, 1.0)
+
+
+#################################################################
+# ScalarPolarSplineSpace
+#################################################################
+
 # build scalar polar spline space
 P_scalar = Mantis.FunctionSpaces.ScalarPolarSplineSpace(
     B_p,
@@ -46,5 +52,22 @@ for element_id in 1:Mantis.FunctionSpaces.get_num_elements(P_scalar)
     @test all(evaluations[1][1][1] .>= 0.0)
     @test all(isapprox.(sum(evaluations[1][1][1], dims=2) .- 1.0, 0.0, atol=1e-14))
 end
+
+#################################################################
+# VectorPolarSplineSpace
+#################################################################
+
+# build vector polar spline space
+P_vector = Mantis.FunctionSpaces.VectorPolarSplineSpace(
+    B_p,
+    B_r,
+    (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]),
+    Mantis.FunctionSpaces.get_derivative_space(B_p),
+    Mantis.FunctionSpaces.get_derivative_space(B_r)
+)
+
+@test Mantis.FunctionSpaces.get_num_basis(P_vector) == 2 * n_p * (n_r - 2) + 2
+@test Mantis.FunctionSpaces.get_num_elements(P_vector) == num_elements_p * num_elements_r
+@test Mantis.FunctionSpaces.get_num_elements_per_patch(P_vector)[1] == num_elements_p * num_elements_r
 
 end
