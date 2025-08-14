@@ -640,6 +640,16 @@ function extract_vector_polar_splines_to_tensorproduct(
     return (E_h, E_v), tri
 end
 
+function get_local_basis(
+    space::VectorPolarSplineSpace,
+    element_id::Int,
+    xi::NTuple{2, Vector{Float64}},
+    nderivatives::Int,
+    component_id::Int
+)
+    return evaluate(space.patch_spaces[component_id], element_id, xi, nderivatives)[1]
+end
+
 function get_num_elements_per_patch(
     space::VectorPolarSplineSpace
 )
