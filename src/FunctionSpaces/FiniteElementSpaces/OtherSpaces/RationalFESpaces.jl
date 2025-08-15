@@ -1,6 +1,6 @@
 
 """
-    RationalFESpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
+    RationalFESpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1, 1}
 
 A rational finite element space obtained by dividing all elements of a given function space
 by a fixed element from the same function space. The latter is defined with the help of
@@ -11,7 +11,7 @@ specified weights.
 - `weights::Vector{Float64}`: The weights associated with the basis functions of the
     function space.
 """
-struct RationalFESpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1}
+struct RationalFESpace{manifold_dim, F} <: AbstractFESpace{manifold_dim, 1, 1}
     function_space::F
     weights::Vector{Float64}
 
@@ -154,7 +154,7 @@ function get_extraction(space::RationalFESpace, element_id::Int, component_id::I
 end
 
 """
-    get_element_size(rat_space::RationalFESpace, element_id::Int)
+    get_element_measure(rat_space::RationalFESpace, element_id::Int)
 
 Returns the size of the element for the rational finite element space.
 
@@ -165,10 +165,10 @@ Returns the size of the element for the rational finite element space.
 # Returns
 The size of the element for the rational finite element space.
 """
-function get_element_size(rat_space::RationalFESpace, element_id::Int)
-    return get_element_size(rat_space.function_space, element_id)
+function get_element_measure(rat_space::RationalFESpace, element_id::Int)
+    return get_element_measure(rat_space.function_space, element_id)
 end
 
-function get_element_dimensions(rat_space::RationalFESpace, element_id::Int)
-    return get_element_dimensions(rat_space.function_space, element_id)
+function get_element_lengths(rat_space::RationalFESpace, element_id::Int)
+    return get_element_lengths(rat_space.function_space, element_id)
 end

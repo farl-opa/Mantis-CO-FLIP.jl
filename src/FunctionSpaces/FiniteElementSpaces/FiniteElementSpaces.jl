@@ -659,7 +659,7 @@ end
 
 
 include("ExtractionOperator.jl")
-include("OtherSpaces/RationalFiniteElementSpaces.jl")
+include("OtherSpaces/RationalFESpaces.jl")
 include("UnivariateSplines/UnivariateSplines.jl")
 
 # composite function spaces

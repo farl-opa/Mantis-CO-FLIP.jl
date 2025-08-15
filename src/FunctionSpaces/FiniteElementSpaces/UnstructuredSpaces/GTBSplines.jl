@@ -41,7 +41,7 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
         regularity::Vector{Int},
         num_dofs_left::Int = -1,
         num_dofs_right::Int = -1
-    ) where {num_patches, S <: Union{BSplineSpace, RationalFiniteElementSpace}, T <: NTuple{num_patches, S}}
+    ) where {num_patches, S <: Union{BSplineSpace, RationalFESpace}, T <: NTuple{num_patches, S}}
         # Check if the number of regularity conditions matches the number of interfaces
         if length(regularity) != num_patches
             throw(ArgumentError("""\
