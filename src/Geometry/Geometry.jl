@@ -7,11 +7,11 @@ module Geometry
 
 import LinearAlgebra
 
-using ..FunctionSpaces
+import ..FunctionSpaces
 
 abstract type AbstractGeometry{manifold_dim} end
 abstract type AbstractAnalyticalGeometry{manifold_dim} <: AbstractGeometry{manifold_dim} end
-abstract type AbstractFEMGeometry{manifold_dim} <: AbstractGeometry{manifold_dim} end
+abstract type AbstractFEGeometry{manifold_dim} <: AbstractGeometry{manifold_dim} end
 
 """
     get_manifold_dim(::AbstractGeometry{manifold_dim})
@@ -101,7 +101,7 @@ Computes the length, in each manifold dimension, of the element given by `elemen
 - 'element_id::Int': Index of the element being considered.
 
 # Returns
-- '::NTuple{manifold_dim, Float64}': The element's lengths. 
+- '::NTuple{manifold_dim, Float64}': The element's lengths.
 
 # Notes
 There is no generic fallback for this method. It should be implemented for each concrete
@@ -208,7 +208,7 @@ end
 
 # core functionality
 include("./CartesianGeometry.jl")
-include("./FEMGeometry.jl")
+include("./FEGeometry.jl")
 include("./MappedGeometry.jl")
 include("./TensorProductGeometry.jl")
 include("./HierarchicalGeometry.jl")

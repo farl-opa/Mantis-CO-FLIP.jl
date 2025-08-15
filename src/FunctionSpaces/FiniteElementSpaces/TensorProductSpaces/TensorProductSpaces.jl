@@ -1,4 +1,4 @@
-
+# TODO: rewrite this file to use Cartesian Indices
 """
     TensorProductSpace{manifold_dim, num_components, num_patches, T} <: AbstractFESpace{manifold_dim, num_components, num_patches}
 

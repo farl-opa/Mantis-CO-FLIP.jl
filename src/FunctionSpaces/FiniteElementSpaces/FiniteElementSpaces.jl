@@ -443,7 +443,7 @@ the evaluation of:
 - of the `k`-th component ...
 - at the `a`-th evaluation point ...
 - for `f₀`.
-See [`get_derivative_idx(der_key::Vector{Int})`](@ref) for more details on the order in
+See [`get_derivative_idx(der_key::Vector{Int})`] for more details on the order in
 which all the mixed derivatives of order `i-1` are stored.
 
 # Arguments
@@ -657,7 +657,7 @@ function _compute_parametric_geometry_coeffs(
     return coeffs
 end
 
-include("FiniteElementSpacesHelpers.jl")
+
 include("ExtractionOperator.jl")
 include("OtherSpaces/RationalFiniteElementSpaces.jl")
 include("UnivariateSplines/UnivariateSplines.jl")

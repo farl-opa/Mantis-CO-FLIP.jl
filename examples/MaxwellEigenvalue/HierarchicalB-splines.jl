@@ -1,6 +1,6 @@
 module HierarchicalBsplines
 
-import Mantis
+using Mantis
 
 using DelimitedFiles
 
@@ -10,7 +10,7 @@ include("../HelperFunctions.jl")
 ############################################################################################
 #                                      Problem setup                                       #
 ############################################################################################
-# Mesh 
+# Mesh
 starting_point = (0.0, 0.0)
 box_size = (fpi, fpi) #(π, π)
 num_elements = (2, 2) .^ 3 # Ininital mesh size.
@@ -31,16 +31,18 @@ eigenfunc = 1 # Eigenfunction to use for adaptive refinement.
 # Quadrature rules
 nq_assembly = p .+ 1
 nq_error = nq_assembly .* 2
-∫ₐ, ∫ₑ = Mantis.Quadrature.get_quadrature_rules(
-    Mantis.Quadrature.gauss_legendre, nq_assembly, nq_error
+∫ₐ, ∫ₑ = Quadrature.get_canonical_quadrature_rules(
+    Quadrature.gauss_legendre, nq_assembly, nq_error
 )
+dΩₐ = Quadrature.StandardQuadrature(∫ₐ, prod(num_elements))
+dΩₑ = Quadrature.StandardQuadrature(∫ₑ, prod(num_elements))
 
 # Number of eigenvalues to compute
-num_eig = 10 
+num_eig = 10
 # Scaling form maxwell eigenfunctions.
 scale_factors = ntuple(2) do k
-    return pi /(box_size[k] - starting_point[k])
-end 
+    return pi / (box_size[k] - starting_point[k])
+end
 
 verbose = true # Set to true for problem information.
 export_csv = false # Set to true to export the computed eigenvalues.
@@ -49,15 +51,14 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 ############################################################################################
 #                                       Run problem                                        #
 ############################################################################################
-# Hierarchical de Rham complex 
-ℌ = Mantis.Forms.create_hierarchical_de_rham_complex(
+# Hierarchical de Rham complex
+ℌ = Forms.create_hierarchical_de_rham_complex(
     starting_point, box_size, num_elements, p, k, num_sub, truncate, simplified
 )
 # Solve problem
-ωₕ², uₕ= Mantis.Assemblers.solve_maxwell_eig(
-    ℌ, num_steps, θ, Lchains, ∫ₐ, ∫ₑ, eigenfunc, num_eig, scale_factors; verbose
+ωₕ², uₕ = Assemblers.solve_maxwell_eig(
+    ℌ, dΩₐ, num_steps, θ, dΩₑ, Lchains, eigenfunc, num_eig, scale_factors; verbose
 )
-
 
 ############################################################################################
 #                                      Solution data                                       #
@@ -65,9 +66,9 @@ export_vtk = false # Set to true to export the computed eigenfunctions.
 # Print eigenvalues
 
 if verbose
-    ⊞ = Mantis.Forms.get_geometry(uₕ[1])
+    ⊞ = Forms.get_geometry(uₕ[1])
     # Exact eigenvalues
-    ω² = Mantis.Assemblers.get_analytical_maxwell_eig(num_eig, ⊞, scale_factors)[1]
+    ω² = Assemblers.get_analytical_maxwell_eig(num_eig, ⊞, scale_factors)[1]
 
     println("Printing first $(num_eig) exact and computed eigenvalues...")
     println("i    ω²[i]      ωₕ²[i]     (ωₕ²[i] - ω²[i])^2")
@@ -82,14 +83,14 @@ end
 
 if export_vtk
     println("Exporting computed eigenfunctions to VTK...")
-    hier_num_elements = Mantis.Geometry.get_num_elements(Mantis.Forms.get_geometry(uₕ[1]))
+    hier_num_elements = Geometry.get_num_elements(Forms.get_geometry(uₕ[1]))
     file_base_name = "MaxwellEigenvalueHBsplines-computed-p=$(p)-k=$(k)-nels=$(hier_num_elements)"
     labels = Vector{String}(undef, num_eig)
     for i in 1:num_eig
         labels[i] = uₕ[i].label
     end
 
-    Mantis.Plot.export_form_fields_to_vtk(uₕ, labels, file_base_name)
+    Plot.export_form_fields_to_vtk(uₕ, labels, file_base_name)
 end
 if export_csv
     eig_ids = 1:num_eig

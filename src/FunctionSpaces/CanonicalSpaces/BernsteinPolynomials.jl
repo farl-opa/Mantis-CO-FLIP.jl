@@ -103,7 +103,7 @@ function _evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)
         msg = "The Bernstein polynomials must be of degree at least 0."
         throw(ArgumentError(msg))
     elseif xi < 0.0 || xi > 1.0
-        msg = "x = $x is outside the interval [0.0, 1.0]."
+        msg = "x = $xi is outside the interval [0.0, 1.0]."
         throw(ArgumentError(msg))
     end
 
