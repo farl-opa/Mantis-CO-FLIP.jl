@@ -70,4 +70,14 @@ P_vector = Mantis.FunctionSpaces.VectorPolarSplineSpace(
 @test Mantis.FunctionSpaces.get_num_elements(P_vector) == num_elements_p * num_elements_r
 @test Mantis.FunctionSpaces.get_num_elements_per_patch(P_vector)[1] == num_elements_p * num_elements_r
 
+# evaluate basis functions
+xi = ([0.0, 0.25, 0.5, 0.75, 1.0], [0.0, 0.33, 0.66, 1.0])
+for element_id in 1:1#Mantis.FunctionSpaces.get_num_elements(P_vector)
+    ex_coeffs, basis_indices = Mantis.FunctionSpaces.get_extraction(P_vector, element_id, 1)
+    ex_coeffs, basis_indices = Mantis.FunctionSpaces.get_extraction(P_vector, element_id, 2)
+    evaluations, basis_indices = Mantis.FunctionSpaces.evaluate(
+        P_vector, element_id, xi
+    )
+end
+
 end
