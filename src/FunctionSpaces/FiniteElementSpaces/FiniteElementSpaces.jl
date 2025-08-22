@@ -71,7 +71,17 @@ Get the ID of the patch to which the specified global element belongs.
 - `::Int`: ID of the patch to which the element belongs.
 """
 function get_patch_id(space::AbstractFESpace, element_id::Int)
-    return findfirst(element_id .<= cumsum(get_num_elements_per_patch(space)))
+    cumulative_elements = cumsum(get_num_elements_per_patch(space))
+    for ci in eachindex(cumulative_elements)
+        if element_id <= cumulative_elements[ci]
+            return ci
+        end
+    end
+    throw(
+        ArgumentError(
+            "Element ID $(element_id) exceeds the total number of elements in the space."
+        )
+    )
 end
 
 function get_patch_id(
@@ -95,9 +105,17 @@ Get the constituent patch ID and local element ID for the specified global eleme
 """
 function get_patch_and_local_element_id(space::AbstractFESpace, element_id::Int)
     patch_id = get_patch_id(space, element_id)
-    local_element_id = element_id - sum(
-        get_num_elements_per_patch(space)[begin:patch_id-1]; init=0
-    )
+
+    elements_per_patch = get_num_elements_per_patch(space)
+    local_element_id = element_id
+    for i in eachindex(elements_per_patch)
+        if i < patch_id
+            local_element_id -= elements_per_patch[i]
+        else
+            break
+        end
+    end
+
     return patch_id, local_element_id
 end
 
@@ -119,46 +137,9 @@ function get_global_element_id(space::AbstractFESpace, patch_id::Int, local_elem
 end
 
 """
-    get_extraction_operators(space::AbstractFESpace)
+    get_extraction_operator(space::AbstractFESpace)
 
-Returns the extraction operators of the given space.
-
-!!! warning "Not all AbstractFESpaces have an extraction operator."
-    Having an explicitly defined extraction operator is not required for building a finite
-    element space.
-
-# Arguments
-- `space::AbstractFESpace`: A finite element space.
-
-# Returns
-- `::NTuple{num_components, ExtractionOperator}`: The extraction operators.
-
-# Exceptions
-- Error "no field 'extraction_op'": This error is thrown if no explicitly defined
-    extraction operator is present for this single-component `space`.
-- Error "no field 'extraction_ops'": This error is thrown if no explicitly defined
-    extraction operators are present for this multi-component `space`.
-
-# Note
-- The default behaviour for a single-component instance of a multi-component space will be
-    incorrect and leads to an infinite recursion. When developing a new multi-component
-    space, this special case has to be handled separately.
-"""
-function get_extraction_operators(space::AbstractFESpace)
-    return space.extraction_ops
-end
-function get_extraction_operators(
-    space::AbstractFESpace{manifold_dim, 1, num_patches}
-) where {manifold_dim, num_patches}
-    return (space.extraction_op,)
-end
-
-"""
-    get_extraction_operator(
-        space::AbstractFESpace{manifold_dim, 1, num_patches}
-    ) where {manifold_dim, num_patches}
-
-Returns the extraction operator of the given single-component space.
+Returns the extraction operator of the given `space`.
 
 !!! warning "Not all AbstractFESpaces have an extraction operator."
     Having an explicitly defined extraction operator is not required for building a finite
@@ -174,9 +155,7 @@ Returns the extraction operator of the given single-component space.
 - Error "no field 'extraction_op'": This error is thrown if no explicitly defined
     extraction operator is present for this `space`.
 """
-function get_extraction_operator(
-    space::AbstractFESpace{manifold_dim, 1, num_patches}
-) where {manifold_dim, num_patches}
+function get_extraction_operator(space::AbstractFESpace)
     return space.extraction_op
 end
 
@@ -201,12 +180,39 @@ given element `element_id` for the given component `component_id`.
 - Error "no field 'extraction_op'": This error is thrown if no extraction operator is
     defined for `space`, and there is no specific `get_extraction` method for `space`
     either.
-- Error "no field 'extraction_ops'": This error is thrown if no extraction operators are
-    defined for the multi-component space `space`, and there is no specific
-    `get_extraction` method for `space` either.
 """
 function get_extraction(space::AbstractFESpace, element_id::Int, component_id::Int=1)
-    return get_extraction(get_extraction_operators(space)[component_id], element_id)
+    return get_extraction(get_extraction_operator(space), element_id, component_id)
+end
+
+"""
+    get_extraction_coefficients(
+        space::AbstractFESpace, element_id::Int, component_id::Int=1
+    )
+
+Returns the extraction coefficients on the given element.
+
+# Arguments
+- `space::AbstractFESpace`: A finite element space.
+- `element_id::Int`: Identifier of the element.
+- `component_id::Int=1`: The component ID. This is only relevant for multi-component
+    spaces, and thus defaults to 1. While it is not needed for single-component spaces, it
+    is still required for the function signature.
+
+# Returns
+- `::Matrix{Float64}`: The extraction coefficients on the requested element.
+
+# Exceptions
+- Error "no field 'extraction_op'": This error is thrown if no extraction operator is
+    defined for `space`, and there is no specific `get_extraction_coefficients` method for
+    `space` either.
+"""
+function get_extraction_coefficients(
+    space::AbstractFESpace, element_id::Int, component_id::Int=1
+)
+    return get_extraction_coefficients(
+        get_extraction_operator(space), element_id, component_id
+    )
 end
 
 """
@@ -219,22 +225,20 @@ Get the global indices of the basis functions of `space` on element `element_id`
 - `element_id::Int`: Identifier of the element.
 
 # Returns
-- `::Vector{Int}`: Global indices of the basis functions.
+- `::TI`: Global indices of the basis functions supported on this element. The type `TI`
+    is an vector-like object with integer type elements. See the documentation of `space` or
+    [`Indices`](@ref) for more details.
+
 
 # Exceptions
 - Error "no field 'extraction_op'": This error is thrown if no extraction operator is
     defined for `space`, and there is no specific `get_basis_indices` method for `space`
     either.
-- Error "no field 'extraction_ops'": This error is thrown if no extraction operators are
-    defined for the multi-component space `space`, and there is no specific
-    `get_basis_indices` method for `space` either.
 """
 function get_basis_indices(space::AbstractFESpace, element_id::Int)
-    return union([
-        get_basis_indices(
-            extraction_operator, element_id
-        ) for extraction_operator in get_extraction_operators(space)
-    ]...) # TODO : This is going to be problematic if the order of indices in the union does not correspond to the order in which basis function evaluations are stored.
+    return get_basis_indices(
+        get_extraction_operator(space), element_id
+    )
 end
 
 """
@@ -252,12 +256,9 @@ Returns the number of basis functions of the finite element space `space`.
 - Error "no field 'extraction_op'": This error is thrown if no extraction operator is
     defined for `space`, and there is no specific `get_num_basis` method for `space`
     either.
-- Error "no field 'extraction_ops'": This error is thrown if no extraction operators are
-    defined for the multi-component space `space`, and there is no specific `get_num_basis`
-    method for `space` either.
 """
 function get_num_basis(space::AbstractFESpace)
-    return get_num_basis(get_extraction_operators(space)[1])
+    return get_num_basis(get_extraction_operator(space))
 end
 
 """
@@ -348,7 +349,7 @@ Returns the total number of elements on which the `space` is build.
 - `::Int`: The number of elements.
 """
 function get_num_elements(space::AbstractFESpace)
-    return get_num_elements(get_extraction_operators(space)[1])
+    return get_num_elements(get_extraction_operator(space))
 end
 
 # Getting the element lengths or measure should be handled by the underlying geometry. With
@@ -454,7 +455,9 @@ which all the mixed derivatives of order `i-1` are stored.
 
 # Returns
 - `evaluation::Vector{Vector{Vector{Matrix{Float64}}}}`: Values of the basis functions.
-- `basis_indices::Vector{Int}`: Global indices of the basis functions.
+- `basis_indices::TI`: Global indices of the basis functions. The type `TI` is an vector-
+    like object with integer type elements. See the documentation of `space` or
+    [`Indices`](@ref) for more details.
 """
 function evaluate(
     space::AbstractFESpace{manifold_dim, num_components, num_patches},
@@ -465,28 +468,29 @@ function evaluate(
     basis_indices = get_basis_indices(space, element_id)
 
     # Pre-allocation.
+    num_points = prod(length.(xi))
     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         # number of derivatives of order j
         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
         evaluations[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
         for der_idx in 1:num_j_ders
-            evaluations[j + 1][der_idx] = Vector{Matrix{Float64}}(undef, num_components)
+            evaluations[j + 1][der_idx] = [
+                zeros(num_points, length(basis_indices)) for _ in 1:num_components
+            ]
         end
     end
 
     # Evaluate the basis functions.
     for component_idx in 1:num_components
-        extraction_coefficients, _ = get_extraction(space, element_id, component_idx)
+        extraction_coefficients, J = get_extraction(space, element_id, component_idx)
         component_basis = get_local_basis(
             space, element_id, xi, nderivatives, component_idx
         )
 
         for der_order in eachindex(evaluations)
             for der_idx in eachindex(evaluations[der_order])
-                evaluations[der_order][der_idx][
-                    component_idx
-                ] = @views component_basis[der_order][der_idx][1] * extraction_coefficients
+                @views evaluations[der_order][der_idx][component_idx][:,J] = component_basis[der_order][der_idx][1] * extraction_coefficients
             end
         end
     end

@@ -10,9 +10,9 @@ import SparseArrays
 
 using Test
 
-struct MultiPatchC0Space{num_patches, T} <: Mantis.FunctionSpaces.AbstractFESpace{2, 1, num_patches}
+struct MultiPatchC0Space{num_patches, T, TE, TI, TJ} <: Mantis.FunctionSpaces.AbstractFESpace{2, 1, num_patches}
     function_spaces::T
-    extraction_op::Mantis.FunctionSpaces.ExtractionOperator
+    extraction_op::Mantis.FunctionSpaces.ExtractionOperator{1, TE, TI, TJ}
     dof_partition::Vector{Vector{Vector{Int}}}
 end
 
@@ -142,24 +142,31 @@ function create_multi_patch_c0_space(
     global_dof -= 1  # Last global dof that was processed.
 
     # Create the global extraction operator.
-    extraction_coefficients = Vector{Matrix{Float64}}(undef, num_elements)
-    basis_indices = Vector{Vector{Int}}(undef, num_elements)
+    extraction_coefficients = Vector{NTuple{1,Matrix{Float64}}}(undef, num_elements)
+    basis_indices = Vector{Mantis.FunctionSpaces.Indices{1, Vector{Int}, StepRange{Int,Int}}}(undef, num_elements)
     for patch_idx in 1:1:num_patches
 
         for elem_idx in 1:1:Mantis.FunctionSpaces.get_num_elements(function_spaces[patch_idx])
             global_elem_id = elems_per_patch_offset[patch_idx]+elem_idx
 
             # Get the local extraction coefficients and basis indices.
-            extr_coeffs, indices = Mantis.FunctionSpaces.get_extraction(function_spaces[patch_idx], elem_idx)
+            extr_coeffs = Mantis.FunctionSpaces.get_extraction_coefficients(function_spaces[patch_idx], elem_idx)
+            indices = Mantis.FunctionSpaces.get_basis_indices(function_spaces[patch_idx], elem_idx)
 
-            extraction_coefficients[global_elem_id] = Matrix(LinearAlgebra.I, size(extr_coeffs))
-            basis_indices[global_elem_id] = [local_to_global_dof_dict[(patch_idx, local_dof)] for local_dof in indices]
+            extraction_coefficients[global_elem_id] = (Matrix(LinearAlgebra.I, size(extr_coeffs)),)
+
+            basis_indices[global_elem_id] = Mantis.FunctionSpaces.Indices(
+                [local_to_global_dof_dict[(patch_idx, local_dof)] for local_dof in indices],
+                (1:1:length(indices),),
+            )
         end
     end
 
-    return MultiPatchC0Space{num_patches, T}(
+    E = Mantis.FunctionSpaces.ExtractionOperator(extraction_coefficients, basis_indices, num_elements, global_dof)
+
+    return MultiPatchC0Space{num_patches, T, Mantis.FunctionSpaces.get_EIJ_types(E)...}(
         function_spaces,
-        Mantis.FunctionSpaces.ExtractionOperator(extraction_coefficients, basis_indices, num_elements, global_dof),
+        E,
         dof_partition
     )
 end
@@ -196,66 +203,62 @@ function extract_mcmp_to_tp(
 
     # Convert the global extraction matrix to the local (per element) ones that the
     # ExtractionOperator expects.
-    extr_ops = ntuple(num_components) do component_idx
+    extraction_coefficients = Vector{NTuple{num_components, Matrix{Float64}}}(undef, num_elements)
+    basis_indices = Vector{Mantis.FunctionSpaces.Indices{num_components, Vector{Int}, Vector{Int}}}(undef, num_elements)
+    basis_indices_all = Vector{Vector{Int}}(undef, num_elements)
+    for elem_id in 1:1:num_elements
 
-        extraction_coefficients = Vector{Matrix{Float64}}(undef, num_elements)
-        basis_indices = Vector{Vector{Int}}(undef, num_elements)
-        basis_indices_all = Vector{Vector{Int}}(undef, num_elements)
-        for elem_id in 1:1:Mantis.FunctionSpaces.get_num_elements(component_spaces[component_idx])
-            support_per_space = [
-                Mantis.FunctionSpaces.get_basis_indices(component_spaces[i], elem_id) for i in 1:num_components
-            ]
+        support_per_space = [
+            Mantis.FunctionSpaces.get_basis_indices(component_spaces[i], elem_id) for i in 1:num_components
+        ]
 
-            basis_indices_all[elem_id] = reduce(
-                vcat, [support_per_space[i] .+ basis_offset[i] for i in 1:num_components]
+        basis_indices_all[elem_id] = reduce(
+            vcat, [support_per_space[i] .+ basis_offset[i] for i in 1:num_components]
+        )
+
+        # The local indices are now column indices in the global extraction coefficient
+        # matrix. The non-zero row indices are the global indices supported on this
+        # element. We need to find the non-zero row indices for each component space to
+        # account for the most general case where the global extraction operator is not
+        # a block-diagonal matrix.
+        nz_row_idxs_per_component = ntuple(num_components) do i
+            (nz_row_idxs_i, _, _) = SparseArrays.findnz(
+                global_extr_ops[i][:, support_per_space[i]]
             )
-
-            # The local indices are now column indices in the global extraction coefficient
-            # matrix. The non-zero row indices are the global indices supported on this
-            # element. We need to find the non-zero row indices for each component space to
-            # account for the most general case where the global extraction operator is not
-            # a block-diagonal matrix.
-            nz_row_idxs_per_component = ntuple(num_components) do i
-                (nz_row_idxs_i, _, _) = SparseArrays.findnz(
-                    global_extr_ops[i][:, support_per_space[i]]
-                )
-                return nz_row_idxs_i
-            end
-
-            # Only the unique indices are needed. unique!(sort!()) is supposed to be more
-            # efficient than unique alone.
-            # nz_row_idxs = unique!(sort!(reduce(vcat, nz_row_idxs_per_component)))
-            nz_row_idxs = unique!(reduce(vcat, nz_row_idxs_per_component))
-            basis_indices[elem_id] = nz_row_idxs
-
-            # Add zeros for the basis functions that are supported on this element but have
-            # a zero value for the current component. These cannot be found through the
-            # search above, so we need to add them manually. Note that the convention is
-            # that [constituent_spaces] * [extraction] = [MCMP].
-            coeffs = zeros(length(support_per_space[component_idx]), length(nz_row_idxs))
-            col_idxs = zeros(Int, length(nz_row_idxs_per_component[component_idx]))
-            for j in eachindex(nz_row_idxs_per_component[component_idx])
-                for i in eachindex(nz_row_idxs)
-                    if nz_row_idxs[i] == nz_row_idxs_per_component[component_idx][j]
-                        col_idxs[j] = i
-                    end
-                end
-            end
-            coeffs[:, col_idxs] = Matrix(transpose(global_extr_ops[component_idx][nz_row_idxs_per_component[component_idx], support_per_space[component_idx]]))
-            extraction_coefficients[elem_id] = coeffs
+            return nz_row_idxs_i
         end
 
-        return Mantis.FunctionSpaces.ExtractionOperator(
-            extraction_coefficients, basis_indices, num_elements, max_global_dof
+        # Only the unique indices are needed.
+        nz_row_idxs = unique!(reduce(vcat, nz_row_idxs_per_component))
+        basis_indices[elem_id] = Mantis.FunctionSpaces.Indices(
+            nz_row_idxs, Tuple(
+                [convert(
+                    Vector{Int}, indexin(nz_row_idxs_per_component[i], nz_row_idxs)
+                ) for i in 1:num_components]
+            )
         )
+
+        e_elem = ntuple(num_components) do component_idx
+            # Note that the convention is that [constituent_spaces] * [extraction] = [MCMP].
+            return transpose(
+                global_extr_ops[component_idx][
+                    nz_row_idxs_per_component[component_idx],
+                    support_per_space[component_idx],
+                ]
+            )
+        end
+
+        extraction_coefficients[elem_id] = e_elem
     end
 
-    return extr_ops
+    return Mantis.FunctionSpaces.ExtractionOperator(
+        extraction_coefficients, basis_indices, num_elements, max_global_dof
+    )
 end
 
-struct MCMP{T} <: Mantis.FunctionSpaces.AbstractFESpace{2, 2, 2}
+struct MCMP{T, TE, TI, TJ} <: Mantis.FunctionSpaces.AbstractFESpace{2, 2, 2}
     component_spaces::T
-    extraction_ops::NTuple{2, Mantis.FunctionSpaces.ExtractionOperator}
+    extraction_op::Mantis.FunctionSpaces.ExtractionOperator{2, TE, TI, TJ}
 
     function MCMP(
         component_spaces::T,
@@ -263,8 +266,8 @@ struct MCMP{T} <: Mantis.FunctionSpaces.AbstractFESpace{2, 2, 2}
     ) where {
         num_components, T <: NTuple{num_components, Mantis.FunctionSpaces.AbstractFESpace}
     }
-        extraction_operators = extract_mcmp_to_tp(component_spaces, global_extraction_operators)
-        new{T}(component_spaces, extraction_operators)
+        extraction_operator = extract_mcmp_to_tp(component_spaces, global_extraction_operators)
+        new{T, Mantis.FunctionSpaces.get_EIJ_types(extraction_operator)...}(component_spaces, extraction_operator)
     end
 end
 

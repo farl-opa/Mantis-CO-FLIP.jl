@@ -793,7 +793,7 @@ function get_extraction(
         basis_indices = copy(space.multilevel_basis_indices[multilevel_id])
     end
 
-    return coeffs, 1:size(coeffs, 1)
+    return coeffs, 1:size(coeffs, 2)
 end
 
 function get_basis_indices(

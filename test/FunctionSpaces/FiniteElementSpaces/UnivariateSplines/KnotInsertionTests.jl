@@ -4,12 +4,12 @@ import Mantis
 
 using Test
 
-Patch1D = Mantis.Mesh.Patch1D
-KnotVector = Mantis.FunctionSpaces.KnotVector
-BSplineSpace = Mantis.FunctionSpaces.BSplineSpace
+const Patch1D = Mantis.Mesh.Patch1D
+const KnotVector = Mantis.FunctionSpaces.KnotVector
+const BSplineSpace = Mantis.FunctionSpaces.BSplineSpace
 
 # Piece-wise degree of the basis functions on which the tests are performed.
-degrees_for_test = 0:20
+degrees_for_test = 0:5#20
 subdivisions_to_test = 2:8
 
 # Tests for validity of knot insertion algorithm

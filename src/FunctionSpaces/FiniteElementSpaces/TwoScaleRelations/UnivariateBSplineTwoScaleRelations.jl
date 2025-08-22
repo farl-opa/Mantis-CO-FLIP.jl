@@ -470,7 +470,7 @@ function build_two_scale_matrix(
     rf = 1
     e = 1
 
-    local_subdiv_matrix = create_identity(nel, p + 1)
+    local_subdiv_matrix = [Matrix{Float64}(LinearAlgebra.I, p + 1, p + 1) for _ in 1:nel]
 
     offs = 0
 

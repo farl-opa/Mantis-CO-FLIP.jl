@@ -1,14 +1,14 @@
 """
-    GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
+    GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_patches}
 
 Constructs a GTBSplineSpace from a tuple of NURBS or B-spline spaces and a vector of
-regularity conditions.
-Periodic spaces are a special case of GTBSplines for `num_patches = 1` and `regularity = [r]`
-with `r > -1`.
+regularity conditions. Periodic spaces are a special case of GTBSplines for
+`num_patches = 1` and `regularity = [r]` with `r > -1`.
 
 # Fields
 - `patch_spaces::NTuple{num_patches, T}`: A tuple of `num_patches` NURBS or B-spline spaces.
-- `extraction_op::ExtractionOperator`: The extraction operator for the GTBSpline space.
+- `extraction_op::ExtractionOperator{1, TE, TI, TJ}`: The extraction operator for the
+    GTBSpline space.
 - `dof_partition::Vector{Vector{Vector{Int}}}`: A vector of vectors of vectors of integers
     representing the degree of freedom partitioning.
 - `regularity::Vector{Int}`: A vector of regularity conditions at the interfaces between
@@ -18,10 +18,10 @@ with `r > -1`.
 - `patch_spaces::NTuple{num_patches, T}`: A tuple of `num_patches` NURBS or B-spline spaces.
 - `regularity::Vector{Int}`: A vector of regularity conditions at the interfaces between
     the spaces.
-- `num_dofs_left::Int`: The number of degrees of freedom at the left boundary. Default is -1,
-    which means it will be computed automatically.
-- `num_dofs_right::Int`: The number of degrees of freedom at the right boundary. Default is -1,
-    which means it will be computed automatically.
+- `num_dofs_left::Int`: The number of degrees of freedom at the left boundary. Default is
+    -1, which means it will be computed automatically.
+- `num_dofs_right::Int`: The number of degrees of freedom at the right boundary. Default is
+    -1, which means it will be computed automatically.
 
 # Throws
 - `ArgumentError`: If the number of regularity conditions does not match the number of
@@ -29,9 +29,9 @@ with `r > -1`.
 - `ArgumentError`: If the minimal polynomial degree of any pair of adjacent spaces is less
     than the corresponding regularity condition.
 """
-struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
+struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_patches}
     patch_spaces::T
-    extraction_op::ExtractionOperator
+    extraction_op::ExtractionOperator{1, TE, TI, TJ}
     dof_partition::Vector{Vector{Vector{Int}}}
     num_elements_per_patch::NTuple{num_patches, Int}
     regularity::Vector{Int}
@@ -41,18 +41,21 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
         regularity::Vector{Int},
         num_dofs_left::Int = -1,
         num_dofs_right::Int = -1
-    ) where {num_patches, S <: Union{BSplineSpace, RationalFESpace}, T <: NTuple{num_patches, S}}
+    ) where {
+        num_patches, S <: Union{BSplineSpace, RationalFESpace}, T <: NTuple{num_patches, S}
+    }
         # Check if the number of regularity conditions matches the number of interfaces
         if length(regularity) != num_patches
             throw(ArgumentError("""\
-                The number of regularity conditions should be equal to the number of bspline \
-                interfaces. You have $(num_patches) interfaces and $(length(regularity)) regularity \
-                conditions.\
+                The number of regularity conditions should be equal to the number of \
+                bspline interfaces. You have $(num_patches) interfaces and \
+                $(length(regularity)) regularity conditions.\
                 """
             ))
         end
 
-        # Check if the polynomial degree of each pair of adjacent spaces is sufficient for the regularity condition
+        # Check if the polynomial degree of each pair of adjacent spaces is sufficient for
+        # the regularity condition
         for i in 1:num_patches
             j = i
             k = i + 1
@@ -76,7 +79,9 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
         # Create the extraction operator
         extraction_op = extract_gtbspline_to_bspline(patch_spaces, regularity)
         # number of element offsets per patch
-        num_elements_per_patch = Tuple(get_num_elements(patch_spaces[i]) for i in 1:num_patches)
+        num_elements_per_patch = ntuple(num_patches) do i
+            return get_num_elements(patch_spaces[i])
+        end
         num_elements_offset = cumsum([0; collect(get_num_elements.(patch_spaces))])
 
         function _get_boundary_dof_inds(patch_id::Int, right_bnd::Bool)
@@ -152,12 +157,13 @@ struct GTBSplineSpace{num_patches, T} <: AbstractFESpace{1, 1, num_patches}
             dof_partition[i][2] = unique(dof_partition[i][2])
         end
 
-        new{num_patches, T}(
+        new{num_patches, T, get_EIJ_types(extraction_op)...}(
             patch_spaces,
             extraction_op,
             dof_partition,
             num_elements_per_patch,
-            regularity)
+            regularity,
+        )
     end
 end
 

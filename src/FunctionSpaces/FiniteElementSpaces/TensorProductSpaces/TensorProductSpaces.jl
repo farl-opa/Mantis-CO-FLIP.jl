@@ -484,7 +484,7 @@ function get_max_local_dim(space::TensorProductSpace)
     return prod(get_max_local_dim, get_constituent_spaces(space))
 end
 
-function get_extraction(
+function get_extraction_coefficients(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
     element_id::Int,
     component_id::Int=1,
@@ -496,7 +496,17 @@ function get_extraction(
         (extraction_per_space[space][1] for space in num_spaces:-1:1)...
     )
 
-    return extraction_coeffs, 1:size(extraction_coeffs, 1)
+    return extraction_coeffs
+end
+
+function get_extraction(
+    space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
+    element_id::Int,
+    component_id::Int=1,
+) where {manifold_dim, num_components, num_patches, num_spaces}
+    extraction_coeffs = get_extraction_coefficients(space, element_id, component_id)
+
+    return extraction_coeffs, 1:size(extraction_coeffs, 2)
 end
 
 function get_local_basis(

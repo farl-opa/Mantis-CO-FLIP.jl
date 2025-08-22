@@ -26,7 +26,12 @@ struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <:
         num_components,
         num_patches,
         num_spaces,
-        TP <: TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
+        T <: NTuple{num_spaces, AbstractFESpace},
+        CIE,
+        LIE,
+        CIB,
+        LIB,
+        TP <: TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces, T, CIE, LIE, CIB, LIB},
         TS <: NTuple{num_spaces, AbstractTwoScaleOperator},
     }
         gm = kron(

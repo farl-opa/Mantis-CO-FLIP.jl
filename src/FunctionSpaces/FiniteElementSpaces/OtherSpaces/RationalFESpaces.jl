@@ -37,26 +37,26 @@ function get_basis_indices(space::RationalFESpace, element_id::Int)
     return get_basis_indices(space.function_space, element_id)
 end
 
-function get_num_elements(rat_space::RationalFESpace)
-    return get_num_elements(rat_space.function_space)
+function get_num_elements(space::RationalFESpace)
+    return get_num_elements(space.function_space)
 end
 
 """
-    get_polynomial_degree(rat_space::RationalFESpace, element_id::Int)
+    get_polynomial_degree(space::RationalFESpace, element_id::Int)
 
 Returns the polynomial degree (or the degree of the underlying function space) of the
 rational finite element space for a specific element.
 
 # Arguments
-- `rat_space::RationalFESpace`: The rational finite element space.
+- `space::RationalFESpace`: The rational finite element space.
 - `element_id::Int`: The index of the element.
 
 # Returns
 The polynomial degree (or the degree of the underlying function space) of the rational
 finite element space for the specified element.
 """
-function get_polynomial_degree(rat_space::RationalFESpace, element_id::Int)
-    return get_polynomial_degree(rat_space.function_space, element_id)
+function get_polynomial_degree(space::RationalFESpace, element_id::Int)
+    return get_polynomial_degree(space.function_space, element_id)
 end
 
 function get_dof_partition(space::RationalFESpace)
@@ -65,7 +65,7 @@ end
 
 """
     evaluate(
-        rat_space::RationalFESpace{manifold_dim, F},
+        space::RationalFESpace{manifold_dim, F},
         element_id::Int,
         xi::NTuple{manifold_dim, Vector{Float64}},
         nderivatives::Int
@@ -74,7 +74,7 @@ end
 Evaluates the basis functions and their derivatives for the rational finite element space.
 
 # Arguments
-- `rat_space::RationalFESpace{manifold_dim, F}`: The rational finite
+- `space::RationalFESpace{manifold_dim, F}`: The rational finite
     element space.
 - `element_id::Int`: The index of the element.
 - `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
@@ -87,14 +87,14 @@ A tuple containing:
 - The basis indices.
 """
 function evaluate(
-    rat_space::RationalFESpace{manifold_dim, F},
+    space::RationalFESpace{manifold_dim, F},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
     nderivatives::Int,
 ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1, 1}}
     # Evaluate the basis functions and their derivatives for the underlying function space
     homog_basis, basis_indices = evaluate(
-        rat_space.function_space, element_id, xi, nderivatives
+        space.function_space, element_id, xi, nderivatives
     )
     n_eval = prod(length.(xi))
 
@@ -103,7 +103,7 @@ function evaluate(
         if j == 0
             # Compute the weight
             temp = homog_basis[1][1][1] *
-                LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                LinearAlgebra.Diagonal(space.weights[basis_indices])
             weight = reshape(sum(temp; dims=2), n_eval)
             # Rationalize with the weights
             homog_basis[1][1][1] .= LinearAlgebra.Diagonal(weight) \ temp
@@ -114,9 +114,9 @@ function evaluate(
                 der_idx = get_derivative_idx(key)
                 # Compute the weight and its derivative
                 temp = homog_basis[1][1][1] *
-                    LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                    LinearAlgebra.Diagonal(space.weights[basis_indices])
                 dtemp = homog_basis[j + 1][der_idx][1] *
-                    LinearAlgebra.Diagonal(rat_space.weights[basis_indices])
+                    LinearAlgebra.Diagonal(space.weights[basis_indices])
                 weight = reshape(sum(temp; dims=2), n_eval)
                 dweight = reshape(sum(dtemp; dims=2), n_eval)
                 # Compute the derivative of the rational basis functions
@@ -124,7 +124,7 @@ function evaluate(
                     LinearAlgebra.Diagonal(dweight ./ weight .^ 2) * temp
             end
         elseif j > 1
-            error("Derivatives of rational spaces of order not implemented")
+            error("Derivatives of rational spaces of order $j not implemented")
         end
     end
 
@@ -147,28 +147,27 @@ end
 
 function get_extraction(space::RationalFESpace, element_id::Int, component_id::Int=1)
     # Get the basis indices for the underlying function space
-    _, basis_indices = get_extraction(space.function_space, element_id)
-    n_supp = length(basis_indices)
+    basis_indices = get_basis_indices(space.function_space, element_id)
 
-    return Matrix{Float64}(LinearAlgebra.I, n_supp, n_supp), basis_indices
+    return LinearAlgebra.I, 1:1:length(basis_indices)
 end
 
 """
-    get_element_measure(rat_space::RationalFESpace, element_id::Int)
+    get_element_measure(space::RationalFESpace, element_id::Int)
 
 Returns the size of the element for the rational finite element space.
 
 # Arguments
-- `rat_space::RationalFESpace`: The rational finite element space.
+- `space::RationalFESpace`: The rational finite element space.
 - `element_id::Int`: The index of the element.
 
 # Returns
 The size of the element for the rational finite element space.
 """
-function get_element_measure(rat_space::RationalFESpace, element_id::Int)
-    return get_element_measure(rat_space.function_space, element_id)
+function get_element_measure(space::RationalFESpace, element_id::Int)
+    return get_element_measure(space.function_space, element_id)
 end
 
-function get_element_lengths(rat_space::RationalFESpace, element_id::Int)
-    return get_element_lengths(rat_space.function_space, element_id)
+function get_element_lengths(space::RationalFESpace, element_id::Int)
+    return get_element_lengths(space.function_space, element_id)
 end
