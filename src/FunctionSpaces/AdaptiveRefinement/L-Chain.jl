@@ -17,7 +17,7 @@ end
 @doc raw"""
     get_corner_basis_ids(fe_space::AbstractFESpace{manifold_dim}, basis_ids::Vector{Int}) where {manifold_dim}
 
-Returns the basis indices of basis functions in the "corners" of a 
+Returns the basis indices of basis functions in the "corners" of a
 set of `basis_ids` with non-empty support in a given element.
 
 # Arguments
@@ -25,14 +25,14 @@ set of `basis_ids` with non-empty support in a given element.
 - `fe_space::AbstractFESpace{manifold_dim}`: finite element space at a given level.
 - `basis_ids::Vector{Int}`: set of basis indices with non-empty support in a given element.
 
-# Returns 
+# Returns
 
 - `::NTuple{4, Int}`: corner basis function indices in the order "UR", "LR", "LL", "UL".
 """
 function get_corner_basis_ids(
     fe_space::AbstractFESpace{manifold_dim}, basis_ids::Vector{Int}
 ) where {manifold_dim}
-    max_ind_basis = _get_num_basis_per_space(fe_space)
+    max_ind_basis = get_constituent_num_basis(fe_space)
     lower_left_bspline = minimum(basis_ids)
     upper_right_bspline = maximum(basis_ids)
 
@@ -110,7 +110,7 @@ function initiate_check_and_inactive_basis(
     inactive_basis = Set{Int}()
     sizehint!(inactive_basis, length(marked_elements))
 
-    # 1. loop over marked elements to get all basis that have support on the elements 
+    # 1. loop over marked elements to get all basis that have support on the elements
 
     for element_id in marked_elements
         # we want the indices in the indexing of the underlying space, not the hierarchical indexing!
@@ -129,7 +129,7 @@ function initiate_check_and_inactive_basis(
     basis_to_check = Set{Int}()
     sizehint!(basis_to_check, length(inactive_basis))
 
-    max_ind_basis = _get_num_basis_per_space(get_space(hier_space, level))
+    max_ind_basis = get_constituent_num_basis(get_space(hier_space, level))
     left_basis = [0, 0]
     right_basis = [0, 0]
     down_basis = [0, 0]
@@ -168,7 +168,7 @@ Checks whether a pair of basis functions has an (manifold_dim-1, l+1)-intersecti
 - `basis_pair::`: pair of basis functions from which the L-chain is contructed.
 - `new_operator<:AbstractTwoScaleOperator`: operator to be used when a new level needs to be checked.
 
-# Returns 
+# Returns
 
 - `::Bool`: whether there is an (manifold_dim-1, l+1)-intersection.
 """
@@ -179,8 +179,8 @@ function check_nl_intersection(
     new_operator::T,
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim}, T <: AbstractTwoScaleOperator}
     level_space = get_space(hier_space, level)
-    basis_supp_per_dim1 = _get_support_per_space(level_space, basis_pair[1])
-    basis_supp_per_dim2 = _get_support_per_space(level_space, basis_pair[2])
+    basis_supp_per_dim1 = get_constituent_support(level_space, basis_pair[1])
+    basis_supp_per_dim2 = get_constituent_support(level_space, basis_pair[2])
 
     for k in 1:manifold_dim
         if first(basis_supp_per_dim2[k]) - last(basis_supp_per_dim1[k]) > 1 ||
@@ -195,7 +195,7 @@ function check_nl_intersection(
         operator = hier_space.two_scale_operators[level]
     end
 
-    p_fine = get_polynomial_degree_per_space(operator.fine_space)
+    p_fine = get_constituent_polynomial_degree(operator.fine_space)
 
     length_flag = Vector{Bool}(undef, manifold_dim)
 
@@ -209,7 +209,7 @@ function check_nl_intersection(
         intersection_boundary_breakpoints = (
             maximum((min_basis_1, min_basis_2)), minimum((max_basis_1, max_basis_2))
         )
-        
+
         I_k = get_contained_knot_vector(intersection_boundary_breakpoints, ts, fine_space)
 
         length_flag[k] = get_knot_vector_length(I_k) > p_fine[k]
@@ -254,7 +254,7 @@ Creates a local graph of active basis functions in the grid determined by pair o
 - `inactive_basis::`: the indices of all deactivated basis in `level`.
 - `manifold_dim::Int`: dimension of the finite element space.
 
-# Returns 
+# Returns
 
 - `basis_pair_graph::`:  graph of active basis functions.
 """
@@ -293,7 +293,7 @@ Checks whether a pair of basis functions has a shortest chain between them.
 - `basis_pair::`: pair of basis functions from which the L-chain is contructed.
 - `inactive_basis::`: the indices of all deactivated basis in `level`.
 
-# Returns 
+# Returns
 
 - `::Bool`: whether there is a shortest chain.
 """
@@ -303,7 +303,7 @@ function check_shortest_chain(
     basis_pair,
     inactive_basis,
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim}, T <: AbstractTwoScaleOperator}
-    max_id_basis = _get_num_basis_per_space(get_space(hier_space, level))
+    max_id_basis = get_constituent_num_basis(get_space(hier_space, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k in 1:2]
     diff_basis_per_dim = -(basis_per_dim...)
 
@@ -335,7 +335,7 @@ Checks whether a pair of basis functions is problematic. I.e., if there is an (m
 - `inactive_basis::`: the indices of all deactivated basis in `level`.
 - `new_operator<:AbstractTwoScaleOperator`: operator to be used when a new level needs to be checked.
 
-# Returns 
+# Returns
 
 - `problematic_pair::Bool`: whether the pair is problematic.
 """
@@ -381,7 +381,7 @@ function build_Lchain(
     chain_type="LR",
 ) where {manifold_dim, S <: AbstractFESpace{manifold_dim}, T <: AbstractTwoScaleOperator}
     Lchain = Int[]
-    max_id_basis = _get_num_basis_per_space(get_space(hier_space, level))
+    max_id_basis = get_constituent_num_basis(get_space(hier_space, level))
     basis_per_dim = [linear_to_ordered_index(basis_pair[k], max_id_basis) for k in 1:2]
 
     # Lower right L-chain
@@ -482,7 +482,7 @@ function _compute_Lchain_basis(
             )
 
             if problematic_pair
-                Lchain, corner_basis = build_Lchain(hier_space, level, basis_pair, "UL") # Choose chain type. Default is "LR" 
+                Lchain, corner_basis = build_Lchain(hier_space, level, basis_pair, "UL") # Choose chain type. Default is "LR"
                 push!(basis_to_check, corner_basis)
                 append!(inactive_basis, Lchain)
                 append!(Lchain_basis_ids, Lchain)
