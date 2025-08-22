@@ -32,18 +32,18 @@ square with ``4 \times 4`` elements. The function space is a B-spline space with
 ``p = (3, 3)`` and knot vector ``k = (2, 2)``.
 
 ````@example HodgeLaplacian
-import Mantis
+using Mantis
 
 starting_point = (0.0, 0.0)
 box_size = (1.0, 1.0)
 num_elements = (4, 4)
-geometry = Mantis.Geometry.create_cartesian_box(
+geometry = Geometry.create_cartesian_box(
     starting_point, box_size, num_elements
 )
 
 p = (3, 3)
 k = (2, 2)
-B = Mantis.FunctionSpaces.create_bspline_space(
+B = FunctionSpaces.create_bspline_space(
     starting_point,
     box_size,
     num_elements,
@@ -56,7 +56,7 @@ Mantis works with forms, so we need to define the form space. In this case, we a
 working with $0$-forms, so we define the form space as follows.
 
 ````@example HodgeLaplacian
-Λ⁰ = Mantis.Forms.FormSpace(0, geometry, Mantis.FunctionSpaces.DirectSumSpace((B,)), "label")
+Λ⁰ = Forms.FormSpace(0, geometry, FunctionSpaces.DirectSumSpace((B,)), "label")
 ````
 
 We define the weak form inputs. The weak form inputs contain the trial and test spaces,
@@ -68,63 +68,61 @@ function of the coordinates. In this case, we define the forcing function as
 function forcing_function(x::Matrix{Float64})
     return [@. 8.0 * pi^2 * sin(2.0 * pi * x[:,1]) * sin(2.0 * pi * x[:,2])]
 end
-f⁰ = Mantis.Forms.AnalyticalFormField(0, forcing_function, geometry, "f⁰")
+f⁰ = Forms.AnalyticalFormField(0, forcing_function, geometry, "f⁰")
 ````
 
 The quadrature rule is defined as a tensor product rule of the degree of the B-spline
 space plus one. In this case, we define the quadrature rule as a Gauss-Legendre rule.
 
 ````@example HodgeLaplacian
-qrule = Mantis.Quadrature.tensor_product_rule(
-    p .+ 1, Mantis.Quadrature.gauss_legendre
-)
+canonical_qrule = Quadrature.tensor_product_rule(p .+ 1, Quadrature.gauss_legendre)
+dΩ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
+````
 
-wfi = Mantis.Assemblers.WeakFormInputs(qrule, Λ⁰, Λ⁰, f⁰)
+We define the weak form inputs as a `WeakFormInputs` object. The weak form inputs contain
+the trial and test spaces, and the forcing function. The trial and test spaces are the
+same in this case, which is the default.
+
+````@example HodgeLaplacian
+wfi = Assemblers.WeakFormInputs(Λ⁰, f⁰)
 ````
 
 We define the weak form for the Hodge-Laplacian. The weak form is defined as a function
-that takes the weak form inputs and the element id as arguments. The weak form inputs
-contain the trial and test spaces, the forcing function, and the quadrature rule.
+that takes the weak form inputs and the quadrature rule as arguments.
 
 ````@example HodgeLaplacian
 function zero_form_hodge_laplacian(
-    inputs::Mantis.Assemblers.WeakFormInputs,
-    element_id,
+    inputs::Assemblers.AbstractInputs, dΩ::Quadrature.AbstractGlobalQuadratureRule
 )
-    dtrial = Mantis.Forms.ExteriorDerivative(Mantis.Assemblers.get_trial_forms(inputs)[1])
-    dtest = Mantis.Forms.ExteriorDerivative(Mantis.Assemblers.get_test_forms(inputs)[1])
+    v⁰ = Assemblers.get_test_form(inputs)
+    u⁰ = Assemblers.get_trial_form(inputs)
+    f⁰ = Assemblers.get_forcing(inputs)
 
-    A11 = Mantis.Forms.InnerProduct(dtest, dtrial)
-    Ar, Ac, Av = Mantis.Forms.evaluate(
-        A11, element_id, Mantis.Assemblers.get_quadrature_rule(inputs)
-    )
+    A = ∫(d(v⁰) ∧ ★(d(u⁰)), dΩ)
+    lhs_expression = ((A,),)
 
-    b1 = Mantis.Forms.InnerProduct(
-        Mantis.Assemblers.get_test_forms(inputs)[1],
-        Mantis.Assemblers.get_forcing(inputs)[1],
-    )
-    br, bc, bv = Mantis.Forms.evaluate(
-        b1, element_id, Mantis.Assemblers.get_quadrature_rule(inputs)
-    )
+    b = ∫(v⁰ ∧ ★(f⁰), dΩ)
+    rhs_expression = ((b,),)
 
-    return (Ar, Ac, Av), (br, bv)
+    return lhs_expression, rhs_expression
 end
 ````
 
 We can now assemble the linear system and solve it to obtain the solution. We define the
-Dirichlet boundary conditions as a dictionary with the boundary condition index as the
-key and the boundary condition value as the value.
+Dirichlet boundary conditions using the appropriate helper function.
 
 ````@example HodgeLaplacian
-bc_dirichlet = Dict(Mantis.Assemblers.get_trace_dofs(B) .=> 0.0)
+bc = Forms.set_dirichlet_boundary_conditions(Λ⁰, 0.0)
 ````
 
 We assemble the linear system and solve it to obtain the solution.
 
 ````@example HodgeLaplacian
-lhs, rhs = Mantis.Assemblers.assemble(zero_form_hodge_laplacian, wfi, bc_dirichlet)
-ϕ⁰ = Mantis.Forms.FormField(Λ⁰, "ϕ⁰")
-ϕ⁰.coefficients .= lhs \ rhs
+lhs_expressions, rhs_expressions = zero_form_hodge_laplacian(wfi, dΩ)
+weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, wfi)
+A, b = Assemblers.assemble(weak_form, bc)
+sol = vec(A \ b)
+ϕ⁰ = Forms.build_form_field(Λ⁰, sol)
 ````
 
 We can now plot the solution using the `plot` function. This will write the output to a
@@ -135,7 +133,7 @@ data_folder = joinpath(dirname(dirname(pathof(Mantis))), "examples", "data")
 output_data_folder = joinpath(data_folder, "output", "HodgeLaplacian")
 output_filename = "HodgeLaplacian-0form-Dirichlet-$(length(p))D.vtu"
 output_file = joinpath(output_data_folder, output_filename)
-Mantis.Plot.plot(
+Plot.plot(
     ϕ⁰;
     vtk_filename = output_file,
     n_subcells = 1,
@@ -159,13 +157,13 @@ avoid type instabilities.
 starting_point_3D = (0.0, 0.0, 0.0)
 box_size_3D = (1.0, 1.0, 1.0)
 num_elements_3D = (4, 4, 4)
-geometry_3D = Mantis.Geometry.create_cartesian_box(
+geometry_3D = Geometry.create_cartesian_box(
     starting_point_3D, box_size_3D, num_elements_3D
 )
 
 p_3D = (3, 3, 3)
 k_3D = (2, 2, 2)
-B_3D = Mantis.FunctionSpaces.create_bspline_space(
+B_3D = FunctionSpaces.create_bspline_space(
     starting_point_3D,
     box_size_3D,
     num_elements_3D,
@@ -184,25 +182,26 @@ end
 We don't need to change any of the previous code, so we can reuse it directly:
 
 ````@example HodgeLaplacian
-Λ⁰_3D = Mantis.Forms.FormSpace(0, geometry_3D, Mantis.FunctionSpaces.DirectSumSpace((B_3D,)), "label")
+Λ⁰_3D = Forms.FormSpace(0, geometry_3D, FunctionSpaces.DirectSumSpace((B_3D,)), "label")
 
-f⁰_3D = Mantis.Forms.AnalyticalFormField(0, forcing_function_3D, geometry_3D, "f⁰")
+f⁰_3D = Forms.AnalyticalFormField(0, forcing_function_3D, geometry_3D, "f⁰")
 
-qrule_3D = Mantis.Quadrature.tensor_product_rule(
-    p_3D .+ 1, Mantis.Quadrature.gauss_legendre
-)
+canonical_qrule_3D = Quadrature.tensor_product_rule(p_3D .+ 1, Quadrature.gauss_legendre)
+dΩ_3D = Quadrature.StandardQuadrature(canonical_qrule_3D, Geometry.get_num_elements(geometry_3D))
 
-wfi_3D = Mantis.Assemblers.WeakFormInputs(qrule_3D, Λ⁰_3D, Λ⁰_3D, f⁰_3D)
+wfi_3D = Assemblers.WeakFormInputs(Λ⁰_3D, f⁰_3D)
 
-bc_dirichlet_3D = Dict(Mantis.Assemblers.get_trace_dofs(B_3D) .=> 0.0)
+bc_3D = Forms.set_dirichlet_boundary_conditions(Λ⁰_3D, 0.0)
 
-lhs_3D, rhs_3D = Mantis.Assemblers.assemble(zero_form_hodge_laplacian, wfi_3D, bc_dirichlet_3D)
-ϕ⁰_3D = Mantis.Forms.FormField(Λ⁰_3D, "ϕ⁰")
-ϕ⁰_3D.coefficients .= lhs_3D \ rhs_3D
+lhs_expressions_3D, rhs_expressions_3D = zero_form_hodge_laplacian(wfi_3D, dΩ_3D)
+weak_form_3D = Assemblers.WeakForm(lhs_expressions_3D, rhs_expressions_3D, wfi_3D)
+A_3D, b_3D = Assemblers.assemble(weak_form_3D, bc_3D)
+sol_3D = vec(A_3D \ b_3D)
+ϕ⁰_3D = Forms.build_form_field(Λ⁰_3D, sol_3D)
 
 output_filename_3D = "HodgeLaplacian-0form-Dirichlet-$(length(p_3D))D.vtu"
 output_file_3D = joinpath(output_data_folder, output_filename_3D)
-Mantis.Plot.plot(
+Plot.plot(
     ϕ⁰_3D;
     vtk_filename = output_file_3D,
     n_subcells = 1,
