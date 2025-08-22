@@ -36,10 +36,10 @@ for i ∈ 1:Mantis.FunctionSpaces.get_num_basis(GBθ)-1
     geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
 end
 geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
-geom = Mantis.Geometry.FEMGeometry(S_θrϕ, geom_coeffs_θrϕ)
+geom = Mantis.Geometry.FEGeometry(S_θrϕ, geom_coeffs_θrϕ)
 # Generate the plot
 output_filename = "fem_geometry_torus_test.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry (toroidal annulus) -------------------------------------------
@@ -73,10 +73,10 @@ for i ∈ 1:3
     geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
 end
 geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
-geom = Mantis.Geometry.FEMGeometry(TP_θrϕ, geom_coeffs_θrϕ)
+geom = Mantis.Geometry.FEGeometry(TP_θrϕ, geom_coeffs_θrϕ)
 # Generate the plot
 output_filename = "fem_geometry_toroidal_annulus_test.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry + form fields (toroidal annulus) -------------------------------------------
@@ -110,7 +110,7 @@ for i ∈ 1:3
     geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
 end
 geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
-geom = Mantis.Geometry.FEMGeometry(TP_θrϕ, geom_coeffs_θrϕ)
+geom = Mantis.Geometry.FEGeometry(TP_θrϕ, geom_coeffs_θrϕ)
 
 # form spaces and fields
 zero_sum_space = Mantis.FunctionSpaces.DirectSumSpace((TP_θrϕ,))
@@ -132,11 +132,11 @@ num_basis = Mantis.FunctionSpaces.get_num_basis(TP_θrϕ)
 
 # Generate the plot
 output_filename = "fem_geometry_toroidal_annulus_and_forms_test"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename * "-0form")
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename * "-0form")
 Mantis.Plot.plot(α⁰; vtk_filename = output_file, n_subcells = 1, degree = 4, ascii = false, compress = false)
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename * "-3form")
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename * "-3form")
 Mantis.Plot.plot(β³; vtk_filename = output_file, n_subcells = 1, degree = 4, ascii = false, compress = false)
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename * "-1form")
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename * "-1form")
 Mantis.Plot.plot(ξ¹; vtk_filename = output_file, n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry (hollow cylinder) -------------------------------------------
@@ -164,10 +164,10 @@ geom_coeffs_θr = [geom_coeffs_θ.*r0
                     geom_coeffs_θ.*r1]
 geom_coeffs_θrz = [geom_coeffs_θr z0.*ones(8)
                     geom_coeffs_θr z1.*ones(8)]
-geom = Mantis.Geometry.FEMGeometry(TP_θrz, geom_coeffs_θrz)
+geom = Mantis.Geometry.FEGeometry(TP_θrz, geom_coeffs_θrz)
 # Generate the plot
 output_filename = "fem_geometry_hollow_cylinder_test.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry (Cartesian cuboid) -------------------------------------------
@@ -178,7 +178,7 @@ breakpoints = (collect(LinRange(0.0, 1.0, nx+1)), collect(LinRange(0.0,2.0,ny+1)
 geom = Mantis.Geometry.CartesianGeometry(breakpoints)
 # Generate the plot
 output_filename = "cartesian_geometry_cuboid_test.vtu"
-output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 2, degree = 4, ascii = false, compress = false)
 
 # -----------------------------------------------------------------------------
@@ -206,14 +206,14 @@ n_subcells_range = 1:3:10
 for n_subcells in n_subcells_range
     for degree in degrees_range
         output_filename = @sprintf "mapped_cartesian_test_nx_%02d_ny_%02d__n_sub_%02d_degree_%02d.vtu" nx ny n_subcells degree
-        output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
+        output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
 
         # Plot
         Mantis.Plot.plot(mapped_geometry; vtk_filename = output_file[1:end-4], n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
 
-        # Test plotting 
+        # Test plotting
         # Read the cell data from the reference file
-        reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
+        reference_file = Mantis.GeneralHelpers.export_path(reference_directory_tree, output_filename)
         vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
         reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
         reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
@@ -222,7 +222,7 @@ for n_subcells in n_subcells_range
         vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
         output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
         output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-        
+
         # # Check if cell data is identical
         @test reference_points ≈ output_points atol = 1e-13
         @test reference_cells == output_cells
@@ -245,23 +245,23 @@ geom_coeffs =   [0.0 -1.0 0.0
 -1.0   1.0 0.75
 -1.0  -1.0 1.0
 0.0  -1.0 1.25]
-geom = Mantis.Geometry.FEMGeometry(GB, geom_coeffs)
+geom = Mantis.Geometry.FEGeometry(GB, geom_coeffs)
 
 # Generate the plots
 degrees_range = 1:3:10
 n_subcells_range = 1:3:10
 
 for n_subcells in n_subcells_range
-    for degree in degrees_range 
+    for degree in degrees_range
         output_filename = @sprintf "spiral_fem_geometry__n_sub_%02d_degree_%02d.vtu" n_subcells degree
-        output_file = Mantis.Plot.export_path(output_directory_tree, output_filename)
-        
+        output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
+
         # Plot
         Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
 
-        # Test plotting  
+        # Test plotting
         # Read the cell data from the reference file
-        reference_file = Mantis.Plot.export_path(reference_directory_tree, output_filename)
+        reference_file = Mantis.GeneralHelpers.export_path(reference_directory_tree, output_filename)
         vtk_reference = ReadVTK.VTKFile(ReadVTK.get_example_file(reference_file))
         reference_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Points")["Points"])
         reference_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_reference, "Cells")["connectivity"])
@@ -270,7 +270,7 @@ for n_subcells in n_subcells_range
         vtk_output = ReadVTK.VTKFile(ReadVTK.get_example_file(output_file))
         output_points = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Points")["Points"])
         output_cells = ReadVTK.get_data(ReadVTK.get_data_section(vtk_output, "Cells")["connectivity"])
-        
+
         # Check if cell data is identical
         @test reference_points ≈ output_points atol = 1e-14
         @test reference_cells == output_cells

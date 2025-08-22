@@ -631,3 +631,81 @@ function _create_polar_spline_space_and_geometry(
 
     return (P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ, ts_r)
 end
+
+################################################################################
+# Masking for hierarchical spaces
+################################################################################
+
+function create_evaluation_mask_from_hierarchical_mesh(
+    hierarchical_space::FunctionSpaces.HierarchicalFiniteElementSpace{manifold_dim, S, T};
+    exclude_elements::Vector{Int}=Int[]
+) where {
+    manifold_dim,
+    S<:FunctionSpaces.AbstractFESpace{manifold_dim, 1},
+    T<:FunctionSpaces.AbstractTwoScaleOperator
+}
+    # initialize trivial evaluation mask for first level space
+    base_space = FunctionSpaces.get_space(hierarchical_space, 1)
+    # number of elements in base mesh
+    num_elements_base = FunctionSpaces.get_num_elements(base_space)
+    # get element vertices for the base space
+    base_element_vertices = [
+        FunctionSpaces.get_element_vertices(base_space, i) for i in 1:num_elements_base
+    ]
+
+    # number of elements in evaluation mask (i.e., the active hierarchical mesh)
+    num_elements = FunctionSpaces.get_num_elements(hierarchical_space)
+    # get eval to base element index map
+    element_idx_map = zeros(Int64, num_elements)
+    # get element vertices for the eval mask
+    eval_element_vertices = Vector{NTuple{manifold_dim, Vector{Float64}}}(
+        undef, num_elements
+    )
+    for i in 1:num_elements
+        element_level, element_level_id =
+        FunctionSpaces.convert_to_element_level_and_level_id(
+            hierarchical_space, i
+        )
+        eval_element_vertices[i] = FunctionSpaces.get_element_vertices(
+                FunctionSpaces.get_space(hierarchical_space, element_level),
+                element_level_id
+        )
+        element_idx_map[i] = FunctionSpaces.get_element_ancestor(
+            hierarchical_space.two_scale_operators,
+            element_level_id,
+            element_level,
+            element_level-1
+        )
+    end
+
+    # allocate memory for translations and scalings
+    translations = Vector{NTuple{manifold_dim, Float64}}(undef, num_elements)
+    scalings = Vector{NTuple{manifold_dim, Float64}}(undef, num_elements)
+
+    # create length scales (i.e., ratios of child and ancestor)
+    for element_idx in 1:num_elements
+        element_idx_base = element_idx_map[element_idx]
+        base_el_verts = base_element_vertices[element_idx_base]
+        eval_el_verts = eval_element_vertices[element_idx]
+
+        length_scales = [eval_el_verts[k][2] - eval_el_verts[k][1] for k in 1:manifold_dim] ./
+        [base_el_verts[k][2] - base_el_verts[k][1] for k in 1:manifold_dim]
+        scalings[element_idx] = tuple(length_scales...)
+
+        translations[element_idx] = tuple(
+            [(eval_el_verts[k][1] - base_el_verts[k][1]) /
+            (base_el_verts[k][2] - base_el_verts[k][1]) for k in 1:manifold_dim]...
+        )
+    end
+
+    # create corresponding evaluation mask
+    E = EvaluationMask.AffineEvaluationMask(
+        num_elements,
+        num_elements_base,
+        element_idx_map,
+        translations,
+        scalings
+    )
+    # return trimmed mask
+    return EvaluationMask.trim_evaluation_mask(E, exclude_elements)
+end

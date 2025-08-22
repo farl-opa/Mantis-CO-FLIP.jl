@@ -1,9 +1,14 @@
+function _L2_norm_square(u, element_id, dΩ)
+    integral = ∫(u ∧ ★(u), dΩ)
 
-function L2_norm(u, ∫)
+    return Forms.evaluate(integral, element_id)[1][1]
+end
+
+function L2_norm(u, dΩ)
     norm = 0.0
-    inner_prod = u * u
+    inner_prod = ∫(u ∧ ★(u), dΩ)
     for el_id in 1:Forms.get_num_elements(u)
-        norm += Forms.evaluate(inner_prod, el_id, ∫)[3][1]
+        norm += Forms.evaluate(inner_prod, el_id)[1][1]
     end
 
     return sqrt(norm)
@@ -19,30 +24,33 @@ function _compute_square_error_per_element(
     G <: Geometry.AbstractGeometry{manifold_dim},
     TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G},
     TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
-    Q <: Quadrature.QuadratureRule{manifold_dim},
+    Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
 }
-    num_elements = Geometry.get_num_elements(Forms.get_geometry(computed_sol))
+    num_elements = Quadrature.get_num_base_elements(quad_rule)
     result = Vector{Float64}(undef, num_elements)
 
     for elem_id in 1:1:num_elements
         difference = computed_sol - exact_sol
         if norm == "L2"
-            result[elem_id] = sum(
-                Forms.evaluate(difference * difference, elem_id, quad_rule)[3]
-            )
+            result[elem_id] = _L2_norm_square(difference, elem_id, quad_rule)
+        elseif norm == "H1"
+            throw(ArgumentError("Computing the H1 norm still needs to be updated."))
+            # d_difference = Forms.ExteriorDerivative(difference)
+            # result[elem_id] = sum(
+            #     Forms.evaluate_inner_product(
+            #         d_difference, d_difference, elem_id, quad_rule
+            #     )[3],
+            # )
         elseif norm == "Linf"
             result[elem_id] = maximum(
                 abs.(
                     Forms.evaluate(difference, elem_id, Quadrature.get_nodes(quad_rule))[1][1]
                 ),
             )
-        elseif norm == "H1"
-            Error("Computing the H1 norm still needs to be updated.")
-            d_difference = Forms.exterior_derivative(difference)
-            result[elem_id] = sum(
-                Forms.evaluate(
-                    d_difference * d_difference, elem_id, quad_rule
-                )[3],
+        else
+            throw(ArgumentError(
+                "Unknown norm '$norm'. Only 'L2', 'Linf', and 'H1' are accepted inputs."
+                )
             )
         end
     end
@@ -61,7 +69,7 @@ function compute_error_per_element(
     G <: Geometry.AbstractGeometry{manifold_dim},
     TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G},
     TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
-    Q <: Quadrature.QuadratureRule{manifold_dim},
+    Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
 }
     partial_result = _compute_square_error_per_element(
         computed_sol, exact_sol, quad_rule, norm
@@ -89,7 +97,7 @@ function compute_error_total(
     G <: Geometry.AbstractGeometry{manifold_dim},
     TF1 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_1, G},
     TF2 <: Forms.AbstractFormExpression{manifold_dim, form_rank, expression_rank_2, G},
-    Q <: Quadrature.QuadratureRule{manifold_dim},
+    Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
 }
     partial_result = _compute_square_error_per_element(
         computed_sol, exact_sol, quad_rule, norm

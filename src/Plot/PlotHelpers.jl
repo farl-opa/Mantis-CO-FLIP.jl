@@ -1,31 +1,4 @@
 """
-    export_path(output_directory_tree::Vector{String}, filename::String)
-
-Create a directory (if needed) and return the path to the output file.
-
-# Arguments
-- `output_directory_tree::Vector{String}`: A vector of strings representing the directory tree.
-- `filename::String`: The name of the output file.
-
-# Example
-```julia
-output_file = export_path(["examples", "data", "output"], "output.vtk") # "examples/data/output/output.vtk"
-```
-"""
-function export_path(output_directory_tree::Vector{String}, filename::String)
-    Mantis_folder = dirname(dirname(pathof(parentmodule(Plot))))
-    output_directory = joinpath(Mantis_folder, output_directory_tree...)
-    output_file = joinpath(output_directory, filename)
-    
-   if !isdir(output_directory)
-        println("Creating new directory $output_directory ...")
-        mkpath(output_directory)
-    end
-
-    return output_file
-end
-
-"""
     visualize_geometry(geo::Geometry.AbstractGeometry, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
 
 Export the geometry to a VTK file.
@@ -38,10 +11,10 @@ Export the geometry to a VTK file.
 - `output_directory_tree::Vector{String}`: A vector of strings representing the directory tree.
 """
 function export_geometry_to_vtk(geo::Geometry.AbstractGeometry, filename::String; n_subcells::Int = 1, degree::Int = 4, output_directory_tree::Vector{String} = ["examples", "data", "output"])
-    
+
     output_file = export_path(output_directory_tree, filename)
     plot(geo; vtk_filename = output_file, n_subcells = n_subcells, degree = degree, ascii = false, compress = false)
-    
+
     return nothing
 end
 
@@ -116,22 +89,22 @@ function visualize_tensor_product_controlnet(control_points::Array{Float64,proje
 
     # create bilinear geometry
     B = [FunctionSpaces.BSplineSpace(Mesh.Patch1D(collect(LinRange(0.0, 1.0, size(control_points,i)+periodic[i]))), 1, 0) for i in 1:manifold_dim]
-    
+
     # impose periodicity if required
     for i = 1:manifold_dim
         if periodic[i]
             B[i] = FunctionSpaces.GTBSplineSpace((B[i],), [0])
         end
     end
-    
+
     # create n-linear tensor product space
     TP = FunctionSpaces.TensorProductSpace(B...)
 
     # create geometry
-    geo = Geometry.FEMGeometry(TP, reshape(control_points, :, range_dim))
-    
+    geo = Geometry.FEGeometry(TP, reshape(control_points, :, range_dim))
+
     # export to vtk
     visualize_geometry(geo, filename; n_subcells=1, degree=1, output_directory_tree=output_directory_tree)
-    
+
     return nothing
 end

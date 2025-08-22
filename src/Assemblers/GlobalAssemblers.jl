@@ -1,184 +1,335 @@
+using InteractiveUtils
+"""
+    assemble(
+        weak_form::WeakForm{manifold_dim, LHS, RHS, I},
+        dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
+        lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
+        rhs_type::Type=Matrix{Float64},
+    ) where {
+        manifold_dim,
+        num_rows,
+        lhs_num_cols,
+        rhs_num_cols,
+        LHS <: NTuple{
+            num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        RHS <: NTuple{
+            num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        I,
+    }
 
-@doc raw"""
-    assemble(weak_form::F, weak_form_inputs::W, dirichlet_bcs::Dict{Int, Float64}) where {F <: Function, W <: AbstractInputs}
-
-Assemble a continuous Galerkin problem for the given weak form and 
-Dirichlet boundary conditions.
+Assemble the left- and right-hand sides of a discrete Petrov-Galerkin problem for the given
+weak-formulation and Dirichlet boundary conditions.
 
 # Arguments
-- `WeakForm <: Function`: The weak form to assemble.
-- `WeakFormInputs <: AbstractInputs`: The inputs for the weak form.
-- `dirichlet_bcs::Dict{Int, Float64}`: A dictionary containing the 
-  Dirichlet boundary conditions, where the key is the index of the 
-  boundary condition and the value is the boundary condition value.
+- `weak_form::WeakForm{manifold_dim, LHS, RHS, I}`: The weak form to assemble.
+- `dirichlet_bcs::Dict{Int, Float64}`: A dictionary containing the Dirichlet boundary
+    conditions, where the key is the index of the boundary condition and the value is the
+    boundary condition value.
+- `lhs_type::Type`: The type of the left-hand side matrix. Default is
+    `SparseMatrixCSC{Float64, Int}`.
+- `rhs_type::Type`: The type of the right-hand side matrix. Default is `Matrix{Float64}`.
 
 # Returns
-- `A::SparseMatrixCSC{Float64, Int}`: The assembled system matrix.
-- `b::Vector{Float64}`: The assembled right-hand side vector.
+- `lhs::lhs_type`: The assembled left-hand side matrix.
+- `rhs::rhs_type`: The assembled right-hand side vector.
 """
-function assemble(weak_form::F, weak_form_inputs::W, dirichlet_bcs::Dict{Int, Float64}) where {F <: Function, W <: AbstractInputs}
-    # Get the actual size of the problem.
-    n_dofs_trial, n_dofs_test = get_problem_size(weak_form_inputs)
-    
-    # Pre-allocate
-    nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
-
-    nvals_A = 9 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 9 times due to the forms being per component. This needs to be updated.
-    A_column_idxs = Vector{Int}(undef, nvals_A)
-    A_row_idxs = Vector{Int}(undef, nvals_A)
-    A_vals = Vector{Float64}(undef, nvals_A)
-
-    # The rhs-vector will have to be a dense vector to be able to solve, 
-    # and this is also easier and more efficient when specifying 
-    # boundary conditions, so it is already dense.
-    b = zeros(Float64, n_dofs_test)
-    
-    # Keep track of the number of elements added to matrix A. Note that 
-    # these can contain duplicates, so these will not indicate the final sizes.
-    counts_A = 0
-
-    # Loop over all active elements
-    for elem_id in 1:get_num_elements(weak_form_inputs)
-        # Volume/element contributions
-        contrib_A, contrib_b = weak_form(weak_form_inputs, elem_id)
-
-        for idx in eachindex(contrib_A...)
-            counts_A += 1
-            A_row_idxs[counts_A] = contrib_A[1][idx]
-            A_column_idxs[counts_A] = contrib_A[2][idx]
-            A_vals[counts_A] = contrib_A[3][idx]
+function assemble(
+    weak_form::WeakForm{manifold_dim, LHS, RHS, I},
+    dirichlet_bcs::Dict{Int, Float64}=Dict{Int, Float64}();
+    lhs_type::Type=spa.SparseMatrixCSC{Float64, Int},
+    rhs_type::Type=Matrix{Float64},
+) where {
+    manifold_dim,
+    num_rows,
+    lhs_num_cols,
+    rhs_num_cols,
+    LHS <:
+    NTuple{num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    RHS <:
+    NTuple{num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    I,
+}
+    lhs_expressions = get_lhs_expressions(weak_form)
+    rhs_expressions = get_rhs_expressions(weak_form)
+    test_offsets, trial_offsets = get_test_offsets(weak_form), get_trial_offsets(weak_form)
+    lhs_rows, lhs_cols, lhs_vals = get_pre_allocation(weak_form, "lhs")
+    rhs_rows, rhs_cols, rhs_vals = get_pre_allocation(weak_form, "rhs")
+    lhs_counts, rhs_counts = 0, 0
+    # TODO: The loop over elements should also handle boundary integrals.
+    # PERF: We might what to make the loop over elements the inner most one; that way we can
+    # skip the 0 expressions instead of checking them everytime.
+    for elem_id in 1:get_num_elements(weak_form), row in 1:num_rows
+        for col in 1:lhs_num_cols
+            lhs_rows, lhs_cols, lhs_vals, lhs_counts = add_expression_contributions!(
+                lhs_rows,
+                lhs_cols,
+                lhs_vals,
+                lhs_counts,
+                lhs_expressions[row][col],
+                elem_id,
+                test_offsets[row],
+                trial_offsets[col],
+            )
         end
 
-        for idx in eachindex(contrib_b...)
-            b[contrib_b[1][idx]] += contrib_b[2][idx]
+        for col in 1:rhs_num_cols
+            rhs_rows, rhs_cols, rhs_vals, rhs_counts = add_expression_contributions!(
+                rhs_rows,
+                rhs_cols,
+                rhs_vals,
+                rhs_counts,
+                rhs_expressions[row][col],
+                elem_id,
+                test_offsets[row],
+                trial_offsets[col],
+            )
         end
-
-        # Interface contributions (Internal boundaries)
-
-        # Boundary contributions (External boundaries)
-
     end
 
+    lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals = add_bc!(
+        lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals, dirichlet_bcs
+    )
+    lhs_size = get_lhs_size(weak_form)
+    rhs_size = get_rhs_size(weak_form)
+    lhs = build_matrix(
+        lhs_type,
+        lhs_rows[1:lhs_counts],
+        lhs_cols[1:lhs_counts],
+        lhs_vals[1:lhs_counts],
+        lhs_size,
+    )
+    rhs = build_matrix(
+        rhs_type,
+        rhs_rows[1:rhs_counts],
+        rhs_cols[1:rhs_counts],
+        rhs_vals[1:rhs_counts],
+        rhs_size,
+    )
 
-    # Set Dirichlet conditions if needed.
-    # WARNING: This may not work as intended if the boundary indices are 
-    # duplicated in the given row and column vectors!
-    if ~isempty(dirichlet_bcs)
-        # Set the bc value for the rhs.
-        for (bc_idx, bc_value) in pairs(dirichlet_bcs)
-            b[bc_idx] = bc_value
+    return lhs, rhs
+end
+
+"""
+    get_pre_allocation(weak_form::WeakForm, side::String)
+
+Returns pre-allocated row, column, and value vectors for the left-hand side (lhs) or
+right-hand side (rhs) matrix.
+
+# Arguments
+- `weak_form::WeakForm`: The weak form to use for the pre-allocation.
+- `side::String`: The side of the matrix to pre-allocate. Must be either "lhs" or "rhs".
+
+# Returns
+- `rows::Vector{Int}`: The pre-allocated row indices.
+- `cols::Vector{Int}`: The pre-allocated column indices.
+- `vals::Vector{Float64}`: The pre-allocated values.
+"""
+function get_pre_allocation(weak_form::WeakForm, side::String)
+    nnz_elem = get_estimated_nnz_per_elem(weak_form)
+    if side == "lhs"
+        nvals = nnz_elem[1] * get_num_evaluation_elements(weak_form)
+    elseif side == "rhs"
+        nvals = nnz_elem[2] * get_num_evaluation_elements(weak_form)
+    else
+        throw(ArgumentError("Invalid side: $(side). Must be 'lhs' or 'rhs'."))
+    end
+
+    rows = Vector{Int}(undef, nvals)
+    if side == "rhs" && ~isnothing(get_forcing(weak_form))
+        cols = ones(Int, nvals)
+    else
+        cols = Vector{Int}(undef, nvals)
+    end
+
+    vals = Vector{Float64}(undef, nvals)
+
+    return rows, cols, vals
+end
+
+"""
+    add_expression_contributions!(
+        rows::Vector{Int},
+        cols::Vector{Int},
+        vals::Vector{Float64},
+        counts::Int,
+        expression,
+        element_id::Int,
+        test_offset::Int,
+        trial_offset::Int,
+    )
+
+Updates the row, column, and value vectors with contributions from the specified real-valued
+expression at the element given by `element_id`.
+
+# Arguments
+- `rows::Vector{Int}`: The row indices of the matrix.
+- `cols::Vector{Int}`: The column indices of the matrix.
+- `vals::Vector{Float64}`: The values of the matrix.
+- `counts::Int`: The current count of non-zero entries in the matrix.
+- `expressions`: The expression to evaluate.
+- `element_id::Int`: The identifier of the element.
+- `test_offsets::Int`: The offset for the test function.
+- `trial_offsets::Int`: The offset for the trial function.
+
+# Returns
+- `rows::Vector{Int}`: The updated row indices of the matrix.
+- `cols::Vector{Int}`: The updated column indices of the matrix.
+- `vals::Vector{Float64}`: The updated values of the matrix.
+- `counts::Int`: The updated count of non-zero entries in the matrix.
+"""
+function add_expression_contributions!(
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    counts::Int,
+    expression,
+    element_id::Int,
+    test_offset::Int,
+    trial_offset::Int,
+)
+    if expression == 0
+        return rows, cols, vals, counts
+    end
+
+    block_eval, block_indices = Forms.evaluate(expression, element_id)
+    for ord_id in CartesianIndices(block_eval)
+        counts += 1
+        for exp_id in eachindex(block_indices)
+            if exp_id == 1
+                rows[counts] = block_indices[1][ord_id[1]] + test_offset
+            elseif exp_id == 2
+                cols[counts] = block_indices[2][ord_id[2]] + trial_offset
+            end
         end
-        
-        # Update the A matrix to be an identity row for the given 
-        # indices. As the default sparse matrices are column-based, we 
-        # cannot easily set all values in a row to zero, so we have to 
-        # loop over all indices and check if they are boundary indices.
-        for idx in eachindex(A_row_idxs, A_column_idxs, A_vals)
+
+        vals[counts] = block_eval[ord_id]
+    end
+
+    return rows, cols, vals, counts
+end
+
+"""
+    add_bc!(
+        lhs_rows::Vector{Int},
+        lhs_cols::Vector{Int},
+        lhs_vals::Vector{Float64},
+        rhs_rows::Vector{Int},
+        rhs_cols::Vector{Int},
+        rhs_vals::Vector{Float64},
+        dirichlet_bcs::Dict{Int, Float64},
+    )
+
+Adds Dirichlet boundary conditions to the left-hand side and right-hand side matrices.
+
+# Arguments
+- `lhs_rows::Vector{Int}`: The row indices of the left-hand side matrix.
+- `lhs_cols::Vector{Int}`: The column indices of the left-hand side matrix.
+- `lhs_vals::Vector{Float64}`: The values of the left-hand side matrix.
+- `rhs_rows::Vector{Int}`: The row indices of the right-hand side matrix.
+- `rhs_cols::Vector{Int}`: The column indices of the right-hand side matrix.
+- `rhs_vals::Vector{Float64}`: The values of the right-hand side matrix.
+- `dirichlet_bcs::Dict{Int, Float64}`: The Dirichlet boundary conditions, where the key is
+    the index of the boundary condition and the value is the boundary condition value.
+
+# Returns
+- `lhs_rows::Vector{Int}`: The updated row indices of the left-hand side matrix.
+- `lhs_cols::Vector{Int}`: The updated column indices of the left-hand side matrix.
+- `lhs_vals::Vector{Float64}`: The updated values of the left-hand side matrix.
+- `rhs_rows::Vector{Int}`: The updated row indices of the right-hand side matrix.
+- `rhs_cols::Vector{Int}`: The updated column indices of the right-hand side matrix.
+- `rhs_vals::Vector{Float64}`: The updated values of the right-hand side matrix.
+"""
+function add_bc!(
+    lhs_rows::Vector{Int},
+    lhs_cols::Vector{Int},
+    lhs_vals::Vector{Float64},
+    rhs_rows::Vector{Int},
+    rhs_cols::Vector{Int},
+    rhs_vals::Vector{Float64},
+    dirichlet_bcs::Dict{Int, Float64},
+)
+    if ~isempty(dirichlet_bcs)
+        for id in eachindex(lhs_rows, lhs_cols, lhs_vals)
             # Check if the row index is also a boundary index.
-            if haskey(dirichlet_bcs, A_row_idxs[idx])
-                if A_column_idxs[idx] == A_row_idxs[idx]
+            if haskey(dirichlet_bcs, lhs_rows[id])
+                if lhs_cols[id] == lhs_rows[id]
                     # Diagonal term, set to 1.0.
-                    A_vals[idx] = 1.0
+                    lhs_vals[id] = 1.0
                 else
                     # Non-diagoal term, set to 0.0.
-                    A_vals[idx] = 0.0
+                    lhs_vals[id] = 0.0
                 end
+            end
+        end
+
+        for id in eachindex(rhs_rows, rhs_cols, rhs_vals)
+            # Check if the row index is also a boundary index.
+            if haskey(dirichlet_bcs, rhs_rows[id])
+                # Set the value to the Dirichlet boundary condition value.
+                rhs_vals[id] = dirichlet_bcs[rhs_rows[id]]
             end
         end
     end
 
-    A = spa.sparse(A_row_idxs[1:counts_A], A_column_idxs[1:counts_A], 
-                    A_vals[1:counts_A], n_dofs_trial, n_dofs_test) 
-    
-    # We can call this function to remove the added zeros (especially 
-    # from the boundary conditions), though I am not sure if this is 
-    # worth it or needed. Note that this would also remove zero values 
-    # that happen to be zero by computation. 
-    #spa.dropzeros!(A)
-
-    return A, b
-
+    return lhs_rows, lhs_cols, lhs_vals, rhs_rows, rhs_cols, rhs_vals
 end
 
-############################################################################################
-#                                    Maxwell Eigenvalue                                    #
-############################################################################################
+"""
+    build_matrix(
+        matrix_type::Type,
+        rows::Vector{Int},
+        cols::Vector{Int},
+        vals::Vector{Float64},
+        size::Tuple{Int, Int},
+    )
 
-function assemble_eigenvalue(
-    weak_form::F, weak_form_inputs::W, bcs::Dict{Int, Float64}
-) where {F <: Function, W <: AbstractInputs}
-    # Get the actual size of the problem.
-    n_dofs_trial, n_dofs_test = get_problem_size(weak_form_inputs)
+Returns a matrix of the specified type with the given row and column indices and values.
 
-    # Pre-allocate
-    nnz_elem = get_estimated_nnz_per_elem(weak_form_inputs)
+# Arguments
+- `matrix_type::Type`: The type of matrix to build.
+- `rows::Vector{Int}`: The row indices of the matrix.
+- `cols::Vector{Int}`: The column indices of the matrix.
+- `vals::Vector{Float64}`: The values of the matrix.
+- `size::Tuple{Int, Int}`: The size of the matrix.
 
-    nvals = 9 * nnz_elem[1] * get_num_elements(weak_form_inputs)  # 4 times due to the forms being per component. This needs to be updated.
-    A_column_idxs = Vector{Int}(undef, nvals)
-    A_row_idxs = Vector{Int}(undef, nvals)
-    A_vals = Vector{Float64}(undef, nvals)
-    B_column_idxs = Vector{Int}(undef, nvals)
-    B_row_idxs = Vector{Int}(undef, nvals)
-    B_vals = Vector{Float64}(undef, nvals)
+# Returns
+- `::matrix_type`: The constructed matrix of the specified type.
+"""
+function build_matrix(
+    matrix_type::Type,
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    size::Tuple{Int, Int},
+)
+    throw(
+        ArgumentError("Assembly of matrix type `$(matrix_type)` not currently implemented.")
+    )
+end
 
-    # Keep track of the number of elements added to matrix A. Note that 
-    # these can contain duplicates, so these will not indicate the final sizes.
-    counts_A = 0
-    counts_B = 0
+function build_matrix(
+    ::Type{SM},
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    size::Tuple{Int, Int},
+) where {SM <: spa.AbstractSparseMatrix}
+    return spa.sparse(rows, cols, vals, size...)
+end
 
-    # Loop over all active elements
-    for elem_id in 1:get_num_elements(weak_form_inputs)
-        # Volume/element contributions
-        contrib_A, contrib_B = weak_form(weak_form_inputs, elem_id)
-
-        for idx in eachindex(contrib_A...)
-            counts_A += 1
-            A_row_idxs[counts_A] = contrib_A[1][idx]
-            A_column_idxs[counts_A] = contrib_A[2][idx]
-            A_vals[counts_A] = contrib_A[3][idx]
-        end
-
-        for idx in eachindex(contrib_B...)
-            counts_B += 1
-            B_row_idxs[counts_B] = contrib_B[1][idx]
-            B_column_idxs[counts_B] = contrib_B[2][idx]
-            B_vals[counts_B] = contrib_B[3][idx]
-        end
-
-        # Interface contributions (Internal boundaries)
-
-        # Boundary contributions (External boundaries)
-
+function build_matrix(
+    ::Type{Matrix{Float64}},
+    rows::Vector{Int},
+    cols::Vector{Int},
+    vals::Vector{Float64},
+    size::Tuple{Int, Int},
+)
+    matrix = zeros(Float64, size)
+    for (row, col, val) in zip(rows, cols, vals)
+        matrix[row, col] += val
     end
 
-    A = spa.sparse(
-        A_row_idxs[1:counts_A],
-        A_column_idxs[1:counts_A],
-        A_vals[1:counts_A],
-        n_dofs_trial,
-        n_dofs_test,
-    )
-    B = spa.sparse(
-        B_row_idxs[1:counts_B],
-        B_column_idxs[1:counts_B],
-        B_vals[1:counts_B],
-        n_dofs_trial,
-        n_dofs_test,
-    )
-
-    # Convert to Matrix type because eigen does not work with SparseMatrixCSC.
-    A = Matrix(A)
-    B = Matrix(B)
-
-    non_boundary_rows_cols = setdiff(1:n_dofs_trial, keys(bcs))
-    A = A[non_boundary_rows_cols, non_boundary_rows_cols]
-    B = B[non_boundary_rows_cols, non_boundary_rows_cols]
-
-    # We can call this function to remove the added zeros (especially 
-    # from the boundary conditions), though I am not sure if this is 
-    # worth it or needed. Note that this would also remove zero values 
-    # that happen to be zero by computation. 
-    #spa.dropzeros!(A)
-
-    return A, B
+    return matrix
 end

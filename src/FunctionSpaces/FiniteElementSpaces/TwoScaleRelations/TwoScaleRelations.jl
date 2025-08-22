@@ -7,8 +7,10 @@ and fine finite element spaces.
 # Fields
 - `coarse_space::S`: The coarse finite element space.
 - `fine_space::S`: The fine finite element space.
-- `global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}`: The global
-    subdivision matrix.
+- `global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}`: The global subdivision
+    matrix. The size of this matrix is `(num_fine_basis, num_coarse_basis)` where
+    `num_fine_basis` is the dimension of `fine_space` and `num_coarse_basis` the dimension
+    of `coarse_space`.
 - `coarse_to_fine_elements::Vector{Vector{Int}}`: A vector of vectors containing the child
     element IDs for each coarse element.
 - `fine_to_coarse_elements::Vector{Int}`: A vector containing the parent element ID for
@@ -37,20 +39,20 @@ struct TwoScaleOperator{manifold_dim, S} <: AbstractTwoScaleOperator{manifold_di
         if typeof(coarse_space) != typeof(fine_space)
             throw(ArgumentError("The coarse and fine spaces must be of the same type."))
         end
+
         dims = size(global_subdiv_matrix)
         coarse_to_fine_functions = Vector{Vector{Int}}(undef, dims[2])
         fine_to_coarse_functions = Vector{Vector{Int}}(undef, dims[1])
-
         gm_data = SparseArrays.findnz(global_subdiv_matrix)
         transpose_matrix = SparseArrays.sparse(gm_data[2], gm_data[1], gm_data[3])
-
-        for i in 1:1:dims[2]
+        for i in 1:dims[2]
             coarse_to_fine_functions[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(
                 global_subdiv_matrix, i
             )]
         end
-        for i in 1:1:dims[1]
-            fine_to_coarse_functions[i] = global_subdiv_matrix.rowval[SparseArrays.nzrange(
+
+        for i in 1:dims[1]
+            fine_to_coarse_functions[i] = transpose_matrix.rowval[SparseArrays.nzrange(
                 transpose_matrix, i
             )]
         end
