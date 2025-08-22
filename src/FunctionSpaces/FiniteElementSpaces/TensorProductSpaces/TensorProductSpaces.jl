@@ -539,7 +539,7 @@ function get_local_basis(
         for space in 1:num_spaces
             space_der_order = sum(key[const_manifold_indices[space]])
             space_der_id = get_derivative_idx(key[const_manifold_indices[space]])
-            const_eval[space] = const_local_basis[space][space_der_order + 1][space_der_id][1]
+            const_eval[space] .= const_local_basis[space][space_der_order + 1][space_der_id][1]
         end
 
         if manifold_dim == 1

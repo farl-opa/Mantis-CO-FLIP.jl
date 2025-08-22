@@ -7,7 +7,6 @@ Tests for tensor-product spline spaces.
 import Mantis
 
 using Test
-using InteractiveUtils
 
 ###
 ### Basic tensor-product tests
