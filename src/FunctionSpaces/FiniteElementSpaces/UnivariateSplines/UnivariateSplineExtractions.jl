@@ -1,52 +1,29 @@
-"""
-    create_identity(ni::Int, d::Int) -> Vector{Matrix{Float64}}
-
-Create a vector of `ni` identity matrices, each of size `d × d`.
-
-# Arguments
-- `ni::Int`: Number of identity matrices to create.
-- `d::Int`: Size of each identity matrix.
-
-# Returns
-- `Vector{Matrix{Float64}}`: A vector containing `ni` identity matrices, each of size
-    `d × d`.
-
-# Examples
-julia> create_identity(2, 3)
-2-element Vector{Matrix{Float64}}:
- [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
- [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]
-"""
-function create_identity(ni::Int, d::Int)
-    # Initialize a vector to store the identity matrices
-    Id = Vector{Matrix{Float64}}(undef, ni)
-
-    # Create 'ni' identity matrices
-    for i in 1:ni
-        # Initialize a d×d zero matrix
-        Id[i] = zeros(d, d)
-
-        # Set diagonal elements to 1.0 to create an identity matrix
-        for j in 1:d
-            Id[i][j, j] = 1.0
-        end
-    end
-
-    return Id
-end
 
 """
-    extract_bspline_to_section_space(knot_vector::KnotVector, canonical_space::AbstractCanonicalSpace)
+    extract_bspline_to_section_space(
+        knot_vector::KnotVector, canonical_space::AbstractCanonicalSpace
+    )
 
 Compute the extraction coefficients of B-Spline basis functions in terms of canonical basis
 functions.
 
 # Arguments
 - `knot_vector::KnotVector`: The knot vector defining the B-Spline basis.
-- `polynomials::AbstractCanonicalSpace`: The canonical space.
+- `polynomials::AbstractCanonicalSpace`: The canonical space to extract to.
 
 # Returns
-- `::ExtractionOperator`: See [`ExtractionOperator`](@ref) for the details.
+- `::ExtractionOperator{Indices{1, TE, TI, TJ}}`: See [`ExtractionOperator`](@ref)
+    for the details.
+
+# Note
+The extraction coefficients `E[el]` for element `el` contain the coefficients of the linear
+combination of reference Canonical polynomials determining the basis functions on that
+element.
+
+# References
+- Borden, M. J., Scott, M. A., Evans, J. A., & Hughes, T. J. R. (2011).
+  Isogeometric finite element data structures based on Bézier extraction of spline_spaces.
+  International Journal for Numerical Methods in Engineering, 87(1-5), 15-47.
 """
 function extract_bspline_to_section_space(
     knot_vector::KnotVector, canonical_space::AbstractCanonicalSpace
@@ -74,58 +51,81 @@ function extract_bspline_to_section_space(
     end
 
     # Initialize extraction matrices for each element
-    E = create_identity(nel, knot_vector.polynomial_degree + 1)
+    E = [(LinearAlgebra.I,) for _ in 1:nel]
 
     # Compute indices of supported basis functions on each element
-    basis_indices = Vector{Vector{Int}}(undef, nel)
-    basis_indices[1] = 1:(knot_vector.polynomial_degree + 1)
+    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices[1] = Indices(
+        1:1:knot_vector.polynomial_degree + 1,
+        (1:1:knot_vector.polynomial_degree + 1,),
+    )
     for el in 2:nel
-        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
+        basis_indices[el] = Indices(
+            get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
+            (1:1:knot_vector.polynomial_degree + 1,),
+        )
     end
 
     return ExtractionOperator(
-        E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree + 1]
+        E, basis_indices, nel, get_basis_indices(basis_indices[end])[end]
     )
 end
 
-"""
-    extract_bspline_to_bernstein(knot_vector::KnotVector) -> ExtractionOperator
+function extract_bspline_to_section_space(
+    knot_vector::KnotVector, canonical_space::AbstractEdgePolynomials
+)
+    # Number of elements in the knot vector
+    nel = size(knot_vector.patch_1d)
 
-Compute the extraction coefficients of B-Spline basis functions defined by the given knot vector.
+    # Ensure that regularities at all breakpoints are either 0 or -1
+    for el in 1:(nel - 1)
+        # Get multiplicity of the knot at the end of the current element
+        mult = knot_vector.multiplicity[el + 1]
+        if mult < knot_vector.polynomial_degree+1
+            throw(
+                ArgumentError(
+                    "The Edge-polynomial extraction is only implemented for regularity -1."
+                ),
+            )
+        end
+    end
 
-This function implements the Bézier extraction process, converting B-Spline basis functions
-to Bernstein polynomials on each element of the knot vector.
+    # Initialize extraction matrices for each element
+    E = [(LinearAlgebra.I,) for _ in 1:nel]
 
-# Arguments
-- `knot_vector::KnotVector`: The knot vector defining the B-Spline basis.
+    # Compute indices of supported basis functions on each element
+    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices[1] = Indices(
+        1:1:knot_vector.polynomial_degree + 1,
+        (1:1:knot_vector.polynomial_degree + 1,),
+    )
+    for el in 2:nel
+        basis_indices[el] = Indices(
+            get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
+            (1:1:knot_vector.polynomial_degree + 1,),
+        )
+    end
 
-# Returns
-- `ExtractionOperator`: A struct containing:
-- `E::Vector{Matrix{Float64}}`: Extraction coefficients for each element.
-- `basis_indices::Vector{Vector{Int}}`: Indices of supported basis functions on each element.
-- `nel::Int`: Number of elements.
-- `num_basis_functions::Int`: Total number of basis functions.
+    return ExtractionOperator(
+        E, basis_indices, nel, get_basis_indices(basis_indices[end])[end]
+    )
+end
 
-# Note
-The extraction coefficients `E[el]` for element `el` contain the coefficients of the linear
-combination of reference Bernstein polynomials determining the basis functions on that element.
 
-# References
-- Borden, M. J., Scott, M. A., Evans, J. A., & Hughes, T. J. R. (2011).
-  Isogeometric finite element data structures based on Bézier extraction of spline_spaces.
-  International Journal for Numerical Methods in Engineering, 87(1-5), 15-47.
-"""
 function extract_bspline_to_section_space(
     knot_vector::KnotVector, canonical_space::Bernstein
 )
     # Number of elements in the knot vector
     nel = size(knot_vector.patch_1d)
 
+    p = knot_vector.polynomial_degree
+    breakpoints = knot_vector.patch_1d.breakpoints
+
     # Initialize extraction matrices for each element
-    E = create_identity(nel, knot_vector.polynomial_degree + 1)
+    E = [(Matrix{Float64}(LinearAlgebra.I, p+1, p+1),) for _ in 1:nel]
 
     # Array to store knot insertion coefficients
-    alphas = zeros(max(knot_vector.polynomial_degree - 1, 0))
+    alphas = zeros(max(p - 1, 0))
 
     # Iterate over all elements
     for el in 1:nel
@@ -133,63 +133,51 @@ function extract_bspline_to_section_space(
         mult = knot_vector.multiplicity[el + 1]
 
         # If multiplicity is less than polynomial degree, perform knot insertion
-        if mult < knot_vector.polynomial_degree
+        if mult < p
             # Calculate numerator for alpha coefficients
-            numer = knot_vector.patch_1d.breakpoints[el + 1] -
-                knot_vector.patch_1d.breakpoints[el]
-            r = knot_vector.polynomial_degree - mult
+            numer = breakpoints[el + 1] - breakpoints[el]
+            r = p - mult
 
             # Compute alpha coefficients
-            for j in (knot_vector.polynomial_degree - 1):-1:mult
+            for j in (p - 1):-1:mult
                 idx = el + 1 + floor(Int, j / mult)
 
                 if idx > nel + 1
-                    alphas[j - mult + 1] =
-                        numer / (
-                            knot_vector.patch_1d.breakpoints[end] -
-                            knot_vector.patch_1d.breakpoints[el]
-                        )
+                    alphas[j - mult + 1] = numer / (breakpoints[end] - breakpoints[el])
                 else
-                    alphas[j - mult + 1] =
-                        numer / (
-                            knot_vector.patch_1d.breakpoints[idx] -
-                            knot_vector.patch_1d.breakpoints[el]
-                        )
+                    alphas[j - mult + 1] = numer / (breakpoints[idx] - breakpoints[el])
                 end
             end
 
             # Update extraction coefficients
             for j in 1:r
                 s = mult + j - 1
-                for k in (knot_vector.polynomial_degree):-1:(s + 1)
+                for k in (p):-1:(s + 1)
                     alpha = alphas[k - s]
-                    E[el][k + 1, :] .=
-                        (@view E[el][k + 1, :]) .* alpha .+
-                        (@view E[el][k, :]) .* (1.0 - alpha)
+                    E[el][1][k + 1, :] .= (@view E[el][1][k + 1, :]) .* alpha .+ (@view E[el][1][k, :]) .* (1.0 - alpha)
                 end
 
                 # Save coefficients for the next element
                 save = r - j + 1
                 if el < nel
-                    E[el + 1][save, save:(save + j)] .= (@view E[el][
-                        knot_vector.polynomial_degree + 1,
-                        (knot_vector.polynomial_degree - j + 1):(knot_vector.polynomial_degree + 1),
-                    ])
+                    E[el + 1][1][save, save:(save + j)] .= (@view E[el][1][p + 1, (p - j + 1):(p + 1)])
                 end
             end
         end
     end
 
     # Compute indices of supported basis functions on each element
-    basis_indices = Vector{Vector{Int}}(undef, nel)
-    basis_indices[1] = 1:(knot_vector.polynomial_degree + 1)
+    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices[1] = Indices(1:1:p + 1, (1:1:p + 1,),)
     for el in 2:nel
-        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
+        basis_indices[el] = Indices(
+            get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
+            (1:1:p + 1,),
+        )
     end
 
-    # Create and return the ExtractionOperator struct
     return ExtractionOperator(
-        E, basis_indices, nel, basis_indices[nel][knot_vector.polynomial_degree + 1]
+        E, basis_indices, nel, get_basis_indices(basis_indices[end])[end]
     )
 end
 
@@ -219,7 +207,8 @@ function extract_bspline_to_section_space(
         mult = knot_vector.multiplicity[el + 1]
         r = p - mult
 
-        # Construct smoothness constraint matrix contributions from the left and right of the breakpoint
+        # Construct smoothness constraint matrix contributions from the left and right of
+        # the breakpoint
         KL = _evaluate_all_at_point(canonical_space, 1.0, r)
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, KL)
         KR = _evaluate_all_at_point(canonical_space, 0.0, r)
@@ -252,40 +241,51 @@ function extract_bspline_to_section_space(
     # Remove small values obtained as a result of round-off errors
     SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, H)
 
-    # Compute basis indices
-    basis_indices = Vector{Vector{Int}}(undef, nel)
-    basis_indices[1] = 1:(p + 1)
+    # Compute basis indices of supported basis functions on each element.
+    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices[1] = Indices(1:1:(p + 1), (1:1:(p + 1),))
     for el in 2:nel
-        basis_indices[el] = basis_indices[el - 1] .+ knot_vector.multiplicity[el]
+        basis_indices[el] = Indices(
+        get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
+        (1:1:(p + 1),),
+    )
     end
+
     # Convert global extraction matrix to element local extractions
     # (the matrix is transposed here so that [canonical_space] * [extraction] = [B-splines])
     extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
     for el in 1:nel
         cols_el = (canonical_dims[el] + 1):canonical_dims[el + 1]
         # Matrix of coefficients
-        extraction_coefficients[el] = Array(H[basis_indices[el], cols_el])'
+        extraction_coefficients[el] = Matrix(
+            H[get_basis_indices(basis_indices[el]), cols_el]
+        )'
     end
 
-    # Create and return the ExtractionOperator
-    return ExtractionOperator(extraction_coefficients, basis_indices, nel, size(H, 1))
+    Etup = [(extraction_coefficients[el],) for el in eachindex(extraction_coefficients)]
+
+    return ExtractionOperator(Etup, basis_indices, nel, size(H, 1))
 end
 
 """
-    extract_gtbspline_to_bspline(spline_spaces::NTuple{m,F}, regularity::Vector{Int}) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
+    extract_gtbspline_to_bspline(
+        spline_spaces::NTuple{m, F}, regularity::Vector{Int}
+    ) where {m, F <: Union{BSplineSpace, RationalFESpace}}
 
-Compute the extraction coefficients of GTB-Spline basis functions in terms of (rational) B-spline basis functions.
+Compute the extraction coefficients of GTB-Spline basis functions in terms of (rational)
+B-spline basis functions.
 
 # Arguments
 - `spline_spaces::NTuple{m,F}`: Collection of (rational) B-spline spaces.
 - `regularity::Vector{Int}`: Smoothness to be imposed at patch interfaces.
 
 # Returns
-- `ExtractionOperator`: The extraction operator containing the coefficients.
+- `ExtractionOperator{Indices{1, TE, TI, TJ}}`: The extraction operator containing the
+    coefficients. See [`ExtractionOperator`](@ref) for the details.
 """
 function extract_gtbspline_to_bspline(
     spline_spaces::NTuple{m, F}, regularity::Vector{Int}
-) where {m, F <: Union{BSplineSpace, RationalFiniteElementSpace}}
+) where {m, F <: Union{BSplineSpace, RationalFESpace}}
     # Construct cumulative sum of all B-spline dimensions
     spl_dims = zeros(Int, m + 1)
     for i in 2:(m + 1)
@@ -385,23 +385,25 @@ function extract_gtbspline_to_bspline(
         end
     end
 
-    # Remove small values obtained as a result of round-off errors
+    # Remove small values obtained as a result of round-off errors.
     SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, H)
 
-    # Convert global extraction matrix to element local extractions
-    # (here, the matrix is transposed so that [spline_spaces] * [extraction] = [GTB-splines])
-    extraction_coefficients = Vector{Matrix{Float64}}(undef, nel)
-    basis_indices = Vector{Vector{Int}}(undef, nel)
+    # Convert global extraction matrix to element local extractions.
+    # The matrix is transposed so that [spline_spaces] * [extraction] = [GTB-splines].
+    extraction_coefficients = Vector{Tuple{Matrix{Float64}}}(undef, nel)
+    basis_indices = Vector{Indices{1, Vector{Int}, StepRange{Int, Int}}}(undef, nel)
     count = 0
     for i in 1:m
         for j in 1:bspl_nels[i]
-            _, cols_ij = get_extraction(spline_spaces[i], j)
+            cols_ij = get_basis_indices(spline_spaces[i], j)
             eij = SparseArrays.findnz(H[:, cols_ij .+ spl_dims[i]])
             # Unique indices for non-zero rows and columns
-            basis_indices[count + 1] = unique(eij[1])
+            unique_eij = unique(eij[1])
+            basis_indices[count + 1] = Indices(unique_eij, (1:1:length(unique_eij),))
             # Matrix of coefficients
-            extraction_coefficients[count + 1] =
-                Array(H[basis_indices[count + 1], cols_ij .+ spl_dims[i]])'
+            extraction_coefficients[count + 1] = (Matrix(
+                H[get_basis_indices(basis_indices[count+1]), cols_ij .+ spl_dims[i]]
+            )',)
             count += 1
         end
     end
@@ -410,7 +412,7 @@ function extract_gtbspline_to_bspline(
 end
 
 """
-    build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64}) -> SparseMatrixCSC{Float64}
+    build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
 
 Build the sparsest possible nullspace of a constraint vector with no zero entries.
 
@@ -418,7 +420,7 @@ Build the sparsest possible nullspace of a constraint vector with no zero entrie
 - `constraint::SparseArrays.SparseVector{Float64}`: The constraint vector.
 
 # Returns
-- `SparseMatrixCSC{Float64}`: The sparse nullspace matrix.
+- `::SparseMatrixCSC{Float64}`: The sparse nullspace matrix.
 """
 function build_sparse_nullspace(constraint::SparseArrays.SparseVector{Float64})
     q = length(constraint)

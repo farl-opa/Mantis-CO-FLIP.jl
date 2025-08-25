@@ -14,4 +14,8 @@ end
 
 @testset verbose=true "TwoScaleRelations" begin include("TwoScaleRelations/runtests.jl") end
 
+@testset verbose=true "UnstructuredSpaces" begin
+    include("UnstructuredSpaces/runtests.jl")
+end
+
 end

@@ -87,7 +87,7 @@ for one_d_rule in one_dim_quad_rules
 
 
         # Constructor tests.
-        @test typeof(quad_rule) == Quad.QuadratureRule{dimension}
+        @test typeof(quad_rule) == Quad.CanonicalQuadratureRule{dimension}
 
 
         # No invalid degree tests here, as theses are tested in the 1D quadrature tests. We
@@ -163,7 +163,7 @@ w = Quad.get_weights(quad_rule)
 @test Quad.get_label(quad_rule) == label
 
 # Constructor tests.
-@test typeof(quad_rule) == Quad.QuadratureRule{5}
+@test typeof(quad_rule) == Quad.CanonicalQuadratureRule{5}
 
 # Property tests.
 @test isapprox(sum(w), 1.0, atol=atol)

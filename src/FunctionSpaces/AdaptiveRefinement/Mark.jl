@@ -1,5 +1,5 @@
 """
-    get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter::Float64) 
+    get_dorfler_marking(element_errors::Vector{Float64}, dorfler_parameter::Float64)
 
 Computes the indices of elements with at least `dorfler_parameter*100`% of the highest error in `element_errors`.
 
@@ -41,6 +41,31 @@ function add_padding!(
         )
         marked_elements_per_level[level] = reduce(
             union, get_support.(Ref(hier_space.spaces[level]), basis_in_marked_elements)
+        )
+    end
+
+    return marked_elements_per_level
+end
+
+function add_padding!(
+    marked_elements_per_level::Vector{Vector{Int}},
+    spaces::Vector{S}
+) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}}
+    num_levels = length(spaces)
+
+    for level in 1:num_levels
+        if marked_elements_per_level[level] == Int[]
+            continue
+        end
+
+        basis_in_marked_elements = reduce(
+            union,
+            get_basis_indices.(
+                Ref(spaces[level]), marked_elements_per_level[level]
+            ),
+        )
+        marked_elements_per_level[level] = union(
+            get_support.(Ref(spaces[level]), basis_in_marked_elements)...
         )
     end
 

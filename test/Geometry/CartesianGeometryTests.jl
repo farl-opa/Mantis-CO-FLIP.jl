@@ -13,7 +13,6 @@ include("GeometryTestsHelpers.jl")
 geometry = Mantis.Geometry.CartesianGeometry((
     [0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75]
 ))
-@test typeof(geometry) == Mantis.Geometry.CartesianGeometry{3}
 @test Mantis.Geometry.get_breakpoints(geometry) ==
     ([0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75])
 @test Mantis.Geometry._get_num_elements_per_dim(geometry) == (2, 2, 3)
@@ -26,7 +25,6 @@ geometry = Mantis.Geometry.CartesianGeometry((
 geometry = Mantis.Geometry.CartesianGeometry((
     LinRange(0.5, 2.5, 5), LinRange(-0.75, 0.75, 3)
 ))
-@test typeof(geometry) == Mantis.Geometry.CartesianGeometry{2}
 @test Mantis.Geometry.get_breakpoints(geometry) ==
     ([0.5, 1.0, 1.5, 2.0, 2.5], [-0.75, 0.0, 0.75])
 @test Mantis.Geometry._get_num_elements_per_dim(geometry) == (4, 2)
@@ -42,7 +40,7 @@ for nx in 1:3
 
         # Set file name and path
         file_name = "cartesian_test_nx_$(nx)_ny_$(ny).vtu"
-        output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+        output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
         # Generate the vtk file
         Mantis.Plot.plot(
             geometry;

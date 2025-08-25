@@ -1,8 +1,8 @@
 
-struct TensorProductGeometry{manifold_dim, T} <: AbstractGeometry{manifold_dim}
+struct TensorProductGeometry{manifold_dim, T, CI} <: AbstractGeometry{manifold_dim}
     geometries::T
     num_elements::Int
-    ordered_indices::CartesianIndices
+    ordered_indices::CI
 
     function TensorProductGeometry(geometries::T) where {
         num_geometries, T<:NTuple{num_geometries, AbstractGeometry}
@@ -19,7 +19,7 @@ struct TensorProductGeometry{manifold_dim, T} <: AbstractGeometry{manifold_dim}
 
         manifold_dim = sum(manifold_dim_per_geometry)
 
-        return new{manifold_dim, T}(
+        return new{manifold_dim, T, typeof(ordered_indices)}(
             geometries,
             num_elements,
             ordered_indices
@@ -180,7 +180,7 @@ function evaluate(
     n_points = prod(n_points_per_geometry) # total number of evaluation points
     image_dim = get_image_dim(geometry)
     eval = zeros(Float64, n_points, image_dim) # evaluation storage
-    
+
     ordered_points = CartesianIndices(n_points_per_geometry)
     linear_points = LinearIndices(ordered_points)
     # loop over all points

@@ -50,6 +50,9 @@ function create_curvilinear_square(
 )
     # build underlying Cartesian geometry
     unit_square = create_cartesian_box(starting_points, box_sizes, num_elements)
+    if crazy_c == 0.0
+        return unit_square
+    end
 
     # build curved mapping
     function mapping(x::AbstractVector)
@@ -90,16 +93,16 @@ function affine_map(
     num_points_per_dim = length.(xi)
     num_points = prod(num_points_per_dim)
     mapped_dim = size(A, 1)
-    mapped_xi = ntuple(mapped_dim) do _ 
+    mapped_xi = ntuple(mapped_dim) do _
         return zeros(Float64, num_points)
     end
-    
+
     xi_ord_id = CartesianIndices(num_points_per_dim)
     xi_lin_id = LinearIndices(xi_ord_id)
     for (lin_point, ord_point) in zip(xi_lin_id, xi_ord_id)
-        for j in axes(A, 2) 
+        for j in axes(A, 2)
             for i in axes(A, 1)
-                mapped_xi[i][lin_point] += A[i, j] * xi[j][ord_point[j]] 
+                mapped_xi[i][lin_point] += A[i, j] * xi[j][ord_point[j]]
             end
         end
         for i in axes(b, 1)

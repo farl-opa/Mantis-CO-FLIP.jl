@@ -65,10 +65,6 @@ function get_component_spaces(space::DirectSumSpace)
     return space.component_spaces
 end
 
-function get_extraction_operators(space::DirectSumSpace)
-    throw(ArgumentError("Extraction operators are not implemented for DirectSumSpace."))
-end
-
 function get_num_basis(space::DirectSumSpace)
     return space.space_dim
 end

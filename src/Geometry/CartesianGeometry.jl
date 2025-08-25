@@ -1,8 +1,8 @@
 
-struct CartesianGeometry{manifold_dim} <: AbstractAnalyticalGeometry{manifold_dim}
+struct CartesianGeometry{manifold_dim, CI} <: AbstractAnalyticalGeometry{manifold_dim}
     num_elements::Int
     breakpoints::NTuple{manifold_dim,Vector{Float64}}
-    ordered_indices::CartesianIndices
+    ordered_indices::CI
 
     """
         CartesianGeometry(breakpoints::NTuple{manifold_dim,T}) where {
@@ -24,7 +24,9 @@ struct CartesianGeometry{manifold_dim} <: AbstractAnalyticalGeometry{manifold_di
         num_elements = prod(num_elements_per_dim)
         ordered_indices = CartesianIndices(num_elements_per_dim)
 
-        return new{manifold_dim}(num_elements, breakpoints, ordered_indices)
+        return new{manifold_dim, typeof(ordered_indices)}(
+            num_elements, breakpoints, ordered_indices
+        )
     end
 end
 
@@ -130,7 +132,7 @@ function get_element_vertices(
 
         return [vertex_1, vertex_2]
     end
-    
+
     return element_vertices
 end
 
@@ -150,4 +152,3 @@ function get_element_measure(geometry::CartesianGeometry, element_id::Int)
 
     return prod(element_lengths)
 end
-

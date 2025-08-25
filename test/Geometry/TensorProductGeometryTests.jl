@@ -22,7 +22,7 @@ tensor_prod_geometry = Mantis.Geometry.TensorProductGeometry((
 
 # Set file name and path
 file_name = "tensor_product_geometry.vtu"
-output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
 # Generate the vtk file
 Mantis.Plot.plot(
     tensor_prod_geometry;
@@ -60,7 +60,7 @@ geom_coeffs_circle = [
     -1.0 +1.0
     -1.0 -1.0
 ]
-cylinder_circle_geometry = Mantis.Geometry.FEMGeometry(GB, geom_coeffs_circle)
+cylinder_circle_geometry = Mantis.Geometry.FEGeometry(GB, geom_coeffs_circle)
 dx_cylinder_line = 0.1
 nz_elements = 10
 cylinder_line_geometry = Mantis.Geometry.create_cartesian_box(
@@ -74,7 +74,7 @@ cylinder_tensor_prod_geometry = Mantis.Geometry.TensorProductGeometry((
 
 # Set file name and path
 file_name = "tensor_product_cylinder_geometry.vtu"
-output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
+output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
 # Generate the vtk file
 Mantis.Plot.plot(
     cylinder_tensor_prod_geometry;
