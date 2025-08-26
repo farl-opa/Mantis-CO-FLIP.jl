@@ -45,9 +45,9 @@ function _build_polar_extraction_and_dof_partition(
             )
         end
         # unique indices for global multicomponent polar bases
-        basis_indices_el = unique(cat(rows_el...))
+        basis_indices_el = unique(cat(rows_el...; dims=1))
         # permutation mapping on element
-        index_perm_el = Vector{Int}(undef, num_components)
+        index_perm_el = Vector{Vector{Int}}(undef, num_components)
         # Matrix of coefficients on element
         coeffs_el = Vector{Matrix{Float64}}(undef, num_components)
         for component_idx in 1:num_components
@@ -72,23 +72,26 @@ function _build_polar_extraction_and_dof_partition(
         extraction_coefficients, basis_indices, num_elements, space_dim
     )
 
-    # TODO: change from here onwards
-    # dof partitioning for the tensor product space
-    dof_partition_tp = get_dof_partition(tp_space)
-    n_partn = length(dof_partition_tp[1])
-    dof_partition = Vector{Vector{Vector{Int}}}(undef, 1)
-    dof_partition[1] = Vector{Vector{Int}}(undef, n_partn)
-    if two_poles
-        for i in 1:n_partn
-            dof_partition[1][i] = []
-        end
-    else
-        for i in 1:n_partn
-            if length(dof_partition_tp[1][i]) == 0
-                dof_partition[1][i] = []
-            else
-                # TODO!!
-                dof_partition[1][i] = []
+    # multicomponent dof partition
+    dof_partition = Vector{Vector{Vector{Vector{Int}}}}(undef, num_components)
+    for component_idx in 1:num_components
+        dof_partition[component_idx] = Vector{Vector{Vector{Int}}}(undef, 1)
+        # dof partitioning for the tensor product space
+        dof_partition_tp = get_dof_partition(tp_space[component_idx])
+        n_partn = length(dof_partition_tp[1])
+        dof_partition[component_idx][1] = Vector{Vector{Int}}(undef, n_partn)
+        if two_poles
+            for i in 1:n_partn
+                dof_partition[component_idx][1][i] = []
+            end
+        else
+            for i in 1:n_partn
+                if length(dof_partition_tp[1][i]) == 0
+                    dof_partition[component_idx][1][i] = []
+                else
+                    # TODO!!
+                    dof_partition[component_idx][1][i] = []
+                end
             end
         end
     end
@@ -219,10 +222,10 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         new{1, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
             patch_spaces,
             extraction_op,
-            dof_partition,
+            (dof_partition...,),
             (get_num_elements(patch_spaces[1]),),
             regularity,
-            E,
+            (E,),
             control_triangle,
             two_poles,
             zero_at_poles
@@ -258,14 +261,14 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         # build polar spline extraction operators and dof partitioning
         # build polar spline extraction operator and dof partitioning
         extraction_op, dof_partition = _build_polar_extraction_and_dof_partition(
-            patch_spaces, (E,), two_poles
+            patch_spaces, E, two_poles
         )
 
         regularity = 0
         return new{2, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
             patch_spaces,
             extraction_op,
-            dof_partition,
+            (dof_partition...,),
             (get_num_elements(patch_spaces[1]),),
             regularity,
             E,

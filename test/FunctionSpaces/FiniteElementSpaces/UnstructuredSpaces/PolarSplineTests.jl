@@ -25,11 +25,11 @@ geom_coeffs_tp, _, _ = Mantis.FunctionSpaces._build_standard_degenerate_control_
 
 
 #################################################################
-# ScalarPolarSplineSpace
+# PolarSplineSpace
 #################################################################
 
 # build scalar polar spline space
-P_scalar = Mantis.FunctionSpaces.ScalarPolarSplineSpace(
+P_scalar = Mantis.FunctionSpaces.PolarSplineSpace(
     B_p,
     B_r,
     (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :])
@@ -58,7 +58,7 @@ end
 #################################################################
 
 # build vector polar spline space
-P_vector = Mantis.FunctionSpaces.VectorPolarSplineSpace(
+P_vector = Mantis.FunctionSpaces.PolarSplineSpace(
     B_p,
     B_r,
     (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]),
