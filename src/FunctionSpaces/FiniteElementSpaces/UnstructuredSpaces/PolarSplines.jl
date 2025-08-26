@@ -19,36 +19,60 @@ Build the extraction operator and dof partitioning for the polar spline space.
 # Returns
 - `::Tuple{ExtractionOperator, Vector{Vector{Vector{Int}}}}`: The extraction operator and dof partitioning.
 """
-function _build_polar_extraction_and_dof_partition(tp_space, E, two_poles)
+function _build_polar_extraction_and_dof_partition(
+    tp_space::NTuple{num_components, TP}, E::NTuple{num_components, TE}, two_poles::Bool
+) where {num_components, TP, TE}
     # number of elements
-    num_elements = get_num_elements(tp_space)
+    # assumption: all component spaces have the same number of elements
+    num_elements = get_num_elements(tp_space[1])
 
     # allocate space for extraction coefficients and basis indices
-    extraction_coefficients = Vector{Matrix{Float64}}(undef, num_elements)
-    basis_indices = Vector{Vector{Int}}(undef, num_elements)
+    extraction_coefficients = Vector{NTuple{num_components, Matrix{Float64}}}(undef, num_elements)
+    basis_indices = Vector{Indices{num_components, Vector{Int}, Vector{Int}}}(undef, num_elements)
 
     # Convert global extraction matrix to element local extractions
     # (the matrix is transposed so that [tp_spline_space] * [extraction] = [Polar-splines])
-    count = 0
-    for i in 1:num_elements
-        _, cols_ij = get_extraction(tp_space, i)
-        eij = SparseArrays.findnz(E[:, cols_ij])
-        # Unique indices for non-zero rows and columns
-        basis_indices[count + 1] = unique(eij[1])
-        # Matrix of coefficients
-        extraction_coefficients[count + 1] =
-            Array(E[basis_indices[count + 1], cols_ij])'
-        count += 1
+    cols_el = Vector{Vector{Int}}(undef, num_components)
+    rows_el = Vector{Vector{Int}}(undef, num_components)
+    for el_idx in 1:num_elements
+        for component_idx in 1:num_components
+            # get the indices of the component bases which contribute to the global
+            # multicomponent polar bases
+            cols_el[component_idx] = get_basis_indices(tp_space[component_idx], el_idx)
+            # get the indices of the global multicomponent polar bases
+            rows_el[component_idx] = unique(
+                SparseArrays.findnz(E[component_idx][:, cols_el[component_idx]])[1]
+            )
+        end
+        # unique indices for global multicomponent polar bases
+        basis_indices_el = unique(cat(rows_el...))
+        # permutation mapping on element
+        index_perm_el = Vector{Int}(undef, num_components)
+        # Matrix of coefficients on element
+        coeffs_el = Vector{Matrix{Float64}}(undef, num_components)
+        for component_idx in 1:num_components
+            index_perm_el[component_idx] = findall(
+                x -> x in rows_el[component_idx], basis_indices_el
+            )
+            coeffs_el[component_idx] = Array(E[component_idx][rows_el[component_idx], cols_el[component_idx]])'
+        end
+
+        # store basis indices and permutation on element
+        basis_indices[el_idx] = Indices(basis_indices_el, (index_perm_el...,))
+        # store Matrix of coefficients
+        extraction_coefficients[el_idx] = (coeffs_el...,)
     end
 
     # number of polar dofs
-    space_dim = size(E, 1)
+    # assume all global component matrices E[i] have the same number of rows
+    space_dim = size(E[1], 1)
 
     # Polar spline extraction operator
     extraction_op = ExtractionOperator(
         extraction_coefficients, basis_indices, num_elements, space_dim
     )
 
+    # TODO: change from here onwards
     # dof partitioning for the tensor product space
     dof_partition_tp = get_dof_partition(tp_space)
     n_partn = length(dof_partition_tp[1])
@@ -118,23 +142,23 @@ function _get_barycentric_coordinates(
 end
 
 ############################################################################################
-# ScalarPolarSplineSpace
+# PolarSplines
 ############################################################################################
 
-struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
-    patch_spaces::NTuple{1,T}
-    extraction_op::ExtractionOperator
-    dof_partition::Vector{Vector{Vector{Int}}}
+struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num_components, 1}
+    patch_spaces::T
+    extraction_op::ExtractionOperator{num_components, TE, TI, TJ}
+    dof_partition::NTuple{num_components, Vector{Vector{Vector{Int}}}}
     num_elements_per_patch::NTuple{1, Int}
     regularity::Int
 
-    global_extraction_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}
+    global_extraction_matrix::NTuple{num_components, SparseArrays.SparseMatrixCSC{Float64, Int}}
     control_triangle::Matrix{Float64}
     two_poles::Bool
     zero_at_poles::Bool
 
     """
-        ScalarPolarSplineSpace(
+        PolarSplineSpace(
             space_p::AbstractFESpace{1, 1},
             space_r::AbstractFESpace{1, 1},
             degenerate_control_points::NTuple{2, Matrix{Float64}},
@@ -156,7 +180,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
     - `polar_splines::AbstractFESpace`: The polar spline space.
     - `E::ExtractionOperator`: The extraction operator.
     """
-    function ScalarPolarSplineSpace(
+    function PolarSplineSpace(
         space_p::AbstractFESpace{1, 1},
         space_r::AbstractFESpace{1, 1},
         degenerate_control_points::NTuple{2, Matrix{Float64}},
@@ -181,7 +205,7 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
             zero_at_poles,
         )
 
-        tp_space = TensorProductSpace((space_p, space_r))
+        patch_spaces = (TensorProductSpace((space_p, space_r)),)
         regularity = 1
         if zero_at_poles
             regularity = -1
@@ -189,19 +213,65 @@ struct ScalarPolarSplineSpace{T} <: AbstractFESpace{2, 1, 1}
 
         # build polar spline extraction operator and dof partitioning
         extraction_op, dof_partition = _build_polar_extraction_and_dof_partition(
-            tp_space, E, two_poles
+            patch_spaces, (E,), two_poles
         )
 
-        new{typeof(tp_space)}(
-            (tp_space,),
+        new{1, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
+            patch_spaces,
             extraction_op,
             dof_partition,
-            (get_num_elements(tp_space),),
+            (get_num_elements(patch_spaces[1]),),
             regularity,
             E,
             control_triangle,
             two_poles,
             zero_at_poles
+        )
+    end
+
+    function PolarSplineSpace(
+        space_p::AbstractFESpace{1, 1},
+        space_r::AbstractFESpace{1, 1},
+        degenerate_control_points::NTuple{2, Matrix{Float64}},
+        dspace_p::AbstractFESpace{1, 1},
+        dspace_r::AbstractFESpace{1, 1},
+        two_poles::Bool=false
+    )
+
+        # number of dofs for the poloidal and radial spaces
+        n_p = get_num_basis(space_p)
+        n_r = get_num_basis(space_r)
+
+        # first, build extraction operator and control triangle
+        E, control_triangle = extract_vector_polar_splines_to_tensorproduct(
+            degenerate_control_points,
+            n_p,
+            n_r,
+            two_poles,
+        )
+
+        # build underlying tensor-product space for the components of the vector field
+        patch_spaces = (
+            TensorProductSpace((dspace_p, space_r)), TensorProductSpace((space_p, dspace_r))
+        )
+
+        # build polar spline extraction operators and dof partitioning
+        # build polar spline extraction operator and dof partitioning
+        extraction_op, dof_partition = _build_polar_extraction_and_dof_partition(
+            patch_spaces, (E,), two_poles
+        )
+
+        regularity = 0
+        return new{2, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
+            patch_spaces,
+            extraction_op,
+            dof_partition,
+            (get_num_elements(patch_spaces[1]),),
+            regularity,
+            E,
+            control_triangle,
+            two_poles,
+            false
         )
     end
 end
@@ -355,114 +425,6 @@ function _get_scalar_polar_extraction_submatrix(
         E0_2 = SparseArrays.spdiagm(ones(3))
     end
     return E0_1, E0_2
-end
-
-function get_local_basis(
-    space::ScalarPolarSplineSpace,
-    element_id::Int,
-    xi::NTuple{2, Vector{Float64}},
-    nderivatives::Int,
-    component_id::Int
-)
-    if component_id != 1
-        throw(ArgumentError("ScalarPolarSplineSpace only has one component."))
-    end
-    return evaluate(space.patch_spaces[1], element_id, xi, nderivatives)[1]
-end
-
-function get_num_elements_per_patch(
-    space::ScalarPolarSplineSpace
-)
-    return space.num_elements_per_patch
-end
-
-
-############################################################################################
-# VectorPolarSplineSpace
-############################################################################################
-
-struct VectorPolarSplineSpace{T} <: AbstractFESpace{2, 2, 1}
-    patch_spaces::NTuple{2, T}
-    extraction_ops::NTuple{2, ExtractionOperator}
-    dof_partition::NTuple{2, Vector{Vector{Vector{Int}}}}
-    num_elements_per_patch::NTuple{1, Int}
-    regularity::Int
-
-    global_extraction_matrices::NTuple{2, SparseArrays.SparseMatrixCSC{Float64, Int}}
-    control_triangle::Matrix{Float64}
-    two_poles::Bool
-    """
-        VectorPolarSplineSpace(
-            space_p::AbstractFESpace{1, 1},
-            space_r::AbstractFESpace{1, 1},
-            degenerate_control_points::NTuple{2, Matrix{Float64}},
-            dspace_p::AbstractFESpace{1, 1},
-            dspace_r::AbstractFESpace{1, 1},
-            two_poles::Bool=false
-        )
-
-    Build a polar spline space from the given poloidal and radial spaces.
-
-    # Arguments
-    - `space_p::AbstractFESpace{1, 1}`: The poloidal space.
-    - `space_r::AbstractFESpace{1, 1}`: The radial space.
-    - `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
-    - `dspace_p::AbstractFESpace{1, 1}`: The derivative space for the poloidal space.
-    - `dspace_r::AbstractFESpace{1, 1}`: The derivative space for the radial space.
-    - `two_poles::Bool=false`: Whether the polar spline space has two poles.
-
-    # Returns
-    - `polar_splines::AbstractFESpace`: The polar spline space.
-    - `E::ExtractionOperator`: The extraction operator.
-    """
-    function VectorPolarSplineSpace(
-        space_p::AbstractFESpace{1, 1},
-        space_r::AbstractFESpace{1, 1},
-        degenerate_control_points::NTuple{2, Matrix{Float64}},
-        dspace_p::AbstractFESpace{1, 1},
-        dspace_r::AbstractFESpace{1, 1},
-        two_poles::Bool=false
-    )
-
-        # number of dofs for the poloidal and radial spaces
-        n_p = get_num_basis(space_p)
-        n_r = get_num_basis(space_r)
-
-        # first, build extraction operator and control triangle
-        E, control_triangle = extract_vector_polar_splines_to_tensorproduct(
-            degenerate_control_points,
-            n_p,
-            n_r,
-            two_poles,
-        )
-
-        # build underlying tensor-product space for the components of the vector field
-        tp_spaces = (
-            TensorProductSpace((dspace_p, space_r)), TensorProductSpace((space_p, dspace_r))
-        )
-
-        # build polar spline extraction operators and dof partitioning
-        extraction_ops = Vector{ExtractionOperator}(undef, 2)
-        dof_partitions = Vector{Vector{Vector{Vector{Int}}}}(undef, 2)
-        for component_idx in 1:2
-            extraction_ops[component_idx], dof_partitions[component_idx] =
-                _build_polar_extraction_and_dof_partition(
-                    tp_spaces[component_idx], E[component_idx], two_poles
-                )
-        end
-
-        regularity = 0
-        return new{typeof(tp_spaces[1])}(
-            tp_spaces,
-            (extraction_ops[1], extraction_ops[2]),
-            (dof_partitions[1], dof_partitions[2]),
-            (get_num_elements(tp_spaces[1]),),
-            regularity,
-            E,
-            control_triangle,
-            two_poles
-        )
-    end
 end
 
 """
@@ -640,18 +602,25 @@ function extract_vector_polar_splines_to_tensorproduct(
     return (E_h, E_v), tri
 end
 
+############################################################################################
+# VectorPolarSplineSpace
+############################################################################################
+
 function get_local_basis(
-    space::VectorPolarSplineSpace,
+    space::PolarSplineSpace{num_components},
     element_id::Int,
     xi::NTuple{2, Vector{Float64}},
     nderivatives::Int,
     component_id::Int
-)
+) where {num_components}
+    if component_id > num_components
+        throw(ArgumentError("PolarSplineSpace only has $num_components component."))
+    end
     return evaluate(space.patch_spaces[component_id], element_id, xi, nderivatives)[1]
 end
 
 function get_num_elements_per_patch(
-    space::VectorPolarSplineSpace
+    space::PolarSplineSpace
 )
     return space.num_elements_per_patch
 end
