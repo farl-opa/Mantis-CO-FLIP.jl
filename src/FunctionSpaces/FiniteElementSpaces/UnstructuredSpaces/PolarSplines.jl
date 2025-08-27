@@ -72,26 +72,24 @@ function _build_polar_extraction_and_dof_partition(
         extraction_coefficients, basis_indices, num_elements, space_dim
     )
 
-    # multicomponent dof partition
-    dof_partition = Vector{Vector{Vector{Vector{Int}}}}(undef, num_components)
-    for component_idx in 1:num_components
-        dof_partition[component_idx] = Vector{Vector{Vector{Int}}}(undef, 1)
-        # dof partitioning for the tensor product space
-        dof_partition_tp = get_dof_partition(tp_space[component_idx])
-        n_partn = length(dof_partition_tp[1])
-        dof_partition[component_idx][1] = Vector{Vector{Int}}(undef, n_partn)
-        if two_poles
-            for i in 1:n_partn
-                dof_partition[component_idx][1][i] = []
-            end
-        else
-            for i in 1:n_partn
-                if length(dof_partition_tp[1][i]) == 0
-                    dof_partition[component_idx][1][i] = []
-                else
-                    # TODO!!
-                    dof_partition[component_idx][1][i] = []
-                end
+    # TODO: the following only uses the partitioning of the first component tp_space, this
+    # is wrong for multicomponent spaces
+    dof_partition = Vector{Vector{Vector{Int}}}(undef, 1)
+    # dof partitioning for the tensor product space
+    dof_partition_tp = get_dof_partition(tp_space[1])
+    n_partn = length(dof_partition_tp[1])
+    dof_partition[1] = Vector{Vector{Int}}(undef, n_partn)
+    if two_poles
+        for i in 1:n_partn
+            dof_partition[1][i] = []
+        end
+    else
+        for i in 1:n_partn
+            if length(dof_partition_tp[1][i]) == 0
+                dof_partition[1][i] = []
+            else
+                # TODO!!
+                dof_partition[1][i] = []
             end
         end
     end
@@ -151,7 +149,7 @@ end
 struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num_components, 1}
     patch_spaces::T
     extraction_op::ExtractionOperator{num_components, TE, TI, TJ}
-    dof_partition::NTuple{num_components, Vector{Vector{Vector{Int}}}}
+    dof_partition::Vector{Vector{Vector{Int}}}
     num_elements_per_patch::NTuple{1, Int}
     regularity::Int
 
@@ -223,7 +221,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         new{1, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
             patch_spaces,
             extraction_op,
-            (dof_partition...,),
+            dof_partition,
             (get_num_elements(patch_spaces[1]),),
             regularity,
             (E,),
@@ -270,7 +268,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         return new{2, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
             patch_spaces,
             extraction_op,
-            (dof_partition...,),
+            dof_partition,
             (get_num_elements(patch_spaces[1]),),
             regularity,
             E,
@@ -640,3 +638,5 @@ function get_global_extraction_matrix(
     end
     return space.global_extraction_matrix[component_id]
 end
+
+get_patch_spaces(space::PolarSplineSpace) = space.patch_spaces

@@ -469,9 +469,10 @@ function create_scalar_polar_spline_space(
     R::Float64 = 1.0,
     two_poles::Bool=false,
     zero_at_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 )
     Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, degrees, regularities, (1, 1), (1, 1)
+        (0.0, 0.0), box_sizes, num_elements, degrees, regularities, (1, 1), (1, 1)
     )
 
     return _create_scalar_polar_spline_space(
@@ -517,9 +518,10 @@ function create_scalar_polar_spline_space(
     R::Float64=1.0,
     two_poles::Bool=false,
     zero_at_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 ) where {F <: NTuple{2, AbstractCanonicalSpace}}
     Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, section_spaces, regularities, (1, 1), (1, 1)
+        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
     )
 
     return _create_scalar_polar_spline_space(
@@ -586,9 +588,10 @@ function create_vector_polar_spline_space(
     geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
     R::Float64=1.0,
     two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 )
     Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, degrees, regularities, (1, 1), (1, 1)
+        (0.0, 0.0), box_sizes, num_elements, degrees, regularities, (1, 1), (1, 1)
     )
 
     return _create_vector_polar_spline_space(
@@ -629,9 +632,10 @@ function create_vector_polar_spline_space(
     geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
     R::Float64=1.0,
     two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 ) where {F <: NTuple{2, AbstractCanonicalSpace}}
     Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, section_spaces, regularities, (1, 1), (1, 1)
+        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
     )
 
     return _create_vector_polar_spline_space(
@@ -699,9 +703,10 @@ function create_polar_geometry_data(
     geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
     R::Float64=1.0,
     two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 )
     Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, degrees, regularities, (1, 1), (1, 1)
+        (0.0, 0.0), box_sizes, num_elements, degrees, regularities, (1, 1), (1, 1)
     )
 
     return _create_polar_geometry_data(
@@ -717,9 +722,10 @@ function create_polar_geometry_data(
     geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
     R::Float64=1.0,
     two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 ) where {F <: NTuple{2, AbstractCanonicalSpace}}
     Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, section_spaces, regularities, (1, 1), (1, 1)
+        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
     )
 
     return _create_polar_geometry_data(
@@ -794,7 +800,7 @@ function refine_polar_geometry_data(
     P_geom, geom_coeffs_polar; two_poles=false
 )
     # get underlying tensor-product space
-    tp_space = get_component_spaces(P_geom)[1]
+    tp_space = get_patch_spaces(P_geom)[1]
     # get underlying univariate constituent spaces
     GBθ, Br = get_constituent_spaces(tp_space)
     Bθ = get_constituent_spaces(GBθ)[1]
