@@ -159,6 +159,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
     control_triangle::Matrix{Float64}
     two_poles::Bool
     zero_at_poles::Bool
+    degenerate_control_points::NTuple{2, Matrix{Float64}}
 
     """
         PolarSplineSpace(
@@ -186,7 +187,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
     function PolarSplineSpace(
         space_p::AbstractFESpace{1, 1},
         space_r::AbstractFESpace{1, 1},
-        degenerate_control_points::NTuple{2, Matrix{Float64}},
+        degenerate_control_points::NTuple{2, Matrix{Float64}};
         two_poles::Bool=false,
         zero_at_poles::Bool=false
     )
@@ -228,7 +229,8 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
             (E,),
             control_triangle,
             two_poles,
-            zero_at_poles
+            zero_at_poles,
+            degenerate_control_points
         )
     end
 
@@ -237,7 +239,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         space_r::AbstractFESpace{1, 1},
         degenerate_control_points::NTuple{2, Matrix{Float64}},
         dspace_p::AbstractFESpace{1, 1},
-        dspace_r::AbstractFESpace{1, 1},
+        dspace_r::AbstractFESpace{1, 1};
         two_poles::Bool=false
     )
 
@@ -274,7 +276,8 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
             E,
             control_triangle,
             two_poles,
-            false
+            false,
+            degenerate_control_points
         )
     end
 end
@@ -606,7 +609,7 @@ function extract_vector_polar_splines_to_tensorproduct(
 end
 
 ############################################################################################
-# VectorPolarSplineSpace
+# Getters
 ############################################################################################
 
 function get_local_basis(
@@ -626,4 +629,14 @@ function get_num_elements_per_patch(
     space::PolarSplineSpace
 )
     return space.num_elements_per_patch
+end
+
+get_global_extraction_matrix(space::PolarSplineSpace) = space.global_extraction_matrix
+function get_global_extraction_matrix(
+    space::PolarSplineSpace{num_components}, component_id::Int
+) where {num_components}
+    if component_id > num_components
+        throw(ArgumentError("PolarSplineSpace only has $num_components component."))
+    end
+    return space.global_extraction_matrix[component_id]
 end

@@ -189,3 +189,5 @@ function get_local_basis(
 
     return evaluate(space.patch_spaces[patch_id], patch_element_id, xi, nderivatives)[1]
 end
+
+get_constituent_spaces(space::GTBSplineSpace) = space.patch_spaces

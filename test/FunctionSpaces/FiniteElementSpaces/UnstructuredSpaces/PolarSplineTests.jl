@@ -5,34 +5,24 @@ import LinearAlgebra
 using Test
 
 # 1D spaces in radial and poloidal directions
-breakpoints_p = [0.0, 0.5, 1.0, 1.5, 2.0]
-breakpoints_r = [0.0, 0.5, 1.0]
-num_elements_p = length(breakpoints_p) - 1
-num_elements_r = length(breakpoints_r) - 1
-patch_p = Mantis.Mesh.Patch1D(breakpoints_p)
-patch_r = Mantis.Mesh.Patch1D(breakpoints_r)
+num_elements_p = 5
+num_elements_r = 2
 deg_p = 2
 deg_r = 3
-regularity_p = vcat(-1, fill(deg_p-1, length(breakpoints_p) - 2), -1)
-regularity_r = vcat(-1, fill(deg_r-1, length(breakpoints_r) - 2), -1)
-B_p = Mantis.FunctionSpaces.BSplineSpace(patch_p, deg_p, regularity_p)
-B_r = Mantis.FunctionSpaces.BSplineSpace(patch_r, deg_r, regularity_r)
-n_p = Mantis.FunctionSpaces.get_num_basis(B_p)
-n_r = Mantis.FunctionSpaces.get_num_basis(B_r)
-
-# degenerate control points for the polar spline space
-geom_coeffs_tp, _, _ = Mantis.FunctionSpaces._build_standard_degenerate_control_points(n_p, n_r, 1.0)
-
+regularity_p = deg_p - 1
+regularity_r = deg_r - 1
+n_p = num_elements_p * (deg_p + 1) - num_elements_p * (regularity_p + 1)
+n_r = num_elements_r * (deg_r + 1) - (num_elements_r - 1) * (regularity_r + 1)
 
 #################################################################
 # PolarSplineSpace
 #################################################################
 
 # build scalar polar spline space
-P_scalar = Mantis.FunctionSpaces.PolarSplineSpace(
-    B_p,
-    B_r,
-    (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :])
+P_scalar = Mantis.FunctionSpaces.create_scalar_polar_spline_space(
+    (num_elements_p, num_elements_r),
+    (deg_p, deg_r),
+    (regularity_p, regularity_r)
 )
 
 @test Mantis.FunctionSpaces.get_num_basis(P_scalar) == n_p * (n_r - 2) + 3
@@ -58,12 +48,10 @@ end
 #################################################################
 
 # build vector polar spline space
-P_vector = Mantis.FunctionSpaces.PolarSplineSpace(
-    B_p,
-    B_r,
-    (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]),
-    Mantis.FunctionSpaces.get_derivative_space(B_p),
-    Mantis.FunctionSpaces.get_derivative_space(B_r)
+P_vector = Mantis.FunctionSpaces.create_vector_polar_spline_space(
+    (num_elements_p, num_elements_r),
+    (deg_p, deg_r),
+    (regularity_p, regularity_r)
 )
 
 @test Mantis.FunctionSpaces.get_num_basis(P_vector) == 2 * n_p * (n_r - 2) + 2
