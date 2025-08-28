@@ -241,6 +241,30 @@ function get_basis_indices(space::AbstractFESpace, element_id::Int)
     )
 end
 
+"""
+    get_basis_permutation(space::AbstractFESpace, element_id::Int, component_id::Int=1)
+
+Get the permutation' of the basis indices. This tells the `evaluate` function to which basis
+on an element the evaluations correspond.
+
+# Arguments
+- `space::AbstractFESpace`: Finite element space.
+- `element_id::Int`: Identifier of the element.
+- `component_id::Int=1`: The component ID. This is only relevant for multi-component
+    spaces, and thus defaults to 1. While it is not needed for single-component spaces, it
+    is still required for the function signature.
+
+# Returns
+- `::TJ`: Permutations of indices of the basis functions supported on this element. The type
+    `TJ` is a vector-like object with integer type elements. See the documentation of
+    `space` or [`Indices`](@ref) for more details.
+
+
+# Exceptions
+- Error "no field 'extraction_op'": This error is thrown if no extraction operator is
+    defined for `space`, and there is no specific `get_basis_indices` method for `space`
+    either.
+"""
 function get_basis_permutation(
     space::AbstractFESpace, element_id::Int, component_id::Int=1
 )
