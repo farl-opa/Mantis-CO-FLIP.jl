@@ -51,41 +51,41 @@ output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_fi
 Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry (toroidal annulus) -------------------------------------------
-# deg = 2
-# Wt = pi/2
-# bθ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
-# breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
-# patch = Mantis.Mesh.Patch1D(breakpoints)
-# Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
-# GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
-# Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
-# TP_θr = Mantis.FunctionSpaces.TensorProductSpace((GBθ, Br))
-# TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((TP_θr, GBθ))
-# # control points for geometry
-# geom_coeffs_θ =   [1.0  -1.0
-# 1.0   1.0
-# -1.0   1.0
-# -1.0  -1.0]
-# r0 = 1
-# r1 = 2
-# geom_coeffs_θr = [geom_coeffs_θ.*r0
-#                   geom_coeffs_θ.*r1]
-# geom_coeffs_θr0 = [geom_coeffs_θr.+[3*r1 0] zeros(8)]
+deg = 2
+Wt = pi/2
+bθ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
+patch = Mantis.Mesh.Patch1D(breakpoints)
+Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
+GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
+Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 1, [-1, -1])
+TP_θr = Mantis.FunctionSpaces.TensorProductSpace((GBθ, Br))
+TP_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((TP_θr, GBθ))
+# control points for geometry
+geom_coeffs_θ =   [1.0  -1.0
+1.0   1.0
+-1.0   1.0
+-1.0  -1.0]
+r0 = 1
+r1 = 2
+geom_coeffs_θr = [geom_coeffs_θ.*r0
+                  geom_coeffs_θ.*r1]
+geom_coeffs_θr0 = [geom_coeffs_θr.+[3*r1 0] zeros(8)]
 
-# # rotate the 3D points around the y-axis
-# geom_coeffs_θrϕ = Vector{Matrix{Float64}}(undef,4)
-# geom_coeffs_θrϕ[1] = geom_coeffs_θr0
-# for i ∈ 1:3
-#     ϕ = i*π/2
-#     R = [cos(ϕ) 0 sin(ϕ); 0 1 0; -sin(ϕ) 0 cos(ϕ)]
-#     geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
-# end
-# geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
-# geom = Mantis.Geometry.FEGeometry(TP_θrϕ, geom_coeffs_θrϕ)
-# # Generate the plot
-# output_filename = "fem_geometry_toroidal_annulus_test.vtu"
-# output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
-# Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
+# rotate the 3D points around the y-axis
+geom_coeffs_θrϕ = Vector{Matrix{Float64}}(undef,4)
+geom_coeffs_θrϕ[1] = geom_coeffs_θr0
+for i ∈ 1:3
+    ϕ = i*π/2
+    R = [cos(ϕ) 0 sin(ϕ); 0 1 0; -sin(ϕ) 0 cos(ϕ)]
+    geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
+end
+geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
+geom = Mantis.Geometry.FEGeometry(TP_θrϕ, geom_coeffs_θrϕ)
+# Generate the plot
+output_filename = "fem_geometry_toroidal_annulus_test.vtu"
+output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)
+Mantis.Plot.plot(geom; vtk_filename = output_file[1:end-4], n_subcells = 1, degree = 4, ascii = false, compress = false)
 
 # Test Plotting of 3D Geometry + form fields (toroidal annulus) -------------------------------------------
 deg = 2
