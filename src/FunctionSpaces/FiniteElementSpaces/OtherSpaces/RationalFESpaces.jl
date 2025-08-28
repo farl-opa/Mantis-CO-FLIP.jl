@@ -149,7 +149,13 @@ function get_extraction(space::RationalFESpace, element_id::Int, component_id::I
     # Get the basis indices for the underlying function space
     basis_indices = get_basis_indices(space.function_space, element_id)
 
-    return LinearAlgebra.I, 1:1:length(basis_indices)
+    return LinearAlgebra.I, 1:length(basis_indices)
+end
+
+function get_basis_permutation(
+    space::RationalFESpace, element_id::Int, component_id::Int=1
+)
+    return 1:get_num_basis(space, element_id)
 end
 
 """

@@ -796,6 +796,12 @@ function get_extraction(
     return coeffs, 1:size(coeffs, 2)
 end
 
+function get_basis_permutation(
+    space::HierarchicalFiniteElementSpace, element_id::Int, component_id::Int=1
+)
+    return 1:get_num_basis(space, element_id)
+end
+
 function get_basis_indices(
     space::HierarchicalFiniteElementSpace{manifold_dim, S, T}, hier_id::Int
 ) where {

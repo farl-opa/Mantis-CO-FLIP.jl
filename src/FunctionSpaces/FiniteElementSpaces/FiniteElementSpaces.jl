@@ -241,6 +241,14 @@ function get_basis_indices(space::AbstractFESpace, element_id::Int)
     )
 end
 
+function get_basis_permutation(
+    space::AbstractFESpace, element_id::Int, component_id::Int=1
+)
+    return get_basis_permutation(
+        get_extraction_operator(space), element_id, component_id
+    )
+end
+
 """
     get_num_basis(space::AbstractFESpace)
 
@@ -490,7 +498,11 @@ function evaluate(
 
         for der_order in eachindex(evaluations)
             for der_idx in eachindex(evaluations[der_order])
-                @views evaluations[der_order][der_idx][component_idx][:,J] = component_basis[der_order][der_idx][1] * extraction_coefficients
+                LinearAlgebra.mul!(
+                    view(evaluations[der_order][der_idx][component_idx], :, J),
+                    component_basis[der_order][der_idx][1],
+                    extraction_coefficients,
+                )
             end
         end
     end

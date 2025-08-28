@@ -538,6 +538,12 @@ function get_extraction(
     return extraction_coeffs, 1:size(extraction_coeffs, 2)
 end
 
+function get_basis_permutation(
+    space::TensorProductSpace, element_id::Int, component_id::Int=1
+)
+    return 1:get_num_basis(space, element_id)
+end
+
 function get_local_basis(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
     element_id::Int,

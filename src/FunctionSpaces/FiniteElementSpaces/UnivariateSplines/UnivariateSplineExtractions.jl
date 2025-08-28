@@ -54,15 +54,15 @@ function extract_bspline_to_section_space(
     E = [(LinearAlgebra.I,) for _ in 1:nel]
 
     # Compute indices of supported basis functions on each element
-    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices = Vector{Indices{1, UnitRange{Int}, UnitRange{Int}}}(undef, nel)
     basis_indices[1] = Indices(
-        1:1:knot_vector.polynomial_degree + 1,
-        (1:1:knot_vector.polynomial_degree + 1,),
+        1:knot_vector.polynomial_degree + 1,
+        (1:knot_vector.polynomial_degree + 1,),
     )
     for el in 2:nel
         basis_indices[el] = Indices(
             get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
-            (1:1:knot_vector.polynomial_degree + 1,),
+            (1:knot_vector.polynomial_degree + 1,),
         )
     end
 
@@ -94,15 +94,15 @@ function extract_bspline_to_section_space(
     E = [(LinearAlgebra.I,) for _ in 1:nel]
 
     # Compute indices of supported basis functions on each element
-    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices = Vector{Indices{1, UnitRange{Int}, UnitRange{Int}}}(undef, nel)
     basis_indices[1] = Indices(
-        1:1:knot_vector.polynomial_degree + 1,
-        (1:1:knot_vector.polynomial_degree + 1,),
+        1:knot_vector.polynomial_degree + 1,
+        (1:knot_vector.polynomial_degree + 1,),
     )
     for el in 2:nel
         basis_indices[el] = Indices(
             get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
-            (1:1:knot_vector.polynomial_degree + 1,),
+            (1:knot_vector.polynomial_degree + 1,),
         )
     end
 
@@ -167,12 +167,12 @@ function extract_bspline_to_section_space(
     end
 
     # Compute indices of supported basis functions on each element
-    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
-    basis_indices[1] = Indices(1:1:p + 1, (1:1:p + 1,),)
+    basis_indices = Vector{Indices{1, UnitRange{Int}, UnitRange{Int}}}(undef, nel)
+    basis_indices[1] = Indices(1:p + 1, (1:p + 1,),)
     for el in 2:nel
         basis_indices[el] = Indices(
             get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
-            (1:1:p + 1,),
+            (1:p + 1,),
         )
     end
 
@@ -242,12 +242,12 @@ function extract_bspline_to_section_space(
     SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, H)
 
     # Compute basis indices of supported basis functions on each element.
-    basis_indices = Vector{Indices{1, StepRange{Int, Int}, StepRange{Int, Int}}}(undef, nel)
-    basis_indices[1] = Indices(1:1:(p + 1), (1:1:(p + 1),))
+    basis_indices = Vector{Indices{1, UnitRange{Int}, UnitRange{Int}}}(undef, nel)
+    basis_indices[1] = Indices(1:(p + 1), (1:(p + 1),))
     for el in 2:nel
         basis_indices[el] = Indices(
         get_basis_indices(basis_indices[el-1]) .+ knot_vector.multiplicity[el],
-        (1:1:(p + 1),),
+        (1:(p + 1),),
     )
     end
 
@@ -391,7 +391,7 @@ function extract_gtbspline_to_bspline(
     # Convert global extraction matrix to element local extractions.
     # The matrix is transposed so that [spline_spaces] * [extraction] = [GTB-splines].
     extraction_coefficients = Vector{Tuple{Matrix{Float64}}}(undef, nel)
-    basis_indices = Vector{Indices{1, Vector{Int}, StepRange{Int, Int}}}(undef, nel)
+    basis_indices = Vector{Indices{1, Vector{Int}, UnitRange{Int}}}(undef, nel)
     count = 0
     for i in 1:m
         for j in 1:bspl_nels[i]
@@ -399,7 +399,7 @@ function extract_gtbspline_to_bspline(
             eij = SparseArrays.findnz(H[:, cols_ij .+ spl_dims[i]])
             # Unique indices for non-zero rows and columns
             unique_eij = unique(eij[1])
-            basis_indices[count + 1] = Indices(unique_eij, (1:1:length(unique_eij),))
+            basis_indices[count + 1] = Indices(unique_eij, (1:length(unique_eij),))
             # Matrix of coefficients
             extraction_coefficients[count + 1] = (Matrix(
                 H[get_basis_indices(basis_indices[count+1]), cols_ij .+ spl_dims[i]]
