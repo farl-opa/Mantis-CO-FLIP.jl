@@ -63,29 +63,6 @@ function get_dof_partition(space::RationalFESpace)
     return get_dof_partition(space.function_space)
 end
 
-"""
-    evaluate(
-        space::RationalFESpace{manifold_dim, F},
-        element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
-        nderivatives::Int
-    ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1, 1}}
-
-Evaluates the basis functions and their derivatives for the rational finite element space.
-
-# Arguments
-- `space::RationalFESpace{manifold_dim, F}`: The rational finite
-    element space.
-- `element_id::Int`: The index of the element.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
-    basis functions.
-- `nderivatives::Int`: The number of derivatives to compute.
-
-# Returns
-A tuple containing:
-- The basis functions and their derivatives evaluated at the specified coordinates.
-- The basis indices.
-"""
 function evaluate(
     space::RationalFESpace{manifold_dim, F},
     element_id::Int,

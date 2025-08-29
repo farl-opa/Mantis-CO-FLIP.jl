@@ -1,7 +1,7 @@
 """
-  TensorProductSpace{
-      manifold_dim, num_components, num_patches, num_spaces, T, CIE, LIE, CIB, LIB
-  } <: AbstractFESpace{manifold_dim, num_components, num_patches}
+    TensorProductSpace{
+        manifold_dim, num_components, num_patches, num_spaces, T, CIE, LIE, CIB, LIB
+    } <: AbstractFESpace{manifold_dim, num_components, num_patches}
 
 A structure representing a `TensorProductSpace`, defined by the tensor product of
 `num_spaces` constituent spaces. The resulting tensor product has a `manifold_dim` equal to
