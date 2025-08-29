@@ -436,8 +436,8 @@ component spaces. Single-component spaces are expected to have a specialised imp
     local basis functions and their derivatives. The first level of nesting corresponds to
     the order of the derivatives. The second level corresponds to a specific derivative. The
     third level corresponds to the component. The matrix contains the actual evaluations.
-    See [`get_derivative_idx(der_key::Vector{Int})`](@ref) for more details on the order in
-    which the derivatives are stored.
+    See [`get_derivative_idx`](@ref Mantis.GeneralHelpers.get_derivative_idx) for more details
+    on the order in which the derivatives are stored.
 """
 function get_local_basis(
     space::AbstractFESpace{manifold_dim, num_components, num_patches},
@@ -476,8 +476,8 @@ the evaluation of:
 - of the `k`-th component ...
 - at the `a`-th evaluation point ...
 - for `f₀`.
-See [`get_derivative_idx(der_key::Vector{Int})`] for more details on the order in
-which all the mixed derivatives of order `i-1` are stored.
+See [`get_derivative_idx`](@ref GeneralHelpers.get_derivative_idx) for more details on
+the order in which all the mixed derivatives of order `i-1` are stored.
 
 # Arguments
 - `space::AbstractFESpace{manifold_dim, num_components, num_patches}`: Finite element space.

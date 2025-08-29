@@ -79,23 +79,6 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
 end
 
 """
-    evaluate(gexp::GeneralizedExponential, ξ::Vector{Float64})
-
-Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
-
-# Arguments
-- `gexp::GeneralizedExponential`:  Generalized Exponential section space.
-- `xi::Vector{Float64}`: vector of evaluation points ``in [0.0, 1.0]``.
-"""
-function evaluate(gexp::GeneralizedExponential, xi::Vector{Float64})
-    return evaluate(gexp, xi, 0)
-end
-
-function evaluate(gexp::GeneralizedExponential, xi::Float64)
-    return evaluate(gexp, [xi], 0)
-end
-
-"""
     gexp_representation(p::Int, w::Float64, t::Bool, m::Int)
 
 Build representation matrix for Generalized Exponential section space of degree `p`, weight
@@ -111,9 +94,6 @@ Build representation matrix for Generalized Exponential section space of degree 
 # Returns:
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
-
-import LinearAlgebra, ToeplitzMatrices
-
 function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
 
     I = Matrix(1.0LinearAlgebra.I, p+1, p+1)

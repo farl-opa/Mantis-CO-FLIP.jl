@@ -89,25 +89,6 @@ function _evaluate(gtrig::GeneralizedTrigonometric, xi::Float64, nderivatives::I
 end
 
 """
-    evaluate(gtrig::GeneralizedTrigonometric, ξ::Vector{Float64})
-
-Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
-
-# Arguments
-- `gtrig::GeneralizedTrigonometric`:  Generalized Trigonometric section space.
-- `xi::Vector{Float64}`: vector of evaluation points in ``[0.0, 1.0]``.
-
-See also [`evaluate(gtrig::GeneralizedTrigonometric, xi::Vector{Float64}, nderivatives::Int64)`](@ref).
-"""
-function evaluate(gtrig::GeneralizedTrigonometric, xi::Vector{Float64})
-    return evaluate(gtrig, xi, 0)
-end
-
-function evaluate(gtrig::GeneralizedTrigonometric, xi::Float64)
-    return evaluate(gtrig, [xi], 0)
-end
-
-"""
     gtrig_representation(p::Int, w::Float64, t::Bool, m::Int)
 
 Build representation matrix for Generalized Trignometric section space of degree `p`, weight
