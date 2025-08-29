@@ -171,6 +171,12 @@ function get_num_elements_per_patch(space::GTBSplineSpace)
     return space.num_elements_per_patch
 end
 
+function get_num_basis_per_patch(space::GTBSplineSpace{num_patches}) where {num_patches}
+    return ntuple(num_patches) do i
+        return get_num_basis(get_constituent_spaces(space)[i])
+    end
+end
+
 function get_element_lengths(space::GTBSplineSpace, element_id::Int)
     patch_id, local_element_id = get_patch_and_local_element_id(space, element_id)
 
@@ -191,3 +197,48 @@ function get_local_basis(
 end
 
 get_constituent_spaces(space::GTBSplineSpace) = space.patch_spaces
+
+"""
+    assemble_global_extraction_matrix(
+        space::GTBSplineSpace{num_patches}
+    ) where {num_patches}
+
+Assembles the global extraction matrix for a GTBSplineSpace by combining the extraction coefficients from each element on each patch.
+
+# Arguments
+- `space::GTBSplineSpace{num_patches}`: The GTBSplineSpace
+
+# Returns
+- `SparseMatrixCSC{Float64}`: The global extraction matrix that maps GTB dofs to local dofs
+"""
+function assemble_global_extraction_matrix(
+    space::GTBSplineSpace{num_patches}
+) where {num_patches}
+    # Number of global basis functions
+    num_global_basis = get_num_basis(space)
+    # Number of elements
+    nel = get_num_elements(space)
+    # Number of local basis functions
+    num_local_basis = get_num_basis_per_patch(space)
+    num_local_basis_offset = cumsum([0; num_local_basis...])
+    # Initialize the global extraction matrix
+    global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)
+
+    # Loop over all patches
+    for el_id in 1:nel
+        patch_id, local_element_id = get_patch_and_local_element_id(space, el_id)
+        # get extraction coefficients on this element
+        extraction_coefficients = get_extraction_coefficients(space, el_id)
+        global_basis_indices = get_basis_indices(space, el_id)
+        # get local basis indices
+        local_basis_indices = get_basis_indices(
+            get_constituent_spaces(space)[patch_id], local_element_id
+        ) .+ num_local_basis_offset[patch_id]
+
+        # Assemble the global extraction matrix
+        global_extraction_matrix[local_basis_indices, global_basis_indices] =
+            extraction_coefficients
+    end
+
+    return SparseArrays.sparse(global_extraction_matrix)
+end

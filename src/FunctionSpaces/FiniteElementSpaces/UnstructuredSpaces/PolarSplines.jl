@@ -639,4 +639,4 @@ function get_global_extraction_matrix(
     return space.global_extraction_matrix[component_id]
 end
 
-get_patch_spaces(space::PolarSplineSpace) = space.patch_spaces
+get_constituent_spaces(space::PolarSplineSpace) = space.patch_spaces
