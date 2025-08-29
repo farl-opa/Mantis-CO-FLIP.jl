@@ -320,17 +320,17 @@ function create_dim_wise_bspline_spaces(
     n_dofs_left::NTuple{manifold_dim, Int},
     n_dofs_right::NTuple{manifold_dim, Int},
 ) where {manifold_dim, F <: NTuple{manifold_dim, AbstractCanonicalSpace}}
-    return map(
-        (xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) ->
-            create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, ; n_dofs_left=lᵢ, n_dofs_right=rᵢ),
-        starting_points,
-        box_sizes,
-        num_elements,
-        section_spaces,
-        regularities,
-        n_dofs_left,
-        n_dofs_right,
-    )::NTuple{manifold_dim, BSplineSpace}
+    return ntuple(manifold_dim) do i
+        create_bspline_space(
+            starting_points[i],
+            box_sizes[i],
+            num_elements[i],
+            section_spaces[i],
+            regularities[i];
+            n_dofs_left=n_dofs_left[i],
+            n_dofs_right=n_dofs_right[i],
+        )
+    end
 end
 
 """
@@ -415,17 +415,17 @@ function create_dim_wise_bspline_spaces(
     n_dofs_left::NTuple{manifold_dim, Int},
     n_dofs_right::NTuple{manifold_dim, Int},
 ) where {manifold_dim}
-    return map(
-        (xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, lᵢ, rᵢ) ->
-            create_bspline_space(xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, ; n_dofs_left=lᵢ, n_dofs_right=rᵢ),
-        starting_points,
-        box_sizes,
-        num_elements,
-        degrees,
-        regularities,
-        n_dofs_left,
-        n_dofs_right,
-    )::NTuple{manifold_dim, BSplineSpace{Bernstein}}
+    return ntuple(manifold_dim) do i
+        create_bspline_space(
+            starting_points[i],
+            box_sizes[i],
+            num_elements[i],
+            degrees[i],
+            regularities[i];
+            n_dofs_left=n_dofs_left[i],
+            n_dofs_right=n_dofs_right[i],
+        )
+    end
 end
 
 ################################################################################
