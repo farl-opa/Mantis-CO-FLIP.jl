@@ -639,4 +639,10 @@ function get_global_extraction_matrix(
     return space.global_extraction_matrix[component_id]
 end
 
-get_constituent_spaces(space::PolarSplineSpace) = space.patch_spaces
+get_patch_spaces(space::PolarSplineSpace) = space.patch_spaces
+
+function assemble_global_extraction_matrix(
+    space::PolarSplineSpace{num_components}
+) where {num_components}
+    return SparseArrays.sparse_hcat(space.global_extraction_matrix...)
+end

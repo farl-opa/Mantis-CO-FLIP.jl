@@ -173,7 +173,7 @@ end
 
 function get_num_basis_per_patch(space::GTBSplineSpace{num_patches}) where {num_patches}
     return ntuple(num_patches) do i
-        return get_num_basis(get_constituent_spaces(space)[i])
+        return get_num_basis(get_patch_spaces(space)[i])
     end
 end
 
@@ -196,7 +196,7 @@ function get_local_basis(
     return evaluate(space.patch_spaces[patch_id], patch_element_id, xi, nderivatives)[1]
 end
 
-get_constituent_spaces(space::GTBSplineSpace) = space.patch_spaces
+get_patch_spaces(space::GTBSplineSpace) = space.patch_spaces
 
 """
     assemble_global_extraction_matrix(
@@ -232,7 +232,7 @@ function assemble_global_extraction_matrix(
         global_basis_indices = get_basis_indices(space, el_id)
         # get local basis indices
         local_basis_indices = get_basis_indices(
-            get_constituent_spaces(space)[patch_id], local_element_id
+            get_patch_spaces(space)[patch_id], local_element_id
         ) .+ num_local_basis_offset[patch_id]
 
         # Assemble the global extraction matrix

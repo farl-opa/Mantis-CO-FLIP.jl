@@ -28,7 +28,7 @@ space_θr, geom_coeffs_θr = Mantis.FunctionSpaces.create_polar_geometry_data(
     (deg-1, deg-1);
     box_sizes = (box_size_θ, box_size_r)
 )
-tp_space_θr = Mantis.FunctionSpaces.get_constituent_spaces(space_θr)[1]
+tp_space_θr = Mantis.FunctionSpaces.get_patch_spaces(space_θr)[1]
 GBθ, Br = Mantis.FunctionSpaces.get_constituent_spaces(tp_space_θr)
 space_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((space_θr, GBθ))
 

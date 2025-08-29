@@ -800,10 +800,10 @@ function refine_polar_geometry_data(
     P_geom, geom_coeffs_polar; two_poles=false
 )
     # get underlying tensor-product space
-    tp_space = get_constituent_spaces(P_geom)[1]
+    tp_space = get_patch_spaces(P_geom)[1]
     # get underlying univariate constituent spaces
     GBθ, Br = get_constituent_spaces(tp_space)
-    Bθ = get_constituent_spaces(GBθ)[1]
+    Bθ = get_patch_spaces(GBθ)[1]
     n_θ = get_num_basis(GBθ)
     n_r = get_num_basis(Br)
 

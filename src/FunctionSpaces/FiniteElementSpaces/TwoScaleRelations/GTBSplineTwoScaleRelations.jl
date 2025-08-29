@@ -7,7 +7,7 @@ function build_two_scale_operator(
     # unstructured space.
     discontinuous_two_scale_ops = ntuple(
         i -> build_two_scale_operator(
-            get_constituent_spaces(coarse_space)[i], nsubdivisions[i]
+            get_patch_spaces(coarse_space)[i], nsubdivisions[i]
         ),
         num_patches,
     )
