@@ -195,13 +195,14 @@ function check_nl_intersection(
         operator = hier_space.two_scale_operators[level]
     end
 
-    p_fine = get_constituent_polynomial_degree(operator.fine_space)
+    p_fine = get_constituent_polynomial_degree(get_child_space(operator))
 
     length_flag = Vector{Bool}(undef, manifold_dim)
+    const_twoscale_operators = get_constituent_twoscale_operators(operator)
 
     for k in 1:manifold_dim
-        fine_space = operator.twoscale_operators[k].fine_space
-        ts = operator.twoscale_operators[k]
+        ts = const_twoscale_operators[k]
+        fine_space = get_child_space(ts)
         min_basis_1 = minimum(basis_supp_per_dim1[k])
         max_basis_1 = maximum(basis_supp_per_dim1[k])
         min_basis_2 = minimum(basis_supp_per_dim2[k])

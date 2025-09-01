@@ -11,10 +11,10 @@ Compute and return the child element IDs for a given coarse element ID based on 
 # Returns
 - `::Vector{Int}`: A vector containing the identifiers of the child elements.
 """
-function get_element_children(coarse_element_id::Int, nsubdivisions::Int)
-    return [i+((coarse_element_id-1)*nsubdivisions) for i ∈ 1:nsubdivisions]
+function get_element_children(parent_element_id::Int, num_subdivisions::Int)
+    return [i + ((parent_element_id - 1) * num_subdivisions) for i in 1:num_subdivisions]
 end
 
-function get_element_parent(fine_element_id::Int, nsubdivisions::Int)
-    return floor(Int, (fine_element_id-1)/nsubdivisions + 1)
+function get_element_parent(child_element_id::Int, num_subdivisions::Int)
+    return floor(Int, (child_element_id - 1) / num_subdivisions + 1)
 end

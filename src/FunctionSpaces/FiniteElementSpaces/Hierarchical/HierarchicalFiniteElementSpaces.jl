@@ -86,11 +86,11 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
             throw(ArgumentError("At least 1 level is required, but 0 were given."))
         elseif length(two_scale_operators) != num_levels - 1
             msg1 = "Number of two-scale operators should be one less than the number of levels. "
-            msg2 = "$num_levels refinement levels and $(length(two_scale_operators)) two-scale operators were given."
+            msg2 = "$num_levels rechildment levels and $(length(two_scale_operators)) two-scale operators were given."
             throw(ArgumentError(msg1 * msg2))
         elseif get_num_levels(domains) != num_levels
             msg1 = "Number of nested domains should be the same as the number of levels. "
-            msg2 = "$num_levels refinement levels and $(get_num_levels(domains)) domains were given."
+            msg2 = "$num_levels rechildment levels and $(get_num_levels(domains)) domains were given."
             throw(ArgumentError(msg1 * msg2))
         end
 
@@ -197,11 +197,11 @@ function get_basis_level(hier_space::HierarchicalFiniteElementSpace, hier_id::In
 end
 
 function get_element_level_id(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
-    return get_level_id(hier_space.active_elements, hier_id)
+    return get_level_ids(hier_space.active_elements, hier_id)
 end
 
 function get_basis_level_id(hier_space::HierarchicalFiniteElementSpace, hier_id::Int)
-    return get_level_id(hier_space.active_basis, hier_id)
+    return get_level_ids(hier_space.active_basis, hier_id)
 end
 
 function get_space(hier_space::HierarchicalFiniteElementSpace, level::Int)
@@ -373,7 +373,7 @@ function get_active_objects_and_nested_domains(
     end
 
     for level in 1:(num_levels - 1) # Loop over levels
-        next_level_domain = [get_level_ids(domains, level + 1)]
+        next_level_domain = Set(get_level_ids(domains, level + 1))
 
         elements_to_remove = Int[]
         elements_to_add = Int[]
@@ -381,53 +381,47 @@ function get_active_objects_and_nested_domains(
         basis_to_add = Int[]
 
         if ~simplified
-            for coarse_basis in active_basis_per_level[level]
+            for parent_basis in active_basis_per_level[level]
                 # Gets the support of Ni on current level and the next one
-                support = get_support(spaces[level], coarse_basis)
+                support = get_support(spaces[level], parent_basis)
                 element_children = [
                     child for parent in support for
                     child in get_element_children(two_scale_operators[level], parent)
                 ]
-                # checks if the support is contained in the next level domain
-                check_in_next_domain = element_children .∈ next_level_domain
-                # Updates elements and basis to add and remove based on check_in_next_domain
-                if all(check_in_next_domain)
+                # Updates elements and basis to add and remove
+                if issubset(element_children, next_level_domain)
                     append!(elements_to_remove, support)
-                    append!(basis_to_remove, coarse_basis)
+                    append!(basis_to_remove, parent_basis)
                 end
             end
 
-            for fine_basis in 1:get_num_basis(spaces[level + 1])
-                support = get_support(spaces[level + 1], fine_basis)
-                check_in_next_domain = support .∈ next_level_domain
-                if all(check_in_next_domain)
+            for child_basis in 1:get_num_basis(spaces[level + 1])
+                support = get_support(spaces[level + 1], child_basis)
+                if issubset(support, next_level_domain)
                     parents = reduce(
                         union, get_element_parent.(Ref(two_scale_operators[level]), support)
                     )
                     append!(elements_to_remove, parents)
                     append!(elements_to_add, support)
-                    append!(basis_to_add, fine_basis)
+                    append!(basis_to_add, child_basis)
                 end
             end
         else
-            for coarse_basis in active_basis_per_level[level] # Loop over active basis on current level
+            for parent_basis in active_basis_per_level[level] # Loop over active basis on current level
                 # Gets the support of Ni on current level and the next one
-                support = get_support(spaces[level], coarse_basis)
+                support = get_support(spaces[level], parent_basis)
                 element_children = [
                     child for parent in support for
                     child in get_element_children(two_scale_operators[level], parent)
                 ]
-                # checks if the support is contained in the next level domain
-                check_in_next_domain = element_children .∈ next_level_domain
-
-                # Updates elements and basis to add and remove based on check_in_next_domain
-                if all(check_in_next_domain)
+                # Updates elements and basis to add and remove
+                if issubset(element_children, next_level_domain)
                     append!(elements_to_remove, support)
-                    append!(basis_to_remove, coarse_basis)
+                    append!(basis_to_remove, parent_basis)
                     append!(elements_to_add, element_children)
                     append!(
                         basis_to_add,
-                        get_basis_children(two_scale_operators[level], coarse_basis),
+                        get_basis_children(two_scale_operators[level], parent_basis),
                     )
                 end
             end
@@ -533,7 +527,7 @@ function get_multilevel_extraction(
             spaces[level], element_level_id, level, active_basis
         )
 
-        refinement_matrix, multilevel_basis_hier_ids = get_refinement_data(
+        rechildment_matrix, multilevel_basis_hier_ids = get_rechildment_data(
             active_basis_matrix,
             active_local_ids,
             spaces,
@@ -554,7 +548,7 @@ function get_multilevel_extraction(
             )
 
         # Add multilevel extraction data
-        multilevel_extraction_coeffs[ml_id_count] = level_coeffs * refinement_matrix
+        multilevel_extraction_coeffs[ml_id_count] = level_coeffs * rechildment_matrix
         multilevel_basis_ids[ml_id_count] = append!(
             basis_hier_ids, multilevel_basis_hier_ids
         )
@@ -584,7 +578,7 @@ end
     ) where {manifold_dim, S <: AbstractFESpace{manifold_dim, 1}, T <: AbstractTwoScaleOperator}
 
 Computes which active elements are multilevel elements, i.e. elements where basis from
-multiple levels have non-empty support, as well as which basis from coarser levels are
+multiple levels have non-empty support, as well as which basis from parentr levels are
 active on those elements.
 
 # Arguments
@@ -598,7 +592,7 @@ active on those elements.
 - `multilevel_information::Dict{Tuple{Int, Int}, Vector{Tuple{Int, Int}}}`: information
     about multilevel elements. The key's two indices indicate the multilevel element's
     level and id and the and the key's value is a vector of tuples where the indices are
-    the basis level and id (from coarser levels), respectively.
+    the basis level and id (from parentr levels), respectively.
 """
 function get_multilevel_information(
     spaces::Vector{S},
@@ -640,7 +634,7 @@ function get_multilevel_information(
     return multilevel_information
 end
 
-function get_refinement_data(
+function get_rechildment_data(
     active_basis_matrix,
     active_local_ids,
     fe_spaces,
@@ -653,13 +647,13 @@ function get_refinement_data(
 )
     active_basis_size = size(active_basis_matrix)
     num_multilevel_basis = length(multilevel_information[(element_level, element_id)])
-    refinement_matrix = hcat(
+    rechildment_matrix = hcat(
         active_basis_matrix, zeros(active_basis_size[1], num_multilevel_basis)
     )
     multilevel_basis_hier_ids = Vector{Int}(undef, num_multilevel_basis)
     ml_basis_count = 1
     for (basis_level, basis_level_id) in multilevel_information[(element_level, element_id)]
-        refinement_matrix[:, active_basis_size[2] + ml_basis_count] .= get_multilevel_basis_evaluation(
+        rechildment_matrix[:, active_basis_size[2] + ml_basis_count] .= get_multilevel_basis_evaluation(
             fe_spaces,
             two_scale_operators,
             active_basis,
@@ -677,10 +671,12 @@ function get_refinement_data(
         ml_basis_count += 1
     end
     if truncated
-        refinement_matrix = truncate_refinement_matrix!(refinement_matrix, active_local_ids)
+        rechildment_matrix = truncate_rechildment_matrix!(
+            rechildment_matrix, active_local_ids
+        )
     end
 
-    return refinement_matrix, multilevel_basis_hier_ids
+    return rechildment_matrix, multilevel_basis_hier_ids
 end
 
 function get_multilevel_basis_evaluation(
@@ -730,24 +726,24 @@ function get_multilevel_basis_evaluation(
 end
 
 """
-    truncate_refinement_matrix!(refinement_matrix, active_indices::Vector{Int})
+    truncate_rechildment_matrix!(rechildment_matrix, active_indices::Vector{Int})
 
-Updates `refinement_matrix` by the rows of `active_indices` to zeros in lower level basis
+Updates `rechildment_matrix` by the rows of `active_indices` to zeros in lower level basis
 functions.
 
 # Arguments
-- `refinement_matrix`: the refinement matrix to be updated.
+- `rechildment_matrix`: the rechildment matrix to be updated.
 - `active_indices::Vector{Int}`: element local indices of active basis functions from the
-    highest refinement level.
+    highest rechildment level.
 
 # Returns
-- `refinement_matrix`: truncated refinement matrix.
+- `rechildment_matrix`: truncated rechildment matrix.
 """
-function truncate_refinement_matrix!(refinement_matrix, active_indices::Vector{Int})
+function truncate_rechildment_matrix!(rechildment_matrix, active_indices::Vector{Int})
     active_length = length(active_indices)
-    refinement_matrix[active_indices, (active_length + 1):end] .= 0.0
+    rechildment_matrix[active_indices, (active_length + 1):end] .= 0.0
 
-    return refinement_matrix
+    return rechildment_matrix
 end
 
 # Extraction method for hierarchical space
@@ -963,7 +959,7 @@ function update_hierarchical_space!(
     )
 end
 
-# Useful for refinement
+# Useful for rechildment
 
 function get_level_inactive_domain(hier_space::HierarchicalFiniteElementSpace, level::Int)
     inactive_basis = setdiff(

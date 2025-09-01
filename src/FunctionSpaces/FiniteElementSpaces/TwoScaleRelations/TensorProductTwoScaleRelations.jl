@@ -1,4 +1,3 @@
-# TODO: rewrite this file to use Cartesian Indices
 """
     struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <: AbstractTwoScaleOperator{manifold_dim}
 
@@ -12,187 +11,201 @@ relationships between coarse and fine tensor product spaces.
     subdivision matrix for the tensor product space.
 - `twoscale_operators::TS`: A tuple of two-scale operators for each constituent space.
 """
-struct TensorProductTwoScaleOperator{manifold_dim, TP, TS} <:
-       AbstractTwoScaleOperator{manifold_dim}
-    coarse_space::TP
-    fine_space::TP
+struct TensorProductTwoScaleOperator{
+    manifold_dim, num_components, num_patches, num_spaces, TP, TS
+} <: AbstractTwoScaleOperator{manifold_dim, num_components, num_patches}
+    parent_space::TP
+    child_space::TP
     global_subdiv_matrix::SparseArrays.SparseMatrixCSC{Float64, Int}
     twoscale_operators::TS
 
     function TensorProductTwoScaleOperator(
-        coarse_space::TP, fine_space::TP, twoscale_operators::TS
+        parent_space::TP, child_space::TP, twoscale_operators::TS
     ) where {
         manifold_dim,
         num_components,
         num_patches,
         num_spaces,
         T <: NTuple{num_spaces, AbstractFESpace},
-        CIE,
-        LIE,
-        CIB,
-        LIB,
-        TP <: TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces, T, CIE, LIE, CIB, LIB},
+        TP <: TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces, T},
         TS <: NTuple{num_spaces, AbstractTwoScaleOperator},
     }
         gm = kron(
             (twoscale_operators[space].global_subdiv_matrix for space in num_spaces:-1:1)...
         )
 
-        return new{manifold_dim, typeof(coarse_space), TS}(
-            coarse_space, fine_space, gm, twoscale_operators
+        return new{manifold_dim, num_components, num_patches, num_spaces, TP, TS}(
+            parent_space, child_space, gm, twoscale_operators
         )
     end
 end
 
+function get_constituent_twoscale_operators(operator::TensorProductTwoScaleOperator)
+    return operator.twoscale_operators
+end
+
 # Basic getters per two scale operator
 
-function _get_element_children_per_space(
-    twoscale_operator::TensorProductTwoScaleOperator, element_id::Int
-)
-    max_ind_c = get_constituent_num_elements(get_coarse_space(twoscale_operator))
-    ordered_index = linear_to_ordered_index(element_id, max_ind_c)
+function get_constituent_element_children(
+    operator::TensorProductTwoScaleOperator{
+        manifold_dim, num_components, num_patches, num_spaces
+    },
+    element_id::Int,
+) where {manifold_dim, num_components, num_patches, num_spaces}
+    const_element_id = get_constituent_element_id(get_parent_space(operator), element_id)
+    twoscale_operators = get_constituent_twoscale_operators(operator)
+    const_children = ntuple(
+        space -> get_element_children(twoscale_operators[space], const_element_id[space]),
+        num_spaces,
+    )
 
-    return map(get_element_children, twoscale_operator.twoscale_operators, ordered_index)
+    return const_children
 end
 
-function _get_element_parent_per_space(
-    twoscale_operator::TensorProductTwoScaleOperator, element_id::Int
-)
-    max_ind_f = get_constituent_num_elements(get_fine_space(twoscale_operator))
-    ordered_index = linear_to_ordered_index(element_id, max_ind_f)
-    return map(get_element_parent, twoscale_operator.twoscale_operators, ordered_index)
+function get_constituent_element_parent(
+    operator::TensorProductTwoScaleOperator{
+        manifold_dim, num_components, num_patches, num_spaces
+    },
+    element_id::Int,
+) where {manifold_dim, num_components, num_patches, num_spaces}
+    const_element_id = get_constituent_element_id(get_child_space(operator), element_id)
+    twoscale_operators = get_constituent_twoscale_operators(operator)
+    const_parent = ntuple(
+        space -> get_element_parent(twoscale_operators[space], const_element_id[space]),
+        num_spaces,
+    )
+
+    return const_parent
 end
 
-function _get_basis_children_per_space(
-    twoscale_operator::TensorProductTwoScaleOperator, basis_id::Int
-)
-    max_ind_c = get_constituent_num_basis(get_coarse_space(twoscale_operator))
-    ordered_index = linear_to_ordered_index(basis_id, max_ind_c)
+function get_constituent_basis_children(
+    operator::TensorProductTwoScaleOperator{
+        manifold_dim, num_components, num_patches, num_spaces
+    },
+    basis_id::Int,
+) where {manifold_dim, num_components, num_patches, num_spaces}
+    const_basis_id = get_constituent_basis_id(get_parent_space(operator), basis_id)
+    twoscale_operators = get_constituent_twoscale_operators(operator)
+    const_children = ntuple(
+        space -> get_basis_children(twoscale_operators[space], const_basis_id[space]),
+        num_spaces,
+    )
 
-    return map(get_basis_children, twoscale_operator.twoscale_operators, ordered_index)
+    return const_children
 end
 
-function _get_basis_parents_per_space(
-    twoscale_operator::TensorProductTwoScaleOperator, basis_id::Int
-)
-    max_ind_f = get_constituent_num_basis(get_fine_space(twoscale_operator))
-    ordered_index = linear_to_ordered_index(basis_id, max_ind_f)
+function get_constituent_basis_parent(
+    operator::TensorProductTwoScaleOperator{
+        manifold_dim, num_components, num_patches, num_spaces
+    },
+    basis_id::Int,
+) where {manifold_dim, num_components, num_patches, num_spaces}
+    const_basis_id = get_constituent_basis_id(get_child_space(operator), basis_id)
+    twoscale_operators = get_constituent_twoscale_operators(operator)
+    const_parent = ntuple(
+        space -> get_basis_parents(twoscale_operators[space], const_basis_id[space]),
+        num_spaces,
+    )
 
-    return map(get_basis_parents, twoscale_operator.twoscale_operators, ordered_index)
+    return const_parent
 end
 
 # Basis getters for TensorProductTwoScaleOperator
 
 """
-    get_element_children(twoscale_operator::TensorProductTwoScaleOperator, element_id::Int)
+    get_element_children(operator::TensorProductTwoScaleOperator, element_id::Int)
 
 Retrieve and return the child element IDs for a given element ID within a tensor product
 two-scale operator.
 
 # Arguments
-- `twoscale_operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
+- `operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
     that defines the parent-child relationships between elements.
 - `element_id::Int`: The identifier of the element whose children are to be retrieved.
 
 # Returns
 - `::Vector{Int}`: A vector containing the identifiers of the child elements.
 """
-function get_element_children(
-    twoscale_operator::TensorProductTwoScaleOperator, element_id::Int
-)
-    element_children_per_space = _get_element_children_per_space(
-        twoscale_operator, element_id
-    )
-
-    max_ind_f = get_constituent_num_elements(get_fine_space(twoscale_operator))
-
-    element_children = Vector{Int}(undef, prod(length.(element_children_per_space)))
-    linear_index = 1
-    for child_per_space in Iterators.product(element_children_per_space...)
-        element_children[linear_index] = ordered_to_linear_index(child_per_space, max_ind_f)
-        linear_index += 1
+function get_element_children(operator::TensorProductTwoScaleOperator, element_id::Int)
+    const_element_children = get_constituent_element_children(operator, element_id)
+    child_lin_num_elements = get_lin_num_elements(get_child_space(operator))
+    element_children = Vector{Int}(undef, prod(length, const_element_children))
+    for (child_count, const_child_id) in
+        enumerate(Iterators.product(const_element_children...))
+        element_children[child_count] = child_lin_num_elements[const_child_id...]
     end
 
     return element_children
 end
 
 """
-    get_element_parent(twoscale_operator::TensorProductTwoScaleOperator, element_id::Int)
+    get_element_parent(operator::TensorProductTwoScaleOperator, element_id::Int)
 
 Retrieve and return the parent element ID for a given element ID within a tensor product
 two-scale operator.
 
 # Arguments
-- `twoscale_operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
+- `operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
     that defines the parent-child relationships between elements.
 - `element_id::Int`: The identifier of the element whose parent is to be retrieved.
 
 # Returns
 - `::Int`: The identifier of the parent element.
 """
-function get_element_parent(
-    twoscale_operator::TensorProductTwoScaleOperator, element_id::Int
-)
-    element_parent_per_space = _get_element_parent_per_space(twoscale_operator, element_id)
+function get_element_parent(operator::TensorProductTwoScaleOperator, element_id::Int)
+    const_element_parent = get_constituent_element_parent(operator, element_id)
+    parent_lin_num_elements = get_lin_num_elements(get_parent_space(operator))
 
-    max_ind_c = get_constituent_num_elements(get_coarse_space(twoscale_operator))
-
-    return ordered_to_linear_index(element_parent_per_space, max_ind_c)
+    return parent_lin_num_elements[const_element_parent...]
 end
 
 """
-    get_basis_children(twoscale_operator::TensorProductTwoScaleOperator, basis_id::Int)
+    get_basis_children(operator::TensorProductTwoScaleOperator, basis_id::Int)
 
 Retrieve and return the child basis function IDs for a given basis function ID within a
 tensor product two-scale operator.
 
 # Arguments
-- `twoscale_operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
+- `operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
     that defines the parent-child relationships between basis functions.
 - `basis_id::Int`: The identifier of the basis function whose children are to be retrieved.
 
 # Returns
 - `::Vector{Int}`: A vector containing the identifiers of the child basis functions.
 """
-function get_basis_children(twoscale_operator::TensorProductTwoScaleOperator, basis_id::Int)
-    basis_children_per_space = _get_basis_children_per_space(twoscale_operator, basis_id)
-
-    max_ind_f = get_constituent_num_basis(get_fine_space(twoscale_operator))
-
-    basis_children = Vector{Int}(undef, prod(length.(basis_children_per_space)))
-    linear_index = 1
-    for child_per_space in Iterators.product(basis_children_per_space...)
-        basis_children[linear_index] = ordered_to_linear_index(child_per_space, max_ind_f)
-        linear_index += 1
+function get_basis_children(operator::TensorProductTwoScaleOperator, basis_id::Int)
+    const_basis_children = get_constituent_basis_children(operator, basis_id)
+    child_lin_num_basis = get_lin_num_basis(get_child_space(operator))
+    basis_children = Vector{Int}(undef, prod(length, const_basis_children))
+    for (child_count, const_child_id) in
+        enumerate(Iterators.product(const_basis_children...))
+        basis_children[child_count] = child_lin_num_basis[const_child_id...]
     end
 
     return basis_children
 end
 
 """
-    get_basis_parents(twoscale_operator::TensorProductTwoScaleOperator, basis_id::Int)
+    get_basis_parents(operator::TensorProductTwoScaleOperator, basis_id::Int)
 
 Retrieve and return the parent basis functions for a given basis function ID within a
 tensor product two-scale operator.
 
 # Arguments
-- `twoscale_operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
+- `operator::TensorProductTwoScaleOperator`: The tensor product two-scale operator
     that defines the parent-child relationships between basis functions.
 - `basis_id::Int`: The identifier of the basis function whose parent is to be retrieved.
 
 # Returns
 - `::Vector{Int}`: The identifier of the parent basis functions.
 """
-function get_basis_parents(twoscale_operator::TensorProductTwoScaleOperator, basis_id::Int)
-    basis_parents_per_space = _get_basis_parents_per_space(twoscale_operator, basis_id)
-
-    max_ind_c = get_constituent_num_basis(get_coarse_space(twoscale_operator))
-
-    basis_parents = Vector{Int}(undef, prod(length.(basis_parents_per_space)))
-    linear_index = 1
-    for parents_per_space in Iterators.product(basis_parents_per_space...)
-        basis_parents[linear_index] = ordered_to_linear_index(parents_per_space, max_ind_c)
-        linear_index += 1
+function get_basis_parents(operator::TensorProductTwoScaleOperator, basis_id::Int)
+    const_basis_parents = get_constituent_basis_parent(operator, basis_id)
+    parent_lin_num_basis = get_lin_num_basis(get_parent_space(operator))
+    basis_parents = Vector{Int}(undef, prod(length, const_basis_parents))
+    for (parent_count, const_parent_id) in
+        enumerate(Iterators.product(const_basis_parents...))
+        basis_parents[parent_count] = parent_lin_num_basis[const_parent_id...]
     end
 
     return basis_parents
@@ -224,11 +237,11 @@ finer tensor product space.
 """
 function subdivide_space(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
-    nsubdivisions::NTuple{num_spaces, Int},
+    num_subdivisions::NTuple{num_spaces, Int},
 ) where {manifold_dim, num_components, num_patches, num_spaces}
     constituent_spaces = get_constituent_spaces(space)
     subdivided_spaces = ntuple(
-        space -> subdivide_space(constituent_spaces[space], nsubdivisions[space]),
+        space -> subdivide_space(constituent_spaces[space], num_subdivisions[space]),
         num_spaces,
     )
 
@@ -260,17 +273,19 @@ finite element space.
 - `::TensorProductSpace`: The resulting finer tensor product space after subdivision.
 """
 function build_two_scale_operator(
-    space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
-    nsubdivisions::NTuple{num_spaces, Int},
+    parent_space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
+    num_subdivisions::NTuple{num_spaces, Int},
 ) where {manifold_dim, num_components, num_patches, num_spaces}
-    const_spaces = get_constituent_spaces(space)
+    const_parent_spaces = get_constituent_spaces(parent_space)
     twoscale_data = ntuple(
-        space -> build_two_scale_operator(const_spaces[space], nsubdivisions[space]),
+        space ->
+            build_two_scale_operator(const_parent_spaces[space], num_subdivisions[space]),
         num_spaces,
     )
     twoscale_operators = ntuple(space -> twoscale_data[space][1], num_spaces)
-    const_fine_spaces = ntuple(space -> twoscale_data[space][2], num_spaces)
-    fine_space = TensorProductSpace(const_fine_spaces)
+    const_child_spaces = ntuple(space -> twoscale_data[space][2], num_spaces)
+    child_space = TensorProductSpace(const_child_spaces)
 
-    return TensorProductTwoScaleOperator(space, fine_space, twoscale_operators), fine_space
+    return TensorProductTwoScaleOperator(parent_space, child_space, twoscale_operators),
+    child_space
 end

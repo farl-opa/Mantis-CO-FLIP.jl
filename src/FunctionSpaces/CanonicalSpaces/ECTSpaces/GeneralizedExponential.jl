@@ -22,19 +22,19 @@ struct GeneralizedExponential <: AbstractECTSpaces
     C::Matrix{Float64}
     endpoint_tol::Float64
 
-    function GeneralizedExponential(p::Int, w::Float64 = 1.0, l::Float64 = 1.0, m::Int = 10)
+    function GeneralizedExponential(p::Int, w::Float64=1.0, l::Float64=1.0, m::Int=10)
         t = abs(w) * l >= 3.0
         return GeneralizedExponential(p, w, l, t, m)
     end
 
     function GeneralizedExponential(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         endpoint_tol = 1e-12
-        new(p, w, l, t, m, gexp_representation(p, w, l, t, m), endpoint_tol)
-     end
+        return new(p, w, l, t, m, gexp_representation(p, w, l, t, m), endpoint_tol)
+    end
 end
 
 function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
-    M = zeros(Float64, 1, gexp.p+1, nderivatives+1)
+    M = zeros(Float64, 1, gexp.p + 1, nderivatives + 1)
 
     left = false
     right = false
@@ -47,25 +47,25 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
     # scale the point to lie in the interval [0, l]
     xi = gexp.l * xi
     if gexp.t
-        for r = 0:nderivatives
-            k = min(r, gexp.p-1)
+        for r in 0:nderivatives
+            k = min(r, gexp.p - 1)
             wxl = gexp.w * xi
-            E = [1.0; cumprod((1.0 ./ (1:gexp.p-k)) * wxl)]
-            E[gexp.p-k, :] .= exp(wxl);
-            E[gexp.p+1-k, :] .= (-1)^r * exp(-wxl);
+            E = [1.0; cumprod((1.0 ./ (1:(gexp.p - k))) * wxl)]
+            E[gexp.p - k, :] .= exp(wxl)
+            E[gexp.p + 1 - k, :] .= (-1)^r * exp(-wxl)
             # rescale the derivative to map back from [0, l] -> [0, 1]
-            M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E) * (gexp.l^r)
+            M[1, :, r + 1] = (gexp.w^r) * (gexp.C[:, (k + 1):end] * E) * (gexp.l^r)
         end
     else
-        for r = 0:nderivatives
-            k = min(r, gexp.p-1)
+        for r in 0:nderivatives
+            k = min(r, gexp.p - 1)
             ww = [1; cumprod(repeat([gexp.w * gexp.w], gexp.m))]
-            Ef = [1.0; cumprod((1.0 ./ (1:gexp.p-k+2*gexp.m)) * xi)]
-            E = Ef[1:gexp.p+1-k]
-            E[gexp.p-k, :] = Ef[gexp.p-k:2:end, :]' * ww
-            E[gexp.p-k+1, :] = Ef[gexp.p-k+1:2:end, :]' * ww
+            Ef = [1.0; cumprod((1.0 ./ (1:(gexp.p - k + 2 * gexp.m))) * xi)]
+            E = Ef[1:(gexp.p + 1 - k)]
+            E[gexp.p - k, :] = Ef[(gexp.p - k):2:end, :]' * ww
+            E[gexp.p - k + 1, :] = Ef[(gexp.p - k + 1):2:end, :]' * ww
             # rescale the derivative to map back from [0, l] -> [0, 1]
-            M[1, :, r+1] = gexp.C[:,k+1:end] * E * (gexp.l^r)
+            M[1, :, r + 1] = gexp.C[:, (k + 1):end] * E * (gexp.l^r)
         end
     end
 
@@ -95,26 +95,25 @@ Build representation matrix for Generalized Exponential section space of degree 
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
 function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
-
-    I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
+    I = Matrix(1.0LinearAlgebra.I, p + 1, p + 1)
     if t
         wl = w * l
         ewl = exp(wl)
         ewlm = exp(-wl)
-        M0 = I[:,:]
+        M0 = I[:, :]
         M0[p, :] .= 1
-        M0[p+1, 1:2:p+1] .= 1
-        M0[p+1, 2:2:p+1] .= -1
-        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:,1]))
-        M1[p, :] .= ewl;
-        M1[p+1, 1:2:p+1] .= ewlm;
-        M1[p+1, 2:2:p+1] .= -ewlm;
+        M0[p + 1, 1:2:(p + 1)] .= 1
+        M0[p + 1, 2:2:(p + 1)] .= -1
+        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:, 1]))
+        M1[p, :] .= ewl
+        M1[p + 1, 1:2:(p + 1)] .= ewlm
+        M1[p + 1, 2:2:(p + 1)] .= -ewlm
 
     else
-        M0 = I[:,:]
-        ww = [1 cumprod(repeat([w * w], 1, m), dims=2)]
-        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:p+2*m))], I[:,1])
-        M1 = M[1:p+1, :]
+        M0 = I[:, :]
+        ww = [1 cumprod(repeat([w * w], 1, m); dims=2)]
+        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:(p + 2 * m)))], I[:, 1])
+        M1 = M[1:(p + 1), :]
         M1[p, :] = ww * M[p:2:end, :]
         M1[p + 1, :] = ww * M[(p + 1):2:end, :]
     end
@@ -145,12 +144,12 @@ Get the space of one degree lower than the input space.
 """
 function get_derivative_space(ect_space::GeneralizedExponential)
     return GeneralizedExponential(
-        ect_space.p-1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
+        ect_space.p - 1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
     )
 end
 
 """
-    get_finer_canonical_space(ect_space::GeneralizedExponential)
+    get_child_canonical_space(ect_space::GeneralizedExponential)
 
 Bisect the canonical space by dividing the weight in half.
 
@@ -161,11 +160,11 @@ Bisect the canonical space by dividing the weight in half.
 - `::GeneralizedExponential`: A ect space with the weight divided by 2.
 """
 function get_bisected_canonical_space(ect_space::GeneralizedExponential)
-    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l/2, ect_space.m)
+    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l / 2, ect_space.m)
 end
 
 """
-    get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
+    get_child_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
 
 For number of sub-elements which is powers of 2, bisect the canonical space by dividing the
 length in half for each power.
@@ -177,7 +176,7 @@ length in half for each power.
 # Returns
 - `::GeneralizedExponential`: A ect space with the subdivided length.
 """
-function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
+function get_child_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
     num_ref = log2(num_sub_elements)
     if num_sub_elements < 2 || !isapprox(num_ref - round(num_ref), 0.0; atol=1e-12)
         throw(
@@ -188,6 +187,6 @@ function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_el
     end
 
     return GeneralizedExponential(
-        ect_space.p, ect_space.w, ect_space.l/num_sub_elements, ect_space.m
+        ect_space.p, ect_space.w, ect_space.l / num_sub_elements, ect_space.m
     )
 end
