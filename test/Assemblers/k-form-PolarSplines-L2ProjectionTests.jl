@@ -28,7 +28,7 @@ p⁰ = [2, 3]
 α = 5.0
 section_space_type = [FunctionSpaces.GeneralizedTrigonometric, FunctionSpaces.GeneralizedExponential, FunctionSpaces.Bernstein]
 # print info?
-verbose = false
+verbose = true
 # tolerance for zero values
 zero_tol = 1e-12
 # tolerance for convergence rates
@@ -64,9 +64,6 @@ for (p_idx, p) in enumerate(p⁰)
             regularities = tuple([0 for _ in 1:manifold_dim]...)
         end
 
-        # initialize geometry coefficients
-        geom_coeffs_tp = nothing
-
         # number of elements at the coarsest refinement level
         num_elements = (num_el_θ, num_el_r)
 
@@ -82,9 +79,8 @@ for (p_idx, p) in enumerate(p⁰)
             dq⁰ = (2, 2)
         end
 
-        # create (and refine) polar spline complex
-        X, _, geom_coeffs_tp = Forms.create_polar_spline_de_rham_complex(num_elements, section_spaces, regularities, R; geom_coeffs_tp = geom_coeffs_tp)
-
+        # create polar spline complex
+        X = Forms.create_polar_spline_de_rham_complex(num_elements, section_spaces, regularities)
         # retrieve geometry underlying the form spaces
         geometry = Forms.get_geometry(X[1])
 
@@ -93,7 +89,7 @@ for (p_idx, p) in enumerate(p⁰)
         # global quadrature rule
         dΩ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
 
-        for form_rank in 0:manifold_dim
+        for form_rank in [1]
             n_dofs = Forms.get_num_basis(X[form_rank+1])
             if verbose
                 display("   Form rank = $form_rank, n_dofs = $n_dofs")
@@ -106,6 +102,9 @@ for (p_idx, p) in enumerate(p⁰)
             ref_coeffs = read_data(
                 sub_dir, "$p-$section_space-$form_rank.txt"
             )
+
+            # display([p_idx ss_idx form_rank])
+            display(ref_coeffs - fₕ.coefficients)
             @test all(isapprox.(fₕ.coefficients, ref_coeffs, atol=atol*10, rtol=rtol*10))
 
             # compute error

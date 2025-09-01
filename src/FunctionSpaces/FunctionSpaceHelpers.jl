@@ -471,9 +471,17 @@ function create_scalar_polar_spline_space(
     zero_at_poles::Bool=false,
     box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 )
-    Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), box_sizes, num_elements, degrees, regularities, (1, 1), (1, 1)
-    )
+    if zero_at_poles
+        # reduce degree and regularity by 1
+        Bθ, Br = create_dim_wise_bspline_spaces(
+            (0.0, 0.0), box_sizes, num_elements,
+            degrees .- 1, regularities .- 1, (1, 1), (1, 1)
+        )
+    else
+        Bθ, Br = create_dim_wise_bspline_spaces(
+            (0.0, 0.0), box_sizes, num_elements, degrees, regularities, (1, 1), (1, 1)
+        )
+    end
 
     return _create_scalar_polar_spline_space(
         Bθ, Br, regularities[1], geom_coeffs_tp, R, two_poles, zero_at_poles
@@ -520,13 +528,24 @@ function create_scalar_polar_spline_space(
     zero_at_poles::Bool=false,
     box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 ) where {F <: NTuple{2, AbstractCanonicalSpace}}
-    Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
-    )
+    if zero_at_poles
+        # reduce degree and regularity by 1
+        Bθ, Br = create_dim_wise_bspline_spaces(
+            (0.0, 0.0), box_sizes, num_elements,
+            get_derivative_space.(section_spaces), regularities .- 1, (1, 1), (1, 1)
+        )
+        return _create_scalar_polar_spline_space(
+            Bθ, Br, regularities[1] - 1, geom_coeffs_tp, R, two_poles, zero_at_poles
+        )
 
-    return _create_scalar_polar_spline_space(
-        Bθ, Br, regularities[1], geom_coeffs_tp, R, two_poles, zero_at_poles
-    )
+    else
+        Bθ, Br = create_dim_wise_bspline_spaces(
+            (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
+        )
+        return _create_scalar_polar_spline_space(
+            Bθ, Br, regularities[1], geom_coeffs_tp, R, two_poles, zero_at_poles
+        )
+    end
 end
 
 function _create_scalar_polar_spline_space(
@@ -542,14 +561,18 @@ function _create_scalar_polar_spline_space(
         end
         # number of control points for a degenerate tensor-product mapping
         n_θ = get_num_basis(GBθ)
-        n_r = get_num_basis(Br)
+        if zero_at_poles
+            n_r = get_num_basis(Br) + 1
+        else
+            n_r = get_num_basis(Br)
+        end
         geom_coeffs_tp, _, _ = _build_standard_degenerate_control_points(n_θ, n_r, R)
     end
 
     return PolarSplineSpace(
         GBθ,
         Br,
-        (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]);
+        geom_coeffs_tp;
         two_poles=two_poles,
         zero_at_poles=zero_at_poles
     )
@@ -666,7 +689,7 @@ function _create_vector_polar_spline_space(
     return PolarSplineSpace(
         GBθ,
         Br,
-        (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]),
+        geom_coeffs_tp,
         dGBθ,
         dBr;
         two_poles=two_poles
@@ -770,7 +793,7 @@ function _create_polar_geometry_data(
     P_geom = PolarSplineSpace(
         GBθ,
         Br,
-        (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]);
+        geom_coeffs_tp;
         two_poles = two_poles
     )
     E_geom = get_global_extraction_matrix(P_geom, 1)
@@ -810,7 +833,7 @@ function refine_polar_geometry_data(
     # get coarse polar geometry control points
     E_geom = get_global_extraction_matrix(P_geom, 1)
     geom_coeffs_polar_tp = reshape(
-        (E_geom * E_geom') \ E_geom * geom_coeffs_polar, n_θ, n_r, 2
+        E_geom' * geom_coeffs_polar, n_θ, n_r, 2
     )
 
     # refine the univariate spaces
@@ -820,20 +843,22 @@ function refine_polar_geometry_data(
     ts_θ, _ = build_two_scale_operator(GBθ, GBθ_ref, ((2,),))
 
     # refine the tensor-product control points
-    geom_coeffs_tp = (
+    geom_coeffs_tp = get_degenerate_control_points(P_geom)
+    geom_coeffs_tp_ref = cat(
         ts_θ.global_subdiv_matrix *
         geom_coeffs_tp[:, :, 1] *
         ts_r.global_subdiv_matrix',
         ts_θ.global_subdiv_matrix *
         geom_coeffs_tp[:, :, 2] *
-        ts_r.global_subdiv_matrix'
+        ts_r.global_subdiv_matrix';
+        dims = 3
     )
 
     # build refined polar spline space
     P_geom_ref = PolarSplineSpace(
         GBθ_ref,
         Br_ref,
-        geom_coeffs_tp;
+        geom_coeffs_tp_ref;
         two_poles = two_poles
     )
 
@@ -848,9 +873,10 @@ function refine_polar_geometry_data(
         ts_r.global_subdiv_matrix';
         dims=3
     ), :, 2)
-    geom_coeffs_polar_ref = (E_geom_ref * E_geom_ref') \ geom_coeffs_polar_tp_ref
+    geom_coeffs_polar_ref = (E_geom_ref * E_geom_ref') \ (E_geom_ref * geom_coeffs_polar_tp_ref)
 
-    return P_geom_ref, geom_coeffs_polar_ref
+    return P_geom_ref, geom_coeffs_polar_ref,
+        (get_num_elements(ts_θ.fine_space), get_num_elements(ts_r.fine_space))
 end
 
 """

@@ -157,13 +157,13 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
     control_triangle::Matrix{Float64}
     two_poles::Bool
     zero_at_poles::Bool
-    degenerate_control_points::NTuple{2, Matrix{Float64}}
+    degenerate_control_points::Array{Float64, 3}
 
     """
         PolarSplineSpace(
             space_p::AbstractFESpace{1, 1},
             space_r::AbstractFESpace{1, 1},
-            degenerate_control_points::NTuple{2, Matrix{Float64}},
+            degenerate_control_points::Array{Float64, 3},
             two_poles::Bool=false,
             zero_at_poles::Bool=false
         )
@@ -173,7 +173,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
     # Arguments
     - `space_p::AbstractFESpace{1, 1}`: The poloidal space.
     - `space_r::AbstractFESpace{1, 1}`: The radial space.
-    - `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
+    - `degenerate_control_points::Array{Float64, 3}`: The degenerate control points.
     - `two_poles::Bool=false`: Whether the polar spline space has two poles.
     - `zero_at_poles::Bool=false`: Whether functions are constrained to zero at poles.
 
@@ -185,7 +185,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
     function PolarSplineSpace(
         space_p::AbstractFESpace{1, 1},
         space_r::AbstractFESpace{1, 1},
-        degenerate_control_points::NTuple{2, Matrix{Float64}};
+        degenerate_control_points::Array{Float64, 3};
         two_poles::Bool=false,
         zero_at_poles::Bool=false
     )
@@ -235,7 +235,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
     function PolarSplineSpace(
         space_p::AbstractFESpace{1, 1},
         space_r::AbstractFESpace{1, 1},
-        degenerate_control_points::NTuple{2, Matrix{Float64}},
+        degenerate_control_points::Array{Float64, 3},
         dspace_p::AbstractFESpace{1, 1},
         dspace_r::AbstractFESpace{1, 1};
         two_poles::Bool=false
@@ -282,7 +282,7 @@ end
 
 """
     extract_scalar_polar_splines_to_tensorproduct(
-        degenerate_control_points::NTuple{2, Matrix{Float64}},
+        degenerate_control_points::Array{Float64, 3},
         num_basis_p::Int,
         num_basis_r::Int,
         two_poles::Bool=false,
@@ -293,7 +293,7 @@ Build the extraction operator to extract the polar spline basis functions from t
 product space.
 
 # Arguments
-- `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
+- `degenerate_control_points::Array{Float64, 3}`: The degenerate control points.
 - `num_basis_p::Int`: Number of poloidal basis functions.
 - `num_basis_r::Int`: Number of radial basis functions.
 - `two_poles::Bool=false`: Whether the polar spline space has two poles.
@@ -304,38 +304,41 @@ product space.
 - `tri::Matrix{Float64}`: The control triangle.
 """
 function extract_scalar_polar_splines_to_tensorproduct(
-    degenerate_control_points::NTuple{2, Matrix{Float64}},
+    degenerate_control_points::Array{Float64, 3},
     num_basis_p::Int,
     num_basis_r::Int,
     two_poles::Bool=false,
     zero_at_poles::Bool=nothing
 )
-    if ~all(size.(degenerate_control_points, 2) .== 2)
+    if size(degenerate_control_points, 3) != 2
         throw(
             ArgumentError(
-                "The control points need to be two-dimensional, got $(size.(degenerate_control_points, 2))."
+                "The control points need to be two-dimensional, got $(size(degenerate_control_points, 3))."
             )
         )
     end
-    if ~all(size.(degenerate_control_points, 1) .== num_basis_p)
+    if size(degenerate_control_points, 1) != num_basis_p
         throw(
             ArgumentError(
-                "The input points need to be two sets of $num_basis_p points, got $(size.(degenerate_control_points, 1))."
+                "The input points need to be two sets of $num_basis_p points, got $(size(degenerate_control_points, 1))."
             )
         )
     end
     if ~all(
         isapprox.(
-            degenerate_control_points[1], degenerate_control_points[1][1:1,:], atol=1e-12
+            degenerate_control_points[:, 1, :], degenerate_control_points[1:1, 1,:], atol=1e-12
         )
     )
         throw(ArgumentError("All points in the first set should be identical."))
     else
-        origin = degenerate_control_points[1][1, :]
+        origin = degenerate_control_points[1, 1, :]
     end
 
     # build triangle circumscribing the input degenerate control points
-    tri = _get_circumscribing_triangle(vcat(degenerate_control_points...), origin)
+    tri = _get_circumscribing_triangle(
+        vcat(degenerate_control_points[:, 1, :], degenerate_control_points[:, 2, :]),
+        origin
+    )
 
     if zero_at_poles
         # eliminate all functions that are non-zero at the poles
@@ -386,7 +389,7 @@ end
 
 """
     _get_scalar_polar_extraction_submatrix(
-        degenerate_control_points::NTuple{2, Matrix{Float64}},
+        degenerate_control_points::Array{Float64, 3},
         tri::Matrix{Float64},
         origin::Vector{Float64}=[0.0, 0.0],
         two_poles::Bool=false
@@ -397,7 +400,7 @@ build the scalar polar spline extraction operator, as well as the vector polar s
 extraction operator.
 
 # Arguments
-- `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
+- `degenerate_control_points::Array{Float64, 3}`: The degenerate control points.
 - `tri::Matrix{Float64}`: The control triangle.
 - `origin::Vector{Float64}=[0.0, 0.0]`: The origin.
 - `two_poles::Bool=false`: Whether the polar spline space has two poles.
@@ -407,17 +410,17 @@ extraction operator.
 - `E0_2::SparseMatrixCSC{Float64,Int}`: The extraction sub-matrix for the second pole.
 """
 function _get_scalar_polar_extraction_submatrix(
-    degenerate_control_points::NTuple{2, Matrix{Float64}},
+    degenerate_control_points::Array{Float64, 3},
     tri::Matrix{Float64},
     origin::Vector{Float64}=[0.0, 0.0],
     two_poles::Bool=false
 )
     # compute barycentric coordinates w.r.t. the control triangle
     baryc_1 = permutedims(
-        _get_barycentric_coordinates(degenerate_control_points[1], tri, origin)
+        _get_barycentric_coordinates(degenerate_control_points[:, 1, :], tri, origin)
     )
     baryc_2 = permutedims(
-        _get_barycentric_coordinates(degenerate_control_points[2], tri, origin)
+        _get_barycentric_coordinates(degenerate_control_points[:, 2, :], tri, origin)
     )
 
     # create extraction matrix for first pole
@@ -433,7 +436,7 @@ end
 
 """
     extract_vector_polar_splines_to_tensorproduct(
-        degenerate_control_points::NTuple{2, Matrix{Float64}},
+        degenerate_control_points::Array{Float64, 3},
         num_basis_p::Int,
         num_basis_r::Int;
         two_poles::Bool=false
@@ -443,7 +446,7 @@ Build the extraction operator to extract the vector polar spline basis functions
 the tensor product basis functions.
 
 # Arguments
-- `degenerate_control_points::NTuple{2,Matrix{Float64}}`: The degenerate control points.
+- `degenerate_control_points::Array{Float64, 3}`: The degenerate control points.
 - `num_basis_p::Int`: Number of poloidal basis functions.
 - `num_basis_r::Int`: Number of radial basis functions.
 - `two_poles::Bool=false`: Whether the polar spline space has two poles.
@@ -454,37 +457,40 @@ The first element corresponds to the horizontal edges and the second element to 
 - `tri::Matrix{Float64}`: The control triangle.
 """
 function extract_vector_polar_splines_to_tensorproduct(
-    degenerate_control_points::NTuple{2, Matrix{Float64}},
+    degenerate_control_points::Array{Float64, 3},
     num_basis_p::Int,
     num_basis_r::Int,
     two_poles::Bool=false
 )
-    if ~all(size.(degenerate_control_points, 2) .== 2)
+    if size(degenerate_control_points, 3) != 2
         throw(
             ArgumentError(
-                "The control points need to be two-dimensional, got $(size.(degenerate_control_points, 2))."
+                "The control points need to be two-dimensional, got $(size(degenerate_control_points, 3))."
             )
         )
     end
-    if ~all(size.(degenerate_control_points, 1) .== num_basis_p)
+    if size(degenerate_control_points, 1) != num_basis_p
         throw(
             ArgumentError(
-                "The input points need to be two sets of $num_basis_p points, got $(size.(degenerate_control_points, 1))."
+                "The input points need to be two sets of $num_basis_p points, got $(size(degenerate_control_points, 1))."
             )
         )
     end
     if ~all(
         isapprox.(
-            degenerate_control_points[1], degenerate_control_points[1][1:1,:], atol=1e-12
+            degenerate_control_points[:, 1, :], degenerate_control_points[1:1, 1, :], atol=1e-12
         )
     )
         throw(ArgumentError("All points in the first set should be identical."))
     else
-        origin = degenerate_control_points[1][1, :]
+        origin = degenerate_control_points[1, 1, :]
     end
 
     # build triangle circumscribing the input degenerate control points
-    tri = _get_circumscribing_triangle(vcat(degenerate_control_points...), origin)
+    tri = _get_circumscribing_triangle(
+        vcat(degenerate_control_points[:, 1, :], degenerate_control_points[:, 2, :]),
+        origin
+    )
 
     # number of vector basis functions
     num_basis =
@@ -640,9 +646,20 @@ function get_global_extraction_matrix(
 end
 
 get_patch_spaces(space::PolarSplineSpace) = space.patch_spaces
+function get_max_local_dim(space::PolarSplineSpace)
+    return sum(get_max_local_dim.(get_patch_spaces(space)))
+end
 
 function assemble_global_extraction_matrix(
     space::PolarSplineSpace{num_components}
 ) where {num_components}
     return SparseArrays.sparse_hcat(space.global_extraction_matrix...)
+end
+
+function get_degenerate_control_points(space::PolarSplineSpace)
+    return space.degenerate_control_points
+end
+
+function get_element_lengths(space::PolarSplineSpace, element_id::Int)
+    return get_element_lengths(get_patch_spaces(space)[1], element_id)
 end

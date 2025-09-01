@@ -171,7 +171,7 @@ function get_num_elements_per_patch(space::GTBSplineSpace)
     return space.num_elements_per_patch
 end
 
-function get_num_basis_per_patch(space::GTBSplineSpace{num_patches}) where {num_patches}
+function get_num_local_basis_per_patch(space::GTBSplineSpace{num_patches}) where {num_patches}
     return ntuple(num_patches) do i
         return get_num_basis(get_patch_spaces(space)[i])
     end
@@ -197,6 +197,10 @@ function get_local_basis(
 end
 
 get_patch_spaces(space::GTBSplineSpace) = space.patch_spaces
+function get_max_local_dim(space::GTBSplineSpace)
+    return maximum(get_max_local_dim.(get_patch_spaces(space)))
+end
+
 
 """
     assemble_global_extraction_matrix(
@@ -219,7 +223,7 @@ function assemble_global_extraction_matrix(
     # Number of elements
     nel = get_num_elements(space)
     # Number of local basis functions
-    num_local_basis = get_num_basis_per_patch(space)
+    num_local_basis = get_num_local_basis_per_patch(space)
     num_local_basis_offset = cumsum([0; num_local_basis...])
     # Initialize the global extraction matrix
     global_extraction_matrix = zeros(Float64, num_local_basis_offset[end], num_global_basis)

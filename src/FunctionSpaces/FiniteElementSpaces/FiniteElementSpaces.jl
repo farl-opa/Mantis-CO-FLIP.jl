@@ -586,6 +586,14 @@ function evaluate(
     return evaluations
 end
 
+function assemble_global_extraction_matrix(space::AbstractFESpace)
+    throw(
+        ArgumentError(
+            "'assemble_global_extraction_matrix' not implemented for $(typeof(space))"
+        )
+    )
+end
+
 """
     _evaluate_all_at_point(
         fem_space::AbstractFESpace{1, num_components},
