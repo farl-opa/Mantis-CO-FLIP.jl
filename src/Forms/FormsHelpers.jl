@@ -692,20 +692,10 @@ function trace_basis_idxs(
         # boundaries.
         throw(ArgumentError("trace_basis_idxs not implemented for multipatch geometries"))
     end
-    if typeof(get_fe_space(form)) <: FunctionSpaces.DirectSumSpace
-        dof_partition = FunctionSpaces.get_dof_partition(get_fe_space(form))
-        num_sides = 3^manifold_dim
-        basis_idxs = [
-            i for k in eachindex(dof_partition) for
-            j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[k][1][j]
-        ]
-        return basis_idxs
-    else
-        dof_partition = FunctionSpaces.get_dof_partition(get_fe_space(form))
-        num_sides = 3^manifold_dim
-        basis_idxs = [
-            i for j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[1][j]
-        ]
-        return basis_idxs
-    end
+    dof_partition = FunctionSpaces.get_dof_partition(get_fe_space(form))
+    num_sides = 3^manifold_dim
+    basis_idxs = [
+        i for j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[1][j]
+    ]
+    return basis_idxs
 end

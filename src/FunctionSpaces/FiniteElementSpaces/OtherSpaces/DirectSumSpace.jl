@@ -102,45 +102,19 @@ function get_max_local_dim(space::DirectSumSpace)
     return max_local_dim
 end
 
-"""
-    get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
-
-Get the d.o.f. partition the component of `space` with `component_idx`. The d.o.f.s are
-offsetted by the (cumulative) dimension(s) of preceding section spaces.
-
-# Arguments
-- `space::DirectSumSpace`: Direct sum space.
-- `component_idx::Int`: Index of the component space.
-
-# Returns
-- `component_dof_partition::Vector{Vector{Vector{Int}}}`: D.o.f. Partition the component
-    space.
-"""
-function get_component_dof_partition(space::DirectSumSpace, component_idx::Int)
-    component_dof_partition = deepcopy(
-        get_dof_partition(get_component_spaces(space)[component_idx])
-    )
-    dof_offset_component = get_dof_offsets(space)[component_idx]
-    for i in eachindex(component_dof_partition)
-        for j in eachindex(component_dof_partition[i])
-            component_dof_partition[i][j] .+= dof_offset_component
-        end
-    end
-
-    return component_dof_partition
-end
-
 function get_dof_partition(space::DirectSumSpace)
     component_spaces = get_component_spaces(space)
     dof_offsets = get_dof_offsets(space)
 
     dof_partition_per_component = FunctionSpaces.get_dof_partition.(component_spaces)
-    dof_partition = deepcopy(dof_partition_per_component)
+    dof_partition = deepcopy(dof_partition_per_component[1])
 
-    for component in 1:get_num_components(space)
+    for component in 2:get_num_components(space)
         for patch in 1:length(dof_partition_per_component[component][1])
-            dof_partition[component][1][patch] =
-                dof_partition_per_component[component][1][patch] .+ dof_offsets[component]
+            append!(
+                dof_partition[1][patch],
+                dof_partition_per_component[component][1][patch] .+ dof_offsets[component],
+            )
         end
     end
 
@@ -189,60 +163,3 @@ end
 function get_extraction(space::DirectSumSpace, element_id::Int, component_id::Int)
     return LinearAlgebra.I, get_basis_permutation(space, element_id, component_id)
 end
-
-
-
-# function evaluate(
-#     space::DirectSumSpace{manifold_dim, num_components, num_patches},
-#     element_id::Int,
-#     xi::NTuple{manifold_dim, Vector{Float64}},
-#     nderivatives::Int=0,
-# ) where {manifold_dim, num_components, num_patches}
-#     basis_indices = get_basis_indices(space, element_id)
-
-#     # Pre-allocation, including padding (see below).
-#     num_points = prod(length.(xi))
-#     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
-#     for j in 0:nderivatives
-#         # number of derivatives of order j
-#         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
-#         evaluations[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
-#         for der_idx in 1:num_j_ders
-#             evaluations[j + 1][der_idx] = [
-#                 zeros(num_points, length(basis_indices)) for _ in 1:num_components
-#             ]
-#         end
-#     end
-
-#     # Actually evaluate the basis functions. Since DirectSumSpace is a direct sum of
-#     # component spaces, we can evaluate each component space independently and then store
-#     # the results in the evaluations array. We do pad with zeros to ensure a consistent and
-#     # correct size of the evaluations array.
-#     local_offsets = zeros(Int, num_components+1)
-#     for component_idx in 1:num_components
-#         # Evaluation.
-#         component_eval, component_basis_idxs = evaluate(
-#             get_component_spaces(space)[component_idx],
-#             element_id,
-#             xi,
-#             nderivatives,
-#         )
-#         local_offsets[component_idx+1] = local_offsets[component_idx] +
-#             length(component_basis_idxs)
-
-#         for der_order in eachindex(evaluations)
-#             for der_idx in eachindex(evaluations[der_order])
-#                 # Padding + shift to the right position.
-#                 for i in eachindex(component_basis_idxs)
-#                     for point_idx in 1:num_points
-#                         evaluations[der_order][der_idx][component_idx][
-#                             point_idx, i + local_offsets[component_idx]
-#                         ] = component_eval[der_order][der_idx][1][point_idx,i]
-#                     end
-#                 end
-#             end
-#         end
-#     end
-
-#     return evaluations, basis_indices
-# end
