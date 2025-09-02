@@ -163,3 +163,58 @@ end
 function get_extraction(space::DirectSumSpace, element_id::Int, component_id::Int)
     return LinearAlgebra.I, get_basis_permutation(space, element_id, component_id)
 end
+
+# function evaluate(
+#     space::DirectSumSpace{manifold_dim, num_components, num_patches},
+#     element_id::Int,
+#     xi::NTuple{manifold_dim, Vector{Float64}},
+#     nderivatives::Int=0,
+# ) where {manifold_dim, num_components, num_patches}
+#     basis_indices = get_basis_indices(space, element_id)
+
+#     # Pre-allocation, including padding (see below).
+#     num_points = prod(length.(xi))
+#     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
+#     for j in 0:nderivatives
+#         # number of derivatives of order j
+#         num_j_ders = binomial(manifold_dim + j - 1, manifold_dim - 1)
+#         evaluations[j + 1] = Vector{Vector{Matrix{Float64}}}(undef, num_j_ders)
+#         for der_idx in 1:num_j_ders
+#             evaluations[j + 1][der_idx] = [
+#                 zeros(num_points, length(basis_indices)) for _ in 1:num_components
+#             ]
+#         end
+#     end
+
+#     # Actually evaluate the basis functions. Since DirectSumSpace is a direct sum of
+#     # component spaces, we can evaluate each component space independently and then store
+#     # the results in the evaluations array. We do pad with zeros to ensure a consistent and
+#     # correct size of the evaluations array.
+#     local_offsets = zeros(Int, num_components+1)
+#     for component_idx in 1:num_components
+#         # Evaluation.
+#         component_eval, component_basis_idxs = evaluate(
+#             get_component_spaces(space)[component_idx],
+#             element_id,
+#             xi,
+#             nderivatives,
+#         )
+#         local_offsets[component_idx+1] = local_offsets[component_idx] +
+#             length(component_basis_idxs)
+
+#         for der_order in eachindex(evaluations)
+#             for der_idx in eachindex(evaluations[der_order])
+#                 # Padding + shift to the right position.
+#                 for i in eachindex(component_basis_idxs)
+#                     for point_idx in 1:num_points
+#                         evaluations[der_order][der_idx][component_idx][
+#                             point_idx, i + local_offsets[component_idx]
+#                         ] = component_eval[der_order][der_idx][1][point_idx,i]
+#                     end
+#                 end
+#             end
+#         end
+#     end
+
+#     return evaluations, basis_indices
+# end
