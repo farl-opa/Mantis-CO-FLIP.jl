@@ -22,8 +22,7 @@ struct KnotVector
             throw(ArgumentError("""\
                 The number of knots and multiplicities must be the same. There are \
                 $(size(patch_1d) + 1) knots and $(length(multiplicity)) multiplicities.\
-                """
-            ))
+                """))
         end
 
         # Ensure all multiplicities are greater than 0
@@ -32,8 +31,7 @@ struct KnotVector
             throw(ArgumentError("""\
                 The multiplicity must be greater than or equal to 1. However, at index \
                 $(error_index), the multiplicity is $(multiplicity[error_index]).\
-                """
-            ))
+                """))
         end
 
         return new(patch_1d, polynomial_degree, multiplicity)
@@ -84,8 +82,7 @@ function create_knot_vector(
         throw(ArgumentError("""\
             Allowed breakpoint conditions are `regularity` or `multiplicity`. The given \
             condition is $(condition_type).\
-            """
-        ))
+            """))
     end
 end
 
@@ -103,6 +100,8 @@ Returns the multiplicity of each knot in `knot_vector`.
 function get_multiplicity(knot_vector::KnotVector)
     return knot_vector.multiplicity
 end
+
+get_polynomial_degree(knot_vector::KnotVector) = knot_vector.polynomial_degree
 
 """
     get_element_measure(knot_vector::KnotVector, element_id::Int)

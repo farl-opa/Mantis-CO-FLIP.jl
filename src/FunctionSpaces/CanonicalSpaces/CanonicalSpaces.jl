@@ -54,7 +54,7 @@ function get_bisected_canonical_space(elem_loc_basis::AbstractCanonicalSpace)
 end
 
 """
-    get_finer_canonical_space(elem_loc_basis::AbstractCanonicalSpace, num_sub_elements::Int)
+    get_child_canonical_space(elem_loc_basis::AbstractCanonicalSpace, num_sub_elements::Int)
 
 This default method returns the given element-local basis. This method should be overloaded
 for element-local bases that do not satisfy this property or those that need additional
@@ -67,7 +67,7 @@ parameters; e.g., ECT spaces.
 # Returns
 - `::AbstractCanonicalSpace`: The input element-local basis.
 """
-function get_finer_canonical_space(
+function get_child_canonical_space(
     elem_loc_basis::AbstractCanonicalSpace, num_sub_elements::Int
 )
     return elem_loc_basis

@@ -108,7 +108,18 @@ function get_basis_index_combinations(manifold_dim::Int, form_rank::Int)
 end
 
 """
-    create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
+    create_tensor_product_bspline_de_rham_complex(
+        starting_points::NTuple{manifold_dim, Float64},
+        box_sizes::NTuple{manifold_dim, Float64},
+        num_elements::NTuple{manifold_dim, Int},
+        section_spaces::NTuple{manifold_dim, F},
+        regularities::NTuple{manifold_dim, Int},
+        geometry::G,
+    ) where {
+        manifold_dim,
+        F <: FunctionSpaces.AbstractCanonicalSpace,
+        G <: Geometry.AbstractGeometry{manifold_dim},
+    }
 
 Create a tensor-product B-spline de Rham complex.
 
@@ -177,17 +188,26 @@ function create_tensor_product_bspline_de_rham_complex(
             # Build and return the corresponding tensor-product FEM space.
             return FunctionSpaces.TensorProductSpace(tp_consituent_spaces)
         end
-
-        direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces)
-
-        return FormSpace(k, geometry, direct_sum_space, "ω_$k")
+        if num_form_components == 1
+            return FormSpace(k, geometry, k_form_fem_spaces[1], "ω_$k")
+        else
+            return FormSpace(
+                k, geometry, FunctionSpaces.DirectSumSpace(k_form_fem_spaces), "ω_$k"
+            )
+        end
     end
 
     return form_spaces
 end
 
 """
-    create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, section_spaces::NTuple{manifold_dim, F}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
+    create_tensor_product_bspline_de_rham_complex(
+        starting_points::NTuple{manifold_dim, Float64},
+        box_sizes::NTuple{manifold_dim, Float64},
+        num_elements::NTuple{manifold_dim, Int},
+        section_spaces::NTuple{manifold_dim, F},
+        regularities::NTuple{manifold_dim, Int},
+    ) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
 
 Create a tensor-product B-spline de Rham complex.
 
@@ -218,7 +238,13 @@ function create_tensor_product_bspline_de_rham_complex(
 end
 
 """
-    create_tensor_product_bspline_de_rham_complex(starting_points::NTuple{manifold_dim, Float64}, box_sizes::NTuple{manifold_dim, Float64}, num_elements::NTuple{manifold_dim, Int}, degrees::NTuple{manifold_dim, Int}, regularities::NTuple{manifold_dim, Int}) where {manifold_dim}
+    create_tensor_product_bspline_de_rham_complex(
+        starting_points::NTuple{manifold_dim, Float64},
+        box_sizes::NTuple{manifold_dim, Float64},
+        num_elements::NTuple{manifold_dim, Int},
+        degrees::NTuple{manifold_dim, Int},
+        regularities::NTuple{manifold_dim, Int},
+    ) where {manifold_dim}
 
 Create a tensor-product B-spline de Rham complex.
 
@@ -399,9 +425,13 @@ function create_hierarchical_de_rham_complex(
             return hierarchical_space
         end
 
-        direct_sum_space = FunctionSpaces.DirectSumSpace(k_form_fem_spaces)
-
-        return FormSpace(k, geometry, direct_sum_space, "ω_$k")
+        if num_form_components == 1
+            return FormSpace(k, geometry, k_form_fem_spaces[1], "ω_$k")
+        else
+            return FormSpace(
+                k, geometry, FunctionSpaces.DirectSumSpace(k_form_fem_spaces), "ω_$k"
+            )
+        end
     end
 
     return form_spaces
@@ -478,12 +508,10 @@ function update_hierarchical_de_rham_complex(
 
     # Build new form spaces
     geom = Geometry.HierarchicalGeometry(zero_form_space)
-    zero_form_space_sum = FunctionSpaces.DirectSumSpace((zero_form_space,))
     one_form_space_sum = FunctionSpaces.DirectSumSpace((one_form_space_x, one_form_space_y))
-    two_form_space_sum = FunctionSpaces.DirectSumSpace((two_form_space,))
-    zero_form = Forms.FormSpace(0, geom, zero_form_space_sum, "β")
+    zero_form = Forms.FormSpace(0, geom, zero_form_space, "β")
     one_form = Forms.FormSpace(1, geom, one_form_space_sum, "σ")
-    two_form = Forms.FormSpace(2, geom, two_form_space_sum, "u")
+    two_form = Forms.FormSpace(2, geom, two_form_space, "u")
 
     return zero_form, one_form, two_form
 end
@@ -659,11 +687,25 @@ Creates a list of basis function idxs which control the trace of the form on the
 function trace_basis_idxs(
     form::AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
 ) where {manifold_dim, form_rank, expression_rank, G}
-    dof_partition = FunctionSpaces.get_dof_partition(form.fem_space)
-    num_sides = 3^manifold_dim
-    basis_idxs = [
-        i for k in eachindex(dof_partition) for
-        j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[k][1][j]  # TODO: is this general enough for multipatch?
-    ]
-    return basis_idxs
+    if FunctionSpaces.get_num_patches(get_fe_space(form)) > 1
+        # This will require topological information to know which interfaces are outer
+        # boundaries.
+        throw(ArgumentError("trace_basis_idxs not implemented for multipatch geometries"))
+    end
+    if typeof(get_fe_space(form)) <: FunctionSpaces.DirectSumSpace
+        dof_partition = FunctionSpaces.get_dof_partition(get_fe_space(form))
+        num_sides = 3^manifold_dim
+        basis_idxs = [
+            i for k in eachindex(dof_partition) for
+            j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[k][1][j]
+        ]
+        return basis_idxs
+    else
+        dof_partition = FunctionSpaces.get_dof_partition(get_fe_space(form))
+        num_sides = 3^manifold_dim
+        basis_idxs = [
+            i for j in setdiff(1:num_sides, Int((num_sides + 1) / 2)) for i in dof_partition[1][j]
+        ]
+        return basis_idxs
+    end
 end
