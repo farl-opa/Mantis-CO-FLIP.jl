@@ -28,7 +28,7 @@ p⁰ = [2, 3]
 α = 5.0
 section_space_type = [FunctionSpaces.GeneralizedTrigonometric, FunctionSpaces.GeneralizedExponential, FunctionSpaces.Bernstein]
 # print info?
-verbose = true
+verbose = false
 # tolerance for zero values
 zero_tol = 1e-12
 # tolerance for convergence rates
@@ -89,7 +89,7 @@ for (p_idx, p) in enumerate(p⁰)
         # global quadrature rule
         dΩ = Quadrature.StandardQuadrature(canonical_qrule, Geometry.get_num_elements(geometry))
 
-        for form_rank in [1]
+        for form_rank in 0:manifold_dim
             n_dofs = Forms.get_num_basis(X[form_rank+1])
             if verbose
                 display("   Form rank = $form_rank, n_dofs = $n_dofs")
@@ -103,8 +103,6 @@ for (p_idx, p) in enumerate(p⁰)
                 sub_dir, "$p-$section_space-$form_rank.txt"
             )
 
-            # display([p_idx ss_idx form_rank])
-            display(ref_coeffs - fₕ.coefficients)
             @test all(isapprox.(fₕ.coefficients, ref_coeffs, atol=atol*10, rtol=rtol*10))
 
             # compute error

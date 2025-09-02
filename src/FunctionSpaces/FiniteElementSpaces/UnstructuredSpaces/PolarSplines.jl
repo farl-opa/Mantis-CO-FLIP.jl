@@ -54,7 +54,14 @@ function _build_polar_extraction_and_dof_partition(
             index_perm_el[component_idx] = findall(
                 x -> x in rows_el[component_idx], basis_indices_el
             )
-            coeffs_el[component_idx] = Array(E[component_idx][rows_el[component_idx], cols_el[component_idx]])'
+            coeffs_el[component_idx] = permutedims(
+                Array(
+                    E[component_idx][
+                        basis_indices_el[index_perm_el[component_idx]],
+                        cols_el[component_idx]
+                    ]
+                )
+            )
         end
 
         # store basis indices and permutation on element
