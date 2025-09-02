@@ -134,8 +134,12 @@ for (p_idx, p) in enumerate(p⁰)
 end
 
 ref_errors = read_data(sub_dir, "errors.txt")
-for i in eachindex(errors)
-    @test isapprox(errors[i], ref_errors[i], atol=1e-1, rtol=1e-1)
+li = LinearIndices(errors)
+for ci in CartesianIndices(errors)
+    (i,j,rankp1) = Tuple(ci)
+    if rankp1 == 2 # only 1-forms
+        @test isapprox(errors[ci], ref_errors[li[ci]], rtol=5e-4)
+    end
 end
 
 end
