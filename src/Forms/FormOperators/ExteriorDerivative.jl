@@ -15,7 +15,7 @@ Represents the exterior derivative of an `AbstractFormExpression`.
     label of `form`.
 
 # Type parameters
-- `manifold_dim`: Dimension of the manifold. 
+- `manifold_dim`: Dimension of the manifold.
 - `form_rank`: The form rank of the exterior derivative. If the form rank of `form` is `k`
     then `form_rank` is `k+1`.
 - `expression_rank`: Rank of the expression. Expressions without basis forms have rank 0,
@@ -147,7 +147,7 @@ function _evaluate_exterior_derivative(
     )
 
     # This is equal to binomial(manifold_dim, form_rank + 1).
-    n_derivative_components = size(d_form_basis_eval, 1) 
+    n_derivative_components = size(d_form_basis_eval, 1)
 
     d_form_eval = Vector{Vector{Float64}}(undef, n_derivative_components)
 
@@ -221,7 +221,7 @@ function _evaluate_exterior_derivative(
         form_space, element_id, xi, 1
     )
 
-    # The exterior derivative is 
+    # The exterior derivative is
     # (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
     # Store the required values
     der_idx_1 = FunctionSpaces.get_derivative_idx([1, 0])
@@ -248,11 +248,11 @@ function _evaluate_exterior_derivative(
     ]
 
     # Evaluate the underlying FEM space and its first order derivatives (all derivatives for each component)
-    d_local_fem_basis, form_basis_indices = FunctionSpaces.evaluate(
-        form_space.fem_space, element_id, xi, 1
+    d_local_fem_basis, form_basis_indices = _evaluate_form_in_canonical_coordinates(
+        form_space, element_id, xi, 1
     )
 
-    # The exterior derivative is 
+    # The exterior derivative is
     # (∂α₃/∂ξ₂ - ∂α₂/∂ξ₃) dξ₂∧dξ₃ + (∂α₁/∂ξ₃ - ∂α₃/∂ξ₁) dξ₃∧dξ₁ + (∂α₂/∂ξ₁ - ∂α₁/∂ξ₂) dξ₁∧dξ₂
     der_idx_1 = FunctionSpaces.get_derivative_idx([1, 0, 0])
     der_idx_2 = FunctionSpaces.get_derivative_idx([0, 1, 0])
@@ -287,13 +287,13 @@ function _evaluate_exterior_derivative(
     ]
 
     # Evaluate the underlying FEM space and its first order derivatives (all derivatives for each component)
-    d_local_fem_basis, form_basis_indices = FunctionSpaces.evaluate(
-        form_space.fem_space, element_id, xi, 1
+    d_local_fem_basis, form_basis_indices = _evaluate_form_in_canonical_coordinates(
+        form_space, element_id, xi, 1
     )
 
-    # The form is 
+    # The form is
     # α₁ dξ₂∧dξ₃ + α₂ dξ₃∧dξ₁ + α₃ dξ₁∧dξ₂
-    # The exterior derivative is 
+    # The exterior derivative is
     # (∂α₁/∂ξ₁ + ∂α₂/∂ξ₂ + ∂α₃/∂ξ₃) dξ₁∧dξ₂∧dξ₃
     der_idx_1 = FunctionSpaces.get_derivative_idx([1, 0, 0])
     der_idx_2 = FunctionSpaces.get_derivative_idx([0, 1, 0])
