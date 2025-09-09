@@ -268,7 +268,7 @@ function _evaluate_exterior_derivative(
         d_local_fem_basis[2][der_idx_1][2] - d_local_fem_basis[2][der_idx_2][1]
 
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
-    return local_d_form_basis_eval, [form_basis_indices]
+    return local_d_form_basis_eval, form_basis_indices
 end
 
 function _evaluate_exterior_derivative(
@@ -304,5 +304,5 @@ function _evaluate_exterior_derivative(
         d_local_fem_basis[2][der_idx_3][3]
 
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
-    return local_d_form_basis_eval, [form_basis_indices]
+    return local_d_form_basis_eval, form_basis_indices
 end
