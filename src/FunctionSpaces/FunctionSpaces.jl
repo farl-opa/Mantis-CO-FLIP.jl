@@ -13,6 +13,7 @@ import SparseArrays
 import ToeplitzMatrices
 
 using ..Mesh
+using ..Points
 using ..GeneralHelpers
 
 """
@@ -47,7 +48,8 @@ components, and on any number of patches.
 - `num_components::Int`: Number of (output) components of the function space.
 - `num_patches::Int`: Number of patches over which the function space is defined.
 """
-abstract type AbstractFESpace{manifold_dim, num_components, num_patches} <: AbstractFunctionSpace end
+abstract type AbstractFESpace{manifold_dim, num_components, num_patches} <:
+              AbstractFunctionSpace end
 
 function get_manifold_dim(
     ::AbstractFESpace{manifold_dim, num_components, num_patches}

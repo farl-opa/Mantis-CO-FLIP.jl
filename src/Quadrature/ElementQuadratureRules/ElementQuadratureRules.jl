@@ -71,8 +71,9 @@ Represents a quadrature rule on a canonical element of dimension `manifold_dim`.
 - [`tensor_product_rule(qrules_1d::NTuple{manifold_dim, CanonicalQuadratureRule{1}}) where
     {manifold_dim}`](@ref).
 """
-struct CanonicalQuadratureRule{manifold_dim} <: AbstractElementQuadratureRule{manifold_dim}
-    nodes::NTuple{manifold_dim, Vector{Float64}}
+struct CanonicalQuadratureRule{manifold_dim, P} <:
+       AbstractElementQuadratureRule{manifold_dim}
+    nodes::P
     weights::Vector{Float64}
     rule_label::String
 end

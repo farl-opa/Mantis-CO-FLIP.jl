@@ -76,13 +76,13 @@ end
 function evaluate(
     geometry::FEGeometry{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, F}
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(
         geometry.fem_space, element_id, xi, 0
     )
     length
-    num_eval_points = prod(size.(xi, 1))
+    num_eval_points = Points.get_num_points(xi)
     image_dim = get_image_dim(geometry)
     eval = zeros(Float64, num_eval_points, image_dim)
 
@@ -101,7 +101,7 @@ end
 function jacobian(
     geometry::FEGeometry{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, F}
     # Jᵢⱼ = ∂Φⁱ\∂ξⱼ
     # evaluate fem space
@@ -119,7 +119,7 @@ function jacobian(
         return der_idx
     end
 
-    num_eval_points = prod(size.(xi, 1))
+    num_eval_points = Points.get_num_points(xi)
     image_dim = get_image_dim(geometry)
     J = zeros(num_eval_points, image_dim, manifold_dim)
     for basis_id in eachindex(fem_basis_indices)

@@ -16,7 +16,7 @@ subdivisions_to_test = 2:8
 nq = 30
 coeff_factor = 5
 
-child_x = collect(range(0, 1, nq + 1))
+child_x = Points.CartesianPoints((range(0, 1, nq + 1),))
 
 for p in degrees_for_test
     nel = p + 2
@@ -30,7 +30,7 @@ for p in degrees_for_test
         (rand(FunctionSpaces.get_num_basis(parent_bspline)) .* 2 .- 1) .* coeff_factor
 
     for nsubdivision in subdivisions_to_test
-        parent_x = collect(range(0, 1, nq * nsubdivision + 1))
+        parent_x = Points.CartesianPoints((range(0, 1, nq * nsubdivision + 1),))
 
         twoscale_operator, child_bspline = FunctionSpaces.build_two_scale_operator(
             parent_bspline, nsubdivision
@@ -43,12 +43,12 @@ for p in degrees_for_test
         for child_el in 1:size(child_bspline.knot_vector.patch_1d)
             parent_el = FunctionSpaces.get_element_parent(child_el, nsubdivision)
             parent_spline_eval = FunctionSpaces.evaluate(
-                parent_bspline, parent_el, (parent_x,), 0, parent_coeffs
+                parent_bspline, parent_el, parent_x, 0, parent_coeffs
             )
             parent_idx = (child_el - 1) % nsubdivision + 1
 
             child_spline_eval = FunctionSpaces.evaluate(
-                child_bspline, child_el, (child_x,), 0, child_coeffs
+                child_bspline, child_el, child_x, 0, child_coeffs
             )
             @test all(
                 isapprox.(

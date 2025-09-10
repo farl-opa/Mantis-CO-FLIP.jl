@@ -84,23 +84,25 @@ in `polynomials` at `ξ` for ``\\xi \\in [0.0, 1.0]``.
 up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \\frac{\\mathrm{d}^{k}B_{j}}{\\mathrm{d}\\xi^{k}}(\\xi_{i})``.
 """
 Memoization.@memoize function evaluate(
-    polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int=0
+    polynomials::AbstractLagrangePolynomials,
+    ξ::Points.CartesianPoints{1},
+    nderivatives::Int=0,
 )
     # Get information from inputs on size of computation
-    n_points = size(ξ, 1)  # the number of points where to evaluate the polynomials and their derivatives
+    num_points = Points.get_num_points(ξ)  # the number of points where to evaluate the polynomials and their derivatives
     p = polynomials.p # the degree of the polynomials, the number of polynomials is p + 1
 
     # Uses the `PolynomialBases` package to evaluate the `polynomial`. This
     # uses the attribute `_core_polynomials` in the `polynomial` struct. This
     # allows every Lagrange polynomial to be evaluated by calling the same
     # method from `PolynomialBases`.
-    ξ_scaled = 2.0 * ξ .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
+    ξ_scaled = 2.0 * Points.get_constituent_points(ξ)[1] .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
 
     # Allocate memory space for the result, derivatives are the third dimension
     d_polynomials = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         d_polynomials[j + 1] = Vector{Matrix{Float64}}(undef, 1)
-        d_polynomials[j + 1][1] = zeros(Float64, n_points, polynomials.p + 1)
+        d_polynomials[j + 1][1] = zeros(Float64, num_points, polynomials.p + 1)
     end
 
     # Evaluate the polynomials at the points ξ
@@ -187,7 +189,7 @@ Evaluate the polynomials ``B_{j}(\\xi)``, ``j = 1, \\dots, p+1``, in `polynomial
 up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \\frac{\\mathrm{d}^{k}B_{j}}{\\mathrm{d}\\xi^{k}}(\\xi_{i})``.
 """
 Memoization.@memoize function evaluate(
-    polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int=0
+    polynomials::EdgeLobattoLegendre, ξ::Points.CartesianPoints{1}, nderivatives::Int=0
 )
     # The edge basis functions are given by, see documentation of EdgeLobattoLegendre:
     #
@@ -260,7 +262,7 @@ D_{k,j} = \\frac{\\mathrm{d}B_{j}(x_{k})}{\\mathrm{d}x}
    ``D_{k,j} = \\frac{\\mathrm{d}B_{j}(x_{k})}{\\mathrm{d}x}``.
    (size: [p+1, p+1])
 """
-function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int=1)
+function _derivative_matrix(nodes::AbstractVector{Float64}; algorithm::Int=1)
     #   Revisions:  2009-11-25 (apalha) First implementation.
     #               2014-12-03 (apalha) Removed pre-allocation of result.
     #                                   Replaced repmats by bsxfun for smaller
@@ -379,7 +381,7 @@ We follow the algorithm proposed in section 4 of [Costa2000](@cite).
 
 """
 function _derivative_matrix_next!(
-    D_m::Array{Float64, 2}, m::Int, D::Array{Float64, 2}, nodes::Vector{Float64}
+    D_m::Array{Float64, 2}, m::Int, D::Array{Float64, 2}, nodes::AbstractVector{Float64}
 )
     # Compute the differences ξ_{i} - ξ_{j}
     Δξ = broadcast(-, nodes, transpose(nodes))

@@ -6,74 +6,71 @@ standard properties of Bezier curves. See
 https://en.wikipedia.org/wiki/B%C3%A9zier_curve#Properties.
 """
 
-import Mantis
+using Mantis
 
 using Test
 
 deg1 = 3
 breakpoints = [0.0, 0.5, 1.0]
-patch1 = Mantis.Mesh.Patch1D(breakpoints)
-B1_univariate_bs = Mantis.FunctionSpaces.BSplineSpace(patch1, deg1, [-1, 1, -1])
-quad_rule = Mantis.Quadrature.gauss_legendre(deg1+1)
-x = Mantis.Quadrature.get_nodes(quad_rule)[1]
+patch1 = Mesh.Patch1D(breakpoints)
+B1_univariate_bs = FunctionSpaces.BSplineSpace(patch1, deg1, [-1, 1, -1])
+quad_rule = Quadrature.gauss_legendre(deg1 + 1)
+x = Quadrature.get_nodes(quad_rule)
 
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B1_univariate_bs)
+for el in 1:1:FunctionSpaces.get_num_elements(B1_univariate_bs)
     # check extraction coefficients
-    ex_coeffs = Mantis.FunctionSpaces.get_extraction_coefficients(B1_univariate_bs, el)
+    ex_coeffs = FunctionSpaces.get_extraction_coefficients(B1_univariate_bs, el)
     # Test for non-negativity
     @test all(ex_coeffs .>= 0.0)
     # Test for partition of unity
-    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14))
+    @test all(isapprox.(sum(ex_coeffs; dims=2) .- 1.0, 0.0, atol=1e-14))
 
     # check B-spline evaluation
-    B1_eval, _ = Mantis.FunctionSpaces.evaluate(B1_univariate_bs, el, (x,), 1)
+    B1_eval, _ = FunctionSpaces.evaluate(B1_univariate_bs, el, x, 1)
     # Positivity of the polynomials
     @test all(B1_eval[1][1][1] .>= 0.0)
     # Partition of unity
-    @test all(isapprox.(sum(B1_eval[1][1][1], dims=2), 1.0))
+    @test all(isapprox.(sum(B1_eval[1][1][1]; dims=2), 1.0))
     # Zero sum of derivatives
-    @test all(isapprox.(abs.(sum(B1_eval[2][1][1], dims=2)), 0.0, atol=1e-14))
+    @test all(isapprox.(abs.(sum(B1_eval[2][1][1]; dims=2)), 0.0, atol=1e-14))
 end
 
 breakpoints2 = [0.0, 0.5, 0.6, 1.0]
 deg2 = 4
-patch2 = Mantis.Mesh.Patch1D(breakpoints2)
-B2_univariate_bs = Mantis.FunctionSpaces.BSplineSpace(patch2, deg2, [-1, 1, 3, -1])
-quad_rule2 = Mantis.Quadrature.gauss_legendre(deg2+1)
-x = Mantis.Quadrature.get_nodes(quad_rule2)[1]
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B2_univariate_bs)
+patch2 = Mesh.Patch1D(breakpoints2)
+B2_univariate_bs = FunctionSpaces.BSplineSpace(patch2, deg2, [-1, 1, 3, -1])
+quad_rule2 = Quadrature.gauss_legendre(deg2 + 1)
+x = Quadrature.get_nodes(quad_rule2)
+for el in 1:1:FunctionSpaces.get_num_elements(B2_univariate_bs)
     # check extraction coefficients
-    ex_coeffs = Mantis.FunctionSpaces.get_extraction_coefficients(B2_univariate_bs, el)
+    ex_coeffs = FunctionSpaces.get_extraction_coefficients(B2_univariate_bs, el)
 
     # Test for non-negativity
     @test all(ex_coeffs .>= 0.0)
     # Test for partition of unity
-    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14))
+    @test all(isapprox.(sum(ex_coeffs; dims=2) .- 1.0, 0.0, atol=1e-14))
 
     # check B-spline evaluation
-    B2_eval, _ = Mantis.FunctionSpaces.evaluate(B2_univariate_bs, el, (x,), 1)
+    B2_eval, _ = FunctionSpaces.evaluate(B2_univariate_bs, el, x, 1)
     # Positivity of the polynomials
     @test minimum(B2_eval[1][1][1]) >= 0.0
     # Partition of unity
-    @test all(isapprox.(sum(B2_eval[1][1][1], dims=2), 1.0))
+    @test all(isapprox.(sum(B2_eval[1][1][1]; dims=2), 1.0))
     # Zero sum of derivatives
-    @test all(isapprox.(abs.(sum(B2_eval[2][1][1], dims=2)), 0.0, atol=1e-14))
+    @test all(isapprox.(abs.(sum(B2_eval[2][1][1]; dims=2)), 0.0, atol=1e-14))
 end
-
-
-
 
 breakpoints = [0.0, 0.5, 0.6, 1.0]
 deg = 2
-patch = Mantis.Mesh.Patch1D(breakpoints)
-Bsp_univariate = Mantis.FunctionSpaces.BSplineSpace(patch, deg, [-1, 1, 1, -1])
+patch = Mesh.Patch1D(breakpoints)
+Bsp_univariate = FunctionSpaces.BSplineSpace(patch, deg, [-1, 1, 1, -1])
 weights = [1.0, 2.0, 2.0, 3.0, 1.0]
-Nurbs_univariate = Mantis.FunctionSpaces.RationalFESpace(Bsp_univariate, weights)
-quad_rule = Mantis.Quadrature.gauss_legendre(deg+1)
-x = Mantis.Quadrature.get_nodes(quad_rule)[1]
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(Nurbs_univariate)
+Nurbs_univariate = FunctionSpaces.RationalFESpace(Bsp_univariate, weights)
+quad_rule = Quadrature.gauss_legendre(deg + 1)
+x = Quadrature.get_nodes(quad_rule)
+for el in 1:1:FunctionSpaces.get_num_elements(Nurbs_univariate)
     # check Nurbs evaluation
-    Nurbs_eval, _ = Mantis.FunctionSpaces.evaluate(Nurbs_univariate, el, (x,), 0)
+    Nurbs_eval, _ = FunctionSpaces.evaluate(Nurbs_univariate, el, x, 0)
     # Positivity of the polynomials
     @test minimum(Nurbs_eval[1][1][1]) >= 0.0
 end
@@ -81,35 +78,35 @@ end
 # Test Ck-smooth GeneralizedExponential spline space ---------------------------------------
 deg = 5
 Wt = 10.0
-b = Mantis.FunctionSpaces.GeneralizedExponential(deg, Wt, 0.25)
+b = FunctionSpaces.GeneralizedExponential(deg, Wt, 0.25)
 breakpoints = [0.0, 0.25, 0.5, 0.75]
-patch = Mantis.Mesh.Patch1D(breakpoints)
-B = Mantis.FunctionSpaces.BSplineSpace(patch, b, [-1, deg-1, deg-1, -1])
-nbasis = Mantis.FunctionSpaces.get_num_basis(B)
-nel = Mantis.FunctionSpaces.get_num_elements(B)
+patch = Mesh.Patch1D(breakpoints)
+B = FunctionSpaces.BSplineSpace(patch, b, [-1, deg - 1, deg - 1, -1])
+nbasis = FunctionSpaces.get_num_basis(B)
+nel = FunctionSpaces.get_num_elements(B)
 for el in 1:1:nel
     # check extraction coefficients
-    ex_coeffs = Mantis.FunctionSpaces.get_extraction_coefficients(B, el)
+    ex_coeffs = FunctionSpaces.get_extraction_coefficients(B, el)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
-    @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=5e-14)) # Test for partition of unity
+    @test all(isapprox.(sum(ex_coeffs; dims=2) .- 1.0, 0.0, atol=5e-14)) # Test for partition of unity
 end
 
 # interpolate an exponential
-x = collect(range(start=0.1, stop=0.9, length=deg+1))
-npts = length(x)
+x = range(; start=0.1, stop=0.9, length=deg + 1)
+xi = Points.CartesianPoints((x,))
+npts = deg + 1
 LHS = zeros(nel * npts, nbasis)
 RHS_P = zeros(nel * npts)
 RHS_N = zeros(nel * npts)
-for el in 1:1:Mantis.FunctionSpaces.get_num_elements(B)
-    B_eval, inds = Mantis.FunctionSpaces.evaluate(B, el, (x,), 0)
-    LHS[(el-1)*npts .+ (1:npts),inds] = B_eval[1][1][1]
-    RHS_P[(el-1)*npts .+ (1:npts)] = exp.(Wt .* (x .+ (el - 1)) .* 0.25)
-    RHS_N[(el-1)*npts .+ (1:npts)] = exp.(-Wt .* (x .+ (el - 1)) .* 0.25)
+for el in 1:1:FunctionSpaces.get_num_elements(B)
+    B_eval, inds = FunctionSpaces.evaluate(B, el, xi, 0)
+    LHS[(el - 1) * npts .+ (1:npts), inds] = B_eval[1][1][1]
+    RHS_P[(el - 1) * npts .+ (1:npts)] = exp.(Wt .* (x .+ (el - 1)) .* 0.25)
+    RHS_N[(el - 1) * npts .+ (1:npts)] = exp.(-Wt .* (x .+ (el - 1)) .* 0.25)
 end
 coeffs_P = LHS \ RHS_P
 coeffs_N = LHS \ RHS_N
 @test all(isapprox.(abs.(LHS * coeffs_P - RHS_P), 0.0, atol=1e-10))
 @test all(isapprox.(abs.(LHS * coeffs_N - RHS_N), 0.0, atol=1e-14))
-
 
 end

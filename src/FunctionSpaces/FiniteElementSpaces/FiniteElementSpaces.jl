@@ -80,7 +80,7 @@ function get_patch_id(space::AbstractFESpace, element_id::Int)
     throw(
         ArgumentError(
             "Element ID $(element_id) exceeds the total number of elements in the space."
-        )
+        ),
     )
 end
 
@@ -133,7 +133,8 @@ Get the global element ID for the specified constituent patch ID and local eleme
 - `::Int`: The global element ID.
 """
 function get_global_element_id(space::AbstractFESpace, patch_id::Int, local_element_id::Int)
-    return sum(get_num_elements_per_patch(space)[begin:patch_id-1]; init=0) + local_element_id
+    return sum(get_num_elements_per_patch(space)[begin:(patch_id - 1)]; init=0) +
+           local_element_id
 end
 
 """
@@ -236,9 +237,7 @@ Get the global indices of the basis functions of `space` on element `element_id`
     either.
 """
 function get_basis_indices(space::AbstractFESpace, element_id::Int)
-    return get_basis_indices(
-        get_extraction_operator(space), element_id
-    )
+    return get_basis_indices(get_extraction_operator(space), element_id)
 end
 
 """
@@ -265,12 +264,8 @@ on an element the evaluations correspond.
     defined for `space`, and there is no specific `get_basis_indices` method for `space`
     either.
 """
-function get_basis_permutation(
-    space::AbstractFESpace, element_id::Int, component_id::Int=1
-)
-    return get_basis_permutation(
-        get_extraction_operator(space), element_id, component_id
-    )
+function get_basis_permutation(space::AbstractFESpace, element_id::Int, component_id::Int=1)
+    return get_basis_permutation(get_extraction_operator(space), element_id, component_id)
 end
 
 """
@@ -422,7 +417,7 @@ component spaces. Single-component spaces are expected to have a specialised imp
 - `space::AbstractFESpace{manifold_dim, num_components, num_patches}`: A finite element
     space.
 - `element_id::Int`: The indentifier of the element.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: The coordinates at which to evaluate the
+- `xi::Points.AbstractPoints{manifold_dim}`: The coordinates at which to evaluate the
     basis functions. These coordinates are in the **canonical** domain, and thus always lie
     in the interval `[0, 1]`. The coordinates have to be given per dimension. Multi-
     dimensional spaces are evaluated on the tensor product of the given coordinates.
@@ -442,13 +437,14 @@ component spaces. Single-component spaces are expected to have a specialised imp
 function get_local_basis(
     space::AbstractFESpace{manifold_dim, num_components, num_patches},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
     component_id::Int=1,
 ) where {manifold_dim, num_components, num_patches}
     vals, _ = evaluate(
         get_component_spaces(space)[component_id], element_id, xi, nderivatives
     )
+
     return vals
 end
 
@@ -482,7 +478,7 @@ the order in which all the mixed derivatives of order `i-1` are stored.
 # Arguments
 - `space::AbstractFESpace{manifold_dim, num_components, num_patches}`: Finite element space.
 - `element_id::Int`: Index of the element.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Point on the element in canonical coordinates.
+- `xi::Points.AbstractPoints{manifold_dim}`: Point on the element in canonical coordinates.
 - `nderivatives::Int=0`: Order of the derivatives. Default is 0 (i.e., function evaluation).
 
 # Returns
@@ -494,13 +490,12 @@ the order in which all the mixed derivatives of order `i-1` are stored.
 function evaluate(
     space::AbstractFESpace{manifold_dim, num_components, num_patches},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int=0,
 ) where {manifold_dim, num_components, num_patches}
     basis_indices = get_basis_indices(space, element_id)
-
     # Pre-allocation.
-    num_points = prod(length.(xi))
+    num_points = Points.get_num_points(xi)
     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         # number of derivatives of order j
@@ -551,7 +546,7 @@ more details.
 # Arguments
 - `space::AbstractFESpace{manifold_dim, num_components, num_patches}`: Finite element space.
 - `element_id::Int`: Index of the element.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Point on the element in canonical coordinates.
+- `xi::Points.AbstractPoints{manifold_dim}`: Point on the element in canonical coordinates.
 - `nderivatives::Int=0`: Order of the derivatives. Default is 0 (i.e., function evaluation).
 - `coefficients::Vector{Float64}`: Coefficients.
 
@@ -561,7 +556,7 @@ more details.
 function evaluate(
     space::AbstractFESpace{manifold_dim, num_components, num_patches},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
     coefficients::Vector{Float64},
 ) where {manifold_dim, num_components, num_patches}
@@ -577,7 +572,8 @@ function evaluate(
         for der_idx in 1:num_j_ders
             for component_idx in 1:num_components
                 evaluations[j + 1][der_idx] = [
-                    basis_evaluations[j + 1][der_idx][component_idx] * coefficients[basis_indices]
+                    basis_evaluations[j + 1][der_idx][component_idx] *
+                    coefficients[basis_indices],
                 ]
             end
         end
@@ -590,7 +586,7 @@ function assemble_global_extraction_matrix(space::AbstractFESpace)
     throw(
         ArgumentError(
             "'assemble_global_extraction_matrix' not implemented for $(typeof(space))"
-        )
+        ),
     )
 end
 
@@ -620,7 +616,9 @@ function _evaluate_all_at_point(
     xi::Float64,
     nderivatives::Int,
 ) where {num_components, num_patches}
-    basis_eval, basis_indices = evaluate(fem_space, element_id, ([xi],), nderivatives)
+    basis_eval, basis_indices = evaluate(
+        fem_space, element_id, Points.CartesianPoints(([xi],)), nderivatives
+    )
     nloc = length(basis_indices)
     ndofs = get_num_basis(fem_space)
     I = zeros(Int, nloc * (nderivatives + 1))
@@ -679,7 +677,9 @@ function _compute_parametric_geometry_coeffs(
     num_xi_per_dim = degrees .+ 1
     num_xi = prod(num_xi_per_dim)
 
-    xi_canonical = tuple(collect.(range(0, 1, num_xi_per_dim[i]) for i in 1:manifold_dim)...)
+    xi_canonical = tuple(
+        collect.(range(0, 1, num_xi_per_dim[i]) for i in 1:manifold_dim)...
+    )
     xi_canonical_prod = Matrix{Float64}(undef, num_xi, manifold_dim)
     for (id, point) in enumerate(Iterators.product(xi_canonical...))
         xi_canonical_prod[id, :] .= point
@@ -704,7 +704,6 @@ function _compute_parametric_geometry_coeffs(
 
     return coeffs
 end
-
 
 include("ExtractionOperator.jl")
 include("OtherSpaces/RationalFESpaces.jl")

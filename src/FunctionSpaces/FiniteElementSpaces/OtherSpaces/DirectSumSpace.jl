@@ -31,9 +31,9 @@ struct DirectSumSpace{manifold_dim, num_components, num_patches, F} <:
     }
         num_elements_per_component_space = get_num_elements.(component_spaces)
         if any(num_elements_per_component_space .!= num_elements_per_component_space[1])
-            throw(ArgumentError(
-                "All component spaces must have the same number of elements."
-            ))
+            throw(
+                ArgumentError("All component spaces must have the same number of elements.")
+            )
         end
         # All components have the same number of elements, so we can just take the first.
         num_elements = get_num_elements(component_spaces[1])
@@ -51,12 +51,16 @@ struct DirectSumSpace{manifold_dim, num_components, num_patches, F} <:
             max_global_dof += num_basis_component
 
             if component_idx < num_components
-                basis_offsets[component_idx+1] = basis_offsets[component_idx] + num_basis_component
+                basis_offsets[component_idx + 1] =
+                    basis_offsets[component_idx] + num_basis_component
             end
         end
 
         return new{manifold_dim, num_components, num_patches, F}(
-            component_spaces, NTuple{num_components, Int}(basis_offsets), num_elements, max_global_dof
+            component_spaces,
+            NTuple{num_components, Int}(basis_offsets),
+            num_elements,
+            max_global_dof,
         )
     end
 end
@@ -84,7 +88,7 @@ end
 function get_basis_indices(space::DirectSumSpace, element_id::Int)
     basis_indices_per_component = ntuple(get_num_components(space)) do i
         return get_basis_indices(get_component_spaces(space)[i], element_id) .+
-            space.basis_offsets[i]
+               space.basis_offsets[i]
     end
 
     return reduce(vcat, basis_indices_per_component)
@@ -124,22 +128,17 @@ end
 function get_local_basis(
     space::DirectSumSpace{manifold_dim, num_components, num_patches},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
     component_id::Int=1,
 ) where {manifold_dim, num_components, num_patches}
     evals, _ = evaluate(
-        get_component_spaces(space)[component_id],
-        element_id,
-        xi,
-        nderivatives,
+        get_component_spaces(space)[component_id], element_id, xi, nderivatives
     )
     return evals
 end
 
-function get_basis_permutation(
-    space::DirectSumSpace, element_id::Int, component_id::Int=1
-)
+function get_basis_permutation(space::DirectSumSpace, element_id::Int, component_id::Int=1)
     endpoint = 0
     start = 0
     # Cumulative sum to find the correct range of basis functions for the specified
@@ -167,13 +166,13 @@ end
 # function evaluate(
 #     space::DirectSumSpace{manifold_dim, num_components, num_patches},
 #     element_id::Int,
-#     xi::NTuple{manifold_dim, Vector{Float64}},
+#     xi::Points.AbstractPoints{manifold_dim},
 #     nderivatives::Int=0,
 # ) where {manifold_dim, num_components, num_patches}
 #     basis_indices = get_basis_indices(space, element_id)
 
 #     # Pre-allocation, including padding (see below).
-#     num_points = prod(length.(xi))
+#     num_points = Points.get_num_points(xi)
 #     evaluations = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
 #     for j in 0:nderivatives
 #         # number of derivatives of order j

@@ -39,8 +39,8 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
     function GTBSplineSpace(
         patch_spaces::T,
         regularity::Vector{Int},
-        num_dofs_left::Int = -1,
-        num_dofs_right::Int = -1
+        num_dofs_left::Int=-1,
+        num_dofs_right::Int=-1,
     ) where {
         num_patches, S <: Union{BSplineSpace, RationalFESpace}, T <: NTuple{num_patches, S}
     }
@@ -50,8 +50,7 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
                 The number of regularity conditions should be equal to the number of \
                 bspline interfaces. You have $(num_patches) interfaces and \
                 $(length(regularity)) regularity conditions.\
-                """
-            ))
+                """))
         end
 
         # Check if the polynomial degree of each pair of adjacent spaces is sufficient for
@@ -71,8 +70,7 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
                     The minimal polynomial degrees must be greater than or equal to the \
                     regularity. The minimal degree is $(polynomial_degree) and there is
                     regularity $(regularity[i]) at index $(i).\
-                    """
-                ))
+                    """))
             end
         end
 
@@ -96,9 +94,7 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
             end
             # get indices as per local numbering
             dof_inds_loc = get_basis_indices(patch_spaces[patch_id], patch_el_id)
-            nnz_loc = [
-                findfirst(dof_inds_loc .== i) for i in dof_partition_loc[1][bnd_id]
-            ]
+            nnz_loc = [findfirst(dof_inds_loc .== i) for i in dof_partition_loc[1][bnd_id]]
             # find all non-zero basis function indices at left end of first element
             el_id = num_elements_offset[patch_id] + 1
             if right_bnd
@@ -108,7 +104,9 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
             nnz_global = findall(
                 get_extraction_coefficients(extraction_op, el_id)[nnz_loc, :] .!= 0
             )
-            return unique([dof_inds_global[nnz_global[i][2]] for i in eachindex(nnz_global)])
+            return unique([
+                dof_inds_global[nnz_global[i][2]] for i in eachindex(nnz_global)
+            ])
         end
 
         # Allocate memory for degree of freedom partitioning: note, even if the 1D space is
@@ -125,7 +123,9 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
         end
         if num_dofs_right >= 0 # the number of dofs has been manually set
             dof_partition[num_patches][3] = collect(
-                (get_num_basis(extraction_op) - num_dofs_right + 1):get_num_basis(extraction_op)
+                (get_num_basis(extraction_op) - num_dofs_right + 1):get_num_basis(
+                    extraction_op
+                ),
             )
         else
             dof_partition[num_patches][3] = _get_boundary_dof_inds(num_patches, true)
@@ -133,36 +133,28 @@ struct GTBSplineSpace{num_patches, T, TE, TI, TJ} <: AbstractFESpace{1, 1, num_p
 
         # Then build the dof-partitioning at the interior patch interfaces ...
         for i in 2:(num_patches)
-            dof_partition[i-1][3] = _get_boundary_dof_inds(i-1, true)
+            dof_partition[i - 1][3] = _get_boundary_dof_inds(i - 1, true)
             dof_partition[i][1] = _get_boundary_dof_inds(i, false)
         end
         # ... and then the interiors.
         for i in 1:num_patches
             nel1 = num_elements_offset[i]
-            nel2 = num_elements_offset[i+1]
+            nel2 = num_elements_offset[i + 1]
             bnd_dofs = vcat(dof_partition[i][1], dof_partition[i][3])
             dof_partition[i][2] = setdiff(
-                get_basis_indices(extraction_op, nel1+1),
-                bnd_dofs
+                get_basis_indices(extraction_op, nel1 + 1), bnd_dofs
             )
-            for j in nel1+1:nel2
+            for j in (nel1 + 1):nel2
                 append!(
                     dof_partition[i][2],
-                    setdiff(
-                        get_basis_indices(extraction_op, j),
-                        bnd_dofs
-                    )
+                    setdiff(get_basis_indices(extraction_op, j), bnd_dofs),
                 )
             end
             dof_partition[i][2] = unique(dof_partition[i][2])
         end
 
-        new{num_patches, T, get_EIJ_types(extraction_op)...}(
-            patch_spaces,
-            extraction_op,
-            dof_partition,
-            num_elements_per_patch,
-            regularity,
+        return new{num_patches, T, get_EIJ_types(extraction_op)...}(
+            patch_spaces, extraction_op, dof_partition, num_elements_per_patch, regularity
         )
     end
 end
@@ -171,7 +163,9 @@ function get_num_elements_per_patch(space::GTBSplineSpace)
     return space.num_elements_per_patch
 end
 
-function get_num_local_basis_per_patch(space::GTBSplineSpace{num_patches}) where {num_patches}
+function get_num_local_basis_per_patch(
+    space::GTBSplineSpace{num_patches}
+) where {num_patches}
     return ntuple(num_patches) do i
         return get_num_basis(get_patch_spaces(space)[i])
     end
@@ -186,7 +180,7 @@ end
 function get_local_basis(
     space::GTBSplineSpace,
     element_id::Int,
-    xi::NTuple{1, Vector{Float64}},
+    xi::Points.AbstractPoints{1},
     nderivatives::Int,
     component_id::Int=1,
 )
@@ -200,7 +194,6 @@ get_patch_spaces(space::GTBSplineSpace) = space.patch_spaces
 function get_max_local_dim(space::GTBSplineSpace)
     return maximum(get_max_local_dim.(get_patch_spaces(space)))
 end
-
 
 """
     assemble_global_extraction_matrix(
@@ -235,9 +228,9 @@ function assemble_global_extraction_matrix(
         extraction_coefficients = get_extraction_coefficients(space, el_id)
         global_basis_indices = get_basis_indices(space, el_id)
         # get local basis indices
-        local_basis_indices = get_basis_indices(
-            get_patch_spaces(space)[patch_id], local_element_id
-        ) .+ num_local_basis_offset[patch_id]
+        local_basis_indices =
+            get_basis_indices(get_patch_spaces(space)[patch_id], local_element_id) .+
+            num_local_basis_offset[patch_id]
 
         # Assemble the global extraction matrix
         global_extraction_matrix[local_basis_indices, global_basis_indices] =

@@ -317,7 +317,7 @@ end
     get_constituent_local_basis(
         space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
         nderivatives::Int=0,
     ) where {manifold_dim, num_components, num_patches, num_spaces}
 
@@ -329,7 +329,7 @@ See also [`get_local_basis`](@ref).
 function get_constituent_local_basis(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int=0,
 ) where {manifold_dim, num_components, num_patches, num_spaces}
     const_spaces = get_constituent_spaces(space)
@@ -349,7 +349,7 @@ end
     get_constituent_evaluations(
         space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
         nderivatives::Int=0,
     ) where {manifold_dim, num_components, num_patches, num_spaces}
 
@@ -358,7 +358,7 @@ Get evaluations of all constituent spaces at `element_id` and points `xi`.
 function get_constituent_evaluations(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int=0,
 ) where {manifold_dim, num_components, num_patches, num_spaces}
     const_spaces = get_constituent_spaces(space)
@@ -377,7 +377,7 @@ end
 """
     get_constituent_evaluation_points(
         space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim, num_components, num_patches, num_spaces}
 
 Returns a tuple corresponding to the constituent-wise splitting of `xi` according to each
@@ -385,10 +385,14 @@ constituent space's manifold dimension.
 """
 function get_constituent_evaluation_points(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, num_components, num_patches, num_spaces}
     const_manifold_indices = get_constituent_manifold_indices(space)
-    const_xi = ntuple(space -> xi[const_manifold_indices[space]], num_spaces)
+    const_points = Points.get_constituent_points(xi)
+    const_xi = ntuple(
+        space -> Points.CartesianPoints(const_points[const_manifold_indices[space]]),
+        num_spaces,
+    )
 
     return const_xi
 end
@@ -547,13 +551,13 @@ end
 function get_local_basis(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int=0,
     component_id::Int=1,
 ) where {manifold_dim, num_components, num_patches, num_spaces}
     const_local_basis = get_constituent_local_basis(space, element_id, xi, nderivatives)
     const_sizes = ntuple(space -> size(const_local_basis[space][1][1][1]), num_spaces)
-    num_points = prod(length, xi)
+    num_points = Points.get_num_points(xi)
     num_basis = get_num_basis(space, element_id)
     local_basis = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for der_order in 0:nderivatives
@@ -592,13 +596,13 @@ end
 function evaluate(
     space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.CartesianPoints{manifold_dim},
     nderivatives::Int=0,
 ) where {manifold_dim, num_components, num_patches, num_spaces}
     basis_indices = get_basis_indices(space, element_id)
     num_basis = length(basis_indices)
     const_eval = get_constituent_evaluations(space, element_id, xi, nderivatives)
-    num_points = prod(length, xi)
+    num_points = Points.get_num_points(xi)
     eval = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for der_order in 0:nderivatives
         num_der_ids = binomial(manifold_dim + der_order - 1, manifold_dim - 1)
@@ -623,12 +627,65 @@ function evaluate(
         end
 
         if num_spaces == 1
-            eval[der_order + 1][der_id][1] =
-                const_eval[1][space_der_order[1] + 1][space_der_id[1]][1]
+            eval[der_order + 1][der_id][1] = const_eval[1][space_der_order[1] + 1][space_der_id[1]][1]
         else
             eval[der_order + 1][der_id][1] = kron(
-                (const_eval[space][space_der_order[space] + 1][space_der_id[space]][1] for space in num_spaces:-1:1)...
+                (
+                    const_eval[space][space_der_order[space] + 1][space_der_id[space]][1] for
+                    space in num_spaces:-1:1
+                )...,
             )
+        end
+    end
+
+    return eval, basis_indices
+end
+
+function evaluate(
+    space::TensorProductSpace{manifold_dim, num_components, num_patches, num_spaces},
+    element_id::Int,
+    xi::Points.AbstractPoints{manifold_dim},
+    nderivatives::Int=0,
+) where {manifold_dim, num_components, num_patches, num_spaces}
+    basis_indices = get_basis_indices(space, element_id)
+    num_basis = length(basis_indices)
+    const_eval = get_constituent_evaluations(space, element_id, xi, nderivatives)
+    num_points = Points.get_num_points(xi)
+    eval = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
+    for der_order in 0:nderivatives
+        num_der_ids = binomial(manifold_dim + der_order - 1, manifold_dim - 1)
+        # We assume that there is only one component.
+        eval[der_order + 1] = [
+            [Matrix{Float64}(undef, (num_points, num_basis))] for _ in 1:num_der_ids
+        ]
+    end
+
+    const_manifold_indices = get_constituent_manifold_indices(space)
+    der_keys = integer_sums(nderivatives, manifold_dim + 1)
+    space_der_order = zeros(Int, num_spaces)
+    space_der_id = zeros(Int, num_spaces)
+    for key in der_keys
+        key = key[1:manifold_dim]
+        der_order = sum(key)
+        der_id = get_derivative_idx(key)
+
+        for space in 1:num_spaces
+            space_der_order[space] = sum(key[const_manifold_indices[space]])
+            space_der_id[space] = get_derivative_idx(key[const_manifold_indices[space]])
+        end
+
+        if num_spaces == 1
+            eval[der_order + 1][der_id][1] = const_eval[1][space_der_order[1] + 1][space_der_id[1]][1]
+        else
+            for point in axes(eval[der_order + 1][der_id][1], 1)
+                eval[der_order + 1][der_id][1][point, :] = kron(
+                    (
+                        const_eval[space][space_der_order[space] + 1][space_der_id[space]][1][
+                            point, :,
+                        ] for space in num_spaces:-1:1
+                    )...,
+                )
+            end
         end
     end
 

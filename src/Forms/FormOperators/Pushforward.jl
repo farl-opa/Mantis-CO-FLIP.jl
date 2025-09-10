@@ -34,7 +34,7 @@ end
     evaluate_sharp_pushforward(
         form_expression::AbstractFormExpression{manifold_dim, 1, 0},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim}
 
 Compute the pushforward of the sharp of a differential 1-form over a specified element of a
@@ -45,7 +45,7 @@ defined in physical coordinates.
 - `form_expression::AbstractFormExpression{manifold_dim, 1, G}`: An expression representing
     the 1-form on the manifold.
 - `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point
+- `xi::Points.AbstractPoints{manifold_dim}`: A tuple containing vectors of floating-point
     numbers representing the coordinates at which the 1-form is evaluated. Each vector within
     the tuple corresponds to a dimension of the manifold.
 
@@ -59,7 +59,7 @@ defined in physical coordinates.
 function evaluate_sharp_pushforward(
     form_expression::AbstractFormExpression{manifold_dim, 1, 0},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     sharp = Sharp(form_expression)
     sharp_eval, sharp_indices = evaluate(sharp, element_id, xi)

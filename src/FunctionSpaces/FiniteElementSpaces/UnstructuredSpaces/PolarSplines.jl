@@ -27,8 +27,12 @@ function _build_polar_extraction_and_dof_partition(
     num_elements = get_num_elements(tp_space[1])
 
     # allocate space for extraction coefficients and basis indices
-    extraction_coefficients = Vector{NTuple{num_components, Matrix{Float64}}}(undef, num_elements)
-    basis_indices = Vector{Indices{num_components, Vector{Int}, Vector{Int}}}(undef, num_elements)
+    extraction_coefficients = Vector{NTuple{num_components, Matrix{Float64}}}(
+        undef, num_elements
+    )
+    basis_indices = Vector{Indices{num_components, Vector{Int}, Vector{Int}}}(
+        undef, num_elements
+    )
 
     # Convert global extraction matrix to element local extractions
     # (the matrix is transposed so that [tp_spline_space] * [extraction] = [Polar-splines])
@@ -58,9 +62,9 @@ function _build_polar_extraction_and_dof_partition(
                 Array(
                     E[component_idx][
                         basis_indices_el[index_perm_el[component_idx]],
-                        cols_el[component_idx]
-                    ]
-                )
+                        cols_el[component_idx],
+                    ],
+                ),
             )
         end
 
@@ -153,14 +157,17 @@ end
 # PolarSplines
 ############################################################################################
 
-struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num_components, 1}
+struct PolarSplineSpace{num_components, T, TE, TI, TJ} <:
+       AbstractFESpace{2, num_components, 1}
     patch_spaces::T
     extraction_op::ExtractionOperator{num_components, TE, TI, TJ}
     dof_partition::Vector{Vector{Vector{Int}}}
     num_elements_per_patch::NTuple{1, Int}
     regularity::Int
 
-    global_extraction_matrix::NTuple{num_components, SparseArrays.SparseMatrixCSC{Float64, Int}}
+    global_extraction_matrix::NTuple{
+        num_components, SparseArrays.SparseMatrixCSC{Float64, Int}
+    }
     control_triangle::Matrix{Float64}
     two_poles::Bool
     zero_at_poles::Bool
@@ -194,7 +201,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         space_r::AbstractFESpace{1, 1},
         degenerate_control_points::Array{Float64, 3};
         two_poles::Bool=false,
-        zero_at_poles::Bool=false
+        zero_at_poles::Bool=false,
     )
 
         # number of dofs for the poloidal and radial spaces
@@ -207,11 +214,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
 
         # first, build extraction operator and control triangle
         E, control_triangle = extract_scalar_polar_splines_to_tensorproduct(
-            degenerate_control_points,
-            n_p,
-            n_r,
-            two_poles,
-            zero_at_poles,
+            degenerate_control_points, n_p, n_r, two_poles, zero_at_poles
         )
 
         patch_spaces = (TensorProductSpace((space_p, space_r)),)
@@ -225,7 +228,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
             patch_spaces, (E,), two_poles
         )
 
-        new{1, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
+        return new{1, typeof(patch_spaces), get_EIJ_types(extraction_op)...}(
             patch_spaces,
             extraction_op,
             dof_partition,
@@ -235,7 +238,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
             control_triangle,
             two_poles,
             zero_at_poles,
-            degenerate_control_points
+            degenerate_control_points,
         )
     end
 
@@ -245,7 +248,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
         degenerate_control_points::Array{Float64, 3},
         dspace_p::AbstractFESpace{1, 1},
         dspace_r::AbstractFESpace{1, 1};
-        two_poles::Bool=false
+        two_poles::Bool=false,
     )
 
         # number of dofs for the poloidal and radial spaces
@@ -254,10 +257,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
 
         # first, build extraction operator and control triangle
         E, control_triangle = extract_vector_polar_splines_to_tensorproduct(
-            degenerate_control_points,
-            n_p,
-            n_r,
-            two_poles,
+            degenerate_control_points, n_p, n_r, two_poles
         )
 
         # build underlying tensor-product space for the components of the vector field
@@ -282,7 +282,7 @@ struct PolarSplineSpace{num_components, T, TE, TI, TJ} <: AbstractFESpace{2, num
             control_triangle,
             two_poles,
             false,
-            degenerate_control_points
+            degenerate_control_points,
         )
     end
 end
@@ -315,26 +315,28 @@ function extract_scalar_polar_splines_to_tensorproduct(
     num_basis_p::Int,
     num_basis_r::Int,
     two_poles::Bool=false,
-    zero_at_poles::Bool=nothing
+    zero_at_poles::Bool=nothing,
 )
     if size(degenerate_control_points, 3) != 2
         throw(
             ArgumentError(
-                "The control points need to be two-dimensional, got $(size(degenerate_control_points, 3))."
-            )
+                "The control points need to be two-dimensional, got $(size(degenerate_control_points, 3)).",
+            ),
         )
     end
     if size(degenerate_control_points, 1) != num_basis_p
         throw(
             ArgumentError(
-                "The input points need to be two sets of $num_basis_p points, got $(size(degenerate_control_points, 1))."
-            )
+                "The input points need to be two sets of $num_basis_p points, got $(size(degenerate_control_points, 1)).",
+            ),
         )
     end
     if ~all(
         isapprox.(
-            degenerate_control_points[:, 1, :], degenerate_control_points[1:1, 1,:], atol=1e-12
-        )
+            degenerate_control_points[:, 1, :],
+            degenerate_control_points[1:1, 1, :],
+            atol=1e-12,
+        ),
     )
         throw(ArgumentError("All points in the first set should be identical."))
     else
@@ -343,8 +345,7 @@ function extract_scalar_polar_splines_to_tensorproduct(
 
     # build triangle circumscribing the input degenerate control points
     tri = _get_circumscribing_triangle(
-        vcat(degenerate_control_points[:, 1, :], degenerate_control_points[:, 2, :]),
-        origin
+        vcat(degenerate_control_points[:, 1, :], degenerate_control_points[:, 2, :]), origin
     )
 
     if zero_at_poles
@@ -388,7 +389,6 @@ function extract_scalar_polar_splines_to_tensorproduct(
             E0_1, SparseArrays.spdiagm(ones(max(0, num_basis - 6))), E0_2
         )
         SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E)
-
     end
 
     return E, tri
@@ -420,7 +420,7 @@ function _get_scalar_polar_extraction_submatrix(
     degenerate_control_points::Array{Float64, 3},
     tri::Matrix{Float64},
     origin::Vector{Float64}=[0.0, 0.0],
-    two_poles::Bool=false
+    two_poles::Bool=false,
 )
     # compute barycentric coordinates w.r.t. the control triangle
     baryc_1 = permutedims(
@@ -467,26 +467,28 @@ function extract_vector_polar_splines_to_tensorproduct(
     degenerate_control_points::Array{Float64, 3},
     num_basis_p::Int,
     num_basis_r::Int,
-    two_poles::Bool=false
+    two_poles::Bool=false,
 )
     if size(degenerate_control_points, 3) != 2
         throw(
             ArgumentError(
-                "The control points need to be two-dimensional, got $(size(degenerate_control_points, 3))."
-            )
+                "The control points need to be two-dimensional, got $(size(degenerate_control_points, 3)).",
+            ),
         )
     end
     if size(degenerate_control_points, 1) != num_basis_p
         throw(
             ArgumentError(
-                "The input points need to be two sets of $num_basis_p points, got $(size(degenerate_control_points, 1))."
-            )
+                "The input points need to be two sets of $num_basis_p points, got $(size(degenerate_control_points, 1)).",
+            ),
         )
     end
     if ~all(
         isapprox.(
-            degenerate_control_points[:, 1, :], degenerate_control_points[1:1, 1, :], atol=1e-12
-        )
+            degenerate_control_points[:, 1, :],
+            degenerate_control_points[1:1, 1, :],
+            atol=1e-12,
+        ),
     )
         throw(ArgumentError("All points in the first set should be identical."))
     else
@@ -495,8 +497,7 @@ function extract_vector_polar_splines_to_tensorproduct(
 
     # build triangle circumscribing the input degenerate control points
     tri = _get_circumscribing_triangle(
-        vcat(degenerate_control_points[:, 1, :], degenerate_control_points[:, 2, :]),
-        origin
+        vcat(degenerate_control_points[:, 1, :], degenerate_control_points[:, 2, :]), origin
     )
 
     # number of vector basis functions
@@ -611,9 +612,7 @@ function extract_vector_polar_splines_to_tensorproduct(
     E1_h_r = E1_h_r[1:ind_h]
     E1_h_c = E1_h_c[1:ind_h]
     E1_h_v = E1_h_v[1:ind_h]
-    E_h = SparseArrays.sparse(
-        E1_h_r, E1_h_c, E1_h_v, num_basis, num_basis_p * num_basis_r
-    )
+    E_h = SparseArrays.sparse(E1_h_r, E1_h_c, E1_h_v, num_basis, num_basis_p * num_basis_r)
     SparseArrays.fkeep!((i, j, x) -> abs(x) > 1e-14, E_h)
 
     return (E_h, E_v), tri
@@ -626,9 +625,9 @@ end
 function get_local_basis(
     space::PolarSplineSpace{num_components},
     element_id::Int,
-    xi::NTuple{2, Vector{Float64}},
+    xi::Points.AbstractPoints{2},
     nderivatives::Int,
-    component_id::Int
+    component_id::Int,
 ) where {num_components}
     if component_id > num_components
         throw(ArgumentError("PolarSplineSpace only has $num_components component."))
@@ -636,9 +635,7 @@ function get_local_basis(
     return evaluate(space.patch_spaces[component_id], element_id, xi, nderivatives)[1]
 end
 
-function get_num_elements_per_patch(
-    space::PolarSplineSpace
-)
+function get_num_elements_per_patch(space::PolarSplineSpace)
     return space.num_elements_per_patch
 end
 

@@ -24,10 +24,11 @@ interval [0, 1].
 """
 function gauss_lobatto(N::Integer)
     ξ, w = FastGaussQuadrature.gausslobatto(N)
-    @. ξ = (ξ + 1.0)/2.0
+    @. ξ = (ξ + 1.0) / 2.0
     @. w = 0.5 * w
+    xi = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1}((ξ,), w, "Gauss-Lobatto")
+    return CanonicalQuadratureRule{1, typeof(xi)}(xi, w, "Gauss-Lobatto")
 end
 
 """
@@ -55,16 +56,18 @@ interval [0, 1].
 """
 function gauss_legendre(N::Integer)
     if N <= 0
-        throw(DomainError("""\
-            Invalid number of nodes: $N. Gauss-Legendre quadrature must have at least one \
-            node.\
-            """
-        ))
+        throw(
+            DomainError("""\
+          Invalid number of nodes: $N. Gauss-Legendre quadrature must have at least one \
+          node.\
+          """)
+        )
     end
 
     ξ, w = FastGaussQuadrature.gausslegendre(N)
-    @. ξ = (ξ + 1.0)/2.0
+    @. ξ = (ξ + 1.0) / 2.0
     @. w = 0.5 * w
+    nodes = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1}((ξ,), w, "Gauss-Legendre")
+    return CanonicalQuadratureRule{1, typeof(nodes)}(nodes, w, "Gauss-Legendre")
 end

@@ -36,7 +36,7 @@ at `ξ` for ``\\xi \\in [0.0, 1.0]``.
 - `::Vector{Vector{Matrix{Float64}}}`: Nested vector containing the values.
 """
 Memoization.@memoize function evaluate(
-    polynomials::Bernstein, xi::Vector{Float64}, nderivatives::Int=0
+    polynomials::Bernstein, xi::Points.CartesianPoints{1}, nderivatives::Int=0
 )
     # store the values and derivatives here
     neval = length(xi)
@@ -50,7 +50,7 @@ Memoization.@memoize function evaluate(
     end
     # loop over the evaluation points and evaluate all derivatives at each point
     for i in eachindex(xi)
-        tmp = _evaluate(polynomials, xi[i], nderivatives)
+        tmp = _evaluate(polynomials, xi[i][1], nderivatives)
         for cart_ind in CartesianIndices(size(tmp))
             (basis, j) = Tuple(cart_ind)
             ders[j][1][i, basis] = tmp[basis, j]

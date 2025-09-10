@@ -66,21 +66,21 @@ end
 function evaluate(
     space::RationalFESpace{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
 ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1, 1}}
     # Evaluate the basis functions and their derivatives for the underlying function space
     homog_basis, basis_indices = evaluate(
         space.function_space, element_id, xi, nderivatives
     )
-    n_eval = prod(length.(xi))
+    n_eval = Points.get_num_points(xi)
 
     # Compute the rational basis functions and their derivatives
     for j in 0:nderivatives
         if j == 0
             # Compute the weight
-            temp = homog_basis[1][1][1] *
-                LinearAlgebra.Diagonal(space.weights[basis_indices])
+            temp =
+                homog_basis[1][1][1] * LinearAlgebra.Diagonal(space.weights[basis_indices])
             weight = reshape(sum(temp; dims=2), n_eval)
             # Rationalize with the weights
             homog_basis[1][1][1] .= LinearAlgebra.Diagonal(weight) \ temp
@@ -90,14 +90,17 @@ function evaluate(
                 # Get the location where the derivative is stored
                 der_idx = get_derivative_idx(key)
                 # Compute the weight and its derivative
-                temp = homog_basis[1][1][1] *
+                temp =
+                    homog_basis[1][1][1] *
                     LinearAlgebra.Diagonal(space.weights[basis_indices])
-                dtemp = homog_basis[j + 1][der_idx][1] *
+                dtemp =
+                    homog_basis[j + 1][der_idx][1] *
                     LinearAlgebra.Diagonal(space.weights[basis_indices])
                 weight = reshape(sum(temp; dims=2), n_eval)
                 dweight = reshape(sum(dtemp; dims=2), n_eval)
                 # Compute the derivative of the rational basis functions
-                homog_basis[j + 1][der_idx][1] .= LinearAlgebra.Diagonal(weight) \ dtemp -
+                homog_basis[j + 1][der_idx][1] .=
+                    LinearAlgebra.Diagonal(weight) \ dtemp -
                     LinearAlgebra.Diagonal(dweight ./ weight .^ 2) * temp
             end
         elseif j > 1
@@ -115,7 +118,7 @@ end
 function get_local_basis(
     space::RationalFESpace{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
     component_id::Int=1,
 ) where {manifold_dim, F <: AbstractFESpace{manifold_dim, 1, 1}}
@@ -129,9 +132,7 @@ function get_extraction(space::RationalFESpace, element_id::Int, component_id::I
     return LinearAlgebra.I, 1:length(basis_indices)
 end
 
-function get_basis_permutation(
-    space::RationalFESpace, element_id::Int, component_id::Int=1
-)
+function get_basis_permutation(space::RationalFESpace, element_id::Int, component_id::Int=1)
     return 1:get_num_basis(space, element_id)
 end
 

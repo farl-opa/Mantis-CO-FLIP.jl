@@ -751,7 +751,7 @@ end
 function get_local_basis(
     space::HierarchicalFiniteElementSpace{manifold_dim, S, T},
     hier_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
     component_id::Int=1,
 ) where {

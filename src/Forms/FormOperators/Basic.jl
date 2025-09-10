@@ -157,7 +157,7 @@ end
     evaluate(
         form_expression::Plus{manifold_dim},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim}
 
 Evaluates the sum of two differential forms at a given element and canonical points `xi`.
@@ -166,7 +166,7 @@ Evaluates the sum of two differential forms at a given element and canonical poi
 - `form_expression::Plus{manifold_dim}`: The form expression resulting from a sum of form
     expressions to be evaluated.
 - `element_id::Int`: The identifier of the element where the evaluation takes place.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: The canonical points where the evaluation is
+- `xi::Points.AbstractPoints{manifold_dim}`: The canonical points where the evaluation is
     performed.
 
 # Returns
@@ -177,7 +177,7 @@ Evaluates the sum of two differential forms at a given element and canonical poi
 function evaluate(
     form_expression::Plus{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     forms = get_forms(form_expression)
     form_1_eval, _ = evaluate(forms[1], element_id, xi)
@@ -190,7 +190,7 @@ end
     evaluate(
         form_expression::Minus{manifold_dim},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim}
 
 Evaluates the difference of two differential forms at a given element and canonical points
@@ -200,7 +200,7 @@ Evaluates the difference of two differential forms at a given element and canoni
 - `form_expression::Minus{manifold_dim}`: The form expression resulting from a difference
     of form expressions to be evaluated.
 - `element_id::Int`: The identifier of the element where the evaluation takes place.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: The canonical points where the evaluation
+- `xi::Points.AbstractPoints{manifold_dim}`: The canonical points where the evaluation
     is performed.
 
 # Returns
@@ -211,7 +211,7 @@ Evaluates the difference of two differential forms at a given element and canoni
 function evaluate(
     form_expression::Minus{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     forms = get_forms(form_expression)
     form_1_eval, _ = evaluate(forms[1], element_id, xi)

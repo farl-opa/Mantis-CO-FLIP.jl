@@ -19,34 +19,36 @@ used here is a direct translation from the given MATLAB code on page 201.
 """
 function clenshaw_curtis(p::Integer)
     if p <= 1
-        throw(DomainError("""\
-            Invalid degree: $p. The degree for Clenshaw-Curtis quadrature must be greater \
-            than 1.\
-            """
-        ))
+        throw(
+            DomainError("""\
+          Invalid degree: $p. The degree for Clenshaw-Curtis quadrature must be greater \
+          than 1.\
+          """)
+        )
     end
 
-    N = 1:2:p-1
+    N = 1:2:(p - 1)
     l = length(N)
     m = p - l
 
-    v0 = vcat(2.0./N./(N.-2), 1/N[end], zeros(m))
-    v2 = -v0[1:end-1] .- v0[end:-1:2]
+    v0 = vcat(2.0 ./ N ./ (N .- 2), 1 / N[end], zeros(m))
+    v2 = -v0[1:(end - 1)] .- v0[end:-1:2]
 
     g0 = -ones(p)
-    g0[l+1] = g0[l+1] + p
-    g0[m+1] = g0[m+1] + p
-    g = g0 ./ (p^2 - 1 + p%2)
+    g0[l + 1] = g0[l + 1] + p
+    g0[m + 1] = g0[m + 1] + p
+    g = g0 ./ (p^2 - 1 + p % 2)
 
-    w = real(FFTW.ifft(v2.+g))
+    w = real(FFTW.ifft(v2 .+ g))
     w = vcat(w, w[1])
 
     rts = cospi.(collect(Float64, range(0, p)) ./ p)
     ξ = rts[end:-1:begin]
 
     # Map roots and weights to the interval [0, 1].
-    @. ξ = (ξ + 1.0)/2.0
+    @. ξ = (ξ + 1.0) / 2.0
     @. w = 0.5 * w
+    nodes = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1}((ξ,), w, "Clenshaw-Curtis")
+    return CanonicalQuadratureRule{1, typeof(nodes)}(nodes, w, "Clenshaw-Curtis")
 end

@@ -3,6 +3,7 @@ module Quadrature
 import FastGaussQuadrature
 import FFTW
 
+import ..Points
 import ..Geometry
 
 """
@@ -20,14 +21,16 @@ abstract type AbstractQuadratureRule{manifold_dim} end
 
 A quadrature rule on a single quadrature element.
 """
-abstract type AbstractElementQuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim} end
+abstract type AbstractElementQuadratureRule{manifold_dim} <:
+              AbstractQuadratureRule{manifold_dim} end
 
 """
     AbstractGlobalQuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim}
 
 A quadrature rule on a global domain.
 """
-abstract type AbstractGlobalQuadratureRule{manifold_dim} <: AbstractQuadratureRule{manifold_dim} end
+abstract type AbstractGlobalQuadratureRule{manifold_dim} <:
+              AbstractQuadratureRule{manifold_dim} end
 
 include("ElementQuadratureRules/ElementQuadratureRules.jl")
 include("GlobalQuadratureRules/GlobalQuadratureRules.jl")

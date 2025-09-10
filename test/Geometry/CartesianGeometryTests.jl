@@ -1,6 +1,6 @@
 module CartesianGeometryTests
 
-import Mantis
+using Mantis
 
 import ReadVTK
 using Test
@@ -10,39 +10,38 @@ include("GeometryTestsHelpers.jl")
 
 # Constructor, property, and getters and setters tests -------------------------------------
 # Vector{Float64} input.
-geometry = Mantis.Geometry.CartesianGeometry((
+geometry = Geometry.CartesianGeometry((
     [0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75]
 ))
-@test Mantis.Geometry.get_breakpoints(geometry) ==
+@test Geometry.get_breakpoints(geometry) ==
     ([0.0, 1.0, 2.0], [0.5, 1.5, 2.5], [-0.75, 0.0, 0.25, 0.75])
-@test Mantis.Geometry._get_num_elements_per_dim(geometry) == (2, 2, 3)
+@test Geometry.get_constituent_num_elements(geometry) == (2, 2, 3)
 
-@test Mantis.Geometry.get_num_elements(geometry) == 12
-@test Mantis.Geometry.get_manifold_dim(geometry) == 3
-@test Mantis.Geometry.get_image_dim(geometry) == 3
+@test Geometry.get_num_elements(geometry) == 12
+@test Geometry.get_manifold_dim(geometry) == 3
+@test Geometry.get_image_dim(geometry) == 3
 
 # LinRange input.
-geometry = Mantis.Geometry.CartesianGeometry((
-    LinRange(0.5, 2.5, 5), LinRange(-0.75, 0.75, 3)
-))
-@test Mantis.Geometry.get_breakpoints(geometry) ==
-    ([0.5, 1.0, 1.5, 2.0, 2.5], [-0.75, 0.0, 0.75])
-@test Mantis.Geometry._get_num_elements_per_dim(geometry) == (4, 2)
+geometry = Geometry.CartesianGeometry((LinRange(0.5, 2.5, 5), LinRange(-0.75, 0.75, 3)))
+@test Geometry.get_breakpoints(geometry) == ([0.5, 1.0, 1.5, 2.0, 2.5], [-0.75, 0.0, 0.75])
+@test Geometry.get_constituent_num_elements(geometry) == (4, 2)
 
-@test Mantis.Geometry.get_num_elements(geometry) == 8
-@test Mantis.Geometry.get_manifold_dim(geometry) == 2
-@test Mantis.Geometry.get_image_dim(geometry) == 2
+@test Geometry.get_num_elements(geometry) == 8
+@test Geometry.get_manifold_dim(geometry) == 2
+@test Geometry.get_image_dim(geometry) == 2
 
 # Test 2D CartesianGeometry ----------------------------------------------------------------
 for nx in 1:3
     for ny in 1:3
-        geometry = Mantis.Geometry.create_cartesian_box((0.0, 0.0), (1.0, 2.0), (nx, ny))
+        geometry = Geometry.create_cartesian_box((0.0, 0.0), (1.0, 2.0), (nx, ny))
 
         # Set file name and path
         file_name = "cartesian_test_nx_$(nx)_ny_$(ny).vtu"
-        output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
+        output_file_path = Mantis.GeneralHelpers.export_path(
+            output_directory_tree, file_name
+        )
         # Generate the vtk file
-        Mantis.Plot.plot(
+        Plot.plot(
             geometry;
             vtk_filename=output_file_path[1:(end - 4)],  # Remove the file extension.
             n_subcells=1,

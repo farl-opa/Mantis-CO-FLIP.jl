@@ -31,8 +31,7 @@ struct BSplineSpace{F, TE, TI, TJ} <: AbstractFESpace{1, 1, 1}
             throw(ArgumentError("""\
                 The polynomial degree must be greater than or equal to 0, but is \
                 $polynomial_degree.\
-                """
-            ))
+                """))
         end
 
         num_breakpoints = size(patch_1d) + 1
@@ -41,18 +40,18 @@ struct BSplineSpace{F, TE, TI, TJ} <: AbstractFESpace{1, 1, 1}
                 The number of regularity conditions should be equal to the number of \
                 breakpoints, but there are $(num_breakpoints) breakpoints and \
                 $(length(regularity)) regularity conditions.\
-                """
-            ))
+                """))
         end
 
         for i in eachindex(regularity)
             if polynomial_degree <= regularity[i]
-                throw(ArgumentError("""\
-                    The polynomial degree must be greater than the regularity, but the \
-                    polynomial degree is $polynomial_degree and the regularity at index $i \
-                    is $(regularity[i]).\
-                    """
-                ))
+                throw(
+                    ArgumentError("""\
+                  The polynomial degree must be greater than the regularity, but the \
+                  polynomial degree is $polynomial_degree and the regularity at index $i \
+                  is $(regularity[i]).\
+                  """)
+                )
             end
         end
 
@@ -61,19 +60,19 @@ struct BSplineSpace{F, TE, TI, TJ} <: AbstractFESpace{1, 1, 1}
                 throw(ArgumentError("""\
                     The minimum regularity is -1 (element-wise discontinuous), but the \
                     regularity at index $i is $(regularity[i]).\
-                    """
-                ))
+                    """))
             end
         end
 
         if F <: AbstractLagrangePolynomials
             if maximum(regularity) > 0
-                throw(ArgumentError("""\
-                    The regularity conditions for Lagrange polynomials must be -1 \
-                    (discontinuous) or 0 (C^0 continuous). You have regularity conditions \
-                    $(regularity), which has maximum $(maximum(regularity)).\
-                    """
-                ))
+                throw(
+                    ArgumentError("""\
+                  The regularity conditions for Lagrange polynomials must be -1 \
+                  (discontinuous) or 0 (C^0 continuous). You have regularity conditions \
+                  $(regularity), which has maximum $(maximum(regularity)).\
+                  """)
+                )
             end
         end
 
@@ -149,7 +148,7 @@ end
 function get_local_basis(
     space::BSplineSpace,
     element_id::Int,
-    xi::NTuple{1, Vector{Float64}},
+    xi::Points.CartesianPoints{1},
     nderivatives::Int,
     component_id::Int=1,
 )
@@ -157,7 +156,7 @@ function get_local_basis(
     # output must be a vector{vector{vector{Matrix{Float64}}}}. The output of the evaluate
     # on polynomials is a vector{vector{Matrix{Float64}}}, so we need to add an extra layer
     # of vectors to the output, corresponding to the component.
-    section_space_eval = evaluate(get_polynomials(space), xi[1], nderivatives)
+    section_space_eval = evaluate(get_polynomials(space), xi, nderivatives)
     ext_eval = Vector{Vector{Vector{Matrix{Float64}}}}(undef, nderivatives + 1)
     for i in 1:(nderivatives + 1)
         # The section spaces, which are CanonicalSpaces, are always 1D, so one derivative
@@ -168,7 +167,6 @@ function get_local_basis(
 
     return ext_eval
 end
-
 
 # Note that `elem_id` is an optional dummy argument for uniformity with other spaces (dummy
 # because the degree is the same for all elements for B-splines).
@@ -261,8 +259,9 @@ Returns the elements where the B-spline given by `basis_id` is supported.
 """
 function get_support(space::BSplineSpace, basis_id::Int)
     first_element = convert_knot_to_breakpoint_idx(get_knot_vector(space), basis_id)
-    last_element = convert_knot_to_breakpoint_idx(
-        get_knot_vector(space), basis_id + get_knot_vector(space).polynomial_degree + 1
+    last_element =
+        convert_knot_to_breakpoint_idx(
+            get_knot_vector(space), basis_id + get_knot_vector(space).polynomial_degree + 1
         ) - 1
     return collect(first_element:last_element)
 end
