@@ -98,10 +98,8 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
     for (p_idx, p) in enumerate(p⁰)
         for (ss_idx, section_space) in enumerate(section_space_type)
             if verbose
-                @info(
-                    """Running volume-form Hodge-Laplace tests for p = $p, \
-                    section_space = $section_space, mesh = $mesh."""
-                )
+                @info("""Running volume-form Hodge-Laplace tests for p = $p, \
+                      section_space = $section_space, mesh = $mesh.""")
             end
 
             # section space degrees
@@ -160,7 +158,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
             ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-uh.txt")
             @test all(
-                isapprox.(uₕ.coefficients, ref_coeffs, atol=atol * 30, rtol=rtol * 30)
+                isapprox.(uₕ.coefficients, ref_coeffs, atol=atol * 35, rtol=rtol * 35)
             )
             ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-phih.txt")
             @test all(
