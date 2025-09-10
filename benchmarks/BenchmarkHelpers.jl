@@ -98,10 +98,11 @@ function run_benchmark(
         end
     end
 
-    hostname, date, commit_hash, julia_version = get_metadata()
+    hostname, date, commit_hash, commit_date, julia_version = get_metadata()
     columns = [
         :benchmark,
         :commit_hash,
+        :commit_date,
         :julia_version,
         :date,
         :med_time,
@@ -119,6 +120,7 @@ function run_benchmark(
         location,
         date,
         commit_hash,
+        commit_date,
         julia_version;
         show=show,
         save=save,
@@ -146,6 +148,9 @@ Returns useful metadata for CSV storage.
 function get_metadata()
     date = string(readchomp(`date +%Y-%m-%d`))
     commit_hash = string(readchomp(`git rev-parse --short HEAD`))
+    commit_date = string(
+        split(string(readchomp(`git show -s --format="%ci" $commit_hash`)))[1]
+    )
     hostname_shasum = split(readchomp(`sh -c "hostname | sha256sum"`))[1]
     julia_version = string(VERSION)
     # Mapping of SHA-256 hashes to hostnames
@@ -169,7 +174,7 @@ function get_metadata()
         )
     end
 
-    return hostname, date, commit_hash, julia_version
+    return hostname, date, commit_hash, commit_date, julia_version
 end
 
 """
@@ -208,6 +213,7 @@ function _run_benchmark!(
     location::String,
     date::String,
     commit_hash::String,
+    commit_date::String,
     julia_version::String;
     show::Bool,
     save::Bool,
@@ -232,6 +238,7 @@ function _run_benchmark!(
             (
                 benchmark=full_name,
                 commit_hash=commit_hash,
+                commit_date=commit_date,
                 julia_version=julia_version,
                 date=date,
                 med_time=BenchmarkTools.prettytime(median(result).time),

@@ -18,7 +18,6 @@ function run_problem(
     regularity = fill(k, num_els + 1)
     regularity[1] = regularity[end] = -1
     Bpk = FunctionSpaces.BSplineSpace(patch, section_space(p), regularity)
-
     eval_points = Points.CartesianPoints((LinRange(0.0, 1.0, 25),))
 
     dim = FunctionSpaces.get_num_basis(Bpk)
@@ -51,7 +50,6 @@ foreach(section_spaces) do section_space
 
     group["$section_space-k=$(k)"] = sub_group
 end
-
 section_spaces2 = (FunctionSpaces.Bernstein, FunctionSpaces.LobattoLegendre)
 k2 = 0
 foreach(section_spaces2) do section_space

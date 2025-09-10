@@ -29,7 +29,6 @@ function run_problem(manifold_dim::Int, num_components::Int, p::Int, k::Int)
     eval_points = Points.CartesianPoints(
         ntuple(dim -> LinRange(0.0, 1.0, 25), manifold_dim)
     )
-
     dim = FunctionSpaces.get_num_basis(DS)
 
     return dim,

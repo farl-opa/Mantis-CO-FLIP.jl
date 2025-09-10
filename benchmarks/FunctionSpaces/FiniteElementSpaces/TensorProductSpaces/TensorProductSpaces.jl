@@ -22,7 +22,6 @@ function run_problem(
         return Bpk
     end
     TP = FunctionSpaces.TensorProductSpace(TPspaces)
-
     eval_points = Points.CartesianPoints(
         ntuple(dim -> LinRange(0.0, 1.0, 25), manifold_dim)
     )
