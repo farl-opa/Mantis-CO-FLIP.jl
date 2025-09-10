@@ -1,3 +1,13 @@
+"""
+    CartesianGeometry{manifold_dim, CI} <: AbstractAnalyticalGeometry{manifold_dim}
+
+A structure representing a Cartesian grid geometry in `manifold_dim` dimensions.
+
+# Fields
+- `breakpoints`: A tuple of vectors defining the grid points in each dimension.
+- `cart_num_elements`: CartesianIndices object representing the indices of elements in the
+  grid. Use to convert from linear to cartesian indexing.
+"""
 struct CartesianGeometry{manifold_dim, CI} <: AbstractAnalyticalGeometry{manifold_dim}
     breakpoints::NTuple{manifold_dim, Vector{Float64}}
     cart_num_elements::CI
