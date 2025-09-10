@@ -1,7 +1,7 @@
 """
     CartesianPoints{manifold_dim, T, CI, LI} <: AbstractPoints{manifold_dim}
 
-Represents a set of points constructed from `manifold_dim` lists of constituent points.
+Represents a set of points constructed from `manifold_dim` lists of uni-dimensional points.
 Conceptually, this structure combines the functionalities of `CartesianIndices` and
 `Iterators.product`.
 

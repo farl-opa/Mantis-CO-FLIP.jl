@@ -4,8 +4,8 @@
 Represents a set of points in `manifold_dim` dimensions.
 
 # Fields
-- `point_set::Vector{NTuple{manifold_dim, T}}`: The vector containing each point in the
-  point set.
+- `point_set::Vector{NTuple{manifold_dim, T}}`: The vector containing the coordinates per
+  point.
 """
 struct PointSet{manifold_dim, T} <: AbstractPoints{manifold_dim}
     point_set::Vector{NTuple{manifold_dim, T}}
