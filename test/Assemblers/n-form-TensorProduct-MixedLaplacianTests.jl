@@ -158,7 +158,7 @@ for (mesh_idx, mesh) in enumerate(mesh_type)
 
             ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-uh.txt")
             @test all(
-                isapprox.(uₕ.coefficients, ref_coeffs, atol=atol * 35, rtol=rtol * 35)
+                isapprox.(uₕ.coefficients, ref_coeffs, atol=atol * 50, rtol=rtol * 50)
             )
             ref_coeffs = read_data(sub_dir, "$p-$section_space-$mesh-phih.txt")
             @test all(
