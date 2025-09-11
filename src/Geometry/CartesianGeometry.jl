@@ -1,27 +1,27 @@
-struct CartesianGeometry{manifold_dim, CI} <: AbstractAnalyticalGeometry{manifold_dim}
-    breakpoints::NTuple{manifold_dim, Vector{Float64}}
+"""
+    CartesianGeometry{manifold_dim, T, CI} <: AbstractAnalyticalGeometry{manifold_dim}
+
+A structure representing a Cartesian grid geometry in `manifold_dim` dimensions.
+
+# Fields
+- `breakpoints::NTuple{manifold_dim, AbstractVector{T}}`: A tuple of vectors defining the
+    grid points in each dimension.
+- `cart_num_elements::CI`: A `CartesianIndices` object representing the indices of elements
+    in the grid. Used to convert from linear to cartesian indexing.
+"""
+struct CartesianGeometry{manifold_dim, T, CI} <: AbstractAnalyticalGeometry{manifold_dim}
+    breakpoints::NTuple{manifold_dim, AbstractVector{T}}
     cart_num_elements::CI
 
-    """
-        CartesianGeometry(breakpoints::NTuple{manifold_dim,T}) where {
-            manifold_dim, N <: Number, T <: AbstractVector{N}
-        }
-
-    Construct a new CartesianGeometry instance.
-
-    # Arguments
-    - `breakpoints`: A tuple of vectors defining the grid points in each dimension.
-
-    # Returns
-    A new CartesianGeometry instance.
-    """
     function CartesianGeometry(
         breakpoints::NTuple{manifold_dim, AbstractVector{T}}
     ) where {manifold_dim, T <: Number}
         const_num_elements = ntuple(dim -> length(breakpoints[dim]) - 1, manifold_dim)
         cart_num_elements = CartesianIndices(const_num_elements)
 
-        return new{manifold_dim, typeof(cart_num_elements)}(breakpoints, cart_num_elements)
+        return new{manifold_dim, T, typeof(cart_num_elements)}(
+            breakpoints, cart_num_elements
+        )
     end
 end
 

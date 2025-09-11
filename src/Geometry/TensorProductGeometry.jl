@@ -1,4 +1,16 @@
+"""
+    TensorProductGeometry{manifold_dim, num_geometries, T, CI, LI} <:
+    AbstractGeometry{manifold_dim}
 
+A geometry type representing the tensor product of multiple constituent geometries.
+
+# Fields
+- `geometries::T`: Tuple of constituent geometries.
+- `cart_num_elements::CI`: A collection of Cartesian indices representing the
+  multi-dimensional positions of each tensor product element. Useful to convert from linear
+  to Cartesian indexing.
+- `lin_num_elements::LI`: Useful to convert from Cartesian to linear indexing.
+"""
 struct TensorProductGeometry{manifold_dim, num_geometries, T, CI, LI} <:
        AbstractGeometry{manifold_dim}
     geometries::T
