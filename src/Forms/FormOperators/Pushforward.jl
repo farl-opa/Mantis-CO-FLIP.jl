@@ -65,7 +65,7 @@ function evaluate_sharp_pushforward(
     sharp_eval, sharp_indices = evaluate(sharp, element_id, xi)
 
     # dξⁱ ↦ G∘♯ (dξⁱ)
-    jacobian = Geometry.jacobian(form_expression.geometry, element_id, xi)
+    jacobian = Geometry.jacobian(get_geometry(form_expression), element_id, xi)
     evaluated_pushforward = evaluate_pushforward(sharp_eval, jacobian, manifold_dim)
 
     return evaluated_pushforward, sharp_indices

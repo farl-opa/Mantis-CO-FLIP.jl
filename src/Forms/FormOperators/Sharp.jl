@@ -98,7 +98,7 @@ function _evaluate_sharp(
     element_id::Int,
     xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
-    inv_g, _, _ = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+    inv_g, _, _ = Geometry.inv_metric(get_geometry(form_expression), element_id, xi)
 
     num_form_components = manifold_dim # = binomial(manifold_dim, 1)
 
