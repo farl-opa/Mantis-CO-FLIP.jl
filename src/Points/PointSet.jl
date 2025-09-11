@@ -4,37 +4,41 @@
 Represents a set of points in `manifold_dim` dimensions.
 
 # Fields
-- `point_set::Vector{NTuple{manifold_dim, T}}`: The vector containing the coordinates per
-  point.
+- `constituent_points::NTuple{manifold_dim, T}`: The set of points per manifold dimension.
 """
 struct PointSet{manifold_dim, T} <: AbstractPoints{manifold_dim}
-    point_set::Vector{NTuple{manifold_dim, T}}
+    constituent_points::NTuple{manifold_dim, T}
+    num_points::Int
 
     function PointSet(
-        point_set::Vector{NTuple{manifold_dim, T}}
-    ) where {manifold_dim, T <: Number}
-        return new{manifold_dim, T}(point_set)
+        constituent_points::NTuple{manifold_dim, T}
+    ) where {manifold_dim, T <: AbstractVector}
+        num_points = length(constituent_points[1])
+
+        return new{manifold_dim, T}(constituent_points, num_points)
+    end
+
+    function PointSet(point_set::Vector{NTuple{manifold_dim, T}}) where {manifold_dim, T}
+        constituent_points = ntuple(
+            dim -> [point_set[point][dim] for point in 1:length(point_set)], manifold_dim
+        )
+
+        return PointSet(constituent_points)
+    end
+
+    function PointSet(point_set::Vector{Vector{T}}) where {T <: Number}
+        manifold_dim = length(point_set[1])
+        constituent_points = ntuple(
+            dim -> [point_set[point][dim] for point in 1:length(point_set)], manifold_dim
+        )
+
+        return PointSet(constituent_points)
     end
 end
 
-"""
-    get_point_set(points::PointSet)
+get_constituent_points(points::CartesianPoints) = points.constituent_points
+get_num_points(points::PointSet) = points.num_points
 
-Returns the `Vector` containing each point in `points`.
-"""
-get_point_set(points::PointSet) = points.point_set
-get_num_points(points::PointSet) = length(get_point_set(points))
-
-function Base.getindex(points::PointSet, i::Int)
-    return get_point_set(points)[i]
-end
-
-function get_constituent_points(points::PointSet{manifold_dim}) where {manifold_dim}
-    point_set = get_point_set(points)
-    num_points = get_num_points(points)
-    const_points = ntuple(
-        dim -> [point_set[point][dim] for point in 1:num_points], manifold_dim
-    )
-
-    return const_points
+function Base.getindex(points::PointSet{manifold_dim}, i::Int) where {manifold_dim}
+    return ntuple(dim -> points[i][dim], manifold_dim)
 end
