@@ -120,6 +120,8 @@ function extract_bspline_to_section_space(
 
     p = knot_vector.polynomial_degree
     breakpoints = knot_vector.patch_1d.breakpoints
+    num_knots = sum(knot_vector.multiplicity)
+
 
     # Initialize extraction matrices for each element
     E = [(Matrix{Float64}(LinearAlgebra.I, p+1, p+1),) for _ in 1:nel]
@@ -127,42 +129,56 @@ function extract_bspline_to_section_space(
     # Array to store knot insertion coefficients
     alphas = zeros(max(p - 1, 0))
 
-    # Iterate over all elements
-    for el in 1:nel
-        # Get multiplicity of the knot at the end of the current element
-        mult = knot_vector.multiplicity[el + 1]
+    # indices used for computing alphas
+    k_id_start = p + 1
+    k_id_end = k_id_start + 1
+    el_id = 1
+
+    # Iterate over all knot indices
+    while k_id_end < num_knots
+        b_id_start = convert_knot_to_breakpoint_idx(knot_vector, k_id_start)
+        b_id_end = convert_knot_to_breakpoint_idx(knot_vector, k_id_end)
+
+        # Count forwrd multiplicity of knot at k_id_end
+        t = k_id_end
+        while k_id_end < num_knots &&
+            convert_knot_to_breakpoint_idx(knot_vector, k_id_end + 1) == b_id_end
+            k_id_end += 1
+        end
+        mult = k_id_end - t + 1
+        b_id_end = convert_knot_to_breakpoint_idx(knot_vector, k_id_end)
 
         # If multiplicity is less than polynomial degree, perform knot insertion
         if mult < p
-            # Calculate numerator for alpha coefficients
-            numer = breakpoints[el + 1] - breakpoints[el]
             r = p - mult
-
+            # Calculate numerator for alpha coefficients
+            numer = breakpoints[b_id_end] - breakpoints[b_id_start]
             # Compute alpha coefficients
-            for j in (p - 1):-1:mult
-                idx = el + 1 + floor(Int, j / mult)
-
-                if idx > nel + 1
-                    alphas[j - mult + 1] = numer / (breakpoints[end] - breakpoints[el])
-                else
-                    alphas[j - mult + 1] = numer / (breakpoints[idx] - breakpoints[el])
-                end
+            for j in p:-1:(mult+1)
+                b_id_j = convert_knot_to_breakpoint_idx(knot_vector, k_id_start + j)
+                alphas[j - mult] = numer / (breakpoints[b_id_j] - breakpoints[b_id_start])
             end
 
             # Update extraction coefficients
             for j in 1:r
-                s = mult + j - 1
-                for k in (p):-1:(s + 1)
+                s = mult + j
+                for k in (p+1):-1:(s + 1)
                     alpha = alphas[k - s]
-                    E[el][1][k + 1, :] .= (@view E[el][1][k + 1, :]) .* alpha .+ (@view E[el][1][k, :]) .* (1.0 - alpha)
+                    E[el_id][1][k, :] .= (@view E[el_id][1][k, :]) .* alpha .+
+                        (@view E[el_id][1][k - 1, :]) .* (1.0 - alpha)
                 end
 
                 # Save coefficients for the next element
                 save = r - j + 1
-                if el < nel
-                    E[el + 1][1][save, save:(save + j)] .= (@view E[el][1][p + 1, (p - j + 1):(p + 1)])
+                if k_id_end < num_knots && el_id < nel
+                    E[el_id + 1][1][save, save:(save + j)] .= (@view E[el_id][1][p + 1, (p - j + 1):(p + 1)])
                 end
             end
+        end
+        el_id += 1
+        if k_id_end < num_knots
+            k_id_start = k_id_end
+            k_id_end += 1
         end
     end
 
