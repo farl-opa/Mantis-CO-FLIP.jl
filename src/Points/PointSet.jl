@@ -36,9 +36,8 @@ struct PointSet{manifold_dim, T} <: AbstractPoints{manifold_dim}
     end
 end
 
-get_constituent_points(points::CartesianPoints) = points.constituent_points
 get_num_points(points::PointSet) = points.num_points
 
 function Base.getindex(points::PointSet{manifold_dim}, i::Int) where {manifold_dim}
-    return ntuple(dim -> points[i][dim], manifold_dim)
+    return ntuple(dim -> get_constituent_points(points)[dim][i], manifold_dim)
 end

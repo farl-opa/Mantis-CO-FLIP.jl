@@ -37,7 +37,6 @@ end
 Returns the `CartesianIndices` used to convert from linear to cartesian indexing.
 """
 get_cart_num_points(points::CartesianPoints) = points.cart_num_points
-get_constituent_points(points::CartesianPoints) = points.constituent_points
 get_num_points(points::CartesianPoints) = length(get_lin_num_points(points))
 
 """
