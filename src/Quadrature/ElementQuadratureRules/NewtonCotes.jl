@@ -78,5 +78,5 @@ function newton_cotes(num_points::Integer, type::String)
     @. w = 0.5 * w
     nodes = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1, typeof(nodes)}(nodes, w, "Newton-Cotes ($type)")
+    return CanonicalQuadratureRule(nodes, w, "Newton-Cotes ($type)")
 end

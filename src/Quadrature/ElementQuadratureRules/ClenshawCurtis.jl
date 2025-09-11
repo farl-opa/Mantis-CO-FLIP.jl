@@ -50,5 +50,5 @@ function clenshaw_curtis(p::Integer)
     @. w = 0.5 * w
     nodes = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1, typeof(nodes)}(nodes, w, "Clenshaw-Curtis")
+    return CanonicalQuadratureRule(nodes, w, "Clenshaw-Curtis")
 end
