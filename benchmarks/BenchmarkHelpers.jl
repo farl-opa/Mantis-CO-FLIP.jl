@@ -442,7 +442,10 @@ example, `12.345 ms`.
 """
 function get_number_in_string(str::AbstractString; new_unit::Union{Nothing, String}=nothing)
     # Conversion factors from different units to second
-    factors = Dict("ns" => 1e-9, "μs" => 1e-6, "ms" => 1e-3, "s" => 1)
+    factors = Dict(
+        "ns" => 1e-9, "μs" => 1e-6, "ms" => 1e-3, "s" => 1,  # Time
+        "Bytes" => 1, "kiB" => 1024, "MiB" => 1024^2, "GiB" => 1024^3  # Memory
+    )
     str_number, str_unit = split(str) # Assumes "number unit" format of the string
     number = parse(Float64, str_number)
     if !isnothing(new_unit)

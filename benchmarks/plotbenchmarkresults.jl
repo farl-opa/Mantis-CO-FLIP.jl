@@ -2,6 +2,7 @@ using GLMakie
 using CSV
 using DataFrames
 using Dates
+using InlineStrings
 
 include("BenchmarkHelpers.jl")
 
@@ -18,6 +19,15 @@ const markers = Dict(
     "DiogoCabanas" => :cross,
     "ArturPalha" => :diamond,
     "DeepeshToshniwal" => :star6,
+)
+
+const units = Dict(
+    :min_time => "ms",
+    :med_time => "ms",
+    :std_time => "ms",
+    :mea_time => "ms",
+    :min_memory => "MiB",
+    :min_allocs => "#"
 )
 
 data = Dict{Tuple{String, String}, DataFrame}()
@@ -49,7 +59,12 @@ function get_benchmarks(benchmark_series)
             end
         end
     end
-    return unique!(sort!(benchmarks)), unique!(sort!(benchmarknames)), unique!(sort!(hostnames))
+
+    unique!(sort!(benchmarks))
+    unique!(sort!(benchmarknames))
+    unique!(sort!(hostnames))
+
+    return benchmarks, benchmarknames, hostnames
 end
 
 function update_data!(data, name, dirname, hostnames)
@@ -66,59 +81,111 @@ end
 # Create a root observable with the benchmark series name. Whenever this changes, everything
 # else updates automatically. Set the first benchmark as default.
 benchmark_series_ob = Observable(benchmark_series_vec[1])
-
-
 benchmark_names_ob = Observable(get_benchmarks(to_value(benchmark_series_ob))[2])
 benchmark_name_ob = Observable(to_value(benchmark_names_ob)[1])
 
-update_data!(data, to_value(benchmark_name_ob), to_value(benchmark_series_ob), get_benchmarks(to_value(benchmark_series_ob))[3])
+update_data!(
+    data,
+    to_value(benchmark_name_ob),
+    to_value(benchmark_series_ob),
+    get_benchmarks(to_value(benchmark_series_ob))[3]
+)
 benchmark_data_ob = Observable(data)
 
 
 
 fig = Figure()
-println(to_value(benchmark_series_ob))
+
 # Menus:
 # Benchmark series menu
-menu_benchmark_series = Menu(fig, options = benchmark_series_vec, default = to_value(benchmark_series_ob))
+menu_benchmark_series = Menu(
+    fig, options = benchmark_series_vec, default = to_value(benchmark_series_ob)
+)
 # Benchmark menu
-menu_benchmark_names = Menu(fig, options = benchmark_names_ob, default = to_value(benchmark_name_ob))
+menu_benchmark_names = Menu(
+    fig, options = benchmark_names_ob, default = to_value(benchmark_name_ob)
+)
+# X data menu
+menu_x_data = Menu(fig, options = ["commit_date", "date"], default = "commit_date")
+# Y data menu
+menu_y_data = Menu(
+    fig,
+    options = ["min_time", "med_time", "std_time", "mea_time", "min_memory", "min_allocs"],
+    default = "min_time"
+)
 
-# Create a list of menus on the left side of the figure.
+col_x = Observable(:commit_date)
+col_y = Observable(:min_time)
+
+# Create a list of menus on the top of the figure.
 fig[1, 1] = vgrid!(
     Label(fig, "Benchmark Series", width = nothing),
     menu_benchmark_series,
     Label(fig, "Benchmark", width = nothing),
     menu_benchmark_names;
-    tellheight = false, width = 200
+    tellheight = false, width = 1000
+)
+
+fig[1, 2] = vgrid!(
+    Label(fig, "X-data", width = nothing),
+    menu_x_data,
+    Label(fig, "Y-data", width = nothing),
+    menu_y_data;
+    tellheight = false, width = nothing
 )
 
 
 
-ax = Axis(fig[1, 2], xlabel = "Hash date [yyyy-mm-dd]", ylabel = "Mimimum time [ms]", xticklabelrotation=45.0)
-
-col_x = Observable(:commit_date)
-col_y = Observable(:min_time)
+ax = Axis(
+    fig[2, 1:2],
+    xlabel = "Commit date [yyyy-mm-dd]",
+    ylabel = "Time [ms]",
+    xticklabelrotation=45.0
+)
 
 x_data = lift(benchmark_data_ob, benchmark_name_ob, col_x) do data, name, col
     df = first(values(data))
-    all_dates = Dates.format.(df.commit_date, "yyyy-mm-dd")
-    ax.xticks = 1:1:length(all_dates)
-    ax.xtickformat = values -> [all_dates[Int(i)] for i in eachindex(values)]
-    return 1:1:length(all_dates)
+    all_dates = df[!, col]
+    all_dates_strings = Dates.format.(all_dates, "yyyy-mm-dd")
+    all_dates_diff = all_dates .- first(all_dates)
+    ax.xticks = Dates.value.(all_dates_diff)
+    ax.xtickformat = values -> [all_dates_strings[Int(i)] for i in eachindex(values)]
+    return Dates.value.(all_dates_diff)
 end
 
+
+
 y_data_joey = lift(benchmark_data_ob, benchmark_name_ob, col_y) do data, name, col
-    return get_number_in_string.(data[("JoeyDekker", name)][:,col], new_unit="ms")
+    plot_data = data[("JoeyDekker", name)][:, col]
+    if eltype(plot_data) <: AbstractString || eltype(plot_data) <: InlineString
+        return get_number_in_string.(data[("JoeyDekker", name)][:,col], new_unit=units[col])
+    else
+        return plot_data
+    end
 end
 y_data_diogo = lift(benchmark_data_ob, benchmark_name_ob, col_y) do data, name, col
-    return get_number_in_string.(data[("DiogoCabanas", name)].min_time, new_unit="ms")
+    plot_data = data[("DiogoCabanas", name)][:, col]
+    if eltype(plot_data) <: AbstractString || eltype(plot_data) <: InlineString
+        return get_number_in_string.(data[("DiogoCabanas", name)][:,col], new_unit=units[col])
+    else
+        return plot_data
+    end
 end
 y_data_artur = lift(benchmark_data_ob, benchmark_name_ob, col_y) do data, name, col
-    return get_number_in_string.(data[("ArturPalha", name)].min_time, new_unit="ms")
+    plot_data = data[("ArturPalha", name)][:, col]
+    if eltype(plot_data) <: AbstractString || eltype(plot_data) <: InlineString
+        return get_number_in_string.(data[("ArturPalha", name)][:,col], new_unit=units[col])
+    else
+        return plot_data
+    end
 end
 y_data_deepesh = lift(benchmark_data_ob, benchmark_name_ob, col_y) do data, name, col
-    return get_number_in_string.(data[("DeepeshToshniwal", name)].min_time, new_unit="ms")
+    plot_data = data[("DeepeshToshniwal", name)][:, col]
+    if eltype(plot_data) <: AbstractString || eltype(plot_data) <: InlineString
+        return get_number_in_string.(data[("DeepeshToshniwal", name)][:,col], new_unit=units[col])
+    else
+        return plot_data
+    end
 end
 
 scatter!(ax, x_data, y_data_joey;
@@ -147,10 +214,33 @@ end
 on(menu_benchmark_names.selection) do s
     println("Selected benchmark name: $s")
     benchmark_stringdata = get_benchmarks(benchmark_series_ob[])
-    # benchmark_data_ob[] = update_data!(data, s, to_value(benchmark_series_ob), benchmark_stringdata[3])
     update_data!(data, s, to_value(benchmark_series_ob), benchmark_stringdata[3])
     benchmark_name_ob[] = s
     ax.title = s
+    autolimits!(ax)
+end
+
+on(menu_x_data.selection) do s
+    println("Selected x data: $s")
+    col_x[] = Symbol(s)
+    if Symbol(s) == :commit_date
+        ax.xlabel = "Commit date [yyyy-mm-dd]"
+    else
+        ax.xlabel = "Date [yyyy-mm-dd]"
+    end
+    autolimits!(ax)
+end
+
+on(menu_y_data.selection) do s
+    println("Selected y data: $s")
+    col_y[] = Symbol(s)
+    if Symbol(s) in [:min_time, :median_time, :std_time, :mean_time]
+        ax.ylabel = "Time [ms]"
+    elseif Symbol(s) == :min_memory
+        ax.ylabel = "Memory [MiB]"
+    elseif Symbol(s) == :min_allocs
+        ax.ylabel = "Allocations [#]"
+    end
     autolimits!(ax)
 end
 
