@@ -143,14 +143,56 @@ ax = Axis(
     xticklabelrotation=45.0
 )
 
-x_data = lift(benchmark_data_ob, benchmark_name_ob, col_x) do data, name, col
-    df = first(values(data))
-    all_dates = df[!, col]
+all_dates = lift(benchmark_data_ob, benchmark_name_ob, col_x) do data, name, col
+    all_dates = vcat(
+        data[("JoeyDekker", name)][!, col],
+        data[("DiogoCabanas", name)][!, col],
+        data[("ArturPalha", name)][!, col],
+        data[("DeepeshToshniwal", name)][!, col]
+    )
     all_dates_strings = Dates.format.(all_dates, "yyyy-mm-dd")
-    all_dates_diff = all_dates .- first(all_dates)
-    ax.xticks = Dates.value.(all_dates_diff)
-    ax.xtickformat = values -> [all_dates_strings[Int(i)] for i in eachindex(values)]
-    return Dates.value.(all_dates_diff)
+    unique_dates = unique(sort(all_dates))
+    diffs = Dates.value.(unique_dates .- first(unique_dates))
+    ax.xticks = (diffs, Dates.format.(unique_dates, "yyyy-mm-dd"))
+    xlims!(ax, minimum(diffs)-1, maximum(diffs)+1)
+    return unique_dates
+end
+
+x_data_joey = lift(all_dates) do dates
+    data = to_value(benchmark_data_ob)
+    name = to_value(benchmark_name_ob)
+    col = to_value(col_x)
+    all_dates_joey = data[("JoeyDekker", name)][!, col]
+    all_dates_diff = dates .- first(dates)
+    idxs = findall(x -> x in all_dates_joey, dates)
+    return Dates.value.(all_dates_diff[idxs])
+end
+x_data_diogo = lift(all_dates) do dates
+    data = to_value(benchmark_data_ob)
+    name = to_value(benchmark_name_ob)
+    col = to_value(col_x)
+    all_dates_diogo = data[("DiogoCabanas", name)][!, col]
+    all_dates_diff = dates .- first(dates)
+    idxs = findall(x -> x in all_dates_diogo, dates)
+    return Dates.value.(all_dates_diff[idxs])
+end
+x_data_artur = lift(all_dates) do dates
+    data = to_value(benchmark_data_ob)
+    name = to_value(benchmark_name_ob)
+    col = to_value(col_x)
+    all_dates_artur = data[("ArturPalha", name)][!, col]
+    all_dates_diff = dates .- first(dates)
+    idxs = findall(x -> x in all_dates_artur, dates)
+    return Dates.value.(all_dates_diff[idxs])
+end
+x_data_deepesh = lift(all_dates) do dates
+    data = to_value(benchmark_data_ob)
+    name = to_value(benchmark_name_ob)
+    col = to_value(col_x)
+    all_dates_deepesh = data[("DeepeshToshniwal", name)][!, col]
+    all_dates_diff = dates .- first(dates)
+    idxs = findall(x -> x in all_dates_deepesh, dates)
+    return Dates.value.(all_dates_diff[idxs])
 end
 
 
@@ -188,16 +230,16 @@ y_data_deepesh = lift(benchmark_data_ob, benchmark_name_ob, col_y) do data, name
     end
 end
 
-scatter!(ax, x_data, y_data_joey;
+scatterlines!(ax, x_data_joey, y_data_joey;
     label="JoeyDekker", color=colours["JoeyDekker"], marker=markers["JoeyDekker"]
 )
-scatter!(ax, x_data, y_data_diogo;
+scatterlines!(ax, x_data_diogo, y_data_diogo;
     label="DiogoCabanas", color=colours["DiogoCabanas"], marker=markers["DiogoCabanas"]
 )
-scatter!(ax, x_data, y_data_artur;
+scatterlines!(ax, x_data_artur, y_data_artur;
     label="ArturPalha", color=colours["ArturPalha"], marker=markers["ArturPalha"]
 )
-scatter!(ax, x_data, y_data_deepesh;
+scatterlines!(ax, x_data_deepesh, y_data_deepesh;
     label="DeepeshToshniwal", color=colours["DeepeshToshniwal"], marker=markers["DeepeshToshniwal"]
 )
 
@@ -217,7 +259,7 @@ on(menu_benchmark_names.selection) do s
     update_data!(data, s, to_value(benchmark_series_ob), benchmark_stringdata[3])
     benchmark_name_ob[] = s
     ax.title = s
-    autolimits!(ax)
+    autoylimits!(ax)
 end
 
 on(menu_x_data.selection) do s
@@ -228,7 +270,6 @@ on(menu_x_data.selection) do s
     else
         ax.xlabel = "Date [yyyy-mm-dd]"
     end
-    autolimits!(ax)
 end
 
 on(menu_y_data.selection) do s
