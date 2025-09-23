@@ -158,3 +158,19 @@ two-scale operator.
 function get_basis_parents(operator::TwoScaleOperator, basis_id::Int)
     return get_child_to_parent_basis(operator)[basis_id]
 end
+
+"""
+    get_global_subdiv_matrix(operator::TwoScaleOperator)
+
+Retrieve and return the global subdivision matrix from a two-scale operator.
+
+# Arguments
+- `operator::TwoScaleOperator`: The two-scale operator containing the global subdivision
+    matrix.
+
+# Returns
+- `::SparseArrays.SparseMatrixCSC{Float64, Int}`: The global subdivision
+"""
+function get_global_subdiv_matrix(operator::TwoScaleOperator)
+    return operator.global_subdiv_matrix
+end
