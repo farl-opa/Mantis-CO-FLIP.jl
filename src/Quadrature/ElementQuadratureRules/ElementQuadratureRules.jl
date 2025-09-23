@@ -76,6 +76,12 @@ struct CanonicalQuadratureRule{manifold_dim, P} <:
     nodes::P
     weights::Vector{Float64}
     rule_label::String
+
+    function CanonicalQuadratureRule(
+        nodes::P, weights::Vector{Float64}, rule_label::String="canonical points"
+    ) where {manifold_dim, P <: Points.AbstractPoints{manifold_dim}}
+        return new{manifold_dim, P}(nodes, weights, rule_label)
+    end
 end
 
 # One-dimensional quadrature rules.

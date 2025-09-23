@@ -58,7 +58,7 @@ function tensor_product_rule(
         rule_label = "Tensor-product of ($rule_labels) rules"
     end
 
-    return CanonicalQuadratureRule{manifold_dim, typeof(nodes)}(nodes, weights, rule_label)
+    return CanonicalQuadratureRule(nodes, weights, rule_label)
 end
 
 """

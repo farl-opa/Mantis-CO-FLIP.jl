@@ -28,7 +28,7 @@ function gauss_lobatto(N::Integer)
     @. w = 0.5 * w
     xi = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1, typeof(xi)}(xi, w, "Gauss-Lobatto")
+    return CanonicalQuadratureRule(xi, w, "Gauss-Lobatto")
 end
 
 """
@@ -69,5 +69,5 @@ function gauss_legendre(N::Integer)
     @. w = 0.5 * w
     nodes = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1, typeof(nodes)}(nodes, w, "Gauss-Legendre")
+    return CanonicalQuadratureRule(nodes, w, "Gauss-Legendre")
 end

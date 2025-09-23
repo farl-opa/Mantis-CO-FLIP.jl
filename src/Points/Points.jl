@@ -45,8 +45,8 @@ end
 
 Returns the constituent points of `points` per manifold dimension.
 """
-function get_constituent_points(::P) where {P <: AbstractPoints}
-    throw(MethodError(get_constituent_points, (P,)))
+function get_constituent_points(points::P) where {P <: AbstractPoints}
+    return points.constituent_points
 end
 
 Base.firstindex(points::AbstractPoints) = 1

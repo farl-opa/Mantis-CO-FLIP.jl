@@ -114,11 +114,13 @@ function get_dof_partition(space::DirectSumSpace)
     dof_partition = deepcopy(dof_partition_per_component[1])
 
     for component in 2:get_num_components(space)
-        for patch in 1:length(dof_partition_per_component[component][1])
-            append!(
-                dof_partition[1][patch],
-                dof_partition_per_component[component][1][patch] .+ dof_offsets[component],
-            )
+        for patch in eachindex(dof_partition_per_component[component])
+            for partition in eachindex(dof_partition_per_component[component][patch])
+                append!(
+                    dof_partition[patch][partition],
+                    dof_partition_per_component[component][patch][partition] .+ dof_offsets[component],
+                )
+            end
         end
     end
 
