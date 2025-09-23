@@ -19,7 +19,8 @@ function build_two_scale_operator(
         SparseArrays.blockdiag(
             ntuple(
                 component -> get_global_subdiv_matrix(comp_twoscale_operators[component]),
-                num_components)
+                num_components
+            )...
         ),
         get_parent_to_child_elements(comp_twoscale_operators[1]),
         get_child_to_parent_elements(comp_twoscale_operators[1]),

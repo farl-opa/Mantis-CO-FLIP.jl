@@ -80,3 +80,76 @@ function build_two_scale_operator(
     ),
     child_space
 end
+
+function build_two_scale_operator(
+    parent_space::GTBSplineSpace{num_patches, T},
+    num_subdivisions::NTuple{num_patches, NTuple{1, Int}},
+) where {num_patches, T}
+    return build_two_scale_operator(
+        parent_space,
+        subdivide_space(parent_space, num_subdivisions),
+        num_subdivisions
+    )
+end
+
+function build_two_scale_operator(
+    parent_space::GTBSplineSpace{num_patches, T},
+    num_subdivisions::NTuple{num_patches, Int},
+) where {num_patches, T}
+    return build_two_scale_operator(
+        parent_space,
+        subdivide_space(parent_space, num_subdivisions),
+        ntuple(i -> (num_subdivisions[i],), num_patches)
+    )
+end
+
+function build_two_scale_operator(
+    parent_space::GTBSplineSpace{num_patches, T},
+    num_subdivisions::Int,
+) where {num_patches, T}
+    return build_two_scale_operator(
+        parent_space,
+        subdivide_space(parent_space, num_subdivisions),
+        ntuple(i -> (num_subdivisions,), num_patches)
+    )
+end
+
+function subdivide_space(
+    parent_space::GTBSplineSpace{num_patches, T},
+    num_subdivisions::NTuple{num_patches, NTuple{1, Int}},
+) where {num_patches, T}
+    # get GTB patch spaces
+    patch_spaces = get_patch_spaces(parent_space)
+    # subdivide all patch spaces
+    child_patch_spaces = ntuple(
+        i -> subdivide_space(patch_spaces[i], num_subdivisions[i][1]),
+        num_patches
+    )
+    # build child GTB spline space
+    return GTBSplineSpace(
+        child_patch_spaces,
+        get_patch_interface_regularities(parent_space),
+        get_constructor_num_dofs_left(parent_space),
+        get_constructor_num_dofs_right(parent_space),
+    )
+end
+
+function subdivide_space(
+    parent_space::GTBSplineSpace{num_patches, T},
+    num_subdivisions::NTuple{num_patches, Int},
+) where {num_patches, T}
+    return subdivide_space(
+        parent_space,
+        ntuple(i -> (num_subdivisions[i],), num_patches)
+    )
+end
+
+function subdivide_space(
+    parent_space::GTBSplineSpace{num_patches, T},
+    num_subdivisions::Int,
+) where {num_patches, T}
+    return subdivide_space(
+        parent_space,
+        ntuple(i -> (num_subdivisions,), num_patches)
+    )
+end
