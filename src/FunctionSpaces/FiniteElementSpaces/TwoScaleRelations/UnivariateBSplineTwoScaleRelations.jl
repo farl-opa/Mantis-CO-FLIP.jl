@@ -306,7 +306,7 @@ ones are given multiplicity `child_multiplicity`.
 - `child_multiplicity::Int`: Multiplicity of each new knot.
 
 # Returns
-- `::BSplineSpace`: Rechildd B-spline space.
+- `::BSplineSpace`: refined B-spline space.
 """
 function subdivide_space(
     parent_bspline::BSplineSpace, num_subdivisions::Int, child_multiplicity::Int
@@ -343,7 +343,7 @@ given multiplicity 1.
 - `num_subdivisions::Int`: Number of times each element is subdivided.
 
 # Returns
-- `::BSplineSpace`: Rechildd B-spline space.
+- `::BSplineSpace`: refined B-spline space.
 """
 function subdivide_space(parent_bspline::BSplineSpace, num_subdivisions::Int)
     return subdivide_space(parent_bspline, num_subdivisions, 1)
@@ -603,7 +603,7 @@ For more information, see [Dangella2018](@cite).
 # Arguments
 - `parent_bspline::BSplineSpace`: parent B-spline.
 - `num_subdivisions::Int`: Number of times each element is subdivided.
-- `child_multiplicity::Int`: Multiplicity of each new knot in rechildd knot vector.\
+- `child_multiplicity::Int`: Multiplicity of each new knot in refined knot vector.\
 
 # Returns
 - `::FiniteElementSpaces.TwoScaleOperator, child_bspline::BSplineSpace`: Tuple with a

@@ -86,11 +86,11 @@ mutable struct HierarchicalFiniteElementSpace{manifold_dim, S, T} <:
             throw(ArgumentError("At least 1 level is required, but 0 were given."))
         elseif length(two_scale_operators) != num_levels - 1
             msg1 = "Number of two-scale operators should be one less than the number of levels. "
-            msg2 = "$num_levels rechildment levels and $(length(two_scale_operators)) two-scale operators were given."
+            msg2 = "$num_levels refinement levels and $(length(two_scale_operators)) two-scale operators were given."
             throw(ArgumentError(msg1 * msg2))
         elseif get_num_levels(domains) != num_levels
             msg1 = "Number of nested domains should be the same as the number of levels. "
-            msg2 = "$num_levels rechildment levels and $(get_num_levels(domains)) domains were given."
+            msg2 = "$num_levels refinement levels and $(get_num_levels(domains)) domains were given."
             throw(ArgumentError(msg1 * msg2))
         end
 
@@ -527,7 +527,7 @@ function get_multilevel_extraction(
             spaces[level], element_level_id, level, active_basis
         )
 
-        rechildment_matrix, multilevel_basis_hier_ids = get_rechildment_data(
+        refinement_matrix, multilevel_basis_hier_ids = get_refinement_data(
             active_basis_matrix,
             active_local_ids,
             spaces,
@@ -548,7 +548,7 @@ function get_multilevel_extraction(
             )
 
         # Add multilevel extraction data
-        multilevel_extraction_coeffs[ml_id_count] = level_coeffs * rechildment_matrix
+        multilevel_extraction_coeffs[ml_id_count] = level_coeffs * refinement_matrix
         multilevel_basis_ids[ml_id_count] = append!(
             basis_hier_ids, multilevel_basis_hier_ids
         )
@@ -634,7 +634,7 @@ function get_multilevel_information(
     return multilevel_information
 end
 
-function get_rechildment_data(
+function get_refinement_data(
     active_basis_matrix,
     active_local_ids,
     fe_spaces,
@@ -647,13 +647,13 @@ function get_rechildment_data(
 )
     active_basis_size = size(active_basis_matrix)
     num_multilevel_basis = length(multilevel_information[(element_level, element_id)])
-    rechildment_matrix = hcat(
+    refinement_matrix = hcat(
         active_basis_matrix, zeros(active_basis_size[1], num_multilevel_basis)
     )
     multilevel_basis_hier_ids = Vector{Int}(undef, num_multilevel_basis)
     ml_basis_count = 1
     for (basis_level, basis_level_id) in multilevel_information[(element_level, element_id)]
-        rechildment_matrix[:, active_basis_size[2] + ml_basis_count] .= get_multilevel_basis_evaluation(
+        refinement_matrix[:, active_basis_size[2] + ml_basis_count] .= get_multilevel_basis_evaluation(
             fe_spaces,
             two_scale_operators,
             active_basis,
@@ -671,12 +671,12 @@ function get_rechildment_data(
         ml_basis_count += 1
     end
     if truncated
-        rechildment_matrix = truncate_rechildment_matrix!(
-            rechildment_matrix, active_local_ids
+        refinement_matrix = truncate_refinement_matrix!(
+            refinement_matrix, active_local_ids
         )
     end
 
-    return rechildment_matrix, multilevel_basis_hier_ids
+    return refinement_matrix, multilevel_basis_hier_ids
 end
 
 function get_multilevel_basis_evaluation(
@@ -726,24 +726,24 @@ function get_multilevel_basis_evaluation(
 end
 
 """
-    truncate_rechildment_matrix!(rechildment_matrix, active_indices::Vector{Int})
+    truncate_refinement_matrix!(refinement_matrix, active_indices::Vector{Int})
 
-Updates `rechildment_matrix` by the rows of `active_indices` to zeros in lower level basis
+Updates `refinement_matrix` by the rows of `active_indices` to zeros in lower level basis
 functions.
 
 # Arguments
-- `rechildment_matrix`: the rechildment matrix to be updated.
+- `refinement_matrix`: the refinement matrix to be updated.
 - `active_indices::Vector{Int}`: element local indices of active basis functions from the
-    highest rechildment level.
+    highest refinement level.
 
 # Returns
-- `rechildment_matrix`: truncated rechildment matrix.
+- `refinement_matrix`: truncated refinement matrix.
 """
-function truncate_rechildment_matrix!(rechildment_matrix, active_indices::Vector{Int})
+function truncate_refinement_matrix!(refinement_matrix, active_indices::Vector{Int})
     active_length = length(active_indices)
-    rechildment_matrix[active_indices, (active_length + 1):end] .= 0.0
+    refinement_matrix[active_indices, (active_length + 1):end] .= 0.0
 
-    return rechildment_matrix
+    return refinement_matrix
 end
 
 # Extraction method for hierarchical space
@@ -760,7 +760,7 @@ function get_local_basis(
     element_level, element_level_id = convert_to_element_level_and_level_id(space, hier_id)
 
     return get_local_basis(
-        get_space(space, element_level), element_level_id, xi, nderivatives
+        get_space(space, element_level), element_level_id, xi, nderivatives  #TODO: generalize to multi components
     )
 end
 
@@ -775,7 +775,7 @@ function get_extraction(
         element_level, element_level_id = convert_to_element_level_and_level_id(
             space, hier_id
         )
-        coeffs, _ = get_extraction(get_space(space, element_level), element_level_id)
+        coeffs, _ = get_extraction(get_space(space, element_level), element_level_id)  #TODO: generalize to multi components (carry permutations through)
         basis_level_ids = get_basis_indices(
             get_space(space, element_level), element_level_id
         )
@@ -795,7 +795,7 @@ end
 function get_basis_permutation(
     space::HierarchicalFiniteElementSpace, element_id::Int, component_id::Int=1
 )
-    return 1:get_num_basis(space, element_id)
+    return 1:get_num_basis(space, element_id) #TODO: generalize to multi components
 end
 
 function get_basis_indices(
@@ -959,7 +959,7 @@ function update_hierarchical_space!(
     )
 end
 
-# Useful for rechildment
+# Useful for refinement
 
 function get_level_inactive_domain(hier_space::HierarchicalFiniteElementSpace, level::Int)
     inactive_basis = setdiff(
