@@ -796,11 +796,11 @@ function _create_polar_geometry_data(
         geom_coeffs_tp;
         two_poles = two_poles
     )
-    E_geom = get_global_extraction_matrix(P_geom, 1)
+    E_geom = assemble_global_extraction_matrix(P_geom)
 
     # control points for the polar spline space
     geom_coeffs_polar =
-        (E_geom * E_geom') \ (E_geom * reshape(geom_coeffs_tp, :, 2))
+        (E_geom' * E_geom) \ (E_geom' * reshape(geom_coeffs_tp, :, 2))
 
     return P_geom, geom_coeffs_polar
 end
@@ -830,10 +830,10 @@ function refine_polar_geometry_data(
     n_θ = get_num_basis(GBθ)
     n_r = get_num_basis(Br)
 
-    # get coarse polar geometry control points
-    E_geom = get_global_extraction_matrix(P_geom, 1)
+    # get coarse polar geometry control points in tensor-product format
+    E_geom = assemble_global_extraction_matrix(P_geom)
     geom_coeffs_polar_tp = reshape(
-        E_geom' * geom_coeffs_polar, n_θ, n_r, 2
+        E_geom * geom_coeffs_polar, n_θ, n_r, 2
     )
 
     # refine the univariate spaces
@@ -863,7 +863,7 @@ function refine_polar_geometry_data(
     )
 
     # refine input polar geometry coefficients
-    E_geom_ref = get_global_extraction_matrix(P_geom_ref, 1)
+    E_geom_ref = assemble_global_extraction_matrix(P_geom_ref)
     geom_coeffs_polar_tp_ref = reshape(cat(
         ts_θ.global_subdiv_matrix *
         geom_coeffs_polar_tp[:, :, 1] *
@@ -873,7 +873,7 @@ function refine_polar_geometry_data(
         ts_r.global_subdiv_matrix';
         dims=3
     ), :, 2)
-    geom_coeffs_polar_ref = (E_geom_ref * E_geom_ref') \ (E_geom_ref * geom_coeffs_polar_tp_ref)
+    geom_coeffs_polar_ref = (E_geom_ref' * E_geom_ref) \ (E_geom_ref' * geom_coeffs_polar_tp_ref)
 
     return P_geom_ref, geom_coeffs_polar_ref,
         (get_num_elements(ts_θ.fine_space), get_num_elements(ts_r.fine_space))

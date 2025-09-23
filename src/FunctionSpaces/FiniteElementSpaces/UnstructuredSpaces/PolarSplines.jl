@@ -639,16 +639,6 @@ function get_num_elements_per_patch(space::PolarSplineSpace)
     return space.num_elements_per_patch
 end
 
-get_global_extraction_matrix(space::PolarSplineSpace) = space.global_extraction_matrix
-function get_global_extraction_matrix(
-    space::PolarSplineSpace{num_components}, component_id::Int
-) where {num_components}
-    if component_id > num_components
-        throw(ArgumentError("PolarSplineSpace only has $num_components component."))
-    end
-    return space.global_extraction_matrix[component_id]
-end
-
 get_patch_spaces(space::PolarSplineSpace) = space.patch_spaces
 function get_max_local_dim(space::PolarSplineSpace)
     return sum(get_max_local_dim.(get_patch_spaces(space)))
@@ -657,7 +647,7 @@ end
 function assemble_global_extraction_matrix(
     space::PolarSplineSpace{num_components}
 ) where {num_components}
-    return SparseArrays.sparse_hcat(space.global_extraction_matrix...)
+    return permutedims(SparseArrays.sparse_hcat(space.global_extraction_matrix...))
 end
 
 function get_degenerate_control_points(space::PolarSplineSpace)

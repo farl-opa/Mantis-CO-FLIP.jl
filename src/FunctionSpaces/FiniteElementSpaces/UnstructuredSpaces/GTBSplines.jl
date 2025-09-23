@@ -195,19 +195,7 @@ function get_max_local_dim(space::GTBSplineSpace)
     return maximum(get_max_local_dim.(get_patch_spaces(space)))
 end
 
-"""
-    assemble_global_extraction_matrix(
-        space::GTBSplineSpace{num_patches}
-    ) where {num_patches}
 
-Assembles the global extraction matrix for a GTBSplineSpace by combining the extraction coefficients from each element on each patch.
-
-# Arguments
-- `space::GTBSplineSpace{num_patches}`: The GTBSplineSpace
-
-# Returns
-- `SparseMatrixCSC{Float64}`: The global extraction matrix that maps GTB dofs to local dofs
-"""
 function assemble_global_extraction_matrix(
     space::GTBSplineSpace{num_patches}
 ) where {num_patches}
