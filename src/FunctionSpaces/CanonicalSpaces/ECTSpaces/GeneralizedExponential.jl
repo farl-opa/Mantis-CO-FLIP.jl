@@ -36,39 +36,39 @@ struct GeneralizedExponential <: AbstractECTSpaces
      end
 end
 
-function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
-    M = zeros(Float64, 1, gexp.p+1, nderivatives+1)
+function _evaluate(ect_space::GeneralizedExponential, xi::Float64, nderivatives::Int)
+    M = zeros(Float64, 1, ect_space.p+1, nderivatives+1)
 
     left = false
     right = false
-    if xi < gexp.endpoint_tol
+    if xi < ect_space.endpoint_tol
         left = true
-    elseif xi > 1.0 - gexp.endpoint_tol
+    elseif xi > 1.0 - ect_space.endpoint_tol
         right = true
     end
 
     # scale the point to lie in the interval [0, l]
-    xi = gexp.l * xi
-    if gexp.t
+    xi = ect_space.l * xi
+    if ect_space.t
         for r = 0:nderivatives
-            k = min(r, gexp.p-1)
-            wxl = gexp.w * xi
-            E = [1.0; cumprod((1.0 ./ (1:gexp.p-k)) * wxl)]
-            E[gexp.p-k, :] .= exp(wxl);
-            E[gexp.p+1-k, :] .= (-1)^r * exp(-wxl);
+            k = min(r, ect_space.p-1)
+            wxl = ect_space.w * xi
+            E = [1.0; cumprod((1.0 ./ (1:ect_space.p-k)) * wxl)]
+            E[ect_space.p-k, :] .= exp(wxl);
+            E[ect_space.p+1-k, :] .= (-1)^r * exp(-wxl);
             # rescale the derivative to map back from [0, l] -> [0, 1]
-            M[1, :, r+1] = (gexp.w^r) * (gexp.C[:,k+1:end] * E) * (gexp.l^r)
+            M[1, :, r+1] = (ect_space.w^r) * (ect_space.C[:,k+1:end] * E) * (ect_space.l^r)
         end
     else
         for r = 0:nderivatives
-            k = min(r, gexp.p-1)
-            ww = [1; cumprod(repeat([gexp.w * gexp.w], gexp.m))]
-            Ef = [1.0; cumprod((1.0 ./ (1:gexp.p-k+2*gexp.m)) * xi)]
-            E = Ef[1:gexp.p+1-k]
-            E[gexp.p-k, :] = Ef[gexp.p-k:2:end, :]' * ww
-            E[gexp.p-k+1, :] = Ef[gexp.p-k+1:2:end, :]' * ww
+            k = min(r, ect_space.p-1)
+            ww = [1; cumprod(repeat([ect_space.w * ect_space.w], ect_space.m))]
+            Ef = [1.0; cumprod((1.0 ./ (1:ect_space.p-k+2*ect_space.m)) * xi)]
+            E = Ef[1:ect_space.p+1-k]
+            E[ect_space.p-k, :] = Ef[ect_space.p-k:2:end, :]' * ww
+            E[ect_space.p-k+1, :] = Ef[ect_space.p-k+1:2:end, :]' * ww
             # rescale the derivative to map back from [0, l] -> [0, 1]
-            M[1, :, r+1] = gexp.C[:,k+1:end] * E * (gexp.l^r)
+            M[1, :, r+1] = ect_space.C[:,k+1:end] * E * (ect_space.l^r)
         end
     end
 
@@ -82,20 +82,20 @@ function _evaluate(gexp::GeneralizedExponential, xi::Float64, nderivatives::Int)
 end
 
 """
-    evaluate(gexp::GeneralizedExponential, ξ::Vector{Float64})
+    evaluate(ect_space::GeneralizedExponential, ξ::Vector{Float64})
 
 Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
 
 # Arguments
-- `gexp::GeneralizedExponential`:  Generalized Exponential section space.
+- `ect_space::GeneralizedExponential`:  Generalized Exponential section space.
 - `xi::Vector{Float64}`: vector of evaluation points ``in [0.0, 1.0]``.
 """
-function evaluate(gexp::GeneralizedExponential, xi::Vector{Float64})
-    return evaluate(gexp, xi, 0)
+function evaluate(ect_space::GeneralizedExponential, xi::Vector{Float64})
+    return evaluate(ect_space, xi, 0)
 end
 
-function evaluate(gexp::GeneralizedExponential, xi::Float64)
-    return evaluate(gexp, [xi], 0)
+function evaluate(ect_space::GeneralizedExponential, xi::Float64)
+    return evaluate(ect_space, [xi], 0)
 end
 
 """

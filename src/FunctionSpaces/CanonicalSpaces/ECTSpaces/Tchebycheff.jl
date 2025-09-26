@@ -47,7 +47,7 @@ struct Tchebycheff <: AbstractECTSpaces
         root_mult_unq = similar(root_mult[roots_i])
         count = 0
         for ru in eachrow(roots_unq)
-            root_mult_unq[count+1] = sum(root_mult[findall(r -> all(r .== ru), eachrow(roots))])
+            root_mult_unq[count+1] = sum(root_mult[findall(row -> all(row .== ru), eachrow(roots))])
             count += 1
         end
         # store types of roots
@@ -72,49 +72,89 @@ struct Tchebycheff <: AbstractECTSpaces
     end
 end
 
-# """
-#     TB_evaluation_all(P, xx; closed=true)
+function _evaluate(ect_space::Tchebycheff, xi::Float64, nderivatives::Int)
+    M = zeros(Float64, 1, ect_space.p+1, nderivatives+1)
 
-# Evaluate all TB-splines at points `xx`.
-# """
-# function TB_evaluation_all(P::TBpatchTcheb, xx::Vector{Float64}; closed::Bool=true)
-#     tol = 1e-12
-#     M = zeros(p+1, length(xx))
-#     j = (xx .>= P.xx[1]) .& (xx .< P.xx[end])
-#     if closed
-#         j[abs.(xx .- P.xx[end]) .< tol] .= true
-#     end
-#     if any(j)
-#         xl = xx[j] .- P.xx[1]
-#         E = zeros(p+1, length(xl))
-#         m = Int(maximum(P.W[:, 4])) - 1
-#         X = vcat(ones(1, length(xl)), cumprod.((1.0 ./ (1:m))' .* xl, dims=1))
-#         for i in 1:length(root_mult)
-#             r_ind = Int(root_type[i])
-#             sel = mu[i]+1:mu[i+1]
-#             if r_ind == 0
-#                 Ei = X[1:Int(root_mult[i]), :]
-#             elseif r_ind == 1
-#                 ewxl = exp(roots[i, 1] .* xl)
-#                 Ei = X[1:Int(root_mult[i]), :] .* ewxl'
-#             elseif r_ind == 2
-#                 cwxl = cos(roots[i, 2] .* xl)
-#                 swxl = sin(roots[i, 2] .* xl)
-#                 Ei = vcat(X[1:Int(root_mult[i]), :] .* cwxl', X[1:Int(root_mult[i]), :] .* swxl')
-#             elseif r_ind == 3
-#                 ewxl = exp(roots[i, 1] .* xl)
-#                 ecwxl = ewxl .* cos(roots[i, 2] .* xl)
-#                 eswxl = ewxl .* sin(roots[i, 2] .* xl)
-#                 Ei = vcat(X[1:Int(root_mult[i]), :] .* ecwxl', X[1:Int(root_mult[i]), :] .* eswxl')
-#             end
-#             E[sel, :] = Ei
-#         end
-#         M[:, j] = P.C * E
-#     end
-#     return M
-# end
+    left = false
+    right = false
+    if xi < ect_space.endpoint_tol
+        left = true
+    elseif xi > 1.0 - ect_space.endpoint_tol
+        right = true
+    end
 
-function tcheb_representation(p, roots, root_mult, root_type, l, mu)
+    # scale the point to lie in the interval [0, l]
+    xi = ect_space.l * xi
+    for r = 0:nderivatives
+        zero_v = zeros(1)
+        E = zeros(ect_space.p+1)
+        m = maximum(ect_space.root_mult) - 1
+        X = vcat([1.0], cumprod((xi ./ (1:m))))
+        for i in eachindex(ect_space.root_mult)
+            if ect_space.root_type[i] == 0
+                Ei = zeros(ect_space.root_mult[i])
+                Ei[r+1:end] .= X[1:ect_space.root_mult[i]-r]
+            elseif ect_space.root_type[i] == 1
+                ewxl = exp(ect_space.roots[i, 1] * xi)
+                Ei = X[1:ect_space.root_mult[i]] .* ewxl
+                for _ in 1:r
+                    Ei .= vcat(zero_v, Ei[1:end-1]) .+ ect_space.roots[i, 1] * Ei
+                end
+            elseif ect_space.root_type[i] == 2
+                cwxl = cos(ect_space.roots[i, 2] * xi)
+                swxl = sin(ect_space.roots[i, 2] * xi)
+                Eci = X[1:ect_space.root_mult[i]] .* cwxl
+                Esi = X[1:ect_space.root_mult[i]] .* swxl
+                for _ in 1:r
+                    Ezi = copy(Eci)
+                    Eci .= vcat(zero_v, Eci[1:end-1]) .- ect_space.roots[i, 2] * Esi
+                    Esi .= vcat(zero_v, Esi[1:end-1]) .+ ect_space.roots[i, 2] * Ezi
+                end
+                Ei = vcat(Eci, Esi)
+            elseif ect_space.root_type[i] == 3
+                ewxl = exp(ect_space.roots[i, 1] * xi)
+                ecwxl = ewxl * cos(ect_space.roots[i, 2] * xi)
+                eswxl = ewxl * sin(ect_space.roots[i, 2] * xi)
+                Eci = X[1:ect_space.root_mult[i]] .* ecwxl
+                Esi = X[1:ect_space.root_mult[i]] .* eswxl
+                for _ in 1:r
+                    Ezi = copy(Eci)
+                    Eci .= vcat(zero_v, Eci[1:end-1]) .+ ect_space.roots[i, 1] * Eci .- ect_space.roots[i, 2] * Esi
+                    Esi .= vcat(zero_v, Esi[1:end-1]) .+ ect_space.roots[i, 1] * Esi .+ ect_space.roots[i, 2] * Ezi
+                end
+                Ei = vcat(Eci, Esi)
+            end
+            E[ect_space.mu[i]+1:ect_space.mu[i+1]] .= Ei
+        end
+        # rescale the derivative to map back from [0, l] -> [0, 1]
+        M[1, :, r+1] = ect_space.C * E * (ect_space.l^r)
+    end
+
+    if left
+        M[1, :, :] = LinearAlgebra.triu(M[1, :, :])
+    elseif right
+        M[1, :, :] = LinearAlgebra.triu!(M[1, end:-1:1, :])[end:-1:1, :]
+    end
+
+    return M
+end
+
+function evaluate(ect_space::Tchebycheff, xi::Vector{Float64})
+    return evaluate(ect_space, xi, 0)
+end
+
+function evaluate(ect_space::GeneralizedExponential, xi::Float64)
+    return evaluate(ect_space, [xi], 0)
+end
+
+function tcheb_representation(
+    p::Int,
+    roots::Matrix{Float64},
+    root_mult::Vector{Int},
+    root_type::Vector{Int},
+    l::Float64,
+    mu::Vector{Int},
+)
     M0 = zeros(p+1, p+1)
     M1 = zeros(p+1, p+1)
     m = maximum(root_mult) - 1
