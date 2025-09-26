@@ -28,6 +28,9 @@ struct GeneralizedTrigonometric <: AbstractECTSpaces
 
     function GeneralizedTrigonometric(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         endpoint_tol = 1e-12
+        if p < 1
+            throw(ArgumentError("Degree p must be a positive integer."))
+        end
         new(p, w, l, t, m, gtrig_representation(p, w, l, t, m), endpoint_tol)
     end
 end

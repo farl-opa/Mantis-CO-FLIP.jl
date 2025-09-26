@@ -29,6 +29,9 @@ struct GeneralizedExponential <: AbstractECTSpaces
 
     function GeneralizedExponential(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
         endpoint_tol = 1e-12
+        if p < 1
+            throw(ArgumentError("Degree p must be a positive integer."))
+        end
         new(p, w, l, t, m, gexp_representation(p, w, l, t, m), endpoint_tol)
      end
 end
@@ -111,9 +114,6 @@ Build representation matrix for Generalized Exponential section space of degree 
 # Returns:
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
-
-import LinearAlgebra, ToeplitzMatrices
-
 function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
 
     I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
