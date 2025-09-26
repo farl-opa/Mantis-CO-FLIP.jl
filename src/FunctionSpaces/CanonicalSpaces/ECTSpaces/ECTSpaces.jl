@@ -36,3 +36,4 @@ end
 
 include("GeneralizedTrigonometric.jl")
 include("GeneralizedExponential.jl")
+include("Tchebycheff.jl")
