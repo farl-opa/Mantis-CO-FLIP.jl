@@ -365,3 +365,60 @@ function _evaluate_exterior_derivative(
 
     return evaluate(dα_wedge_β + (-1)^get_form_rank(α) * α_wedge_dβ, element_id, xi)
 end
+
+
+#############################################################################################
+#                                Unitary transformation                                     #
+#############################################################################################
+function _evaluate_exterior_derivative(
+    form::UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {
+    manifold_dim,
+    form_rank,
+    expression_rank,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    T <: Function
+}
+    # The exterior derivative of a binary transformation follows the law:
+    # d(c*αᵏ) = c*dαᵏ
+    
+    # Extract the forms that compose the binary transformation and their exterior derivatives
+    α = get_form(form)
+    uni_transformation = get_transformation(form)
+    
+    # Evaluate the distributive expression components, sum them, and return
+    return evaluate(uni_transformation(d(α)), element_id, xi)
+end
+
+
+#############################################################################################
+#                                 Binary transformation                                     #
+#############################################################################################
+function _evaluate_exterior_derivative(
+    form::BinaryFormTransformation{manifold_dim, form_rank, expression_rank, F1, F2, G, T},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {
+    manifold_dim,
+    form_rank,
+    expression_rank,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    F1 <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    F2 <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+    T <: Function
+}
+    # The exterior derivative of a binary transformation follows the distributive law:
+    # d(αᵏ + βᵏ) = dαᵏ +  dβᵏ
+    
+    # Extract the forms
+    forms = get_forms(form)
+
+    # Extract the transformation 
+    binary_transformation = get_transformation(form)
+
+    # Evaluate the distributive expression components, sum them, and return
+    return evaluate(binary_transformation(d(forms[1]), d(forms[2])), element_id, xi)
+end

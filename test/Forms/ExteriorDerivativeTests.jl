@@ -93,137 +93,246 @@ for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
     ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
     ζ¹.coefficients .= 1.0
 
+    β¹ = Mantis.Forms.FormField(one_form_space, "ζ")
+    β¹.coefficients .= 1.0
+
     # Compute exterior derivatives
     dα⁰ = d(α⁰)
     dζ¹ = d(ζ¹)
 
-    # Test exterior derivatives
-    for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
-        # 0-form
-        # Exterior derivative of a unity 0-form is a zero 1-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
-
-        # 1-form
-        # Exterior derivative of a unity 1-form is a zero 2-form
-        @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
-    end
-
-    # Test exterior derivative of wedge product for FormFields ----------------------------------
-    # Generate the form expressions
-    # 0-form: random form field
-    Random.rand!(α⁰.coefficients)
-    
-    # 1-form: random form field
-    Random.rand!(ζ¹.coefficients)
-    
-    if TIME_TESTS
-        @info "Timing tests for form fields..."
-    end
-
-    # Compute exterior derivative of wedge product 
-    d_α⁰_wedge_ζ¹ = d(α⁰ ∧ ζ¹)
-    if TIME_TESTS
-        time_spent = @timed d_α⁰_wedge_ζ¹ = d(α⁰ ∧ ζ¹)
-        @info "Time spent for d(α⁰ ∧ ζ¹): $(time_spent.time) seconds"
-    end
-
-    # Reference via Leibniz rule
-    dα⁰_wedge_ζ¹_via_leibniz = (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹))
-    if TIME_TESTS
-        time_spent = @timed dα⁰_wedge_ζ¹_via_leibniz = (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹))
-        @info "Time spent for (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
-    end
-
-    # Error form 
-    error_form_d_wedge = d(α⁰ ∧ ζ¹) - ((d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)))
-    if TIME_TESTS
-        time_spent = @timed error_form_d_wedge = d(α⁰ ∧ ζ¹) - ((d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)))
-        @info "Time spent for d(α⁰ ∧ ζ¹) - (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
-    end 
-
-    # Check error of automatic exterior derivative vs explicit Leibniz rule on all elements
-    for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
-        # Evaluate the Leibniz rule form to check we are not in the trivial case (= 0)
-        dα⁰_wedge_ζ¹_via_leibniz_eval, _ = Mantis.Forms.evaluate(dα⁰_wedge_ζ¹_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
-        if TIME_TESTS
-            time_spent = @timed dα⁰_wedge_ζ¹_via_leibniz_eval, _ = Mantis.Forms.evaluate(dα⁰_wedge_ζ¹_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
-            @info "Time spent for evaluating (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
+    begin # Test error barriers
+        @test_throws ArgumentError (d(zero_form_space) ∧ one_form_space) + (zero_form_space ∧ top_form_space)
+        
+        # Check if compatible spaces error is NOT thrown
+        @test begin
+            (α⁰ ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
+            true
         end
-        @test all(>(0), [sum(abs.(component)) for component in dα⁰_wedge_ζ¹_via_leibniz_eval])  # Check it's not zero just not to check trivial case
 
-        # Evaluate the error between explicit and automatic exterior derivative of wedge product and
-        # explicit Leibniz rule
-        error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
-        if TIME_TESTS
-            time_spent = @timed error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
-            @info "Time spent for evaluating d(α⁰ ∧ ζ¹) - (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
+        # Check if incompatible form_rank error is thrown (no method should exist)
+        @test_throws MethodError (d(α⁰) ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
+        @test_throws MethodError d(α⁰ ∧ one_form_space) + (zero_form_space ∧ top_form_space)
+        @test_throws MethodError (d(α⁰) ∧ one_form_space) + (d(zero_form_space) ∧ one_form_space)
+    end
+
+    begin # Test exterior derivatives on form field
+        for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+            # 0-form
+            # Exterior derivative of a unity 0-form is a zero 1-form
+            @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
+            @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+
+            # 1-form
+            # Exterior derivative of a unity 1-form is a zero 2-form
+            @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dζ¹, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
         end
-        @test all(isapprox.([sum(abs.(component_error)) for component_error in error_form_d_wedge_eval], 0.0, atol=1e-12))
     end
 
-    # Test exterior derivative of wedge product for FormFields and FormSpaces -------------------
-    
-    # Test exterior derivative of wedge product for FormFields ----------------------------------
-    # Generate the form expressions
-
-    # Check if incompatible spaces error is thrown
-    @test_throws ArgumentError (d(zero_form_space) ∧ one_form_space) + (zero_form_space ∧ top_form_space)
-    
-    # Check if compatible spaces error is NOT thrown
-    @test begin
-        (α⁰ ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
-        true
-    end
-
-    # Check if incompatible form_rank error is thrown (no method should exist)
-    @test_throws MethodError (d(α⁰) ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
-    @test_throws MethodError d(α⁰ ∧ one_form_space) + (zero_form_space ∧ top_form_space)
-    @test_throws MethodError (d(α⁰) ∧ one_form_space) + (d(zero_form_space) ∧ one_form_space)
-    
-    if TIME_TESTS
-        @info "Timing tests for form spaces..."
-    end
-
-    # Compute exterior derivative of wedge product 
-    d_α⁰_wedge_one_form_space = d(α⁰ ∧ one_form_space)
-    if TIME_TESTS
-        time_spent = @timed d_α⁰_wedge_one_form_space = d(α⁰ ∧ one_form_space)
-        @info "Time spent for d(α⁰ ∧ one_form_space): $(time_spent.time) seconds"
-    end
-
-    # Reference via Leibniz rule
-    d_α⁰_wedge_one_form_space_via_leibniz = (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space))
-    if TIME_TESTS
-        time_spent = @timed d_α⁰_wedge_one_form_space_via_leibniz = (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space))
-        @info "Time spent for (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)): $(time_spent.time) seconds"
-    end
-
-    # Error form 
-    error_form_d_wedge = d_α⁰_wedge_one_form_space - ((d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)))
-    if TIME_TESTS
-        time_spent = @timed error_form_d_wedge = d_α⁰_wedge_one_form_space - ((d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)))
-        @info "Time spent for d_α⁰_wedge_one_form_space - (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)): $(time_spent.time) seconds"
-    end 
-
-    # Check error of automatic exterior derivative vs explicit Leibniz rule on all elements
-    for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
-        # Evaluate the Leibniz rule form to check we are not in the trivial case (= 0)
-        d_α⁰_wedge_one_form_space_via_leibniz_eval, _ = Mantis.Forms.evaluate(d_α⁰_wedge_one_form_space_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+    begin # Test exterior derivative of wedge product for FormFields
+        # Generate the form expressions
+        # 0-form: random form field
+        Random.rand!(α⁰.coefficients)
+        
+        # 1-form: random form field
+        Random.rand!(ζ¹.coefficients)
+        
         if TIME_TESTS
-            time_spent = @timed d_α⁰_wedge_one_form_space_via_leibniz_eval, _ = Mantis.Forms.evaluate(d_α⁰_wedge_one_form_space_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
-            @info "Time spent for evaluating (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)): $(time_spent.time) seconds"
+            @info "Timing tests for form fields..."
         end
-        @test all(>(0), [sum(abs.(component)) for component in d_α⁰_wedge_one_form_space_via_leibniz_eval])  # Check it's not zero just not to check trivial case
 
-        # Evaluate the error between explicit and automatic exterior derivative of wedge product and
-        # explicit Leibniz rule
-        error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+        # Compute exterior derivative of wedge product 
+        d_α⁰_wedge_ζ¹ = d(α⁰ ∧ ζ¹)
         if TIME_TESTS
-            time_spent = @timed error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
-            @info "Time spent for evaluating d_α⁰_wedge_one_form_space - ((d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space))): $(time_spent.time) seconds"
+            time_spent = @timed d_α⁰_wedge_ζ¹ = d(α⁰ ∧ ζ¹)
+            @info "Time spent for d(α⁰ ∧ ζ¹): $(time_spent.time) seconds"
         end
-        @test all(isapprox.([sum(abs.(component_error)) for component_error in error_form_d_wedge_eval], 0.0, atol=1e-12))
+
+        # Reference via Leibniz rule
+        dα⁰_wedge_ζ¹_via_leibniz = (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹))
+        if TIME_TESTS
+            time_spent = @timed dα⁰_wedge_ζ¹_via_leibniz = (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹))
+            @info "Time spent for (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
+        end
+
+        # Error form 
+        error_form_d_wedge = d(α⁰ ∧ ζ¹) - ((d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)))
+        if TIME_TESTS
+            time_spent = @timed error_form_d_wedge = d(α⁰ ∧ ζ¹) - ((d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)))
+            @info "Time spent for d(α⁰ ∧ ζ¹) - (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
+        end 
+
+        # Check error of automatic exterior derivative vs explicit Leibniz rule on all elements
+        for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+            # Evaluate the Leibniz rule form to check we are not in the trivial case (= 0)
+            dα⁰_wedge_ζ¹_via_leibniz_eval, _ = Mantis.Forms.evaluate(dα⁰_wedge_ζ¹_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed dα⁰_wedge_ζ¹_via_leibniz_eval, _ = Mantis.Forms.evaluate(dα⁰_wedge_ζ¹_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
+            end
+            @test all(>(0), [sum(abs.(component)) for component in dα⁰_wedge_ζ¹_via_leibniz_eval])  # Check it's not zero just not to check trivial case
+
+            # Evaluate the error between explicit and automatic exterior derivative of wedge product and
+            # explicit Leibniz rule
+            error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating d(α⁰ ∧ ζ¹) - (d(α⁰) ∧ ζ¹) + (α⁰ ∧ d(ζ¹)): $(time_spent.time) seconds"
+            end
+            @test all(isapprox.([sum(abs.(component_error)) for component_error in error_form_d_wedge_eval], 0.0, atol=1e-12))
+        end
+    end
+
+    begin # Test exterior derivative of wedge product for FormFields and FormSpaces
+        if TIME_TESTS
+            @info "Timing tests for form spaces..."
+        end
+
+        # Compute exterior derivative of wedge product 
+        d_α⁰_wedge_one_form_space = d(α⁰ ∧ one_form_space)
+        if TIME_TESTS
+            time_spent = @timed d_α⁰_wedge_one_form_space = d(α⁰ ∧ one_form_space)
+            @info "Time spent for d(α⁰ ∧ one_form_space): $(time_spent.time) seconds"
+        end
+
+        # Reference via Leibniz rule
+        d_α⁰_wedge_one_form_space_via_leibniz = (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space))
+        if TIME_TESTS
+            time_spent = @timed d_α⁰_wedge_one_form_space_via_leibniz = (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space))
+            @info "Time spent for (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)): $(time_spent.time) seconds"
+        end
+
+        # Error form 
+        error_form_d_wedge = d_α⁰_wedge_one_form_space - ((d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)))
+        if TIME_TESTS
+            time_spent = @timed error_form_d_wedge = d_α⁰_wedge_one_form_space - ((d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)))
+            @info "Time spent for d_α⁰_wedge_one_form_space - (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)): $(time_spent.time) seconds"
+        end 
+
+        # Check error of automatic exterior derivative vs explicit Leibniz rule on all elements
+        for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+            # Evaluate the Leibniz rule form to check we are not in the trivial case (= 0)
+            d_α⁰_wedge_one_form_space_via_leibniz_eval, _ = Mantis.Forms.evaluate(d_α⁰_wedge_one_form_space_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed d_α⁰_wedge_one_form_space_via_leibniz_eval, _ = Mantis.Forms.evaluate(d_α⁰_wedge_one_form_space_via_leibniz, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating (d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space)): $(time_spent.time) seconds"
+            end
+            @test all(>(0), [sum(abs.(component)) for component in d_α⁰_wedge_one_form_space_via_leibniz_eval])  # Check it's not zero just not to check trivial case
+
+            # Evaluate the error between explicit and automatic exterior derivative of wedge product and
+            # explicit Leibniz rule
+            error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed error_form_d_wedge_eval, _ = Mantis.Forms.evaluate(error_form_d_wedge, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating d_α⁰_wedge_one_form_space - ((d(α⁰) ∧ one_form_space) + (α⁰ ∧ d(one_form_space))): $(time_spent.time) seconds"
+            end
+            @test all(isapprox.([sum(abs.(component_error)) for component_error in error_form_d_wedge_eval], 0.0, atol=1e-12))
+        end
+    end
+
+    begin # Test exterior derivative of binary product of FormFields
+        # Generate the form expressions
+        #1-form: random form field
+        Random.rand!(β¹.coefficients)
+        
+        # 1-form: random form field
+        Random.rand!(ζ¹.coefficients)
+        
+        if TIME_TESTS
+            @info "Timing tests for binary product of form fields..."
+        end
+
+        # Compute exterior derivative of binary product product (subtraction) 
+        d_β¹_minus_ζ¹ = d(β¹ - ζ¹)
+        if TIME_TESTS
+            time_spent = @timed d_β¹_minus_ζ¹ = d(β¹ - ζ¹)
+            @info "Time spent for d(β¹ - ζ¹): $(time_spent.time) seconds"
+        end
+
+        # Reference via explicit expression
+        d_β¹_minus_ζ¹_explicit = d(β¹) - d(ζ¹)
+        if TIME_TESTS
+            time_spent = @timed d_β¹_minus_ζ¹_explicit = d(β¹) - d(ζ¹)
+            @info "Time spent for d(β¹) - d(ζ¹): $(time_spent.time) seconds"
+        end
+
+        # Error form 
+        error_form_d_minus = d(β¹ - ζ¹) - (d(β¹) - d(ζ¹))
+        if TIME_TESTS
+            time_spent = @timed error_form_d_minus = d(β¹ - ζ¹) - (d(β¹) - d(ζ¹))
+            @info "Time spent for d(β¹ - ζ¹) - (d(β¹) - d(ζ¹)): $(time_spent.time) seconds"
+        end 
+
+        # Check error of automatic exterior derivative vs explicit Leibniz rule on all elements
+        for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+            # Evaluate the Leibniz rule form to check we are not in the trivial case (= 0)
+            d_β¹_minus_ζ¹_explicit_eval, _ = Mantis.Forms.evaluate(d_β¹_minus_ζ¹_explicit, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed d_β¹_minus_ζ¹_explicit_eval, _ = Mantis.Forms.evaluate(d_β¹_minus_ζ¹_explicit, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating d(β¹) - d(ζ¹): $(time_spent.time) seconds"
+            end
+            @test all(>(0), [sum(abs.(component)) for component in d_β¹_minus_ζ¹_explicit_eval])  # Check it's not zero just not to check trivial case
+
+            # Evaluate the error between explicit and automatic exterior derivative of wedge product and
+            # explicit Leibniz rule
+            error_form_d_minus_eval, _ = Mantis.Forms.evaluate(error_form_d_minus, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed error_form_d_minus_eval, _ = Mantis.Forms.evaluate(error_form_d_minus, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating d(β¹ - ζ¹) - (d(β¹) - d(ζ¹)): $(time_spent.time) seconds"
+            end
+            @test all(isapprox.([sum(abs.(component_error)) for component_error in error_form_d_minus_eval], 0.0, atol=1e-12))
+        end
+    end
+
+    begin # Test exterior derivative of unitary product of FormFields
+        # Generate the form expressions
+        # 1-form: random form field
+        Random.rand!(ζ¹.coefficients)
+        
+        if TIME_TESTS
+            @info "Timing tests for unitary product of form fields..."
+        end
+
+        # Compute exterior derivative of unitary product product (multiplication by scalar) 
+        c = 2.0
+        d_c_ζ¹ = d(c*ζ¹)
+        if TIME_TESTS
+            time_spent = @timed d_c_ζ¹ = d(c*ζ¹)
+            @info "Time spent for d(c*ζ¹): $(time_spent.time) seconds"
+        end
+
+        # Reference via explicit expression
+        d_c_ζ¹_explicit = c*d(ζ¹)
+        if TIME_TESTS
+            time_spent = @timed d_c_ζ¹_explicit = c*d(ζ¹)
+            @info "Time spent for c*d(ζ¹): $(time_spent.time) seconds"
+        end
+
+        # Error form 
+        error_form_d_times = d(c*ζ¹) - (c*d(ζ¹))
+        if TIME_TESTS
+            time_spent = @timed error_form_d_times = d(c*ζ¹) - (c*d(ζ¹))
+            @info "Time spent for d(c*ζ¹) - (c*d(ζ¹)): $(time_spent.time) seconds"
+        end 
+
+        # Check error of automatic exterior derivative vs explicit Leibniz rule on all elements
+        for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
+            # Evaluate the Leibniz rule form to check we are not in the trivial case (= 0)
+            d_c_ζ¹_explicit_eval, _ = Mantis.Forms.evaluate(d_c_ζ¹_explicit, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed d_c_ζ¹_explicit_eval, _ = Mantis.Forms.evaluate(d_c_ζ¹_explicit, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating c*d(ζ¹): $(time_spent.time) seconds"
+            end
+            @test all(>(0), [sum(abs.(component)) for component in d_c_ζ¹_explicit_eval])  # Check it's not zero just not to check trivial case
+
+            # Evaluate the error between explicit and automatic exterior derivative of wedge product and
+            # explicit Leibniz rule
+            error_form_d_times_eval, _ = Mantis.Forms.evaluate(error_form_d_times, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+            if TIME_TESTS
+                time_spent = @timed error_form_d_times_eval, _ = Mantis.Forms.evaluate(error_form_d_times, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                @info "Time spent for evaluating d(c*ζ¹) - (c*d(ζ¹)): $(time_spent.time) seconds"
+            end
+            @test all(isapprox.([sum(abs.(component_error)) for component_error in error_form_d_times_eval], 0.0, atol=1e-12))
+        end
     end
 end
 

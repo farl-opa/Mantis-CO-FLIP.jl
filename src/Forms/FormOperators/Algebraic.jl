@@ -134,7 +134,7 @@ struct UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F,
     end
 
     function Base.:*(factor::Number, form::AbstractFormExpression)
-        return UnitaryFormTransformation(form, x -> factor .* x, string(factor)*"×"*get_label(form))
+        return UnitaryFormTransformation(form, x -> factor * x, string(factor)*"×"*get_label(form))
     end
 
     Base.:-(form::AbstractFormExpression) = -1.0 * form
@@ -334,7 +334,7 @@ function evaluate(
     form = get_form(uni_trans)
     transformation = get_transformation(uni_trans)
     form_eval, indices = evaluate(form, element_id, xi)
-    eval = transformation(form_eval)
+    eval = transformation.(form_eval)
 
     return eval, indices
 end
