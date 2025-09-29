@@ -12,7 +12,7 @@ for ``\\xi \\in [0.0, 1.0]``.
     ``\\leq p``). Defaults to `0`, i.e., only the values are computed.
 """
 Memoization.@memoize function evaluate(
-    ect_space::AbstractECTSpaces, ξ::Points.CartesianPoints{1}, nderivatives::Int=0
+    ect_space::AbstractECTSpaces, ξ::Points.AbstractPoints{1}, nderivatives::Int=0
 )
     neval = Points.get_num_points(ξ)
     # allocate space for derivatives

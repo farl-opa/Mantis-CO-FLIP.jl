@@ -148,7 +148,7 @@ end
 function get_local_basis(
     space::BSplineSpace,
     element_id::Int,
-    xi::Points.CartesianPoints{1},
+    xi::Points.AbstractPoints{1},
     nderivatives::Int,
     component_id::Int=1,
 )
