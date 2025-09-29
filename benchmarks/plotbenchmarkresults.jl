@@ -259,7 +259,7 @@ on(menu_benchmark_names.selection) do s
     update_data!(data, s, to_value(benchmark_series_ob), benchmark_stringdata[3])
     benchmark_name_ob[] = s
     ax.title = s
-    autoylimits!(ax)
+    autolimits!(ax)
 end
 
 on(menu_x_data.selection) do s
