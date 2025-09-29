@@ -59,6 +59,9 @@ function d(form::AbstractFormExpression)
     return ExteriorDerivative(form)
 end
 
+############################################################################################
+#                                         Getters                                          #
+############################################################################################
 """
     get_form(ext_der::ExteriorDerivative)
 
@@ -71,6 +74,23 @@ Returns the form to which the exterior derivative is applied.
 - `<:AbstractFormExpression`: The form to which the exterior derivative is applied.
 """
 get_form(ext_der::ExteriorDerivative) = ext_der.form
+
+"""
+    get_form_space_tree(ext_der::ExteriorDerivative)
+
+Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the exterior derivative, e.g., for
+`d((α ∧ β) + γ)`, it returns the spaces of `α`, `β`, and `γ`, if all have expression_rank > 1. \
+If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
+
+# Arguments
+- `ext_der::ExteriorDerivative`: The exterior derivative structure.
+
+# Returns
+- `Tuple(<:AbstractFormExpression)`: The list of spaces of forms present in the tree of the exterior derivative.
+"""
+function get_form_space_tree(ext_der::ExteriorDerivative)
+    return get_form_space_tree(ext_der.form)
+end
 
 """
     get_geometry(ext_der::ExteriorDerivative)
@@ -305,4 +325,43 @@ function _evaluate_exterior_derivative(
 
     # We need to wrap form_basis_indices in [] to return a vector of vector to allow multi-indexed expressions, like wedges
     return local_d_form_basis_eval, [form_basis_indices]
+end
+
+
+
+
+#############################################################################################
+#                                     Wedge product                                         #
+#############################################################################################
+
+function _evaluate_exterior_derivative(
+    form::Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}},
+) where {
+    manifold_dim,
+    form_rank,
+    form_rank_1,
+    form_rank_2,
+    expression_rank,
+    expression_rank_1,
+    expression_rank_2,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    F1 <: AbstractFormExpression{manifold_dim, form_rank_1, expression_rank_1, G},
+    F2 <: AbstractFormExpression{manifold_dim, form_rank_2, expression_rank_2, G}
+}
+    # The exterior derivative of a wedge product follows the Leibniz rule:
+    # d(αᵏ ∧ βᵐ) = dαᵏ ∧ βᵐ + (-1)^k αᵏ ∧ dβᵐ
+    
+    # Extract the forms that compose the wedge product and their exterior derivatives
+    α = form.form_1
+    β = form.form_2
+    dα = ExteriorDerivative(α)
+    dβ = ExteriorDerivative(β)
+    
+    # Compute the Leibniz expression components
+    dα_wedge_β = Forms.Wedge(dα, β)
+    α_wedge_dβ = Forms.Wedge(α, dβ)
+
+    return evaluate(dα_wedge_β + (-1)^get_form_rank(α) * α_wedge_dβ, element_id, xi)
 end
