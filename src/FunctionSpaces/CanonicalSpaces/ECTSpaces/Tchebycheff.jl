@@ -1,7 +1,24 @@
 """
-    TBpatchTcheb
+    Tchebycheff <: AbstractECTSpaces
 
-A TB-spline patch of degree `p` based on a linear differential operator with constant coefficients.
+A Tchebycheffian section space. The parameters are the roots of a differential operator with
+constant coefficients.
+* A complex root `α + iβ`, `β ≠ 0`, of multiplicity `m` contributes `2m` basis functions of
+  the form (upto scaling):
+    `x^i e^(αx) cos(βx)`, `x^i e^(αx) sin(βx)`, `i = 0, ..., m-1`
+* A real root `α` of multiplicity `m` contributes `m` basis functions of the
+  form (upto scaling):
+    `x^i e^(αx)`, `i = 0, ..., m-1`
+
+# Fields
+- `p::Int`: Degree of the space.
+- `roots::Matrix{Float64}`: (real, imag) pairs of roots.
+- `root_mult::Vector{Int}`: Multiplicities of roots.
+- `root_type::Vector{Int}`: Types of roots: 0=zero, 1=real, 2=imaginary, 3=complex.
+- `l::Float64`: Length of the interval. Tchebycheff space is not scale-invariant.
+- `mu::Vector{Int}`: Cumulative dimension for the roots.
+- `C::Matrix{Float64}`: Representation matrix for the local basis.
+- `endpoint_tol::Float64`: Tolerance to determine if a point is at an endpoint.
 """
 struct Tchebycheff <: AbstractECTSpaces
     p::Int
@@ -139,6 +156,15 @@ function _evaluate(ect_space::Tchebycheff, xi::Float64, nderivatives::Int)
     return M
 end
 
+"""
+    evaluate(ect_space::Tchebycheff, ξ::Vector{Float64})
+
+Compute all basis function values at `ξ` in ``[0.0, 1.0]``.
+
+# Arguments
+- `ect_space::Tchebycheff`:  Tchebycheff section space.
+- `xi::Vector{Float64}`: vector of evaluation points ``in [0.0, 1.0]``.
+"""
 function evaluate(ect_space::Tchebycheff, xi::Vector{Float64})
     return evaluate(ect_space, xi, 0)
 end
@@ -147,6 +173,24 @@ function evaluate(ect_space::GeneralizedExponential, xi::Float64)
     return evaluate(ect_space, [xi], 0)
 end
 
+"""
+    tcheb_representation(p::Int, roots::Matrix{Float64}, root_mult::Vector{Int}, root_type::Vector{Int},
+                        l::Float64, mu::Vector{Int})
+
+Build representation matrix for Tchebycheff section space of degree `p`, roots `roots`, root multiplicities
+`root_mult`, root types `root_type`, length `l`, and cumulative dimensions `mu`.
+
+# Arguments
+- `p::Int`: Degree of the space.
+- `roots::Matrix{Float64}`: (real, imag) pairs of roots.
+- `root_mult::Vector{Int}`: Multiplicities of roots.
+- `root_type::Vector{Int}`: Types of roots: 0=zero, 1=real, 2=imaginary, 3=complex.
+- `l::Float64`: Length of the interval.
+- `mu::Vector{Int}`: Cumulative dimension for the roots.
+
+# Returns
+- `C::Matrix{Float64}`: Representation matrix for the local basis.
+"""
 function tcheb_representation(
     p::Int,
     roots::Matrix{Float64},
@@ -237,6 +281,18 @@ function tcheb_representation(
     return C
 end
 
+"""
+    get_derivative_space(ect_space::Tchebycheff)
+
+Get the space of one degree lower than the input space. Requires that the input space has
+the zero root with multiplicity at least 1.
+
+# Arguments
+- `ect_space::Tchebycheff`: A Tchebycheff space.
+
+# Returns
+- `::Tchebycheff`: A Tchebycheff space of one degree lower than the input space.
+"""
 function get_derivative_space(ect_space::Tchebycheff)
     zero_i = findall(all(ect_space.roots .== 0.0, dims=2))
     if length(zero_i) == 0
@@ -258,10 +314,33 @@ function get_derivative_space(ect_space::Tchebycheff)
     )
 end
 
+"""
+    get_bisected_canonical_space(ect_space::Tchebycheff)
+
+Bisect the canonical space by dividing the length in half.
+
+# Arguments
+- `ect_space::Tchebycheff`: A Tchebycheff space.
+
+# Returns
+- `::Tchebycheff`: A Tchebycheff space with the length divided by 2.
+"""
 function get_bisected_canonical_space(ect_space::Tchebycheff)
     return Tchebycheff(ect_space.p, ect_space.roots, ect_space.l/2, ect_space.root_mult)
 end
 
+"""
+    get_finer_canonical_space(ect_space::Tchebycheff, num_sub_elements::Int)
+
+Bisect the canonical space by dividing the length in half for each power.
+
+# Arguments
+- `ect_space::Tchebycheff`: A Tchebycheff space.
+- `num_sub_elements::Int`: Number of sub-elements to be created.
+
+# Returns
+- `::Tchebycheff`: A Tchebycheff space with the subdivided length.
+"""
 function get_finer_canonical_space(ect_space::Tchebycheff, num_sub_elements::Int)
     num_ref = log2(num_sub_elements)
     if num_sub_elements < 2 || !isapprox(num_ref - round(num_ref), 0.0; atol=1e-12)

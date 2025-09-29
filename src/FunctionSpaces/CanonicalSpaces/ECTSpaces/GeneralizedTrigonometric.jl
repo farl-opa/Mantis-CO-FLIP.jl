@@ -174,15 +174,19 @@ end
 """
     get_derivative_space(ect_space::GeneralizedTrigonometric)
 
-Get the space of one degree lower than the input space.
+Get the space of one degree lower than the input space. Assumes that the degree of the space
+is at least 2.
 
 # Arguments
-- `ect_space::GeneralizedTrigonometric`: A ect space.
+- `ect_space::GeneralizedTrigonometric`: A generalized trigonometric space.
 
 # Returns
-- `::GeneralizedTrigonometric`: A ect space of one degree lower than the input space.
+- `::GeneralizedTrigonometric`: A generalized trigonometric space of one degree lower than the input space.
 """
 function get_derivative_space(ect_space::GeneralizedTrigonometric)
+    if ect_space.p < 2
+        throw(ArgumentError("Degree of the space must be at least 2 to get derivative space."))
+    end
     return GeneralizedTrigonometric(
         ect_space.p - 1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
     )
@@ -191,13 +195,13 @@ end
 """
     get_bisected_canonical_space(ect_space::GeneralizedTrigonometric)
 
-Bisect the canonical space by dividing the weight in half.
+Bisect the canonical space by dividing the length in half.
 
 # Arguments
-- `ect_space::GeneralizedTrigonometric`: A ect space.
+- `ect_space::GeneralizedTrigonometric`: A generalized trigonometric space.
 
 # Returns
-- `::GeneralizedTrigonometric`: A ect space with the weight divided by 2.
+- `::GeneralizedTrigonometric`: A generalized trigonometric space with the length divided by 2.
 """
 function get_bisected_canonical_space(ect_space::GeneralizedTrigonometric)
     return GeneralizedTrigonometric(ect_space.p, ect_space.w, ect_space.l/2, ect_space.m)
@@ -210,11 +214,11 @@ For number of sub-elements which is powers of 2, bisect the canonical space by d
 length in half for each power.
 
 # Arguments
-- `ect_space::GeneralizedTrigonometric`: A ect space.
+- `ect_space::GeneralizedTrigonometric`: A generalized trigonometric space.
 - `num_sub_elements::Int`: Number of sub-elements to be created.
 
 # Returns
-- `::GeneralizedTrigonometric`: A ect space with the subdivided length.
+- `::GeneralizedTrigonometric`: A generalized trigonometric space with the subdivided length.
 """
 function get_finer_canonical_space(
     ect_space::GeneralizedTrigonometric, num_sub_elements::Int
