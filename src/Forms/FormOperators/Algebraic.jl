@@ -38,7 +38,7 @@ struct UnitaryOperatorTransformation{manifold_dim, O, T} <:
     end
 
     function Base.:*(factor::Number, operator::AbstractRealValuedOperator)
-        return UnitaryOperatorTransformation(operator, x -> factor .* x)
+        return UnitaryOperatorTransformation(operator, x -> factor * x)
     end
 
     Base.:-(operator::AbstractRealValuedOperator) = -1.0 * operator
@@ -50,6 +50,10 @@ end
 
 Structure holding the necessary information to evaluate a binary, algebraic transformation
 acting on two real-valued operators.
+
+!!! warning
+    It is expected that the basis underlying each operator are compatible, and
+    this will not be checked.
 
 # Fields
 - `operator_1::O1`: The first real-valued operator.
@@ -166,6 +170,10 @@ end
 Structure holding the necessary information to evaluate a binary, algebraic transformation
 acting on two differential form fields.
 
+!!! warning
+    It is expected that the basis underlying each operator are compatible, and
+    this will not be checked.
+
 # Fields
 - `form_1::F1`: The first differential form.
 - `form_2::F2`: The second differential form.
@@ -229,16 +237,16 @@ end
 get_transformation(unit_trans::UnitaryOperatorTransformation) = unit_trans.transformation
 get_operator(unit_trans::UnitaryOperatorTransformation) = unit_trans.operator
 get_transformation(bin_trans::BinaryOperatorTransformation) = bin_trans.transformation
-function get_operators(bin_trans::BinaryOperatorTransformation)
-    return bin_trans.operator_1, bin_trans.operator_2
-end
-
 get_transformation(unit_trans::UnitaryFormTransformation) = unit_trans.transformation
 get_form(unit_trans::UnitaryFormTransformation) = unit_trans.form
 get_transformation(bin_trans::BinaryFormTransformation) = bin_trans.transformation
 get_forms(bin_trans::BinaryFormTransformation) = bin_trans.form_1, bin_trans.form_2
 get_geometry(bin_trans::BinaryFormTransformation) = get_geometry(get_forms(bin_trans)...)
 get_geometry(unit_trans::UnitaryFormTransformation) = get_geometry(get_form(unit_trans))
+
+function get_operators(bin_trans::BinaryOperatorTransformation)
+    return bin_trans.operator_1, bin_trans.operator_2
+end
 
 function get_estimated_nnz_per_elem(unit_trans::UnitaryOperatorTransformation)
     return get_estimated_nnz_per_elem(get_operator(unit_trans))
@@ -257,16 +265,10 @@ function get_num_elements(bin_trans::BinaryOperatorTransformation)
 end
 
 function get_estimated_nnz_per_elem(bin_trans::BinaryOperatorTransformation)
-    # WARNING: Here we assume that that both operator are acting on the same form of
-    # expression rank 1, meaning they have the same basis, otherwise this would need to
-    # become expression_rank=2 to make sense.
     return get_estimated_nnz_per_elem(get_operators(bin_trans)[1])
 end
 
 function get_num_evaluation_elements(bin_trans::BinaryOperatorTransformation)
-    # WARNING: Here we assume that that both operator are acting on the same form of
-    # expression rank 1, meaning they have the same basis, otherwise this would need to
-    # become expression_rank=2 to make sense.
     return get_num_evaluation_elements(get_operators(bin_trans)[1])
 end
 
@@ -285,9 +287,6 @@ end
 function evaluate(bin_trans::BinaryOperatorTransformation, element_id::Int)
     operators = get_operators(bin_trans)
     transformation = get_transformation(bin_trans)
-    # WARNING: Here we assume that that both operator are acting on the same form of
-    # expression rank 1, meaning they have the same basis, otherwise this would need to
-    # become expression_rank=2 to make sense.
     eval_1, indices = evaluate(operators[1], element_id)
     eval_2, _ = evaluate(operators[2], element_id)
     eval = transformation(eval_1, eval_2)
@@ -314,9 +313,9 @@ function evaluate(
 ) where {manifold_dim}
     forms = get_forms(bin_trans)
     transformation = get_transformation(bin_trans)
-    form_1_eval, _ = evaluate(forms[1], element_id, xi)
+    form_1_eval, indices = evaluate(forms[1], element_id, xi)
     form_2_eval, _ = evaluate(forms[2], element_id, xi)
     eval = transformation(form_1_eval, form_2_eval)
 
-    return eval, [[1]]
+    return eval, indices
 end
