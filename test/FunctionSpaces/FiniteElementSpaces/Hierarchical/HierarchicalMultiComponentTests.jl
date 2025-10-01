@@ -4,96 +4,89 @@ using Mantis
 
 using Test
 
-nq = 7
-p = 3
-nlevels = 3
-subdiv = 2
-
-# mesh, degree and regularity of the coarsest level
-brk = collect(LinRange(0, 1, nq))
-patch = Mesh.Patch1D(brk)
-regularity_1 = fill(p - 1, nq)
-regularity_1[1] = regularity_1[nq] = -1
-regularity_2 = fill(p - 2, nq)
-regularity_2[1] = regularity_2[nq] = -1
-
-# refined domains
-refined_domains = FunctionSpaces.HierarchicalActiveInfo([
-    [1, 2, 3, 4, 5, 6], [3, 4, 5, 6, 7, 8, 9, 10], [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-])
-
-##########################################
-# STANDARD CONSTRUCTION
-##########################################
-
-# b-spline spaces for the two component direct sum space
-bspline = [
-    FunctionSpaces.BSplineSpace(patch, p, regularity_1),
-    FunctionSpaces.BSplineSpace(patch, p, regularity_2)
-]
-num_components = length(bspline)
-
-# two scale operators
-two_scale_operators = [
-    Vector{FunctionSpaces.TwoScaleOperator}(undef, nlevels - 1) for _ in 1:num_components
-]
-bsplines = [
-    Vector{FunctionSpaces.BSplineSpace}(undef, nlevels) for _ in 1:num_components
-]
-for c in 1:num_components
-    bsplines[c][1] = bspline[c]
+function create_hier_ds(parent_splines)
+    bspline_DS = FunctionSpaces.DirectSumSpace(parent_splines)
+    two_scale_operators_DS = Vector{FunctionSpaces.TwoScaleOperator}(undef, nlevels - 1)
+    bsplines_DS = Vector{FunctionSpaces.DirectSumSpace{2, 2, 1}}(undef, nlevels)
+    bsplines_DS[1] = bspline_DS
     for l in 1:(nlevels - 1)
-        ts_operator, bspline_l = FunctionSpaces.build_two_scale_operator(bsplines[c][l], subdiv)
-        two_scale_operators[c][l] = ts_operator
-        bsplines[c][l + 1] = bspline_l
+        ts_operator, bspline_l = FunctionSpaces.build_two_scale_operator(
+            bsplines_DS[l], subdiv
+        )
+        two_scale_operators_DS[l] = ts_operator
+        bsplines_DS[l + 1] = bspline_l
     end
+    hier_space = FunctionSpaces.HierarchicalFiniteElementSpace(
+        bsplines_DS, two_scale_operators_DS, refined_domains, (subdiv,)
+    )
+
+    return hier_space
 end
 
-# hierarchical space built component wise
-hier_space = [
-    FunctionSpaces.HierarchicalFiniteElementSpace(
-        tuple(bsplines[c]...), tuple(two_scale_operators[c]...), refined_domains, (subdiv,)
-    ) for c in 1:num_components
-]
-hier_space = FunctionSpaces.DirectSumSpace(tuple(hier_space...))
+function create_ds_hier(parent_splines)
+    two_scale_operators = [
+        Vector{FunctionSpaces.TwoScaleOperator}(undef, nlevels - 1) for _ in 1:2
+    ]
+    bsplines = [Vector{FunctionSpaces.TensorProductSpace}(undef, nlevels) for _ in 1:2]
+    for c in 1:2
+        bsplines[c][1] = parent_splines[c]
+        for l in 1:(nlevels - 1)
+            ts_operator, bspline_l = FunctionSpaces.build_two_scale_operator(
+                bsplines[c][l], subdiv
+            )
+            two_scale_operators[c][l] = ts_operator
+            bsplines[c][l + 1] = bspline_l
+        end
+    end
 
-##########################################
-# NEW CONSTRUCTION
-##########################################
+    # hierarchical space built component wise
+    hier_space = [
+        FunctionSpaces.HierarchicalFiniteElementSpace(
+            bsplines[c], two_scale_operators[c], refined_domains, (subdiv,)
+        ) for c in 1:2
+    ]
+    hier_space = FunctionSpaces.DirectSumSpace(tuple(hier_space...))
 
-# b-spline spaces for the two component direct sum space
-bspline_DS = FunctionSpaces.DirectSumSpace(tuple(bspline...))
-
-# two scale operators
-two_scale_operators_DS = Vector{FunctionSpaces.TwoScaleOperator}(undef, nlevels - 1)
-bsplines_DS = Vector{FunctionSpaces.DirectSumSpace}(undef, nlevels)
-bsplines_DS[1] = bspline_DS
-for l in 1:(nlevels - 1)
-    ts_operator, bspline_l = FunctionSpaces.build_two_scale_operator(bsplines_DS[l], subdiv)
-    two_scale_operators_DS[l] = ts_operator
-    bsplines_DS[l + 1] = bspline_l
+    return hier_space
 end
 
-# hierarchical space built component wise
-hier_space_DS = FunctionSpaces.HierarchicalFiniteElementSpace(
-    tuple(bsplines_DS...), tuple(two_scale_operators_DS...), refined_domains, (subdiv,)
+p = (3, 2)
+k1 = (2, 1)
+k2 = (1, 0)
+starting_point = (0.0, 0.0)
+box_size = (1.0, 1.0)
+num_elements = (5, 5)
+nlevels = 3
+subdiv = (2, 2)
+bsplines = (
+    FunctionSpaces.create_bspline_space(starting_point, box_size, num_elements, p, k1),
+    FunctionSpaces.create_bspline_space(starting_point, box_size, num_elements, p, k2),
 )
-
-##########################################
-# TESTS COMPARING hier_space AND hier_space_DS
-##########################################
-
-# loop over elements: check that evaluations, supported basis ids and local_subdiv_matrices are the same
-for elem in 1:FunctionSpaces.get_num_elements(hier_space)
-
-end
-
-# loop over basis: check that basis supports are the same
-@test FunctionSpaces.get_num_basis(hier_space) == FunctionSpaces.get_num_basis(hier_space_DS)
-for i in 1:FunctionSpaces.get_num_basis(hier_space)
-    supp = FunctionSpaces.get_support(hier_space, i)
-    supp_DS = FunctionSpaces.get_support(hier_space_DS, i)
-    @test supp == supp_DS
-end
+const refined_domains = FunctionSpaces.HierarchicalActiveInfo([
+    collect(1:25),
+    [100, 99, 98, 97, 90, 89, 88, 87, 80, 79, 78, 77, 70, 69, 68, 67],
+    [400, 399, 398, 397, 380, 379, 378, 377, 360, 359, 358, 357, 340, 339, 338, 337],
+])
+hier_ds = create_hier_ds(bsplines)
+ds_hier = create_ds_hier(bspline)
+geo = Geometry.create_cartesian_box((0.0,), (1.0,), (nq - 1,))
+fs_hier_ds = Forms.FormSpace(0, geo, hier_ds, "HDS")
+fs_ds_hier = Forms.FormSpace(0, geo, ds_hier, "DSH")
+c1s = rand(4)
+c2s = rand(3)
+sol_expr =
+    x -> [
+        # Component 1
+        sum(c1s[i] * x[:, 1] .^ i for i in 0:p[1]) +
+        sum(c2s[i] * x[:, 2] .^ i for i in 0:p[2]),
+        # Component 2
+        sum(8.3 * c1s[i] * x[:, 1] .^ i for i in 0:p[1]) +
+        sum(3.8 * c2s[i] * x[:, 2]^i for i in 0:p[2]),
+    ]
+sol = Forms.AnalyticalFormField(1, sol_expr, geo, "sol")
+∫ₐ = Quadrature.get_canonical_quadrature_rules(Quadrature.gauss_legendre, (4, 4))
+dΩₐ = Quadrature.StandardQuadrature(∫ₐ, prod(num_elements))
+hier_ds_sol = Assemblers.solve_L2_projection(fs_hier_ds, sol, dΩ)
+ds_hier_sol = Assemblers.solve_L2_projection(fs_ds_hier, sol, dΩ)
 
 end
