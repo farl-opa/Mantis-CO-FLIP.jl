@@ -16,7 +16,6 @@ nqrule = max(degree_2d...) + 1
 qrule = Quadrature.tensor_product_rule((nqrule, nqrule), Quadrature.gauss_legendre)
 dΩ = Quadrature.StandardQuadrature(qrule, prod(num_elements_2d))
 xi = ([0.0, 0.5, 1.0], [0.1, 0.2, 0.86])
-
 # Create the geometry
 G = Geometry.create_cartesian_box(starting_point_2d, box_size_2d, num_elements_2d)
 # Create the B-spline de Rham complex
@@ -45,8 +44,7 @@ x1 = Forms.FormField(X1, "x¹")
 x1.coefficients .= x1_c
 x2 = Forms.FormField(X2, "x²")
 x2.coefficients .= x2_c
-
-@testset "UnitaryOperatorTransformation" begin
+@testset "UnaryOperatorTransformation" begin
     int0 = ∫(w0 ∧ ★(x0), dΩ)
     int1 = ∫(w1 ∧ ★(x1), dΩ)
     int2 = ∫(w2 ∧ ★(x2), dΩ)
@@ -71,17 +69,14 @@ end
     int0_val = w0_c * x0_c
     int1_val = 2.0 * w1_c * x1_c
     int2_val = w2_c * x2_c
-
     # Addition
     @test isapprox(Forms.evaluate(int0 + int1, 1)[1][1], int0_val + int1_val)
     @test isapprox(Forms.evaluate(int1 + int2, 1)[1][1], int1_val + int2_val)
     @test isapprox(Forms.evaluate(int0 + int2, 1)[1][1], int0_val + int2_val)
-
     # Subtraction
     @test isapprox(Forms.evaluate(int0 - int1, 1)[1][1], int0_val - int1_val)
     @test isapprox(Forms.evaluate(int1 - int2, 1)[1][1], int1_val - int2_val)
     @test isapprox(Forms.evaluate(int2 - int0, 1)[1][1], int2_val - int0_val)
-
     # Scalar multiplication and addition
     c1 = 2.5
     c2 = -0.7
@@ -91,7 +86,6 @@ end
     @test isapprox(
         Forms.evaluate(c1 * int2 - c2 * int1, 1)[1][1], c1 * int2_val - c2 * int1_val
     )
-
     # Nested binary operations
     @test isapprox(
         Forms.evaluate((int0 + int1) - int2, 1)[1][1], (int0_val + int1_val) - int2_val
@@ -101,7 +95,7 @@ end
     )
 end
 
-@testset "UnitaryFormTransformation" begin
+@testset "UnaryFormTransformation" begin
     w0_val = Forms.evaluate(w0, 1, xi)[1][1]
     w1_val = Forms.evaluate(w1, 1, xi)[1]
     w2_val = Forms.evaluate(w2, 1, xi)[1][1]

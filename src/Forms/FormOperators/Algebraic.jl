@@ -3,10 +3,10 @@
 ############################################################################################
 
 """
-  UnitaryOperatorTransformation{manifold_dim, O, T} <:
+  UnaryOperatorTransformation{manifold_dim, O, T} <:
   AbstractRealValuedOperator{manifold_dim}
 
-Structure holding the necessary information to evaluate a unitary, algebraic transformation
+Structure holding the necessary information to evaluate a unary, algebraic transformation
 of a `AbstractRealValuedOperator`.
 
 # Fields
@@ -20,25 +20,25 @@ of a `AbstractRealValuedOperator`.
 - `T <: Function`: Function defining the algebraic transformation.
 
 # Inner constructors
-- `UnitaryOperatorTransformation(operator::O, transformation::T)`: General constructor.
+- `UnaryOperatorTransformation(operator::O, transformation::T)`: General constructor.
 - `Base.:*(factor::Number, operator::AbstractRealValuedOperator)`: Alias for the
   multiplication of a real-valued operator with a constant factor.
 - `Base.:-(operator::AbstractRealValuedOperator)`: Alias for the additive inverse of a
   real-valued operator.
 """
-struct UnitaryOperatorTransformation{manifold_dim, O, T} <:
+struct UnaryOperatorTransformation{manifold_dim, O, T} <:
        AbstractRealValuedOperator{manifold_dim}
     operator::O
     transformation::T
 
-    function UnitaryOperatorTransformation(
+    function UnaryOperatorTransformation(
         operator::O, transformation::T
     ) where {manifold_dim, O <: AbstractRealValuedOperator{manifold_dim}, T <: Function}
         return new{manifold_dim, O, T}(operator, transformation)
     end
 
     function Base.:*(factor::Number, operator::AbstractRealValuedOperator)
-        return UnitaryOperatorTransformation(operator, x -> factor * x)
+        return UnaryOperatorTransformation(operator, x -> factor * x)
     end
 
     Base.:-(operator::AbstractRealValuedOperator) = -1.0 * operator
@@ -103,10 +103,10 @@ struct BinaryOperatorTransformation{manifold_dim, O1, O2, T} <:
 end
 
 """
-  UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
+  UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
   AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
 
-Structure holding the necessary information to evaluate a unitary, algebraic transformation
+Structure holding the necessary information to evaluate a unary, algebraic transformation
 of a differential form expression.
 
 # Fields
@@ -124,20 +124,20 @@ of a differential form expression.
 - `T <: Function`: The type of the algebraic transformation.
 
 # Inner constructors
-- `UnitaryFormTransformation(form::F, transformation::T, label::String)`:
+- `UnaryFormTransformation(form::F, transformation::T, label::String)`:
     General constructor.
 - `Base.:-(form::AbstractFormField)`: Alias for the additive inverse of a
 differential form expression .
 - `Base.:*(factor::Number, form::AbstractFormField)`: Alias for the
     multiplication of a differential form expression with a constant factor.
 """
-struct UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
+struct UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
        AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
     form::F
     transformation::T
     label::String
 
-    function UnitaryFormTransformation(
+    function UnaryFormTransformation(
         form::F, transformation::T, label::String
     ) where {
         manifold_dim,
@@ -155,11 +155,11 @@ struct UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F,
     end
 
     function Base.:-(form::AbstractFormExpression)
-        return UnitaryFormTransformation(form, x -> -x, "-")
+        return UnaryFormTransformation(form, x -> -x, "-")
     end
 
     function Base.:*(factor::Number, form::AbstractFormExpression)
-        return UnitaryFormTransformation(form, x -> factor * x, "$(factor)*")
+        return UnaryFormTransformation(form, x -> factor * x, "$(factor)*")
     end
 end
 
@@ -234,30 +234,30 @@ end
 #                                         Getters                                          #
 ############################################################################################
 
-get_transformation(unit_trans::UnitaryOperatorTransformation) = unit_trans.transformation
-get_operator(unit_trans::UnitaryOperatorTransformation) = unit_trans.operator
+get_transformation(una_trans::UnaryOperatorTransformation) = una_trans.transformation
+get_operator(una_trans::UnaryOperatorTransformation) = una_trans.operator
 get_transformation(bin_trans::BinaryOperatorTransformation) = bin_trans.transformation
-get_transformation(unit_trans::UnitaryFormTransformation) = unit_trans.transformation
-get_form(unit_trans::UnitaryFormTransformation) = unit_trans.form
+get_transformation(una_trans::UnaryFormTransformation) = una_trans.transformation
+get_form(una_trans::UnaryFormTransformation) = una_trans.form
 get_transformation(bin_trans::BinaryFormTransformation) = bin_trans.transformation
 get_forms(bin_trans::BinaryFormTransformation) = bin_trans.form_1, bin_trans.form_2
 get_geometry(bin_trans::BinaryFormTransformation) = get_geometry(get_forms(bin_trans)...)
-get_geometry(unit_trans::UnitaryFormTransformation) = get_geometry(get_form(unit_trans))
+get_geometry(una_trans::UnaryFormTransformation) = get_geometry(get_form(una_trans))
 
 function get_operators(bin_trans::BinaryOperatorTransformation)
     return bin_trans.operator_1, bin_trans.operator_2
 end
 
-function get_estimated_nnz_per_elem(unit_trans::UnitaryOperatorTransformation)
-    return get_estimated_nnz_per_elem(get_operator(unit_trans))
+function get_estimated_nnz_per_elem(una_trans::UnaryOperatorTransformation)
+    return get_estimated_nnz_per_elem(get_operator(una_trans))
 end
 
-function get_num_evaluation_elements(unit_trans::UnitaryOperatorTransformation)
-    return get_num_evaluation_elements(get_operator(unit_trans))
+function get_num_evaluation_elements(una_trans::UnaryOperatorTransformation)
+    return get_num_evaluation_elements(get_operator(una_trans))
 end
 
-function get_num_elements(unit_trans::UnitaryOperatorTransformation)
-    return get_num_elements(get_operator(unit_trans))
+function get_num_elements(una_trans::UnaryOperatorTransformation)
+    return get_num_elements(get_operator(una_trans))
 end
 
 function get_num_elements(bin_trans::BinaryOperatorTransformation)
@@ -276,9 +276,9 @@ end
 #                                     Evaluate methods                                     #
 ############################################################################################
 
-function evaluate(unit_trans::UnitaryOperatorTransformation, element_id::Int)
-    operator = get_operator(unit_trans)
-    transformation = get_transformation(unit_trans)
+function evaluate(una_trans::UnaryOperatorTransformation, element_id::Int)
+    operator = get_operator(una_trans)
+    transformation = get_transformation(una_trans)
     eval, indices = evaluate(operator, element_id)
 
     return transformation(eval), indices
@@ -295,12 +295,12 @@ function evaluate(bin_trans::BinaryOperatorTransformation, element_id::Int)
 end
 
 function evaluate(
-    unit_trans::UnitaryFormTransformation{manifold_dim},
+    una_trans::UnaryFormTransformation{manifold_dim},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}
-    form = get_form(unit_trans)
-    transformation = get_transformation(unit_trans)
+    form = get_form(una_trans)
+    transformation = get_transformation(una_trans)
     form_eval, indices = evaluate(form, element_id, xi)
 
     return transformation(form_eval), indices
