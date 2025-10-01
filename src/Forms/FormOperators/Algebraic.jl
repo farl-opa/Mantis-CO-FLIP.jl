@@ -285,7 +285,7 @@ function get_num_evaluation_elements(bin_trans::BinaryOperatorTransformation)
 end
 
 """
-    get_form_space_tree(uni_trans::UnitaryFormTransformation)
+    get_form_space_tree(uni_trans::UnaryFormTransformation)
 
 Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the unary transformation, e.g., for
 `c*((α ∧ β) + γ)`, it returns the spaces of `α`, `β`, and `γ`, if all have expression_rank > 1. 
@@ -352,7 +352,7 @@ function evaluate(bin_trans::BinaryOperatorTransformation, element_id::Int)
 end
 
 function evaluate(
-    uni_trans::UnitaryFormTransformation{manifold_dim},
+    uni_trans::UnaryFormTransformation{manifold_dim},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {manifold_dim}

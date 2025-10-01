@@ -368,10 +368,10 @@ end
 
 
 #############################################################################################
-#                                Unitary transformation                                     #
+#                                Unary transformation                                     #
 #############################################################################################
 function _evaluate_exterior_derivative(
-    form::UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T},
+    form::UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T},
     element_id::Int,
     xi::NTuple{manifold_dim, Vector{Float64}},
 ) where {
