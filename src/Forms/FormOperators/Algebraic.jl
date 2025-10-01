@@ -86,6 +86,14 @@ struct BinaryOperatorTransformation{manifold_dim, O1, O2, T} <:
         O2 <: AbstractRealValuedOperator{manifold_dim},
         T <: Function,
     }
+        # Check if both forms contain the same forms in their tree
+        tree_form_1 = get_form_space_tree(operator_1)
+        tree_form_2 = get_form_space_tree(operator_2)
+
+        if !(tree_form_1 === tree_form_2)
+            throw(ArgumentError("Both forms in the binary transformation must contain the same forms in their tree."))
+        end
+
         return new{manifold_dim, O1, O2, T}(operator_1, operator_2, transformation)
     end
 
@@ -282,6 +290,49 @@ function get_num_evaluation_elements(bin_trans::BinaryOperatorTransformation)
     # expression rank 1, meaning they have the same basis, otherwise this would need to
     # become expression_rank=2 to make sense.
     return get_num_evaluation_elements(get_operators(bin_trans)[1])
+end
+
+
+"""
+    get_form_space_tree(uni_trans::UnaryOperatorTransformation)
+
+Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the unary transformation, e.g., for
+`c*((α ∧ β) + γ)`, it returns the spaces of `α`, `β`, and `γ`, if all have expression_rank > 1. 
+If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
+
+# Arguments
+- `uni_trans::UnaryOperatorTransformation`: The unary transformation structure.
+
+# Returns
+- `Tuple(<:AbstractFormExpression)`: The list of form spaces present in the tree of the unary transformation.
+"""
+function get_form_space_tree(una_trans::UnaryOperatorTransformation)
+    return get_form_space_tree(una_trans.operator)
+end
+
+"""
+    get_form_space_tree(bin_trans::BinaryOperatorTransformation)
+
+Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the binary transformation, e.g., for
+`(α ∧ β) + γ`, it returns the spaces of `α`, `β`, and `γ`, if all have exprssion_rank > 1. If `α` has expression_rank = 0, 
+it returns only the spaces of `β` and `γ`.
+
+# Arguments
+- `bin_trans::BinaryOperatorTransformation`: The binary transformation structure.
+
+# Returns
+- `Tuple(<:AbstractFormSpace)`: The list of FormSpace present in the tree of the binary transformation.
+"""
+function get_form_space_tree(bin_trans::BinaryOperatorTransformation)
+    tree_form_1 = get_form_space_tree(bin_trans.operator_1)
+    tree_form_2 = get_form_space_tree(bin_trans.operator_2)
+
+    if !(tree_form_1 === tree_form_2)
+        throw(ArgumentError("Both forms in the binary transformation must contain the same forms in their tree."))
+    end
+
+    # We can now safely return the tree of just one of the forms, since the trees are the same.
+    return tree_form_1
 end
 
 """
