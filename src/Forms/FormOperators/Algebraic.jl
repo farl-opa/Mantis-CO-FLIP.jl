@@ -1,10 +1,12 @@
 ############################################################################################
 #                                        Structures                                        #
 ############################################################################################
-"""
-  UnitaryOperatorTransformation{manifold_dim, O, T} <: AbstractRealValuedOperator{manifold_dim}
 
-Structure holding the necessary information to evaluate a unitary, algebraic transformation
+"""
+  UnaryOperatorTransformation{manifold_dim, O, T} <:
+  AbstractRealValuedOperator{manifold_dim}
+
+Structure holding the necessary information to evaluate a unary, algebraic transformation
 of a `AbstractRealValuedOperator`.
 
 # Fields
@@ -18,25 +20,25 @@ of a `AbstractRealValuedOperator`.
 - `T <: Function`: Function defining the algebraic transformation.
 
 # Inner constructors
-- `UnitaryOperatorTransformation(operator::O, transformation::T)`: General constructor.
+- `UnaryOperatorTransformation(operator::O, transformation::T)`: General constructor.
 - `Base.:*(factor::Number, operator::AbstractRealValuedOperator)`: Alias for the
   multiplication of a real-valued operator with a constant factor.
 - `Base.:-(operator::AbstractRealValuedOperator)`: Alias for the additive inverse of a
   real-valued operator.
 """
-struct UnitaryOperatorTransformation{manifold_dim, O, T} <:
+struct UnaryOperatorTransformation{manifold_dim, O, T} <:
        AbstractRealValuedOperator{manifold_dim}
     operator::O
     transformation::T
 
-    function UnitaryOperatorTransformation(
+    function UnaryOperatorTransformation(
         operator::O, transformation::T
     ) where {manifold_dim, O <: AbstractRealValuedOperator{manifold_dim}, T <: Function}
         return new{manifold_dim, O, T}(operator, transformation)
     end
 
     function Base.:*(factor::Number, operator::AbstractRealValuedOperator)
-        return UnitaryOperatorTransformation(operator, x -> factor .* x)
+        return UnaryOperatorTransformation(operator, x -> factor * x)
     end
 
     Base.:-(operator::AbstractRealValuedOperator) = -1.0 * operator
@@ -48,6 +50,10 @@ end
 
 Structure holding the necessary information to evaluate a binary, algebraic transformation
 acting on two real-valued operators.
+
+!!! warning
+    It is expected that the basis underlying each operator are compatible, and
+    this will not be checked.
 
 # Fields
 - `operator_1::O1`: The first real-valued operator.
@@ -97,59 +103,76 @@ struct BinaryOperatorTransformation{manifold_dim, O1, O2, T} <:
 end
 
 """
-  UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+  UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
+  AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
 
-Structure holding the necessary information to evaluate a unitary, algebraic transformation
-of a `AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`.
+Structure holding the necessary information to evaluate a unary, algebraic transformation
+of a differential form expression.
 
 # Fields
-- `form::F`: The form to which the transformation is applied.
-- `transformation::T`: The transformation to apply to the form.
+- `form::F`: The differential form expression to which the transformation is applied.
+- `transformation::T`: The transformation function to apply to the form.
+- `label::String`: The label to associate with the resulting transformed form.
 
 # Type parameters
-- `manifold_dim::Int`: The dimension of the manifold where the operator is defined.
-- `form_rant::Int`: The rank of the differential form.
-- `expression_rank::Int`: The expression rank of the differential form.
-- `G <: AbstractGeometry{manifold_dim}`: The type of the geometry where the form is
-  defined.
-- `T <: Function`: Function defining the algebraic transformation.
+- `manifold_dim::Int`: The dimension of the manifold where the form is defined.
+- `form_rank::Int`: The rank of the differential form.
+- `expression_rank::Int`: The rank of the expression.
+- `G <: AbstractGeometry{manifold_dim}`: The type of the geometry where the form is defined.
+- `F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}`: The
+    type of the original form expression .
+- `T <: Function`: The type of the algebraic transformation.
 
 # Inner constructors
-- `UnitaryFormTransformation(form::F, transformation::T)`: General constructor.
+- `UnaryFormTransformation(form::F, transformation::T, label::String)`:
+    General constructor.
+- `Base.:-(form::AbstractFormExpression)`: Alias for the additive inverse of a
+differential form expression .
 - `Base.:*(factor::Number, form::AbstractFormExpression)`: Alias for the
-  multiplication of a form with a constant factor.
-- `Base.:-(operator::AbstractFormExpression)`: Alias for the additive inverse of a
-  real-valued form.
+    multiplication of a differential form expression with a constant factor.
 """
-struct UnitaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
+struct UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T} <:
        AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
     form::F
     transformation::T
     label::String
 
-    function UnitaryFormTransformation(
+    function UnaryFormTransformation(
         form::F, transformation::T, label::String
-    ) where {manifold_dim, form_rank, expression_rank, G, F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}, T <: Function}
-        return new{manifold_dim, form_rank, expression_rank, G, F, T}(form, transformation, label)
+    ) where {
+        manifold_dim,
+        form_rank,
+        expression_rank,
+        G,
+        F <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+        T <: Function,
+    }
+        label = "(" * label * get_label(form) * ")"
+
+        return new{manifold_dim, form_rank, expression_rank, G, F, T}(
+            form, transformation, label
+        )
+    end
+
+    function Base.:-(form::AbstractFormExpression)
+        return UnaryFormTransformation(form, x -> -x, "-")
     end
 
     function Base.:*(factor::Number, form::AbstractFormExpression)
-        return UnitaryFormTransformation(form, x -> factor * x, string(factor)*"×"*get_label(form))
+        return UnaryFormTransformation(form, x -> factor * x, "$(factor)*"*get_label(form))
     end
-
-    Base.:-(form::AbstractFormExpression) = -1.0 * form
 end
 
 """
-  BinaryFormTransformation{manifold_dim, form_rank, expression_rank, F1, F2, G, T} <:
-  AbstractFormExpression{manifold_dim, form_rank, expression_rank, G}
+  BinaryFormTransformation{manifold_dim, form_rank, F1, F2, G, T} <:
+  AbstractFormExpression{manifold_dim, form_rank, G}
 
 Structure holding the necessary information to evaluate a binary, algebraic transformation
-acting on two expression differential forms.
+acting on two differential form expressions.
 
 # Fields
-- `form_1::F1`: The first expression differential form.
-- `form_2::F2`: The second expression differential form.
+- `form_1::F1`: The first differential form expression.
+- `form_2::F2`: The second differential form expression.
 - `transformation::T`: The transformation to apply to the differential forms.
 - `label::String`: The label to associate to the resulting differential form.
 
@@ -215,29 +238,32 @@ end
 #                                         Getters                                          #
 ############################################################################################
 
+get_transformation(una_trans::UnaryOperatorTransformation) = una_trans.transformation
+get_operator(una_trans::UnaryOperatorTransformation) = una_trans.operator
+
+get_transformation(bin_trans::BinaryOperatorTransformation) = bin_trans.transformation
+get_operators(bin_trans::BinaryOperatorTransformation) = bin_trans.operator_1, bin_trans.operator_2
+
+get_transformation(una_form::UnaryFormTransformation) = una_form.transformation
+get_form(una_form::UnaryFormTransformation) = una_form.form
+get_geometry(una_trans::UnaryFormTransformation) = get_geometry(get_form(una_trans))
+get_label(una_form::UnaryFormTransformation) = una_form.label
+
+get_transformation(bin_trans::BinaryFormTransformation) = bin_trans.transformation
 get_forms(bin_trans::BinaryFormTransformation) = bin_trans.form_1, bin_trans.form_2
 get_geometry(bin_trans::BinaryFormTransformation) = get_geometry(get_forms(bin_trans)...)
-get_form(unit_form::UnitaryFormTransformation) = unit_form.form
-get_operator(unit_trans::UnitaryOperatorTransformation) = unit_trans.operator
-get_transformation(unit_trans::UnitaryOperatorTransformation) = unit_trans.transformation
-get_transformation(unit_form::UnitaryFormTransformation) = unit_form.transformation
-get_transformation(bin_trans::BinaryOperatorTransformation) = bin_trans.transformation
-get_transformation(bin_trans::BinaryFormTransformation) = bin_trans.transformation
+get_label(bin_form::BinaryFormTransformation) = bin_form.label
 
-function get_operators(bin_trans::BinaryOperatorTransformation)
-    return bin_trans.operator_1, bin_trans.operator_2
+function get_estimated_nnz_per_elem(una_trans::UnaryOperatorTransformation)
+    return get_estimated_nnz_per_elem(get_operator(una_trans))
 end
 
-function get_estimated_nnz_per_elem(unit_trans::UnitaryOperatorTransformation)
-    return get_estimated_nnz_per_elem(get_operator(unit_trans))
+function get_num_evaluation_elements(una_trans::UnaryOperatorTransformation)
+    return get_num_evaluation_elements(get_operator(una_trans))
 end
 
-function get_num_evaluation_elements(unit_trans::UnitaryOperatorTransformation)
-    return get_num_evaluation_elements(get_operator(unit_trans))
-end
-
-function get_num_elements(unit_trans::UnitaryOperatorTransformation)
-    return get_num_elements(get_operator(unit_trans))
+function get_num_elements(una_trans::UnaryOperatorTransformation)
+    return get_num_elements(get_operator(una_trans))
 end
 
 function get_num_elements(bin_trans::BinaryOperatorTransformation)
@@ -261,18 +287,18 @@ end
 """
     get_form_space_tree(uni_trans::UnitaryFormTransformation)
 
-Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the unitary transformation, e.g., for
+Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the unary transformation, e.g., for
 `c*((α ∧ β) + γ)`, it returns the spaces of `α`, `β`, and `γ`, if all have expression_rank > 1. 
 If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
 
 # Arguments
-- `uni_trans::UnitaryFormTransformation`: The unitary transformation structure.
+- `uni_trans::UnaryFormTransformation`: The unary transformation structure.
 
 # Returns
-- `Tuple(<:AbstractFormExpression)`: The list of form spaces present in the tree of the unitary transformation.
+- `Tuple(<:AbstractFormExpression)`: The list of form spaces present in the tree of the unary transformation.
 """
-function get_form_space_tree(uni_trans::UnitaryFormTransformation)
-    return get_form_space_tree(uni_trans.form)
+function get_form_space_tree(una_trans::UnaryFormTransformation)
+    return get_form_space_tree(una_trans.form)
 end
 
 """
@@ -304,11 +330,11 @@ end
 #                                     Evaluate methods                                     #
 ############################################################################################
 
-function evaluate(unit_trans::UnitaryOperatorTransformation, element_id::Int)
-    operator = get_operator(unit_trans)
-    transformation = get_transformation(unit_trans)
+function evaluate(una_trans::UnaryOperatorTransformation, element_id::Int)
+    operator = get_operator(una_trans)
+    transformation = get_transformation(una_trans)
     eval, indices = evaluate(operator, element_id)
-    eval .= transformation(eval)
+    eval .= transformation.(eval)
 
     return eval, indices
 end
@@ -316,14 +342,13 @@ end
 function evaluate(bin_trans::BinaryOperatorTransformation, element_id::Int)
     operators = get_operators(bin_trans)
     transformation = get_transformation(bin_trans)
-    # WARNING: Here we assume that that both operator are acting on the same form of
-    # expression rank 1, meaning they have the same basis, otherwise this would need to
-    # become expression_rank=2 to make sense.
     eval_1, indices = evaluate(operators[1], element_id)
     eval_2, _ = evaluate(operators[2], element_id)
-    eval = transformation(eval_1, eval_2)
+    eval_1 .= transformation.(eval_1, eval_2)  # we store the output in eval_1 to avoid extra
+                                               # allocations, the same reason for using .= and
+                                               # transformation.()
 
-    return eval, indices
+    return eval_1, indices
 end
 
 function evaluate(
@@ -334,9 +359,10 @@ function evaluate(
     form = get_form(uni_trans)
     transformation = get_transformation(uni_trans)
     form_eval, indices = evaluate(form, element_id, xi)
-    eval = transformation.(form_eval)
-
-    return eval, indices
+    form_eval .= transformation.(form_eval)  # we store the output in form_eval to avoid extra
+                                             # allocations, the same reason for using .= and
+                                             # transformation.()
+    return form_eval, indices
 end
 
 function evaluate(
@@ -346,11 +372,11 @@ function evaluate(
 ) where {manifold_dim}
     forms = get_forms(bin_trans)
     transformation = get_transformation(bin_trans)
-    # WARNING: Here we assume that that both forms are defined on the same spaces, otherwise
-    # This binary operation would not make sense. This means that both indices are the same.
+
     form_1_eval, indices = evaluate(forms[1], element_id, xi)
     form_2_eval, indices = evaluate(forms[2], element_id, xi)
-    eval = transformation(form_1_eval, form_2_eval)
-
-    return eval, indices
+    form_1_eval .= transformation.(form_1_eval, form_2_eval)  # we store the output in form_eval_1 to avoid extra
+                                                            # allocations, the same reason for using .= and
+                                                            # transformation.()
+    return form_1_eval, indices
 end

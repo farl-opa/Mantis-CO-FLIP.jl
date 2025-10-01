@@ -11,4 +11,8 @@ include("Pushforward.jl")
 # include("RotatedProxy.jl")
 include("Sharp.jl")
 include("Integral.jl")
+<<<<<<< HEAD
 
+=======
+include("Algebraic.jl")
+>>>>>>> origin/main
