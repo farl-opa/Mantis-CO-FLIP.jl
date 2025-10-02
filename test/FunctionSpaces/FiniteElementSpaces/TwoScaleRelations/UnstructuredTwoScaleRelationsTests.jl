@@ -118,7 +118,7 @@ size_tp_coarse = size(geom_coeffs_coarse)
 
 # refine degenerate control points
 TS_tp, space_tp_fine = FunctionSpaces.build_two_scale_operator(
-    FunctionSpaces.get_patch_spaces(P_scalar_coarse)[1], (num_subdiv_p, num_subdiv_r)
+    FunctionSpaces.get_degenerate_space(P_scalar_coarse), (num_subdiv_p, num_subdiv_r)
 )
 size_tp_fine =
     FunctionSpaces.get_num_basis.(FunctionSpaces.get_constituent_spaces(space_tp_fine))
@@ -129,14 +129,8 @@ geom_coeffs_fine = reshape(
 )
 
 # build finer space
-P_scalar_fine = FunctionSpaces.create_scalar_polar_spline_space(
-    (num_elements_p, num_elements_r) .* (num_subdiv_p, num_subdiv_r),
-    (deg_p, deg_r),
-    (regularity_p, regularity_r);
-    geom_coeffs_tp=geom_coeffs_fine,
-)
-TS_polar, _ = FunctionSpaces.build_two_scale_operator(
-    P_scalar_coarse, P_scalar_fine, ((num_subdiv_p, num_subdiv_r),)
+TS_polar, P_scalar_fine = FunctionSpaces.build_two_scale_operator(
+    P_scalar_coarse, (num_subdiv_p, num_subdiv_r)
 )
 subdiv_mat_polar = FunctionSpaces.get_global_subdiv_matrix(TS_polar)
 

@@ -203,6 +203,20 @@ function get_max_local_dim(space::GTBSplineSpace)
     return maximum(get_max_local_dim.(get_patch_spaces(space)))
 end
 
+function get_derivative_space(space::GTBSplineSpace{num_patches}) where {num_patches}
+    patch_spaces_der = ntuple(num_patches) do i
+        return get_derivative_space(get_patch_spaces(space)[i])
+    end
+    regularity_der = space.regularity .- 1
+    regularity_der = [max(r, -1) for r in regularity_der]
+
+    return GTBSplineSpace(
+        patch_spaces_der,
+        regularity_der,
+        max(space.num_dofs_left-1, -1),
+        max(space.num_dofs_right-1, -1),
+    )
+end
 
 function assemble_global_extraction_matrix(
     space::GTBSplineSpace{num_patches}
