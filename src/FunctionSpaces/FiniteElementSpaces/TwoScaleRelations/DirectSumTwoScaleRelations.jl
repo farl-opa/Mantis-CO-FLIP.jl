@@ -9,7 +9,9 @@ function build_two_scale_operator(
             build_two_scale_operator(comp_parent_spaces[component], num_subdivisions),
         num_components,
     )
-    comp_twoscale_operators = ntuple(component -> twoscale_data[component][1], num_components)
+    comp_twoscale_operators = ntuple(
+        component -> twoscale_data[component][1], num_components
+    )
     comp_child_spaces = ntuple(component -> twoscale_data[component][2], num_components)
     child_space = DirectSumSpace(comp_child_spaces)
 
@@ -19,10 +21,11 @@ function build_two_scale_operator(
         SparseArrays.blockdiag(
             ntuple(
                 component -> get_global_subdiv_matrix(comp_twoscale_operators[component]),
-                num_components
-            )...
+                num_components,
+            )...,
         ),
-        get_parent_to_child_elements(comp_twoscale_operators[1]),
+        get_parent_to_children_elements(comp_twoscale_operators[1]),
         get_child_to_parent_elements(comp_twoscale_operators[1]),
-    ), child_space
+    ),
+    child_space
 end

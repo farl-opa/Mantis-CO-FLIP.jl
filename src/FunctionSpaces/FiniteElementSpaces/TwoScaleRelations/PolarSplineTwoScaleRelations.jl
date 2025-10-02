@@ -6,8 +6,7 @@ function build_two_scale_operator(
     # Build the two-scale operators for the individual function spaces that form the parent
     # unstructured space.
     discontinuous_two_scale_op, _ = build_two_scale_operator(
-        DirectSumSpace(get_patch_spaces(parent_space)),
-        num_subdivisions[1]
+        DirectSumSpace(get_patch_spaces(parent_space)), num_subdivisions[1]
     )
 
     ###
@@ -35,7 +34,7 @@ function build_two_scale_operator(
         parent_space,
         child_space,
         global_subdiv_matrix,
-        get_parent_to_child_elements(discontinuous_two_scale_op),
+        get_parent_to_children_elements(discontinuous_two_scale_op),
         get_child_to_parent_elements(discontinuous_two_scale_op),
     ),
     child_space
