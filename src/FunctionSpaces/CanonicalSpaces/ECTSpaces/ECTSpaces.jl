@@ -26,7 +26,7 @@ See also [`evaluate(ect_space::AbstractECTSpaces, ξ::Float64, nderivatives::Int
     end
     # loop over the evaluation points and evaluate all derivatives at each point
     for i = 1:neval
-        tmp = _evaluate(ect_space, ξ[i],nderivatives)
+        tmp = _evaluate(ect_space, ξ[i], nderivatives)
         for j = 0:nderivatives
             ders[j+1][1][i,:] .= tmp[1,:,j+1]
         end
@@ -36,3 +36,4 @@ end
 
 include("GeneralizedTrigonometric.jl")
 include("GeneralizedExponential.jl")
+include("Tchebycheff.jl")
