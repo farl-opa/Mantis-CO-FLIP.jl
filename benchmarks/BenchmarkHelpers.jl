@@ -149,8 +149,8 @@ Returns useful metadata for CSV storage.
 """
 function get_metadata()
     date = string(readchomp(`date +%Y-%m-%d`))
-    long_hash= string(readchomp(`git merge-base main HEAD`))
-    commit_hash = string(readchomp(`git rev-parse --short $long_hash`))
+    long_hash= string(readchomp(`git merge-base remotes/origin/main HEAD`))
+    commit_hash = string(readchomp(`git rev-parse --short=7 $long_hash`))
     commit_date = string(
         split(string(readchomp(`git show -s --format="%ci" $commit_hash`)))[1]
     )
