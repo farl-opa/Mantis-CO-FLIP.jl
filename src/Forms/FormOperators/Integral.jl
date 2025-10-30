@@ -92,7 +92,7 @@ If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
 - `Tuple(<:AbstractFormExpression)`: The list of form spaces present in the tree of the integrand of integral.
 """
 function get_form_space_tree(integral::Integral)
-    return get_form_space_tree(integral.form)
+    return get_form_space_tree(get_form(integral))
 end
 
 """

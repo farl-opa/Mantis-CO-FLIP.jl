@@ -167,7 +167,7 @@ struct UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T
     end
 
     function Base.:*(factor::Number, form::AbstractFormExpression)
-        return UnaryFormTransformation(form, x -> factor * x, "$(factor)*"*get_label(form))
+        return UnaryFormTransformation(form, x -> factor * x, "$(factor)*")
     end
 end
 
@@ -279,16 +279,10 @@ function get_num_elements(bin_trans::BinaryOperatorTransformation)
 end
 
 function get_estimated_nnz_per_elem(bin_trans::BinaryOperatorTransformation)
-    # WARNING: Here we assume that that both operator are acting on the same form of
-    # expression rank 1, meaning they have the same basis, otherwise this would need to
-    # become expression_rank=2 to make sense.
     return get_estimated_nnz_per_elem(get_operators(bin_trans)[1])
 end
 
 function get_num_evaluation_elements(bin_trans::BinaryOperatorTransformation)
-    # WARNING: Here we assume that that both operator are acting on the same form of
-    # expression rank 1, meaning they have the same basis, otherwise this would need to
-    # become expression_rank=2 to make sense.
     return get_num_evaluation_elements(get_operators(bin_trans)[1])
 end
 
@@ -366,14 +360,10 @@ it returns only the spaces of `β` and `γ`.
 - `Tuple(<:AbstractFormExpression)`: The list of forms present in the tree of the binary transformation.
 """
 function get_form_space_tree(bin_trans::BinaryFormTransformation)
+    # Note that here we do not need to check if both trees are the same, since this is already
+    # done in the inner constructor of the BinaryFormTransformation struct.
     tree_form_1 = get_form_space_tree(bin_trans.form_1)
-    tree_form_2 = get_form_space_tree(bin_trans.form_2)
 
-    if !(tree_form_1 === tree_form_2)
-        throw(ArgumentError("Both forms in the binary transformation must contain the same forms in their tree."))
-    end
-
-    # We can now safely return the tree of just one of the forms, since the trees are the same.
     return tree_form_1
 end
 
