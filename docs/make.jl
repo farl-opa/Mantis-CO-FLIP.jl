@@ -94,7 +94,7 @@ bib = CitationBibliography(
 # that the favicon is found (the small logo in the tab bar).
 format_setup = Documenter.HTML(
     assets = [
-        "assets/favicon.ico"
+        "assets/favicon.png"
         "assets/citations.css"
     ],
     mathengine=math_engine,
