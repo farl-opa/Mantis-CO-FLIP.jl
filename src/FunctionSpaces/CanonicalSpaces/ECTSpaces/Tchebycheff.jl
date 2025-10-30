@@ -169,7 +169,7 @@ function evaluate(ect_space::Tchebycheff, xi::Vector{Float64})
     return evaluate(ect_space, xi, 0)
 end
 
-function evaluate(ect_space::GeneralizedExponential, xi::Float64)
+function evaluate(ect_space::Tchebycheff, xi::Float64)
     return evaluate(ect_space, [xi], 0)
 end
 
