@@ -1,2 +1,6 @@
 benchmark,commit_hash,commit_date,julia_version,date,med_time,mea_time,std_time,min_time,min_gc,min_memory,min_allocs
+<<<<<<< HEAD
 FunctionSpaces/FiniteElementSpaces/OtherSpaces/DirectSumSpace/3D-num_components=3-num_basis=1029-p=3-k=2,74d8ef29,2025-04-25,1.10.7,2025-10-30,8.745 ms,10.945 ms,12.454 ms,7.883 ms,940.375 μs,91.81 MiB,285
+=======
+FunctionSpaces/FiniteElementSpaces/OtherSpaces/DirectSumSpace/3D-num_components=3-num_basis=1029-p=3-k=2,2625f63d,2025-09-22,1.10.7,2025-10-30,6.850 ms,9.161 ms,12.392 ms,6.299 ms,627.666 μs,91.81 MiB,285
+>>>>>>> c8749b4727d2a445f98a737c9ffca363aeb9a85d
