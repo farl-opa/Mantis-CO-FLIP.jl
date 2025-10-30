@@ -23,11 +23,10 @@ Memoization.@memoize function evaluate(
         ders[j + 1][1] = zeros(Float64, neval, ect_space.p + 1)
     end
     # loop over the evaluation points and evaluate all derivatives at each point
-    for i in 1:neval
-        tmp = _evaluate(ect_space, ξ[i][1], nderivatives)
-        for cart_ind in CartesianIndices(size(tmp))
-            (_, basis, j) = Tuple(cart_ind)
-            ders[j][1][i, basis] = tmp[1, basis, j]
+    for i = 1:neval
+        tmp = _evaluate(ect_space, ξ[i], nderivatives)
+        for j = 0:nderivatives
+            ders[j+1][1][i,:] .= tmp[1,:,j+1]
         end
     end
     return ders
@@ -35,3 +34,4 @@ end
 
 include("GeneralizedTrigonometric.jl")
 include("GeneralizedExponential.jl")
+include("Tchebycheff.jl")
