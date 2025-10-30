@@ -52,8 +52,8 @@ Structure holding the necessary information to evaluate a binary, algebraic tran
 acting on two real-valued operators.
 
 !!! warning
-    It is expected that the basis underlying each operator are compatible, and
-    this will not be checked.
+    The basis underlying each operator must compatible, this is checked. If not compatible
+    an ArgumentError is thrown.
 
 # Fields
 - `operator_1::O1`: The first real-valued operator.
