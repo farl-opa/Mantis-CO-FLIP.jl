@@ -1,5 +1,4 @@
 using GLMakie
-using Observables
 using CSV
 using DataFrames
 using Dates
@@ -252,7 +251,6 @@ on(menu_benchmark_series.selection) do s
     println("Selected benchmark series: $s")
     benchmark_series_ob[] = s
     benchmark_names_ob[] = get_benchmarks(s)[2]
-    fig.title = s
 end
 
 on(menu_benchmark_names.selection) do s
