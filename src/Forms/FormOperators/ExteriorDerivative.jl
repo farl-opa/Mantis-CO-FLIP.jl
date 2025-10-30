@@ -328,7 +328,36 @@ function _evaluate_exterior_derivative(
 end
 
 
+#############################################################################################
+#                                           dd                                              #
+#############################################################################################
+function _evaluate_exterior_derivative(
+    dform::ExteriorDerivative{manifold_dim, form_rank_d, expression_rank, G, F},
+    element_id::Int,
+    xi::NTuple{manifold_dim, Vector{Float64}}
+) where {
+    manifold_dim,
+    form_rank_d,
+    expression_rank,
+    form_rank,
+    G <: Geometry.AbstractGeometry{manifold_dim},
+    F <: AbstractFormField{manifold_dim, form_rank, G},
+}
+    # Determine shape of the output 
+    n_evaluation_points = prod(size.(xi, 1))
+    n_derivative_components = binomial(manifold_dim, form_rank_d + 1)
+    n_basis_functions = 1
 
+    # Generate the zeros output array
+    ddform_eval = [
+        zeros(Float64, n_evaluation_points, n_basis_functions) for
+        _ in 1:n_derivative_components
+    ]
+
+    # We need to wrap form_basis_indices in [] to return a vector of vector to allow
+    # multi-indexed expressions, like wedges.
+    return ddform_eval, [[1]]
+end
 
 #############################################################################################
 #                                     Wedge product                                         #

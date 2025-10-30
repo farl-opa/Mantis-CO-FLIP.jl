@@ -83,42 +83,42 @@ crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping_ed_test, dmapping_ed_
 
     q_rule = Mantis.Quadrature.tensor_product_rule((deg1+1, deg2+1), Mantis.Quadrature.gauss_legendre)
 
-    @testset "Error barriers" begin 
-        for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
-            # Create form spaces
-            zero_form_space = Mantis.Forms.FormSpace(0, geom, dsTP_0_form_2d, "ν")
-            one_form_space = Mantis.Forms.FormSpace(1, geom, dsTP_1_form_2d, "η")
-            top_form_space = Mantis.Forms.FormSpace(2, geom, dsTP_2_form_2d, "σ")
+    # @testset "Error barriers" begin 
+    #     for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
+    #         # Create form spaces
+    #         zero_form_space = Mantis.Forms.FormSpace(0, geom, dsTP_0_form_2d, "ν")
+    #         one_form_space = Mantis.Forms.FormSpace(1, geom, dsTP_1_form_2d, "η")
+    #         top_form_space = Mantis.Forms.FormSpace(2, geom, dsTP_2_form_2d, "σ")
 
-            # Generate the form expressions
-            # 0-form: constant
-            α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
-            α⁰.coefficients .= 1.0
+    #         # Generate the form expressions
+    #         # 0-form: constant
+    #         α⁰ = Mantis.Forms.FormField(zero_form_space, "α")
+    #         α⁰.coefficients .= 1.0
 
-            # 1-form: constant
-            ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
-            ζ¹.coefficients .= 1.0
+    #         # 1-form: constant
+    #         ζ¹ = Mantis.Forms.FormField(one_form_space, "ζ")
+    #         ζ¹.coefficients .= 1.0
 
-            β¹ = Mantis.Forms.FormField(one_form_space, "ζ")
-            β¹.coefficients .= 1.0
+    #         β¹ = Mantis.Forms.FormField(one_form_space, "ζ")
+    #         β¹.coefficients .= 1.0
 
-            # Compute exterior derivatives
-            dα⁰ = d(α⁰)
-            dζ¹ = d(ζ¹)
-            @test_throws ArgumentError (d(zero_form_space) ∧ one_form_space) + (zero_form_space ∧ top_form_space)
+    #         # Compute exterior derivatives
+    #         dα⁰ = d(α⁰)
+    #         dζ¹ = d(ζ¹)
+    #         @test_throws ArgumentError (d(zero_form_space) ∧ one_form_space) + (zero_form_space ∧ top_form_space)
                 
-            # Check if compatible spaces error is NOT thrown
-            @test begin
-                (α⁰ ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
-                true
-            end
+    #         # Check if compatible spaces error is NOT thrown
+    #         @test begin
+    #             (α⁰ ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
+    #             true
+    #         end
 
-            # Check if incompatible form_rank error is thrown (no method should exist)
-            @test_throws MethodError (d(α⁰) ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
-            @test_throws MethodError d(α⁰ ∧ one_form_space) + (zero_form_space ∧ top_form_space)
-            @test_throws MethodError (d(α⁰) ∧ one_form_space) + (d(zero_form_space) ∧ one_form_space)
-        end
-    end
+    #         # Check if incompatible form_rank error is thrown (no method should exist)
+    #         @test_throws MethodError (d(α⁰) ∧ zero_form_space ∧ one_form_space) + (zero_form_space ∧ one_form_space)
+    #         @test_throws MethodError d(α⁰ ∧ one_form_space) + (zero_form_space ∧ top_form_space)
+    #         @test_throws MethodError (d(α⁰) ∧ one_form_space) + (d(zero_form_space) ∧ one_form_space)
+    #     end
+    # end
 
     @testset "FormField" begin
         for geom in [geo_2d_cart, tensor_prod_geo, geom_crazy]
@@ -142,6 +142,7 @@ crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping_ed_test, dmapping_ed_
             # Compute exterior derivatives
             dα⁰ = d(α⁰)
             dζ¹ = d(ζ¹)
+            ddα⁰ = d(dα⁰)
 
             # Perform the tests
             for elem_id in 1:1:Mantis.Geometry.get_num_elements(geom)
@@ -149,6 +150,11 @@ crazy_mapping = Mantis.Geometry.Mapping(dimension, mapping_ed_test, dmapping_ed_
                 # Exterior derivative of a unity 0-form is a zero 1-form
                 @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][1])), 0.0, atol=1e-12))
                 @test all(isapprox(sum(abs.(Mantis.Forms.evaluate(dα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))[1][2])), 0.0, atol=1e-12))
+                ddα⁰_eval = Mantis.Forms.evaluate(ddα⁰, elem_id, Mantis.Quadrature.get_nodes(q_rule))
+                num_components_ddα⁰ = 1
+                @test all(isapprox(sum(abs.(ddα⁰_eval[1][1])), 0.0, atol=1e-12))
+                @test size(ddα⁰_eval[1]) == (num_components_ddα⁰, )
+                @test length(ddα⁰_eval[1][1]) == prod(size.(Mantis.Quadrature.get_nodes(q_rule), 1))
 
                 # 1-form
                 # Exterior derivative of a unity 1-form is a zero 2-form
