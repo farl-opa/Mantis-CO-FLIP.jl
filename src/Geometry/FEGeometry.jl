@@ -62,11 +62,11 @@ function compute_parametric_geometry(fem_space::FunctionSpaces.AbstractFESpace)
 end
 
 function get_element_measure(geometry::FEGeometry, element_id::Int)
-    return FunctionSpaces.get_element_size(geometry.fem_space, element_id)
+    return FunctionSpaces.get_element_measure(geometry.fem_space, element_id)
 end
 
 function get_element_lengths(geometry::FEGeometry, element_id::Int)
-    return FunctionSpaces.get_element_dimensions(geometry.fem_space, element_id)
+    return FunctionSpaces.get_element_lengths(geometry.fem_space, element_id)
 end
 
 function get_image_dim(geometry::FEGeometry)
@@ -76,21 +76,21 @@ end
 function evaluate(
     geometry::FEGeometry{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, F}
     fem_basis, fem_basis_indices = FunctionSpaces.evaluate(
         geometry.fem_space, element_id, xi, 0
     )
     length
-    num_eval_points = prod(size.(xi, 1))
+    num_eval_points = Points.get_num_points(xi)
     image_dim = get_image_dim(geometry)
     eval = zeros(Float64, num_eval_points, image_dim)
 
     for dim in 1:image_dim
-        for cartesian_id in CartesianIndices(fem_basis[1][1])
+        for cartesian_id in CartesianIndices(fem_basis[1][1][1])
             (point, basis_id) = Tuple(cartesian_id)
             eval[point, dim] +=
-                fem_basis[1][1][point, basis_id] *
+                fem_basis[1][1][1][point, basis_id] *
                 geometry.geometry_coeffs[fem_basis_indices[basis_id], dim]
         end
     end
@@ -101,7 +101,7 @@ end
 function jacobian(
     geometry::FEGeometry{manifold_dim, F},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, F}
     # Jᵢⱼ = ∂Φⁱ\∂ξⱼ
     # evaluate fem space
@@ -119,14 +119,14 @@ function jacobian(
         return der_idx
     end
 
-    num_eval_points = prod(size.(xi, 1))
+    num_eval_points = Points.get_num_points(xi)
     image_dim = get_image_dim(geometry)
     J = zeros(num_eval_points, image_dim, manifold_dim)
     for basis_id in eachindex(fem_basis_indices)
         for cartesian_idx in CartesianIndices(J)
             (point, k_im, k_mani) = Tuple(cartesian_idx)
             J[point, k_im, k_mani] +=
-                fem_basis[2][der_idxs[k_mani]][point, basis_id] *
+                fem_basis[2][der_idxs[k_mani]][1][point, basis_id] *
                 geometry.geometry_coeffs[fem_basis_indices[basis_id], k_im]
         end
     end

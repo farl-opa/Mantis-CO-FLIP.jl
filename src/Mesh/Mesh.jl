@@ -1,10 +1,10 @@
 """
     module Mesh
 
-Contains all mesh structs and functions. At the moment, these are simple 
-versions to be able to start experimenting with the other parts of the 
-code. This module makes extensive use of getters and setters, so the 
-internals of a struct are considered 'hidden' details that **can change 
+Contains all mesh structs and functions. At the moment, these are simple
+versions to be able to start experimenting with the other parts of the
+code. This module makes extensive use of getters and setters, so the
+internals of a struct are considered 'hidden' details that **can change
 without warning**, even those not preceded with an underscore.
 """
 module Mesh
@@ -20,7 +20,7 @@ Is a 1-dimensional patch, so only the breakpoints.
 # Extended help
 
 # Error behaviour
-The strictly increasing property of the breakpoints is checked. An 
+The strictly increasing property of the breakpoints is checked. An
 `ArgumentError` is raised if the breakpoints are not strictly increasing.
 """
 struct Patch1D
@@ -53,7 +53,7 @@ Is an n-dimensional **structured** tensor-product patch.
 # Extended help
 
 # Implementation
-The patch is assumed to be a tensor-product patch of quadilaterals. This 
+The patch is assumed to be a tensor-product patch of quadilaterals. This
 is also reflected in the implementation.
 """
 struct Patch{n}
@@ -61,7 +61,7 @@ struct Patch{n}
 
     # Inner constructor(s)
     function Patch(breakpoints::NTuple{n, Vector{Float64}}) where {n}
-        new{n}(NTuple{n, Patch1D}(Patch1D(breakpoints[d]) for d in 1:1:n))        
+        new{n}(NTuple{n, Patch1D}(Patch1D(breakpoints[d]) for d in 1:1:n))
     end
 end
 
@@ -86,7 +86,7 @@ function get_breakpoints(patch::Patch{n}) where {n}
     return NTuple{n, Vector{Float64}}(get_breakpoints(patch.patches_per_dim[d]) for d in 1:1:n)
 end
 
-function get_element_size(patch::Patch1D, element_id::Int)
+function get_element_measure(patch::Patch1D, element_id::Int)
     return patch.breakpoints[element_id+1]-patch.breakpoints[element_id]
 end
 
@@ -127,7 +127,7 @@ end
 
 Returns the number of elements in the `patch`.
 
-Redefinition of `Base.size` for a `Patch`. This ensures that one can 
+Redefinition of `Base.size` for a `Patch`. This ensures that one can
 call `size(patch)` to get the size of the patch.
 
 # Arguments
@@ -137,7 +137,7 @@ call `size(patch)` to get the size of the patch.
 - `::NTuple{n, Int}`: Tuple of the number of elements per dimension.
 """
 function Base.size(patch::Patch{n}) where {n}
-    return NTuple{n, Int}(length(get_breakpoints(patch)[i]) - 1 for i = 1:1:n)   
+    return NTuple{n, Int}(length(get_breakpoints(patch)[i]) - 1 for i = 1:1:n)
 end
 
 """
@@ -145,7 +145,7 @@ end
 
 Returns the number of elements in the `patch` in dimension `d`.
 
-Redefinition of `Base.size` for a `Patch`. This ensures that one can 
+Redefinition of `Base.size` for a `Patch`. This ensures that one can
 call `size(patch, d)` to get the size of the patch.
 
 # Arguments
@@ -164,7 +164,7 @@ end
 
 Returns the number of elements in the `patch_1d`.
 
-Redefinition of `Base.size` for a `Patch1D`. This ensures that one can 
+Redefinition of `Base.size` for a `Patch1D`. This ensures that one can
 call `size(patch_1d)` to get the size of the patch.
 
 # Arguments
@@ -182,7 +182,7 @@ end
 
 Returns an iterator of the valid element ids for this `patch`.
 
-The element ids are computed on-the-fly by the iterator and are neither 
+The element ids are computed on-the-fly by the iterator and are neither
 precomputed nor stored.
 
 # Arguments

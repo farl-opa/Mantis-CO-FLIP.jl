@@ -22,7 +22,7 @@ struct GeneralizedExponential <: AbstractECTSpaces
     C::Matrix{Float64}
     endpoint_tol::Float64
 
-    function GeneralizedExponential(p::Int, w::Float64 = 1.0, l::Float64 = 1.0, m::Int = 10)
+    function GeneralizedExponential(p::Int, w::Float64=1.0, l::Float64=1.0, m::Int=10)
         t = abs(w) * l >= 3.0
         return GeneralizedExponential(p, w, l, t, m)
     end
@@ -115,26 +115,25 @@ Build representation matrix for Generalized Exponential section space of degree 
 - `C::Matrix{Float64}`: representation matrix for the local basis.
 """
 function gexp_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
-
-    I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
+    I = Matrix(1.0LinearAlgebra.I, p + 1, p + 1)
     if t
         wl = w * l
         ewl = exp(wl)
         ewlm = exp(-wl)
-        M0 = I[:,:]
+        M0 = I[:, :]
         M0[p, :] .= 1
-        M0[p+1, 1:2:p+1] .= 1
-        M0[p+1, 2:2:p+1] .= -1
-        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:,1]))
-        M1[p, :] .= ewl;
-        M1[p+1, 1:2:p+1] .= ewlm;
-        M1[p+1, 2:2:p+1] .= -ewlm;
+        M0[p + 1, 1:2:(p + 1)] .= 1
+        M0[p + 1, 2:2:(p + 1)] .= -1
+        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:, 1]))
+        M1[p, :] .= ewl
+        M1[p + 1, 1:2:(p + 1)] .= ewlm
+        M1[p + 1, 2:2:(p + 1)] .= -ewlm
 
     else
-        M0 = I[:,:]
-        ww = [1 cumprod(repeat([w * w], 1, m), dims=2)]
-        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:p+2*m))], I[:,1])
-        M1 = M[1:p+1, :]
+        M0 = I[:, :]
+        ww = [1 cumprod(repeat([w * w], 1, m); dims=2)]
+        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:(p + 2 * m)))], I[:, 1])
+        M1 = M[1:(p + 1), :]
         M1[p, :] = ww * M[p:2:end, :]
         M1[p + 1, :] = ww * M[(p + 1):2:end, :]
     end
@@ -169,12 +168,12 @@ function get_derivative_space(ect_space::GeneralizedExponential)
         throw(ArgumentError("Degree of the space must be at least 2 to get derivative space."))
     end
     return GeneralizedExponential(
-        ect_space.p-1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
+        ect_space.p - 1, ect_space.w, ect_space.l, ect_space.t, ect_space.m
     )
 end
 
 """
-    get_finer_canonical_space(ect_space::GeneralizedExponential)
+    get_child_canonical_space(ect_space::GeneralizedExponential)
 
 Bisect the canonical space by dividing the length in half.
 
@@ -185,11 +184,11 @@ Bisect the canonical space by dividing the length in half.
 - `::GeneralizedExponential`: A generalized exponential space with the length divided by 2.
 """
 function get_bisected_canonical_space(ect_space::GeneralizedExponential)
-    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l/2, ect_space.m)
+    return GeneralizedExponential(ect_space.p, ect_space.w, ect_space.l / 2, ect_space.m)
 end
 
 """
-    get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
+    get_child_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
 
 For number of sub-elements which is powers of 2, bisect the canonical space by dividing the
 length in half for each power.
@@ -201,7 +200,7 @@ length in half for each power.
 # Returns
 - `::GeneralizedExponential`: A generalized exponential space with the subdivided length.
 """
-function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
+function get_child_canonical_space(ect_space::GeneralizedExponential, num_sub_elements::Int)
     num_ref = log2(num_sub_elements)
     if num_sub_elements < 2 || !isapprox(num_ref - round(num_ref), 0.0; atol=1e-12)
         throw(
@@ -212,6 +211,6 @@ function get_finer_canonical_space(ect_space::GeneralizedExponential, num_sub_el
     end
 
     return GeneralizedExponential(
-        ect_space.p, ect_space.w, ect_space.l/num_sub_elements, ect_space.m
+        ect_space.p, ect_space.w, ect_space.l / num_sub_elements, ect_space.m
     )
 end

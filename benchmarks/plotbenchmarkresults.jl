@@ -66,6 +66,7 @@ function get_benchmarks(benchmark_series)
 
     return benchmarks, benchmarknames, hostnames
 end
+notify(menu_unit.selection)
 
 function update_data!(data, name, dirname, hostnames)
     for hostname in hostnames

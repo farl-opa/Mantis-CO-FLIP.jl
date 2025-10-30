@@ -26,14 +26,14 @@ function run_problem(manifold_dim::Int, num_components::Int, p::Int, k::Int)
     end
     DS = FunctionSpaces.DirectSumSpace(comp_spaces)
 
-    eval_points = ntuple(manifold_dim) do i
-        return collect(LinRange(0.0, 1.0, 25))
-    end
-
+    eval_points = Points.CartesianPoints(
+        ntuple(dim -> LinRange(0.0, 1.0, 25), manifold_dim)
+    )
     dim = FunctionSpaces.get_num_basis(DS)
 
     return dim,
-    @benchmarkable FunctionSpaces.evaluate($DS, 1, $eval_points) samples = 100 evals = 1 seconds = Inf
+    @benchmarkable FunctionSpaces.evaluate($DS, 1, $eval_points) samples = 100 evals = 1 seconds =
+        Inf
 end
 
 ############################################################################################

@@ -21,7 +21,7 @@ struct GeneralizedTrigonometric <: AbstractECTSpaces
     C::Matrix{Float64}
     endpoint_tol::Float64
 
-    function GeneralizedTrigonometric(p::Int, w::Float64 = 1.0, l::Float64 = 1.0, m::Int = 10)
+    function GeneralizedTrigonometric(p::Int, w::Float64=1.0, l::Float64=1.0, m::Int=10)
         t = abs(w) * l >= 3.0
         return GeneralizedTrigonometric(p, w, l, t, m)
     end
@@ -128,32 +128,31 @@ Build representation matrix for Generalized Trignometric section space of degree
 """
 
 function gtrig_representation(p::Int, w::Float64, l::Float64, t::Bool, m::Int)
-
-    I = Matrix(1.0LinearAlgebra.I, p+1, p+1)
+    I = Matrix(1.0LinearAlgebra.I, p + 1, p + 1)
     if t
         wl = w * l
         cwl = cos(wl)
         swl = sin(wl)
-        M0 = I[:,:]
-        M0[[p, p+1], [p, p+1]] .= 0.0
+        M0 = I[:, :]
+        M0[[p, p + 1], [p, p + 1]] .= 0.0
         M0[p, 1:4:end] .= 1
         M0[p, 3:4:end] .= -1
-        M0[p+1, 2:4:end] .= 1
-        M0[p+1, 4:4:end] .= -1
-        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:,1]))
+        M0[p + 1, 2:4:end] .= 1
+        M0[p + 1, 4:4:end] .= -1
+        M1 = Matrix(ToeplitzMatrices.Toeplitz([1; cumprod(wl ./ (1:p))], I[:, 1]))
         M1[p, 1:4:end] .= cwl
         M1[p, 2:4:end] .= -swl
         M1[p, 3:4:end] .= -cwl
         M1[p, 4:4:end] .= swl
-        M1[p+1, 1:4:end] .= swl
-        M1[p+1, 2:4:end] .= cwl
-        M1[p+1, 3:4:end] .= -swl
-        M1[p+1, 4:4:end] .= -cwl
+        M1[p + 1, 1:4:end] .= swl
+        M1[p + 1, 2:4:end] .= cwl
+        M1[p + 1, 3:4:end] .= -swl
+        M1[p + 1, 4:4:end] .= -cwl
     else
-        M0 = I[:,:]
-        ww = [1 cumprod(repeat([-w * w], 1, m), dims=2)]
-        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:p+2*m))], I[:,1])
-        M1 = M[1:p+1, :]
+        M0 = I[:, :]
+        ww = [1 cumprod(repeat([-w * w], 1, m); dims=2)]
+        M = ToeplitzMatrices.Toeplitz([1; cumprod(l ./ (1:(p + 2 * m)))], I[:, 1])
+        M1 = M[1:(p + 1), :]
         M1[p, :] = ww * M[p:2:end, :]
         M1[p + 1, :] = ww * M[(p + 1):2:end, :]
     end
@@ -204,11 +203,11 @@ Bisect the canonical space by dividing the length in half.
 - `::GeneralizedTrigonometric`: A generalized trigonometric space with the length divided by 2.
 """
 function get_bisected_canonical_space(ect_space::GeneralizedTrigonometric)
-    return GeneralizedTrigonometric(ect_space.p, ect_space.w, ect_space.l/2, ect_space.m)
+    return GeneralizedTrigonometric(ect_space.p, ect_space.w, ect_space.l / 2, ect_space.m)
 end
 
 """
-    get_finer_canonical_space(ect_space::GeneralizedTrigonometric, num_sub_elements::Int)
+    get_child_canonical_space(ect_space::GeneralizedTrigonometric, num_sub_elements::Int)
 
 For number of sub-elements which is powers of 2, bisect the canonical space by dividing the
 length in half for each power.
@@ -220,7 +219,7 @@ length in half for each power.
 # Returns
 - `::GeneralizedTrigonometric`: A generalized trigonometric space with the subdivided length.
 """
-function get_finer_canonical_space(
+function get_child_canonical_space(
     ect_space::GeneralizedTrigonometric, num_sub_elements::Int
 )
     num_ref = log2(num_sub_elements)
@@ -233,6 +232,6 @@ function get_finer_canonical_space(
     end
 
     return GeneralizedTrigonometric(
-        ect_space.p, ect_space.w, ect_space.l/num_sub_elements, ect_space.m
+        ect_space.p, ect_space.w, ect_space.l / num_sub_elements, ect_space.m
     )
 end
