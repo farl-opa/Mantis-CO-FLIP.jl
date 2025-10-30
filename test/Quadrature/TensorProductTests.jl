@@ -1,33 +1,26 @@
 module TensorProductQuadratureTests
 
-import Mantis
+using Mantis
 
 import LinearAlgebra
 
 using Test
 
-
-const Quad = Mantis.Quadrature
-
-
 # Defines test functions and tolerances for quadrature rules.
 include("QuadratureTestsSetup.jl")
-
 
 # The tensor product quadrature is a product of two or more 1D quadrature rules. The 1D
 # rules have their own tests, so only tests for the tensor product quadrature are needed.
 
-
 const one_dim_quad_rules = [
-    Quad.clenshaw_curtis,
-    Quad.gauss_legendre,
-    Quad.gauss_lobatto,
-    (Quad.newton_cotes, "closed"),
-    (Quad.newton_cotes, "open"),
+    Quadrature.clenshaw_curtis,
+    Quadrature.gauss_legendre,
+    Quadrature.gauss_lobatto,
+    (Quadrature.newton_cotes, "closed"),
+    (Quadrature.newton_cotes, "open"),
 ]
 
 non_existing_quad_rule() = nothing
-
 
 # Different degree but same rule -----------------------------------------------------------
 
@@ -36,64 +29,46 @@ non_existing_quad_rule() = nothing
 # rules are the same by manually checking the nodes, weights and rule type.
 for one_d_rule in one_dim_quad_rules
     for p in [2, 5, 8]
-
         deg = (p,)
 
         if typeof(one_d_rule) <: Tuple
             quad_rule_1d = one_d_rule[1](p, one_d_rule[2])
-            quad_rule = Quad.tensor_product_rule(deg, one_d_rule...)
+            quad_rule = Quadrature.tensor_product_rule(deg, one_d_rule...)
         else
             quad_rule_1d = one_d_rule(p)
-            quad_rule = Quad.tensor_product_rule(deg, one_d_rule)
+            quad_rule = Quadrature.tensor_product_rule(deg, one_d_rule)
         end
 
         quad_rule_info = (
-            Quad.get_nodes(quad_rule),
-            Quad.get_weights(quad_rule),
-            Quad.get_label(quad_rule),
+            Quadrature.get_weights(quad_rule), Quadrature.get_label(quad_rule)
         )
 
         one_d_rule_info = (
-            Quad.get_nodes(quad_rule_1d),
-            Quad.get_weights(quad_rule_1d),
-            Quad.get_label(quad_rule_1d),
+            Quadrature.get_weights(quad_rule_1d), Quadrature.get_label(quad_rule_1d)
         )
 
         @test all(quad_rule_info .== one_d_rule_info)
     end
 end
 
-
-
 for one_d_rule in one_dim_quad_rules
     for dimension in [2, 3, 4]
         deg = (3, 5, 7, 8)[1:dimension]
         if typeof(one_d_rule) <: Tuple
-            quad_rule = Quad.tensor_product_rule(deg, one_d_rule...)
-            label_1d = Quad.get_label(one_d_rule[1](deg[1], one_d_rule[2]))
-            label = """Tensor-product of $dimension $(label_1d) rules"""
+            quad_rule = Quadrature.tensor_product_rule(deg, one_d_rule...)
         else
-            quad_rule = Quad.tensor_product_rule(deg, one_d_rule)
-            label_1d = Quad.get_label(one_d_rule(deg[1]))
-            label = "Tensor-product of $dimension $(label_1d) rules"
+            quad_rule = Quadrature.tensor_product_rule(deg, one_d_rule)
         end
 
-        ξ = Quad.get_nodes(quad_rule)
-        w = Quad.get_weights(quad_rule)
-
-
-        # Check that the rule type is correct.
-        @test Quad.get_label(quad_rule) == label
-
+        ξ = Quadrature.get_nodes(quad_rule)
+        w = Quadrature.get_weights(quad_rule)
 
         # Constructor tests.
-        @test typeof(quad_rule) == Quad.CanonicalQuadratureRule{dimension}
-
+        @test typeof(quad_rule) <: Quadrature.CanonicalQuadratureRule{dimension}
 
         # No invalid degree tests here, as theses are tested in the 1D quadrature tests. We
         # can check what happens if a non-existing rule is used.
-        @test_throws MethodError Quad.tensor_product_rule(deg, non_existing_quad_rule)
-
+        @test_throws MethodError Quadrature.tensor_product_rule(deg, non_existing_quad_rule)
 
         # Property tests.
         @test isapprox(sum(w), 1.0, atol=atol)
@@ -105,16 +80,13 @@ for one_d_rule in one_dim_quad_rules
         end
         @test isapprox(w, reverse(w), atol=atol)
 
-
         # Value tests on [0,1]^d.
-        f = chebyshev_nd(deg.-1, ξ)
+        f = chebyshev_nd(deg .- 1, Points.get_constituent_points(ξ))
         I_num = LinearAlgebra.dot(w, f)
-        I = integrated_chebyshev_nd(deg.-1)
+        I = integrated_chebyshev_nd(deg .- 1)
         @test isapprox(I_num, I, atol=atol)
     end
 end
-
-
 
 # Different rules --------------------------------------------------------------------------
 
@@ -125,45 +97,45 @@ end
 # define a specialised equality function for quadrature rules, we can only check that the
 # rules are the same by manually checking the nodes, weights and rule type.
 one_dim_rules = (
-    Quad.clenshaw_curtis(3),
-    Quad.gauss_legendre(5),
-    Quad.gauss_lobatto(4),
-    Quad.newton_cotes(2, "closed"),
-    Quad.newton_cotes(3, "open")
+    Quadrature.clenshaw_curtis(3),
+    Quadrature.gauss_legendre(5),
+    Quadrature.gauss_lobatto(4),
+    Quadrature.newton_cotes(2, "closed"),
+    Quadrature.newton_cotes(3, "open"),
 )
 
 for one_d_rule in one_dim_rules
-    quad_rule = Quad.tensor_product_rule((one_d_rule,))
+    quad_rule = Quadrature.tensor_product_rule((one_d_rule,))
 
     quad_rule_info = (
-        Quad.get_nodes(quad_rule),
-        Quad.get_weights(quad_rule),
-        Quad.get_label(quad_rule),
+        Quadrature.get_nodes(quad_rule),
+        Quadrature.get_weights(quad_rule),
+        Quadrature.get_label(quad_rule),
     )
 
     one_d_rule_info = (
-        Quad.get_nodes(one_d_rule),
-        Quad.get_weights(one_d_rule),
-        Quad.get_label(one_d_rule),
+        Quadrature.get_nodes(one_d_rule),
+        Quadrature.get_weights(one_d_rule),
+        Quadrature.get_label(one_d_rule),
     )
 
     @test all(quad_rule_info .== one_d_rule_info)
 end
 
 # Test the tensor product of different rules.
-quad_rule = Quad.tensor_product_rule(one_dim_rules)
+quad_rule = Quadrature.tensor_product_rule(one_dim_rules)
 label = """\
     Tensor-product of (Clenshaw-Curtis, Gauss-Legendre, Gauss-Lobatto, Newton-Cotes \
     (closed), Newton-Cotes (open)) rules\
     """
 
-w = Quad.get_weights(quad_rule)
+w = Quadrature.get_weights(quad_rule)
 
 # Check that the rule label is correct.
-@test Quad.get_label(quad_rule) == label
+@test Quadrature.get_label(quad_rule) == label
 
 # Constructor tests.
-@test typeof(quad_rule) == Quad.CanonicalQuadratureRule{5}
+@test typeof(quad_rule) <: Quadrature.CanonicalQuadratureRule{5}
 
 # Property tests.
 @test isapprox(sum(w), 1.0, atol=atol)

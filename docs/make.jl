@@ -58,6 +58,7 @@ DevelDocs = [
     "Modules" => [
         "DevelDocs/Modules/Assemblers.md",
         "DevelDocs/Modules/FunctionSpaces.md",
+        "DevelDocs/Modules/GeneralHelpers.md",
         "DevelDocs/Modules/Geometry.md",
         "DevelDocs/Modules/Quadrature.md",
     ],

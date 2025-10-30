@@ -1,4 +1,4 @@
-using InteractiveUtils
+
 """
     assemble(
         weak_form::WeakForm{manifold_dim, LHS, RHS, I},

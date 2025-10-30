@@ -2,27 +2,27 @@
 function metric(
     geometry::AbstractGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     # The metric tensor gᵢⱼ is
     #   gᵢⱼ := ∑ₖᵐ ∂Φᵏ\∂ξᵢ ⋅ ∂Φᵏ\∂ξⱼ
     # Since the Jacobian matrix J is given by
     #   Jᵢⱼ = ∂Φⁱ\∂ξⱼ
-    # The metric tensor can be computed as 
-    #   g = Jᵗ ⋅ J 
+    # The metric tensor can be computed as
+    #   g = Jᵗ ⋅ J
 
     # Compute the jacobian
     J = jacobian(geometry, element_id, xi)
 
-    n_evaluation_points = prod(size.(xi, 1))  # compute the number of nD points evaluated
+    n_evaluation_points = Points.get_num_points(xi)  # compute the number of nD points evaluated
     g = zeros(Float64, n_evaluation_points, manifold_dim, manifold_dim)
 
-    # Compute the metric 
+    # Compute the metric
     for index in CartesianIndices(g)
         (point, row, column) = Tuple(index)
         # Here we compute: gᵢⱼ := ∑ₖᵐ ∂Φᵏ\∂ξᵢ ⋅ ∂Φᵏ\∂ξⱼ
         # with:
-        #   - i := row 
+        #   - i := row
         #   - j := column
         # The summation over k corresponds to the summation over the second dimension.
         for k in 1:manifold_dim
@@ -38,7 +38,7 @@ end
 function inv_metric(
     geometry::AbstractGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     # The inverse of the metric tensor gᵢⱼ is
     #   [gⁱʲ] := [gᵢⱼ]⁻¹
@@ -52,7 +52,7 @@ function inv_metric(
     # in the future if we wish to add space-time approaches we can add the manifold_dim = 4
     # case.
 
-    # First compute the metric 
+    # First compute the metric
     g, sqrt_g = metric(geometry, element_id, xi)
 
     # Then compute the inverse of the metric

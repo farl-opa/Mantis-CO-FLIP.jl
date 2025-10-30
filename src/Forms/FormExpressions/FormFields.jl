@@ -64,10 +64,9 @@ struct FormField{manifold_dim, form_rank, G, FS} <:
             throw(ArgumentError("""\
                       The number of coefficients ($(length(coefficients))) must match the\
                       number of basis functions ($(get_num_basis(form_space))).
-                      """
-            ))
+                      """))
         end
-        
+
         return new{manifold_dim, form_rank, G, FS}(
             get_geometry(form_space), form_space, coefficients, label
         )
@@ -75,13 +74,13 @@ struct FormField{manifold_dim, form_rank, G, FS} <:
 
     """
         FormField(form_space::FS, label::String)
-    
+
     Construct a FormField with zero coefficients.
 
     # Arguments
     - `form_space::FS`: The form space.
     - `label::String`: Label for the form field.
-    
+
     # Returns
     - `FormField`: A new FormField instance with zero coefficients.
     """
@@ -126,7 +125,7 @@ struct AnalyticalFormField{manifold_dim, form_rank, G, E} <:
         ) where {
             manifold_dim, E <: Function, G <: Geometry.AbstractGeometry{manifold_dim}
         }
-    
+
     General constructor for analytical form fields.
 
     # Arguments
@@ -134,15 +133,13 @@ struct AnalyticalFormField{manifold_dim, form_rank, G, E} <:
     - `expression::E`: The expression defining the form field.
     - `geometry::G`: The geometry associated with this field.
     - `label::String`: The label for the form field.
-    
+
     # Returns
     - `AnalyticalFormField`: The new analytical form field.
     """
     function AnalyticalFormField(
         form_rank::Int, expression::E, geometry::G, label::String
-    ) where {
-        manifold_dim, E <: Function, G <: Geometry.AbstractGeometry{manifold_dim}
-    }
+    ) where {manifold_dim, E <: Function, G <: Geometry.AbstractGeometry{manifold_dim}}
         return new{manifold_dim, form_rank, G, E}(geometry, expression, label)
     end
 end
@@ -176,7 +173,6 @@ Returns the coefficients of the form field.
 """
 get_coefficients(form_field::FormField) = form_field.coefficients
 
-
 """
     get_expression(form_field::AnalyticalFormField)
 
@@ -191,7 +187,6 @@ Returns the expression of the analytical form field.
 
 get_expression(form_field::AnalyticalFormField) = form_field.expression
 
-
 ############################################################################################
 #                                    Evaluation methods                                    #
 ############################################################################################
@@ -200,7 +195,7 @@ get_expression(form_field::AnalyticalFormField) = form_field.expression
     evaluate(
         form_field::FormField{manifold_dim, form_rank, G, FS},
         element_idx::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {
         manifold_dim,
         form_rank,
@@ -224,7 +219,7 @@ element given by `element_idx`.
 function evaluate(
     form_field::FormField{manifold_dim, form_rank, G, FS},
     element_idx::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {
     manifold_dim,
     form_rank,
@@ -252,7 +247,7 @@ end
     evaluate(
         form_field::AnalyticalFormField{manifold_dim},
         element_idx::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim}
 
 Evaluates a differential form field at given canonical points `xi` mapped to the parametric
@@ -271,16 +266,15 @@ element given by `element_idx`.
 function evaluate(
     form_field::AnalyticalFormField{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
-
     return _evaluate(form_field, element_id, xi)
 end
 
 function _evaluate(
     form_field::AnalyticalFormField{manifold_dim, 0},
     element_idx::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     x = Geometry.evaluate(get_geometry(form_field), element_idx, xi)
     form_eval = get_expression(form_field)(x)
@@ -293,7 +287,7 @@ end
 function _evaluate(
     form_field::AnalyticalFormField{manifold_dim, manifold_dim},
     element_idx::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     geometry = get_geometry(form_field)
     if Geometry.get_image_dim(geometry) != manifold_dim
@@ -313,7 +307,7 @@ end
 function _evaluate(
     form_field::AnalyticalFormField{manifold_dim, 1},
     element_idx::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     geometry = get_geometry(form_field)
     x = Geometry.evaluate(geometry, element_idx, xi)

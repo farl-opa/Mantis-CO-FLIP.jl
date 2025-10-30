@@ -61,7 +61,7 @@ function quarter_annulus_nurbs(radius_inner::Float64, radius_outer::Float64)
     # B-spline space - angular direction
     Bθ = univariate_bsplines(deg, num_el, -1)
     # NURBS space - angular direction
-    Rθ = Mantis.FunctionSpaces.RationalFiniteElementSpace(Bθ, [1, 1 / sqrt(2), 1])
+    Rθ = Mantis.FunctionSpaces.RationalFESpace(Bθ, [1, 1 / sqrt(2), 1])
     # B-spline space - radial direction
     Br = univariate_bsplines(deg, num_el, -1)
     # tensor-product space

@@ -98,13 +98,16 @@ function run_benchmark(
         end
     end
 
-    hostname, date, commit_hash, julia_version = get_metadata()
+    hostname, date, commit_hash, commit_date, julia_version = get_metadata()
     columns = [
         :benchmark,
         :commit_hash,
+        :commit_date,
         :julia_version,
         :date,
         :med_time,
+        :mea_time,
+        :std_time,
         :min_time,
         :min_gc,
         :min_memory,
@@ -119,6 +122,7 @@ function run_benchmark(
         location,
         date,
         commit_hash,
+        commit_date,
         julia_version;
         show=show,
         save=save,
@@ -145,7 +149,11 @@ Returns useful metadata for CSV storage.
 """
 function get_metadata()
     date = string(readchomp(`date +%Y-%m-%d`))
-    commit_hash = string(readchomp(`git rev-parse --short HEAD`))
+    long_hash= string(readchomp(`git merge-base remotes/origin/main HEAD`))
+    commit_hash = string(readchomp(`git rev-parse --short=7 $long_hash`))
+    commit_date = string(
+        split(string(readchomp(`git show -s --format="%ci" $commit_hash`)))[1]
+    )
     hostname_shasum = split(readchomp(`sh -c "hostname | sha256sum"`))[1]
     julia_version = string(VERSION)
     # Mapping of SHA-256 hashes to hostnames
@@ -169,7 +177,7 @@ function get_metadata()
         )
     end
 
-    return hostname, date, commit_hash, julia_version
+    return hostname, date, commit_hash, commit_date, julia_version
 end
 
 """
@@ -208,6 +216,7 @@ function _run_benchmark!(
     location::String,
     date::String,
     commit_hash::String,
+    commit_date::String,
     julia_version::String;
     show::Bool,
     save::Bool,
@@ -232,9 +241,12 @@ function _run_benchmark!(
             (
                 benchmark=full_name,
                 commit_hash=commit_hash,
+                commit_date=commit_date,
                 julia_version=julia_version,
                 date=date,
                 med_time=BenchmarkTools.prettytime(median(result).time),
+                mea_time=BenchmarkTools.prettytime(mean(result).time),
+                std_time=BenchmarkTools.prettytime(std(result).time),
                 min_time=BenchmarkTools.prettytime(minimum(result).time),
                 min_gc=BenchmarkTools.prettytime(minimum(result).gctime),
                 min_memory=BenchmarkTools.prettymemory(minimum(result).memory),
@@ -430,7 +442,10 @@ example, `12.345 ms`.
 """
 function get_number_in_string(str::AbstractString; new_unit::Union{Nothing, String}=nothing)
     # Conversion factors from different units to second
-    factors = Dict("ns" => 1e-9, "μs" => 1e-6, "ms" => 1e-3, "s" => 1)
+    factors = Dict(
+        "ns" => 1e-9, "μs" => 1e-6, "ms" => 1e-3, "s" => 1,  # Time
+        "bytes" => 1, "kiB" => 1024, "MiB" => 1024^2, "GiB" => 1024^3  # Memory
+    )
     str_number, str_unit = split(str) # Assumes "number unit" format of the string
     number = parse(Float64, str_number)
     if !isnothing(new_unit)

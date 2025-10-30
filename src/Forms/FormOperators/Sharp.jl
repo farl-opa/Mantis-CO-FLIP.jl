@@ -13,7 +13,7 @@ Represents the sharp operator, which converts a differential 1-form into a vecto
 # Type Parameters
 - `manifold_dim`: The dimension of the manifold.
 - `G`: The geometry type associated with the manifold.
-- `F`: The type of the differential 1-form. 
+- `F`: The type of the differential 1-form.
 
 # Inner Constructors
 - `Sharp(form::F)`: General constructor.
@@ -64,7 +64,7 @@ get_form(sharp::Sharp) = sharp.form
 
 """
     evaluate(
-        sharp::Sharp{manifold_dim}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}
+        sharp::Sharp{manifold_dim}, element_id::Int, xi::Points.AbstractPoints{manifold_dim}
     ) where {manifold_dim}
 
 Evaluates the sharp operator on a differential 1-form over a specified element of a
@@ -74,7 +74,7 @@ vector-field are defined in reference, curvilinear coordinates.
 # Arguments
 - `sharp::Sharp{manifold_dim}`: The sharp structure containing the form to be evaluated.
 - `element_id::Int`: The identifier of the element on which the sharp is to be evaluated.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: A tuple containing vectors of floating-point
+- `xi::Points.AbstractPoints{manifold_dim}`: A tuple containing vectors of floating-point
     numbers representing the coordinates at which the 1-form is evaluated. Each vector within
     the tuple corresponds to a dimension of the manifold.
 
@@ -86,7 +86,7 @@ vector-field are defined in reference, curvilinear coordinates.
     the indices of the evaluated basis functions.
 """
 function evaluate(
-    sharp::Sharp{manifold_dim}, element_id::Int, xi::NTuple{manifold_dim, Vector{Float64}}
+    sharp::Sharp{manifold_dim}, element_id::Int, xi::Points.AbstractPoints{manifold_dim}
 ) where {manifold_dim}
     form = get_form(sharp)
 
@@ -96,9 +96,9 @@ end
 function _evaluate_sharp(
     form_expression::AbstractFormExpression{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
-    inv_g, _, _ = Geometry.inv_metric(form_expression.geometry, element_id, xi)
+    inv_g, _, _ = Geometry.inv_metric(get_geometry(form_expression), element_id, xi)
 
     num_form_components = manifold_dim # = binomial(manifold_dim, 1)
 

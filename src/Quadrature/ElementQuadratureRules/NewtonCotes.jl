@@ -20,31 +20,32 @@ function newton_cotes(num_points::Integer, type::String)
     # Compute the equally spaced nodes on the interval [-1, 1].
     if type == "closed"
         if num_points <= 1
-            throw(DomainError("""\
-                Invalid number of points: $num_points. A closed Newton-Cotes rule requires \
-                at least 2 points.\
-                """
-            ))
+            throw(
+                DomainError("""\
+              Invalid number of points: $num_points. A closed Newton-Cotes rule requires \
+              at least 2 points.\
+              """)
+            )
         else
-            ξ = [-1.0 + i * 2.0 / (num_points-1) for i = 0:num_points-1]
+            ξ = [-1.0 + i * 2.0 / (num_points - 1) for i in 0:(num_points - 1)]
         end
 
     elseif type == "open"
         if num_points <= 0
-            throw(DomainError("""\
-                Invalid number of points: $num_points. An open Newton-Cotes rule requires \
-                at least 1 point.\
-                """
-            ))
+            throw(
+                DomainError("""\
+              Invalid number of points: $num_points. An open Newton-Cotes rule requires \
+              at least 1 point.\
+              """)
+            )
         else
-            ξ = [-1.0 + i * 2.0 / (num_points+1) for i = 1:num_points]
+            ξ = [-1.0 + i * 2.0 / (num_points + 1) for i in 1:num_points]
         end
 
     else
         throw(ArgumentError("""\
             Invalid Newton-Cotes type: $type. Valid types are 'closed' and 'open'.\
-            """
-        ))
+            """))
     end
 
     # Compute the weights by integrating the Lagrange basis functions. We need n Lagrange
@@ -54,7 +55,6 @@ function newton_cotes(num_points::Integer, type::String)
     lagrange_at_ql = zeros(Float64, num_points, length(ql))
     for i in 1:num_points
         for j in eachindex(ql)
-
             l_poly_i = 1.0
             for k in 1:num_points
                 if k != i
@@ -62,20 +62,21 @@ function newton_cotes(num_points::Integer, type::String)
                 end
             end
 
-            lagrange_at_ql[i,j] = l_poly_i
+            lagrange_at_ql[i, j] = l_poly_i
         end
     end
 
     w = zeros(Float64, num_points)
     for i in 1:num_points
         for j in eachindex(ql, wl)
-            w[i] += wl[j] * lagrange_at_ql[i,j]
+            w[i] += wl[j] * lagrange_at_ql[i, j]
         end
     end
 
     # Map roots and weights to the interval [0, 1].
-    @. ξ = (ξ + 1.0)/2.0
+    @. ξ = (ξ + 1.0) / 2.0
     @. w = 0.5 * w
+    nodes = Points.CartesianPoints((ξ,))
 
-    return CanonicalQuadratureRule{1}((ξ,), w, "Newton-Cotes ($type)")
+    return CanonicalQuadratureRule(nodes, w, "Newton-Cotes ($type)")
 end
