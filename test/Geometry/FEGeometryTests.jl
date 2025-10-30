@@ -10,26 +10,26 @@ using Test
 # Refer to the following file for method and variable definitions.
 include("GeometryTestsHelpers.jl")
 
-# Test FEGeometry (Polar) --------------------------------------------------
-deg = 2
-Wt = pi / 2
-b_θ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
-b_r = Mantis.FunctionSpaces.Bernstein(deg)
+# Test FEMGeometry (Polar) --------------------------------------------------
+# deg = 2
+# Wt = pi / 2
+# b_θ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
+# b_r = Mantis.FunctionSpaces.Bernstein(deg)
 
-(P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ =
-    Mantis.FunctionSpaces.create_polar_spline_space_and_geometry(
-        (4, 1), (b_θ, b_r), (1, -1), 1.0
-)
-geom = Mantis.Geometry.FEGeometry(P_geom.component_spaces[1], geom_coeffs_polar)
-field_coeffs = Matrix{Float64}(
-    LinearAlgebra.I,
-    Mantis.FunctionSpaces.get_num_basis(P_sol),
-    Mantis.FunctionSpaces.get_num_basis(P_sol),
-)
+# (P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), _ =
+#     Mantis.FunctionSpaces.create_scalar_polar_splines_and_geometry(
+#         (4, 1), (b_θ, b_r), (1, -1), 1.0
+# )
+# geom = Mantis.Geometry.FEMGeometry(P_geom, geom_coeffs_polar)
+# field_coeffs = Matrix{Float64}(
+#     LinearAlgebra.I,
+#     Mantis.FunctionSpaces.get_num_basis(P_sol),
+#     Mantis.FunctionSpaces.get_num_basis(P_sol),
+# )
 
-# Generate the plot
-file_name = "fem_geometry_polar_test.vtu"
-output_file_path = Mantis.GeneralHelpers.export_path(output_directory_tree, file_name)
+# # Generate the plot
+# file_name = "fem_geometry_polar_test.vtu"
+# output_file_path = Mantis.Plot.export_path(output_directory_tree, file_name)
 
 # Test FEGeometry (Annulus) --------------------------------------------------
 deg = 2

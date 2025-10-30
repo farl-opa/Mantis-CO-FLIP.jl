@@ -85,31 +85,30 @@ end
 #                                         Mappings                                         #
 ############################################################################################
 
+function affine_map(xi, A, b)
+    return xi * A + b
+end
+
 function affine_map(
-    xi::NTuple{manifold_dim, Vector{Float64}},
-    A::Matrix,
-    b::Vector,
+    xi::Points.AbstractPoints{manifold_dim}, A::Matrix, b::Vector
 ) where {manifold_dim}
-    num_points_per_dim = length.(xi)
-    num_points = prod(num_points_per_dim)
+    num_points = Points.get_num_points(xi)
     mapped_dim = size(A, 1)
     mapped_xi = ntuple(mapped_dim) do _
         return zeros(Float64, num_points)
     end
 
-    xi_ord_id = CartesianIndices(num_points_per_dim)
-    xi_lin_id = LinearIndices(xi_ord_id)
-    for (lin_point, ord_point) in zip(xi_lin_id, xi_ord_id)
+    for (point_id, point) in enumerate(xi)
         for j in axes(A, 2)
             for i in axes(A, 1)
-                mapped_xi[i][lin_point] += A[i, j] * xi[j][ord_point[j]]
+                mapped_xi[i][point_id] += affine_map(point[j], A[i, j], 0.0)
             end
         end
+
         for i in axes(b, 1)
-            mapped_xi[i][lin_point] += b[i]
+            mapped_xi[i][point_id] += b[i]
         end
     end
-
 
     return mapped_xi
 end

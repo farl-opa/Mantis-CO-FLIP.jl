@@ -9,8 +9,9 @@ module Plot
 import WriteVTK
 
 using ..GeneralHelpers
-using .. Geometry
-using .. Forms
+using ..Points
+using ..Geometry
+using ..Forms
 
 # core functionality
 include("./PlotKernel.jl")
@@ -39,16 +40,18 @@ degree elements.
 # Returns
 Nothing
 """
-function plot(geometry::Geometry.AbstractGeometry{manifold_dim}; kwargs...) where {manifold_dim}
-    _plot(geometry; kwargs...)
+function plot(
+    geometry::Geometry.AbstractGeometry{manifold_dim}; kwargs...
+) where {manifold_dim}
+    return _plot(geometry; kwargs...)
 end
 
 function plot(form::Forms.AbstractFormExpression; kwargs...)
-  _plot(form; kwargs...)
+    return _plot(form; kwargs...)
 end
 
 function plot(form::Forms.AbstractFormExpression, offset::Function; kwargs...)
-  _plot(form, offset; kwargs...)
+    return _plot(form, offset; kwargs...)
 end
 
 # @doc raw"""

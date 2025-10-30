@@ -35,9 +35,10 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
         ) where {
             manifold_dim,
             num_components,
+            num_patches,
             G <: Geometry.AbstractGeometry{manifold_dim},
-            F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components},
-        } 
+            F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components, num_patches},
+        }
 
     General constructor for differential form spaces.
 
@@ -46,7 +47,7 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
     - `geometry::G`: The geometry where the form is defined.
     - `fem_space::F`: The function space used to represent the form.
     - `label::String`: The label of the form space.
-    
+
     # Returns
     - `FormSpace{manifold_dim, form_rank, G, F}`: The FormSpace structure.
     """
@@ -55,15 +56,16 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
     ) where {
         manifold_dim,
         num_components,
+        num_patches,
         G <: Geometry.AbstractGeometry{manifold_dim},
-        F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components},
+        F <: FunctionSpaces.AbstractFESpace{manifold_dim, num_components, num_patches},
     }
         if (form_rank ∈ Set([0, manifold_dim])) && (num_components > 1)
             throw(
                 ArgumentError(
                     "Mantis.Forms.FormSpace: form_rank = $form_rank with " *
                     "manifold_dim = $manifold_dim requires FE space with only one " *
-                    "component (got num_compoents = $num_components)."
+                    "component (got num_compoents = $num_components).",
                 ),
             )
         elseif (form_rank ∉ Set([0, manifold_dim])) && (num_components != manifold_dim)
@@ -71,7 +73,7 @@ struct FormSpace{manifold_dim, form_rank, G, F} <:
                 ArgumentError(
                     "Mantis.Forms.FormSpace: form_rank = $form_rank with " *
                     "manifold_dim = $manifold_dim requires a FE space with " *
-                    "num_components = $manifold_dim (got num_components = $num_components)."
+                    "num_components = $manifold_dim (got num_components = $num_components).",
                 ),
             )
         end
@@ -161,14 +163,13 @@ function get_max_local_dim(form_space::AbstractFormSpace)
     return FunctionSpaces.get_max_local_dim(get_fe_space(form_space))
 end
 
-
 ############################################################################################
 #                                     Evaluate methods                                     #
 ############################################################################################
 
 """
     evaluate(
-        form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}
+        form_space::FS, element_idx::Int, xi::Points.AbstractPoints{manifold_dim}
     ) where {
         manifold_dim,
         form_rank,
@@ -192,7 +193,7 @@ mapped to the parametric element given by `element_idx`.
     canonical coordinates of the element.
 """
 function evaluate(
-    form_space::FS, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}
+    form_space::FS, element_idx::Int, xi::Points.AbstractPoints{manifold_dim}
 ) where {
     manifold_dim,
     form_rank,
@@ -221,7 +222,7 @@ end
     _evaluate_form_in_canonical_coordinates(
         form_space::FS,
         element_idx::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
         nderivatives::Int,
     ) where {
         manifold_dim,
@@ -235,7 +236,7 @@ Evaluate the form basis functions and their arbitrary derivatives in canonical c
 # Arguments
 - `form_space::FS`: The form space.
 - `element_idx::Int`: Index of the element where the evaluation is performed.
-- `xi::NTuple{manifold_dim, Vector{Float64}}`: Canonical points for evaluation.
+- `xi::Points.AbstractPoints{manifold_dim}`: Canonical points for evaluation.
 
 # Returns
 - `local_form_basis::Vector{Vector{Vector{Matrix{Float64}}}}`: The basis functions evaluated
@@ -246,7 +247,7 @@ Evaluate the form basis functions and their arbitrary derivatives in canonical c
 function _evaluate_form_in_canonical_coordinates(
     form_space::FS,
     element_idx::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
     nderivatives::Int,
 ) where {
     manifold_dim,

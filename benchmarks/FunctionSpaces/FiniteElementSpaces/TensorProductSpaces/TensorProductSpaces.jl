@@ -12,7 +12,7 @@ include(joinpath(mantis_dir, "examples", "HelperFunctions.jl"))
 
 function run_problem(
     manifold_dim::Int, section_space::Type{T}, p::Int, k::Int
-) where T <: FunctionSpaces.AbstractCanonicalSpace
+) where {T <: FunctionSpaces.AbstractCanonicalSpace}
     breakpoints = collect(LinRange(0.0, 1.0, 5))
     patch = Mesh.Patch1D(breakpoints)
     regularity = fill(k, 5)
@@ -22,15 +22,14 @@ function run_problem(
         return Bpk
     end
     TP = FunctionSpaces.TensorProductSpace(TPspaces)
-
-    eval_points = ntuple(manifold_dim) do i
-        return collect(LinRange(0.0, 1.0, 25))
-    end
-
+    eval_points = Points.CartesianPoints(
+        ntuple(dim -> LinRange(0.0, 1.0, 25), manifold_dim)
+    )
     dim = FunctionSpaces.get_num_basis(TP)
 
     return dim,
-    @benchmarkable FunctionSpaces.evaluate($TP, 1, $eval_points) samples = 500 evals = 1 seconds = Inf
+    @benchmarkable FunctionSpaces.evaluate($TP, 1, $eval_points) samples = 500 evals = 1 seconds =
+        Inf
 end
 
 ############################################################################################

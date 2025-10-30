@@ -395,7 +395,7 @@ end
 function evaluate(
     uni_trans::UnaryFormTransformation{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     form = get_form(uni_trans)
     transformation = get_transformation(uni_trans)
@@ -409,7 +409,7 @@ end
 function evaluate(
     bin_trans::BinaryFormTransformation{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     forms = get_forms(bin_trans)
     transformation = get_transformation(bin_trans)

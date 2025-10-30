@@ -66,11 +66,12 @@ function get_benchmarks(benchmark_series)
 
     return benchmarks, benchmarknames, hostnames
 end
+notify(menu_unit.selection)
 
 function update_data!(data, name, dirname, hostnames)
     for hostname in hostnames
         filename = "host-$hostname-$name.csv"
-        println("Updating data for file: $filename")
+        println("Updating plotting data using file: $filename")
         df = DataFrame(CSV.File(joinpath(dirname, filename)))
         data[(hostname, name)] = df
     end
@@ -249,17 +250,19 @@ axislegend("Host names", position = :rt)
 # Define what happens when a menu selection changes.
 on(menu_benchmark_series.selection) do s
     println("Selected benchmark series: $s")
+    benchmark_series_ob[] = s
     benchmark_names_ob[] = get_benchmarks(s)[2]
-    fig.title = s
 end
 
 on(menu_benchmark_names.selection) do s
-    println("Selected benchmark name: $s")
-    benchmark_stringdata = get_benchmarks(benchmark_series_ob[])
-    update_data!(data, s, to_value(benchmark_series_ob), benchmark_stringdata[3])
-    benchmark_name_ob[] = s
-    ax.title = s
-    autoylimits!(ax)
+    if !isnothing(s)
+        println("Selected benchmark name: $s")
+        benchmark_stringdata = get_benchmarks(benchmark_series_ob[])
+        update_data!(data, s, to_value(benchmark_series_ob), benchmark_stringdata[3])
+        benchmark_name_ob[] = s
+        ax.title = s
+        autolimits!(ax)
+    end
 end
 
 on(menu_x_data.selection) do s

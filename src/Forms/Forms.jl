@@ -5,6 +5,7 @@ Contains all definitions of forms, including form fields, form spaces, and form 
 """
 module Forms
 
+using ..Points
 using ..FunctionSpaces
 using ..Geometry
 using ..Quadrature

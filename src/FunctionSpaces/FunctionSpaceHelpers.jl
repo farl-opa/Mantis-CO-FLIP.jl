@@ -320,17 +320,17 @@ function create_dim_wise_bspline_spaces(
     n_dofs_left::NTuple{manifold_dim, Int},
     n_dofs_right::NTuple{manifold_dim, Int},
 ) where {manifold_dim, F <: NTuple{manifold_dim, AbstractCanonicalSpace}}
-    return map(
-        (xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, lᵢ, rᵢ) ->
-            create_bspline_space(xᵢ, Lᵢ, mᵢ, Fᵢ, kᵢ, ; n_dofs_left=lᵢ, n_dofs_right=rᵢ),
-        starting_points,
-        box_sizes,
-        num_elements,
-        section_spaces,
-        regularities,
-        n_dofs_left,
-        n_dofs_right,
-    )::NTuple{manifold_dim, BSplineSpace}
+    return ntuple(manifold_dim) do i
+        create_bspline_space(
+            starting_points[i],
+            box_sizes[i],
+            num_elements[i],
+            section_spaces[i],
+            regularities[i];
+            n_dofs_left=n_dofs_left[i],
+            n_dofs_right=n_dofs_right[i],
+        )
+    end
 end
 
 """
@@ -415,17 +415,17 @@ function create_dim_wise_bspline_spaces(
     n_dofs_left::NTuple{manifold_dim, Int},
     n_dofs_right::NTuple{manifold_dim, Int},
 ) where {manifold_dim}
-    return map(
-        (xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, lᵢ, rᵢ) ->
-            create_bspline_space(xᵢ, Lᵢ, mᵢ, pᵢ, kᵢ, ; n_dofs_left=lᵢ, n_dofs_right=rᵢ),
-        starting_points,
-        box_sizes,
-        num_elements,
-        degrees,
-        regularities,
-        n_dofs_left,
-        n_dofs_right,
-    )::NTuple{manifold_dim, BSplineSpace{Bernstein}}
+    return ntuple(manifold_dim) do i
+        create_bspline_space(
+            starting_points[i],
+            box_sizes[i],
+            num_elements[i],
+            degrees[i],
+            regularities[i];
+            n_dofs_left=n_dofs_left[i],
+            n_dofs_right=n_dofs_right[i],
+        )
+    end
 end
 
 ################################################################################
@@ -433,203 +433,382 @@ end
 ################################################################################
 
 """
-    create_polar_spline_space_and_geometry(
+    create_scalar_polar_spline_space(
         num_elements::NTuple{2, Int},
         degrees::NTuple{2, Int},
-        regularities::NTuple{2, Int},
-        R::Float64;
-        refine::Bool=false,
+        regularities::NTuple{2, Int};
         geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
-        form_rank::Int=0,
+        R::Float64 = 1.0,
+        two_poles::Bool = false
     )
 
-Create a polar spline space and geometry based on the provided parameters. The function
-constructs a tensor-product B-spline space in the angular and radial directions, and then
-creates a polar spline space and geometry based on the tensor-product space. The geometry
-is defined by the radius `R` and the number of elements in the angular and radial
+Create a scalar polar spline space and geometry based on the provided parameters. The
+function constructs a tensor-product B-spline space in the angular and radial directions,
+and then creates a polar spline space and geometry based on the tensor-product space. The
+geometry is defined by the radius `R` and the number of elements in the angular and radial
 directions. Optional arguments include a flag to refine the geometry, the geometry
-coefficients, and the form rank.
+coefficients, and whether the scalars are constrained to zero at poles.
 
 # Arguments
-- `num_elements::NTuple{2, Int}`: The number of elements in the angular and radial
-    directions.
+- `num_elements::NTuple{2, Int}`: The number of elements in the angular and radial directions.
 - `degrees::NTuple{2, Int}`: The polynomial degrees in the angular and radial directions.
-- `regularities::NTuple{2, Int}`: The regularities in the angular and radial directions.
-- `R::Float64`: The radius of the domain.
-- `refine::Bool`: A flag to refine the geometry.
-- `geom_coeffs_tp::Union{Nothing,Array{Float64,3}}`: The geometry coefficients.
-- `form_rank::Int`: The form rank.
+- `regularities::NTuple{2, Int}`: The regularities of the B-spline in the angular and radial directions.
+- `geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing`: The geometry coefficients for the polar spline space.
+- `R::Float64=1.0`: The radius of the polar spline space.
+- `two_poles::Bool=false`: Whether the polar spline space has two poles.
+- `zero_at_poles::Bool=false`: Whether the scalars are constrained to zero at the poles.
 
 # Returns
-- `(P_sol, E_sol)`: The polar spline solution space and global extraction matrix for the
-    solution.
-- `(P_geom, E_geom, geom_coeffs_polar)`: The polar spline geometry space, global extraction
-    matrix, and geometry coefficients.
-- `geom_coeffs_tp`: The tensor-product geometry coefficients.
-- `(ts_θ, ts_r)`: The univariate refinement operators for the angular and radial directions.
+- `::PolarSplineSpace`: The resulting scalar polar spline space.
 """
-function create_polar_spline_space_and_geometry(
+function create_scalar_polar_spline_space(
     num_elements::NTuple{2, Int},
     degrees::NTuple{2, Int},
-    regularities::NTuple{2, Int},
-    R::Float64;
-    refine::Bool=false,
+    regularities::NTuple{2, Int};
     geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
-    form_rank::Int=0,
+    R::Float64 = 1.0,
+    two_poles::Bool=false,
+    zero_at_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 )
-    Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, degrees, regularities, (1, 1), (1, 1)
-    )
-
-    return _create_polar_spline_space_and_geometry(
-        Bθ, Br, regularities[1], R, refine, geom_coeffs_tp, form_rank
+    return create_scalar_polar_spline_space(
+        num_elements,
+        Bernstein.(degrees),
+        regularities;
+        geom_coeffs_tp=geom_coeffs_tp,
+        R=R,
+        two_poles=two_poles,
+        zero_at_poles=zero_at_poles,
+        box_sizes=box_sizes
     )
 end
 
 """
-    create_polar_spline_space_and_geometry(
+    create_scalar_polar_splines_space(
         num_elements::NTuple{2, Int},
         section_spaces::F,
-        regularities::NTuple{2, Int},
-        R::Float64;
-        refine::Bool=false,
+        regularities::NTuple{2, Int};
         geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
-        form_rank::Int=0,
+        R::Float64=1.0,
+        two_poles::Bool=false,
+        zero_at_poles::Bool=false
     ) where {F <: NTuple{2, AbstractCanonicalSpace}}
 
-Create a polar spline space and geometry based on the provided parameters. The function
-constructs a tensor-product B-spline space in the angular and radial directions, and then
-creates a polar spline space and geometry based on the tensor-product space. The geometry
-is defined by the radius `R` and the number of elements in the angular and radial
-directions. Optional arguments include a flag to refine the geometry, the geometry
-coefficients, and the form rank.
+Create a scalar polar spline space and geometry based on the provided parameters. The
+function constructs a tensor-product B-spline space in the angular and radial directions,
+and then creates a polar spline space and geometry based on the tensor-product space. The
+geometry is defined by the radius `R` and the number of elements in the angular and radial
+directions. Optional arguments include the geometry coefficients, whether there are two poles,
+and whether the scalars are constrained to zero at the poles.
 
 # Arguments
-- `num_elements::NTuple{2, Int}`: The number of elements in the angular and radial
-    directions.
-- `section_spaces::NTuple{2, AbstractCanonicalSpace}`: The section spaces in the angular
-    and radial directions.
-- `regularities::NTuple{2, Int}`: The regularities in the angular and radial directions.
-- `R::Float64`: The radius of the domain.
-- `refine::Bool`: A flag to refine the geometry.
-- `geom_coeffs_tp::Union{Nothing,Array{Float64,3}}`: The geometry coefficients.
-- `form_rank::Int`: The form rank.
+- `num_elements::NTuple{2, Int}`: The number of elements in the angular and radial directions.
+- `section_spaces::F`: The section spaces for the angular and radial directions.
+- `regularities::NTuple{2, Int}`: The regularities of the B-spline in the angular and radial directions.
+- `geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing`: The geometry coefficients for the polar spline space.
+- `R::Float64=1.0`: The radius of the polar spline space.
+- `two_poles::Bool=false`: Whether the polar spline space has two poles.
+- `zero_at_poles::Bool=false`: Whether the scalars are constrained to zero at the poles.
 
 # Returns
-- `(P_sol, E_sol)`: The polar spline solution space and global extraction matrix for
-    the solution
-- `(P_geom, E_geom, geom_coeffs_polar)`: The polar spline geometry space, global extraction
-    matrix, and geometry coefficients
-- `geom_coeffs_tp`: The tensor-product geometry coefficients
-- `(ts_θ, ts_r)`: The univariate refinement operators for the angular and radial directions
+- `::PolarSplineSpace`: The resulting scalar polar spline space.
 """
-function create_polar_spline_space_and_geometry(
+function create_scalar_polar_spline_space(
     num_elements::NTuple{2, Int},
     section_spaces::F,
-    regularities::NTuple{2, Int},
-    R::Float64;
-    refine::Bool=false,
+    regularities::NTuple{2, Int};
     geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
-    form_rank::Int=0,
+    R::Float64=1.0,
+    two_poles::Bool=false,
+    zero_at_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 ) where {F <: NTuple{2, AbstractCanonicalSpace}}
-    Bθ, Br = create_dim_wise_bspline_spaces(
-        (0.0, 0.0), (1.0, 1.0), num_elements, section_spaces, regularities, (1, 1), (1, 1)
+    # spaces used for creating degenerate geometry
+    Bθ_g, Br_g = create_dim_wise_bspline_spaces(
+        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
+    )
+    GBθ_g = GTBSplineSpace((Bθ_g,), [regularities[1]])
+
+    if isnothing(geom_coeffs_tp)
+        if two_poles
+            error("Two-pole geometries require user-provided geometry coefficients.")
+        end
+        # number of control points for a degenerate tensor-product mapping
+        n_θ = get_num_basis(GBθ_g)
+        n_r = get_num_basis(Br_g)
+        geom_coeffs_tp, _, _ = _build_standard_degenerate_control_points(n_θ, n_r, R)
+    end
+
+    if zero_at_poles
+        # reduce degree and regularity by 1
+        Bθ, Br = create_dim_wise_bspline_spaces(
+            (0.0, 0.0), box_sizes, num_elements,
+            get_derivative_space.(section_spaces), regularities .- 1, (1, 1), (1, 1)
+        )
+        GBθ = GTBSplineSpace((Bθ,), [regularities[1] - 1])
+
+        return PolarSplineSpace(
+            (TensorProductSpace((GBθ, Br)),),
+            geom_coeffs_tp,
+            TensorProductSpace((GBθ_g, Br_g)),
+            two_poles,
+            zero_at_poles
+        )
+    else
+        return PolarSplineSpace(
+            (TensorProductSpace((GBθ_g, Br_g)),),
+            geom_coeffs_tp,
+            TensorProductSpace((GBθ_g, Br_g)),
+            two_poles,
+            zero_at_poles
+        )
+    end
+end
+
+"""
+    create_vector_polar_spline_space(
+        num_elements::NTuple{2, Int},
+        degrees::NTuple{2, Int},
+        regularities::NTuple{2, Int};
+        geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+        R::Float64=1.0,
+        two_poles::Bool=false
     )
 
-    return _create_polar_spline_space_and_geometry(
-        Bθ, Br, regularities[1], R, refine, geom_coeffs_tp, form_rank
+Create a vector polar spline space and geometry based on the provided parameters. The
+function constructs two tensor-product B-spline spaces, and then creates a 2-component polar
+spline space and geometry based on them. The geometry is defined by the radius `R`
+and the number of elements in the angular and radial directions. Optional arguments include
+the geometry coefficients, and whether there are two poles.
+
+# Arguments
+- `num_elements::NTuple{2, Int}`: The number of elements in each direction.
+- `degrees::NTuple{2, Int}`: The polynomial degrees in each direction.
+- `regularities::NTuple{2, Int}`: The regularities in each direction.
+- `geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}`: The geometry coefficients.
+- `R::Float64`: The radius of the domain.
+
+# Returns
+- `::PolarSplineSpace`: The resulting vector polar spline space.
+"""
+function create_vector_polar_spline_space(
+    num_elements::NTuple{2, Int},
+    degrees::NTuple{2, Int},
+    regularities::NTuple{2, Int};
+    geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+    R::Float64=1.0,
+    two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
+)
+    return create_vector_polar_spline_space(
+        num_elements,
+        Bernstein.(degrees),
+        regularities;
+        geom_coeffs_tp=geom_coeffs_tp,
+        R=R,
+        two_poles=two_poles,
+        box_sizes=box_sizes
     )
 end
 
 """
-    _create_polar_spline_space_and_geometry(
-        Bθ, Br, endpt_regularity_θ, R, refine, geom_coeffs_tp, form_rank
-    )
+    create_vector_polar_spline_space(
+        num_elements::NTuple{2, Int},
+        section_spaces::F,
+        regularities::NTuple{2, Int};
+        geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+        R::Float64=1.0,
+        two_poles::Bool=false,
+    ) where {F <: NTuple{2, AbstractCanonicalSpace}}
 
-Create a polar spline space and geometry based on the provided parameters. The function
-constructs a polar spline space and geometry based on the tensor-product space constructed
-from the input univariate spaces.
+Create a vector polar spline space and geometry based on the provided parameters. The
+function constructs two tensor-product B-spline spaces, and then creates a 2-component polar
+spline space and geometry based on them. The geometry is defined by the radius `R`
+and the number of elements in the angular and radial directions. Optional arguments include
+the geometry coefficients, and whether there are two poles.
 
 # Arguments
-- `Bθ::BSplineSpace`: The univariate B-spline space in the angular direction.
-- `Br::BSplineSpace`: The univariate B-spline space in the radial direction.
-- `endpt_regularity_θ::Int`: The regularity at the endpoints in the angular direction.
+- `num_elements::NTuple{2, Int}`: The number of elements in each direction.
+- `degrees::NTuple{2, Int}`: The polynomial degrees in each direction.
+- `regularities::NTuple{2, Int}`: The regularities in each direction.
+- `geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}`: The geometry coefficients.
 - `R::Float64`: The radius of the domain.
-- `refine::Bool`: A flag to refine the geometry.
-- `geom_coeffs_tp::Union{Nothing,Array{Float64,3}}`: The geometry coefficients.
-- `form_rank::Int`: The form rank.
 
 # Returns
-- `(P_sol, E_sol)`: The polar spline solution space and global extraction matrix for the
-    solution
-- `(P_geom, E_geom, geom_coeffs_polar)`: The polar spline geometry space, global extraction
-    matrix, and geometry coefficients
-- `geom_coeffs_tp`: The tensor-product geometry coefficients
-- `(ts_θ, ts_r)`: The univariate refinement operators for the angular and radial directions
+- `::PolarSplineSpace`: The resulting vector polar spline space.
 """
-function _create_polar_spline_space_and_geometry(
-    Bθ, Br, endpt_regularity_θ, R, refine, geom_coeffs_tp, form_rank
+function create_vector_polar_spline_space(
+    num_elements::NTuple{2, Int},
+    section_spaces::F,
+    regularities::NTuple{2, Int};
+    geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+    R::Float64=1.0,
+    two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
+) where {F <: NTuple{2, AbstractCanonicalSpace}}
+    # spaces used for creating degenerate geometry
+    Bθ_g, Br_g = create_dim_wise_bspline_spaces(
+        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
+    )
+    GBθ_g = GTBSplineSpace((Bθ_g,), [regularities[1]])
+
+    if isnothing(geom_coeffs_tp)
+        if two_poles
+            error("Two-pole geometries require user-provided geometry coefficients.")
+        end
+        # number of control points for a degenerate tensor-product mapping
+        n_θ = get_num_basis(GBθ_g)
+        n_r = get_num_basis(Br_g)
+        geom_coeffs_tp, _, _ = _build_standard_degenerate_control_points(n_θ, n_r, R)
+    end
+
+    return PolarSplineSpace(
+        (
+            TensorProductSpace((get_derivative_space(GBθ_g), Br_g)),
+            TensorProductSpace((GBθ_g, get_derivative_space(Br_g))),
+        ),
+        geom_coeffs_tp,
+        TensorProductSpace((GBθ_g, Br_g)),
+        two_poles,
+        false
+    )
+end
+
+"""
+    create_polar_geometry_data(
+        num_elements::NTuple{2, Int},
+        degrees::NTuple{2, Int},
+        regularities::NTuple{2, Int};
+        geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+        R::Float64=1.0,
+        two_poles::Bool=false
+    )
+
+Create all data required for creating a polar spline geometry.
+
+# Arguments
+- `num_elements::NTuple{2, Int}`: The number of elements in each direction.
+- `degrees::NTuple{2, Int}`: The polynomial degrees in each direction.
+- `regularities::NTuple{2, Int}`: The regularities in each direction.
+- `geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}`: The geometry coefficients.
+- `R::Float64`: The radius of the domain.
+
+# Returns
+- `P_geom`: The polar spline geometry space.
+- `geom_coeffs_polar`: The polar geometry coefficients.
+"""
+function create_polar_geometry_data(
+    num_elements::NTuple{2, Int},
+    degrees::NTuple{2, Int},
+    regularities::NTuple{2, Int};
+    geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+    R::Float64=1.0,
+    two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
 )
-    GBθ = GTBSplineSpace((Bθ,), [endpt_regularity_θ]) # impose periodicity
+    return create_polar_geometry_data(
+        num_elements,
+        Bernstein.(degrees),
+        regularities;
+        geom_coeffs_tp=geom_coeffs_tp,
+        R=R,
+        two_poles=two_poles,
+        box_sizes=box_sizes
+    )
+end
+
+function create_polar_geometry_data(
+    num_elements::NTuple{2, Int},
+    section_spaces::F,
+    regularities::NTuple{2, Int};
+    geom_coeffs_tp::Union{Nothing, Array{Float64, 3}}=nothing,
+    R::Float64=1.0,
+    two_poles::Bool=false,
+    box_sizes::NTuple{2, Float64} = (1.0, 1.0)
+) where {F <: NTuple{2, AbstractCanonicalSpace}}
+    Bθ, Br = create_dim_wise_bspline_spaces(
+        (0.0, 0.0), box_sizes, num_elements, section_spaces, regularities, (1, 1), (1, 1)
+    )
+    # impose periodicity
+    GBθ = GTBSplineSpace((Bθ,), [regularities[1]])
 
     # number of control points for a degenerate tensor-product mapping
     n_θ = get_num_basis(GBθ)
     n_r = get_num_basis(Br)
 
-    # two-scale operators per dimension
-    ts_θ = nothing
-    ts_r = nothing
     if isnothing(geom_coeffs_tp)
-        geom_coeffs_tp, _, _ = build_standard_degenerate_control_points(n_θ, n_r, R)
-    else
-        # geometry has already been provided, just check if we need to refine it
-        if refine
-            # refine the univariate spaces
-            ts_r, Br_ref = build_two_scale_operator(Br, 2)
-            _, Bθ_ref = build_two_scale_operator(Bθ, 2)
-            GBθ_ref = GTBSplineSpace((Bθ_ref,), [endpt_regularity_θ])
-            ts_θ, _ = build_two_scale_operator(GBθ, GBθ_ref, ((2,),))
-
-            # refine the tensor-product control points
-            geom_coeffs_tp = cat(
-                ts_θ.global_subdiv_matrix *
-                geom_coeffs_tp[:, :, 1] *
-                ts_r.global_subdiv_matrix',
-                ts_θ.global_subdiv_matrix *
-                geom_coeffs_tp[:, :, 2] *
-                ts_r.global_subdiv_matrix';
-                dims=3,
-            )
-
-            # update old spaces
-            Br = Br_ref
-            Bθ = Bθ_ref
-            GBθ = GBθ_ref
-        end
+        geom_coeffs_tp, _, _ = _build_standard_degenerate_control_points(n_θ, n_r, R)
     end
 
     # Polar spline space and global extraction matrix for the geometry
-    P_geom, E_geom = PolarSplineSpace(
-        GBθ, Br, (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]); form_rank=0
+    P_geom = PolarSplineSpace(
+        (TensorProductSpace((GBθ, Br)),),
+        geom_coeffs_tp,
+        TensorProductSpace((GBθ, Br)),
+        two_poles,
+        false
     )
+    E_geom = assemble_global_extraction_matrix(P_geom)
+
     # control points for the polar spline space
-    geom_coeffs_polar =
-        (E_geom[1] * E_geom[1]') \ (E_geom[1] * reshape(geom_coeffs_tp, :, 2))
+    geom_coeffs_polar = (E_geom' * E_geom) \ (E_geom' * reshape(geom_coeffs_tp, :, 2))
 
-    # Polar spline space and global extraction matrix for the solution
-    dBr = get_derivative_space(Br)
-    dBθ = get_derivative_space(Bθ)
-    dGBθ = GTBSplineSpace((dBθ,), [endpt_regularity_θ - 1])
-    P_sol, E_sol = PolarSplineSpace(
-        GBθ,
-        Br,
-        (geom_coeffs_tp[:, 1, :], geom_coeffs_tp[:, 2, :]);
-        form_rank=form_rank,
-        dspace_p=dGBθ,
-        dspace_r=dBr,
-    )
+    return P_geom, geom_coeffs_polar
+end
 
-    return (P_sol, E_sol), (P_geom, E_geom, geom_coeffs_polar), geom_coeffs_tp, (ts_θ, ts_r)
+"""
+    refine_polar_geometry_data(P_geom, geom_coeffs_polar; two_poles=false)
+
+Refine the polar geometry data.
+
+# Arguments
+- `P_geom`: The polar spline geometry space.
+- `geom_coeffs_polar`: The polar geometry coefficients.
+- `two_poles`: Whether the polar geometry contains two poles.
+
+# Returns
+- `P_geom_ref`: The refined polar spline geometry space.
+- `geom_coeffs_polar_tp_ref`: The refined polar geometry coefficients.
+"""
+function refine_polar_geometry_data(
+    P_geom, geom_coeffs_polar; two_poles=false
+)
+    # refine the space and build two-scale operator
+    TS, P_geom_ref = build_two_scale_operator(P_geom, 2)
+    subdiv_mat = get_global_subdiv_matrix(TS)
+    # refine input polar geometry coefficients
+    geom_coeffs_polar_ref = subdiv_mat * geom_coeffs_polar
+
+    return P_geom_ref, geom_coeffs_polar_ref,
+        get_num_elements.(get_constituent_spaces(P_geom_ref))
+end
+
+"""
+    _build_standard_degenerate_control_points(n_p::Int, n_r::Int, R::Float64)
+
+Generate degenerate control points for a given number of poloidal and radial divisions.
+
+# Arguments
+- n_p::Int: Number of poloidal divisions.
+- n_r::Int: Number of radial divisions.
+- R::Float64: Radius of the polar domain.
+
+# Returns
+- degenerate_control_points::Array{Float64,3}: The degenerate control points.
+- radii::Vector{Float64}: The radii values.
+- theta::Vector{Float64}: The theta values.
+"""
+function _build_standard_degenerate_control_points(n_p::Int, n_r::Int, R::Float64)
+    radii = LinRange(0.0, R, n_r)
+    theta = 2 * pi .+ (1 .- 2 .* (1:n_p)) .* pi / n_p
+    degenerate_control_points = zeros(Float64, n_p, n_r, 2)
+    # the control points that are identical to the tensor-product control points
+    for idx in Iterators.product(1:n_p, 1:n_r)
+        degenerate_control_points[idx[1], idx[2], 1] = radii[idx[2]] * cos(theta[idx[1]])
+        degenerate_control_points[idx[1], idx[2], 2] = radii[idx[2]] * sin(theta[idx[1]])
+    end
+
+    return degenerate_control_points, radii, theta
 end
 
 ################################################################################
