@@ -198,13 +198,13 @@ k = 0
 n = N * (p + 1) - (k + 1) * (N - 1)
 
 ## Create the mesh and the function space
-breakpoints = collect(LinRange(0.0, L, N+1))
-patch = Mantis.Mesh.Patch1D(breakpoints)
+breakpoints = LinRange(0.0, L, N+1)
+patch = Mantis.Mesh.Patch1D(collect(breakpoints))
 B = Mantis.FunctionSpaces.BSplineSpace(patch, p, k)
 line_geo = Mantis.Geometry.CartesianGeometry((breakpoints,))
 
 ## Create a Form Space.
-BF = Mantis.Forms.FormSpace(0, line_geo, Mantis.FunctionSpaces.DirectSumSpace((B,)), "b")
+BF = Mantis.Forms.FormSpace(0, line_geo, B, "b")
 
 ## Plot the basis functions.
 n_plot_points_per_element = 25
@@ -216,8 +216,8 @@ ax = Axis(fig[1, 1],
     ylabel = "b_i(x)",
 )
 
-n_elements = Mantis.Geometry.get_num_elements(Mantis.Forms.get_geometry(BF))
-xi = collect(LinRange(0.0, 1.0, n_plot_points_per_element))
+n_elements = Mantis.Geometry.get_num_elements(line_geo)
+xi = Mantis.Points.CartesianPoints((LinRange(0.0, 1.0, n_plot_points_per_element),))
 BFF = Mantis.Forms.FormField(BF, " ")
 
 dim_V = Mantis.Forms.get_num_basis(BF)
@@ -232,8 +232,8 @@ for basis_idx in 1:dim_V
     color_i = colors[basis_idx]
 
     for element_idx in 1:n_elements
-        form_eval, _ = Mantis.Forms.evaluate(BFF, element_idx, (xi,))
-        x = Mantis.Geometry.evaluate(Mantis.Forms.get_geometry(BF), element_idx, (xi,))
+        form_eval, _ = Mantis.Forms.evaluate(BFF, element_idx, xi)
+        x = Mantis.Geometry.evaluate(Mantis.Forms.get_geometry(BF), element_idx, xi)
 
         lines!(ax, x[:], form_eval[1], color=color_i)
 
