@@ -1,6 +1,6 @@
 module HierarchicalBSplineTests
 
-import Mantis
+using Mantis
 
 using Test
 
@@ -11,79 +11,86 @@ p = 3
 nlevels = 3
 subdiv = 2
 
-brk = collect(LinRange(0,1,nq))
-patch = Mantis.Mesh.Patch1D(brk)
-regularity = fill(p-1, nq)
-regularity[1]=regularity[nq] = -1
-bspline1 = Mantis.FunctionSpaces.BSplineSpace(patch, p, regularity)
+brk = collect(LinRange(0, 1, nq))
+patch = Mesh.Patch1D(brk)
+regularity = fill(p - 1, nq)
+regularity[1] = regularity[nq] = -1
+bspline1 = FunctionSpaces.BSplineSpace(patch, p, regularity)
 
-two_scale_operators = Vector{Mantis.FunctionSpaces.TwoScaleOperator}(undef, nlevels-1)
-bsplines = Vector{Mantis.FunctionSpaces.BSplineSpace}(undef, nlevels)
+two_scale_operators = Vector{FunctionSpaces.TwoScaleOperator}(undef, nlevels - 1)
+bsplines = Vector{FunctionSpaces.BSplineSpace}(undef, nlevels)
 bsplines[1] = bspline1
 
-for l in 1:nlevels-1
-    ts_operator, bspline = Mantis.FunctionSpaces.build_two_scale_operator(bsplines[l], subdiv)
+for l in 1:(nlevels - 1)
+    ts_operator, bspline = FunctionSpaces.build_two_scale_operator(bsplines[l], subdiv)
     two_scale_operators[l] = ts_operator
-    bsplines[l+1] = bspline
+    bsplines[l + 1] = bspline
 end
 
-refined_domains = Mantis.FunctionSpaces.HierarchicalActiveInfo([[1,2,3,4,5,6],[3,4,5,6,7,8,9,10],[7,8,9,10,11,12,13,14,15,16]])
-hier_space = Mantis.FunctionSpaces.HierarchicalFiniteElementSpace(bsplines, two_scale_operators, refined_domains, (subdiv,)); nothing
+refined_domains = FunctionSpaces.HierarchicalActiveInfo([
+    [1, 2, 3, 4, 5, 6], [3, 4, 5, 6, 7, 8, 9, 10], [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+])
+hier_space = FunctionSpaces.HierarchicalFiniteElementSpace(
+    bsplines, two_scale_operators, refined_domains, (subdiv,)
+)
+nothing
 
-# test if active elements are correct   
-@test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 1) == [1,6]
-@test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 2) == [3,9,10]
-@test Mantis.FunctionSpaces.get_level_element_ids(hier_space, 3) == collect(7:16)
+# test if active elements are correct
+@test FunctionSpaces.get_level_element_ids(hier_space, 1) == [1, 6]
+@test FunctionSpaces.get_level_element_ids(hier_space, 2) == [3, 9, 10]
+@test FunctionSpaces.get_level_element_ids(hier_space, 3) == collect(7:16)
 
-# test if active functions are correct   
-@test Mantis.FunctionSpaces.get_level_basis_ids(hier_space, 1) == [1,2,3,4,6,7,8,9]
-@test Mantis.FunctionSpaces.get_level_basis_ids(hier_space, 2) == [6,9,10]
-@test Mantis.FunctionSpaces.get_level_basis_ids(hier_space, 3) == collect(10:16)
+# test if active functions are correct
+@test FunctionSpaces.get_level_basis_ids(hier_space, 1) == [1, 2, 3, 4, 6, 7, 8, 9]
+@test FunctionSpaces.get_level_basis_ids(hier_space, 2) == [6, 9, 10]
+@test FunctionSpaces.get_level_basis_ids(hier_space, 3) == collect(10:16)
 
 # Test if projection in space is exact
 nxi = 20
-xi = collect(range(0,1, nxi))
+xi = Points.CartesianPoints((range(0, 1, nxi),))
 
-xs = Vector{Float64}(undef, Mantis.FunctionSpaces.get_num_elements(hier_space)*nxi)
+xs = Vector{Float64}(undef, FunctionSpaces.get_num_elements(hier_space) * nxi)
 nx = length(xs)
 
-A = zeros(nx, Mantis.FunctionSpaces.get_num_basis(hier_space))
+A = zeros(nx, FunctionSpaces.get_num_basis(hier_space))
 
-for element_id ∈ 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
-    level, element_level_id = Mantis.FunctionSpaces.convert_to_element_level_and_level_id(hier_space, element_id)
+for element_id in 1:1:FunctionSpaces.get_num_elements(hier_space)
+    level, element_level_id = FunctionSpaces.convert_to_element_level_and_level_id(
+        hier_space, element_id
+    )
 
-    borders = Mantis.Mesh.get_element(hier_space.spaces[level].knot_vector.patch_1d, element_id)
-    x = borders[1] .+ xi .* (borders[2] - borders[1])
+    borders = Mesh.get_element(hier_space.spaces[level].knot_vector.patch_1d, element_id)
+    x = borders[1] .+ Points.get_constituent_points(xi)[1] .* (borders[2] - borders[1])
 
-    idx = (element_id-1)*nxi+1:element_id*nxi
+    idx = ((element_id - 1) * nxi + 1):(element_id * nxi)
     xs[idx] = x
 
-    local eval = Mantis.FunctionSpaces.evaluate(hier_space, element_id, (xi,), 0)
+    h_eval, h_inds = FunctionSpaces.evaluate(hier_space, element_id, xi, 0)
 
-    A[idx, eval[2]] = eval[1][1][1]
+    A[idx, h_inds] = h_eval[1][1][1]
 end
 
 coeffs = A \ xs
 A * coeffs .- xs
 all(isapprox.(A * coeffs .- xs, 0.0, atol=1e-14))
 
-@test Mantis.FunctionSpaces.get_num_levels(hier_space) == nlevels
+@test FunctionSpaces.get_num_levels(hier_space) == nlevels
 
 for l in 1:nlevels
-    @test Mantis.FunctionSpaces.get_space(hier_space, l) == bsplines[l]
+    @test FunctionSpaces.get_space(hier_space, l) == bsplines[l]
 end
 
 # Tests for coefficients and evaluation
-for element_id in 1:1:Mantis.FunctionSpaces.get_num_elements(hier_space)
+for element_id in 1:1:FunctionSpaces.get_num_elements(hier_space)
 
     # check extraction coefficients
-    ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(hier_space, element_id)
+    ex_coeffs, _ = FunctionSpaces.get_extraction(hier_space, element_id)
     @test all(ex_coeffs .>= 0.0) # Test for non-negativity
 
     # check Hierarchical B-spline evaluation
-    h_eval, _ = Mantis.FunctionSpaces.evaluate(hier_space, element_id, (xi,), 0)
+    h_eval, _ = FunctionSpaces.evaluate(hier_space, element_id, xi, 0)
     # Positivity of the basis
-    @test minimum(h_eval[1][1]) >= 0.0
+    @test minimum(h_eval[1][1][1]) >= 0.0
 end
 
 end

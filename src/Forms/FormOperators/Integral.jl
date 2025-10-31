@@ -20,13 +20,15 @@ Structure representing the integral of a form over a manifold.
 - `∫`: Symbolic wrapper for the integral operator.
 """
 struct Integral{manifold_dim, F, Q} <: AbstractRealValuedOperator{manifold_dim}
-    # form::AbstractFormExpression{manifold_dim}
-    # quad_rule::Quadrature.AbstractGlobalQuadratureRule{manifold_dim}
     form::F
     quad_rule::Q
     function Integral(
         form::F, quad_rule::Q
-    ) where {manifold_dim, F <: AbstractFormExpression{manifold_dim, manifold_dim}, Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim}}
+    ) where {
+        manifold_dim,
+        F <: AbstractFormExpression{manifold_dim, manifold_dim},
+        Q <: Quadrature.AbstractGlobalQuadratureRule{manifold_dim},
+    }
         geom = get_geometry(form)
         if Geometry.get_num_elements(geom) != Quadrature.get_num_base_elements(quad_rule)
             throw(
@@ -75,6 +77,23 @@ Returns the form associated with the integral operator.
 - `<: AbstractFormExpression`: The form associated with the integral operator.
 """
 get_form(integral::Integral) = integral.form
+
+"""
+    get_form_space_tree(integral::Integral)
+
+Returns the spaces of forms of `expression_rank` > 0 appearing in the tree of the integrand of integral, e.g., for
+`∫c*((α ∧ β) + γ)`, it returns the spaces of `α`, `β`, and `γ`, if all have expression_rank > 1. 
+If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
+
+# Arguments
+- `integral::Integral`: The Integral structure.
+
+# Returns
+- `Tuple(<:AbstractFormExpression)`: The list of form spaces present in the tree of the integrand of integral.
+"""
+function get_form_space_tree(integral::Integral)
+    return get_form_space_tree(get_form(integral))
+end
 
 """
     get_expression_rank(integral::Integral)
@@ -188,37 +207,46 @@ function evaluate(
     quad_rule = get_quadrature_rule(integral)
     quadrature_elements = Quadrature.get_element_idxs(quad_rule, global_element_id)
     if isempty(quadrature_elements)
-        return Float64[], Vector{Int}[]
+        array_dim = max(expression_rank, 1)
+        return Array{Float64, array_dim}(undef, ntuple(_ -> 0, array_dim)), Vector{Int}[]
     end
 
-    integral_ids = [Int[] for _ in 1:expression_rank]
-    integral_vals = Float64[]
     form = get_form(integral)
-    for quad_element_id in quadrature_elements
+    element_quad_rule = Quadrature.get_element_quadrature_rule(
+        quad_rule, quadrature_elements[1]
+    )
+    weights = Quadrature.get_weights(element_quad_rule)
+
+    form_eval, basis_indices = evaluate(
+        form, global_element_id, Quadrature.get_nodes(element_quad_rule)
+    )
+    num_basis_indices = ntuple(i -> length(basis_indices[i]), max(expression_rank, 1))
+    integral_vals = zeros(num_basis_indices)
+    integral_vals = add_integral_contribution!(
+        integral_vals, num_basis_indices, form_eval, weights
+    )
+    for quad_element_id in quadrature_elements[2:end]
         element_quad_rule = Quadrature.get_element_quadrature_rule(
             quad_rule, quad_element_id
         )
-        element_val, element_ids = evaluate(
+        weights .= Quadrature.get_weights(element_quad_rule)
+        form_eval .= evaluate(
             form, global_element_id, Quadrature.get_nodes(element_quad_rule)
+        )[1]
+        integral_vals = add_integral_contribution!(
+            integral_vals, num_basis_indices, form_eval, weights
         )
-        append!(
-            integral_vals,
-            vec(sum(Quadrature.get_weights(element_quad_rule) .* element_val[1]; dims=1)),
-        )
-        num_indices = length.(element_ids)
-        for j in eachindex(integral_ids)
-            append!(integral_ids[j], zeros(Int, prod(num_indices)))
-        end
+    end
 
-        count = prod(num_indices) - 1
-        for id in Iterators.product([1:l for l in num_indices]...)
-            for j in eachindex(integral_ids)
-                integral_ids[j][end - count] = element_ids[j][id[j]]
-            end
+    return integral_vals, basis_indices
+end
 
-            count -= 1
+function add_integral_contribution!(integral_vals, num_basis_indices, form_eval, weights)
+    for ord_id in CartesianIndices(num_basis_indices)
+        for node_id in axes(form_eval[1], 1)
+            integral_vals[ord_id] += weights[node_id] * form_eval[1][node_id, ord_id]
         end
     end
 
-    return integral_vals, integral_ids
+    return integral_vals
 end

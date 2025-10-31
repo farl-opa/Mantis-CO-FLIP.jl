@@ -23,25 +23,25 @@ function GaussLegendre(p::Int)
     return GaussLegendre(p, nodes, gl_polynomials)
 end
 
-@doc raw"""
+"""
 Edge polynomials of degree ``p`` over Gauss-Lobatto-Legendre nodes.
 
-The ``j``-th edge basis polynomial, ``e_{j}(\xi)``, is given by, see [1],
+The ``j``-th edge basis polynomial, ``e_{j}(\\xi)``, is given by, see [1],
 
 ```math
-    e_{j}(\xi) = -\sum_{k=1}^{j} \frac{\mathrm{d} h_{k}(\xi)}{\mathrm{d}\xi}, j = 1 , \dots, p+1\,.
+    e_{j}(\\xi) = -\\sum_{k=1}^{j} \\frac{\\mathrm{d} h_{k}(\\xi)}{\\mathrm{d}\\xi}, j = 1 , \\dots, p+1\\,.
 ```
 
-where ``h_{k}(\xi)`` is the ``k``-th Lagrange polynomial of degree ``(p+1)`` over
+where ``h_{k}(\\xi)`` is the ``k``-th Lagrange polynomial of degree ``(p+1)`` over
 Gauss-Lobatto-Legendre nodes.
 
-If ``\xi_{i}`` are the ``(p+1)`` nodes of the associated Gauss-Lobatto-Legendre polynomials, then
+If ``\\xi_{i}`` are the ``(p+1)`` nodes of the associated Gauss-Lobatto-Legendre polynomials, then
 
 ```math
-\int_{\xi_{i}}^{\xi_{i+1}} e_{j}(\xi)\,\mathrm{d}\xi = \delta_{i,j}, \qquad i,j = 1, \dots, p\,,
+\\int_{\\xi_{i}}^{\\xi_{i+1}} e_{j}(\\xi)\\,\\mathrm{d}\\xi = \\delta_{i,j}, \\qquad i,j = 1, \\dots, p\\,,
 ```
 
-i.e., they satisfy an integral Kronecker-``\delta`` property.
+i.e., they satisfy an integral Kronecker-``\\delta`` property.
 
 # Fields
 - `p::Int`: polynomial degree.
@@ -66,43 +66,43 @@ function get_derivative_space(elem_loc_basis::LobattoLegendre)
     return EdgeLobattoLegendre(max(elem_loc_basis.p - 1, 0))
 end
 
-@doc raw"""
-    evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64)
+"""
+    evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int=0)
 
-Evaluate the first `nderivatives` derivatives of the polynomials ``B_{j}(\xi)``, ``j = 1, \dots, p+1``,
-in `polynomials` at `ξ` for ``\xi \in [0.0, 1.0]``.
+Evaluate the first `nderivatives` derivatives of the polynomials ``B_{j}(\\xi)``, ``j = 1, \\dots, p+1``,
+in `polynomials` at `ξ` for ``\\xi \\in [0.0, 1.0]``.
 
 # Arguments
 - `polynomials::AbstractLagrangePolynomials`: ``(p+1)`` polynomials of degree ``p``,
-    ``B_{j}^{p}(\xi)`` with ``j = 1, \dots, p+1``, to evaluate.
-- `ξ::Vector{Float64}`: vector of ``n`` evaluation points ``\xi \in [0.0, 1.0]``.
-- `nderivatives::Int64`: maximum order of derivatives to be computed (nderivatives ``\leq p``). Will compute
+    ``B_{j}^{p}(\\xi)`` with ``j = 1, \\dots, p+1``, to evaluate.
+- `ξ::Vector{Float64}`: vector of ``n`` evaluation points ``\\xi \\in [0.0, 1.0]``.
+- `nderivatives::Int`: maximum order of derivatives to be computed (nderivatives ``\\leq p``). Will compute
    the polynomial, first derivative, second derivative, etc, up to nderivatives.
 
 # Returns
 `d_polynomials::Array{Float64, 3}(n, p+1, nderivatives)` with the evaluation of `polynomials` and its derivatives
-up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \frac{\mathrm{d}^{k}B_{j}}{\mathrm{d}\xi^{k}}(\xi_{i})``.
-
-See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
+up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \\frac{\\mathrm{d}^{k}B_{j}}{\\mathrm{d}\\xi^{k}}(\\xi_{i})``.
 """
 Memoization.@memoize function evaluate(
-    polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64}, nderivatives::Int64
+    polynomials::AbstractLagrangePolynomials,
+    ξ::Points.AbstractPoints{1},
+    nderivatives::Int=0,
 )
     # Get information from inputs on size of computation
-    n_points = size(ξ, 1)  # the number of points where to evaluate the polynomials and their derivatives
+    num_points = Points.get_num_points(ξ)  # the number of points where to evaluate the polynomials and their derivatives
     p = polynomials.p # the degree of the polynomials, the number of polynomials is p + 1
 
     # Uses the `PolynomialBases` package to evaluate the `polynomial`. This
     # uses the attribute `_core_polynomials` in the `polynomial` struct. This
     # allows every Lagrange polynomial to be evaluated by calling the same
     # method from `PolynomialBases`.
-    ξ_scaled = 2.0 * ξ .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
+    ξ_scaled = 2.0 * Points.get_constituent_points(ξ)[1] .- 1.0  # Abstract polynomials are evaluated for ξ ∈ [0, 1], but PolynomialBases uses ξ ∈ [-1, 1]
 
     # Allocate memory space for the result, derivatives are the third dimension
     d_polynomials = Vector{Vector{Matrix{Float64}}}(undef, nderivatives + 1)
     for j in 0:nderivatives
         d_polynomials[j + 1] = Vector{Matrix{Float64}}(undef, 1)
-        d_polynomials[j + 1][1] = zeros(Float64, n_points, polynomials.p + 1)
+        d_polynomials[j + 1][1] = zeros(Float64, num_points, polynomials.p + 1)
     end
 
     # Evaluate the polynomials at the points ξ
@@ -170,55 +170,26 @@ Memoization.@memoize function evaluate(
     return d_polynomials
 end
 
-function evaluate(
-    polynomials::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64
-)::Matrix{Float64}
-    return evaluate(polynomials, [ξ], nderivatives)
-end
-
-@doc raw"""
-    evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})
-
-Evaluate the polynomials ``B_{j}(\xi)``, ``j = 1, \dots, p+1``, in `polynomials` at `ξ` for
-``\xi \in [0.0, 1.0]``.
-
-# Arguments
-- `polynomials::AbstractLagrangePolynomials`: ``(p+1)`` polynomials of degree ``p``,
-    ``B_{j}(\xi)`` with ``j = 1, \dots, p+1``, to evaluate.
-- `ξ::Vector{Float64}`: vector of ``n`` evaluation points ``\xi \in [0.0, 1.0]``.
-
-# Returns
-`polynomials::Array{Float64, 3}(n, p+1)` with the evaluation of `polynomials` at every point `ξ`.
-    `polynomials[i, j]` ``= B_{j}(\xi_{i})``.
-
-See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::AbstractLagrangePolynomials, ξ::Vector{Float64})
-    return evaluate(polynomials, ξ, 0)
-end
+    evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int=0)
 
-@doc raw"""
-    evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int64)
-
-Evaluate the polynomials ``B_{j}(\xi)``, ``j = 1, \dots, p+1``, in `polynomials` at `ξ` for
-``\xi \in [0.0, 1.0]``.
+Evaluate the polynomials ``B_{j}(\\xi)``, ``j = 1, \\dots, p+1``, in `polynomials` at `ξ` for
+``\\xi \\in [0.0, 1.0]``.
 
 
 # Arguments
 - `polynomials::EdgeLobattoLegendre`: ``(p+1)`` polynomials of degree ``p``,
-    ``B_{j}^{p}(\xi)`` with ``j = 1, \dots, p+1``, to evaluate.
-- `ξ::Vector{Float64}`: vector of ``n`` evaluation points ``\xi \in [0.0, 1.0]``.
-- `nderivatives::Int64`: maximum order of derivatives to be computed (nderivatives ``\leq p``). Will compute
+    ``B_{j}^{p}(\\xi)`` with ``j = 1, \\dots, p+1``, to evaluate.
+- `ξ::Vector{Float64}`: vector of ``n`` evaluation points ``\\xi \\in [0.0, 1.0]``.
+- `nderivatives::Int`: maximum order of derivatives to be computed (nderivatives ``\\leq p``). Will compute
    the polynomial, first derivative, second derivative, etc, up to nderivatives.
 
 # Returns
 `d_polynomials::Array{Float64, 3}(n, p+1, nderivatives)` with the evaluation of `polynomials` and its derivatives
-up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \frac{\mathrm{d}^{k}B_{j}}{\mathrm{d}\xi^{k}}(\xi_{i})``.
-
-See also [`evaluate(polynomial::AbstractLagrangePolynomials, ξ::Float64, nderivatives::Int64)`](@ref).
+up to degree `nderivatives` at every point `ξ`. `d_polynomials[i, j, k]` ``= \\frac{\\mathrm{d}^{k}B_{j}}{\\mathrm{d}\\xi^{k}}(\\xi_{i})``.
 """
 Memoization.@memoize function evaluate(
-    polynomials::EdgeLobattoLegendre, ξ::Vector{Float64}, nderivatives::Int64
+    polynomials::EdgeLobattoLegendre, ξ::Points.AbstractPoints{1}, nderivatives::Int=0
 )
     # The edge basis functions are given by, see documentation of EdgeLobattoLegendre:
     #
@@ -239,29 +210,8 @@ Memoization.@memoize function evaluate(
     return ll_polynomials_eval[1:(nderivatives + 1)]
 end
 
-@doc raw"""
-    evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64})
-
-Evaluate the polynomials ``B_{j}(\xi)``, ``j = 1, \dots, p+1``, in `polynomials` at `ξ` for
-``\xi \in [0.0, 1.0]``.
-
-# Arguments
-- `polynomials::EdgeLobattoLegendre`: ``(p+1)`` polynomials of degree ``p``,
-    ``B_{j}(\xi)`` with ``j = 1, \dots, p+1``, to evaluate.
-- `ξ::Vector{Float64}`: vector of ``n`` evaluation points ``\xi \in [0.0, 1.0]``.
-
-# Returns
-`polynomials::Array{Float64, 3}(n, p+1)` with the evaluation of `polynomials` at every point `ξ`.
-    `polynomials[i, j]` ``= B_{j}(\xi_{i})``.
-
-See also [`evaluate(polynomial::EdgeLobattoLegendre, ξ::Float64, nderivatives::Int64)`](@ref).
 """
-function evaluate(polynomials::EdgeLobattoLegendre, ξ::Vector{Float64})
-    return evaluate(polynomials, ξ, 0)
-end
-
-@doc raw"""
-    _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
+    _derivative_matrix(nodes::Vector{Float64}; algorithm::Int=1)
 
 Returns the first derivative of the polynomial lagrange basis
 functions at the nodal points.
@@ -270,49 +220,49 @@ The derivative of the Lagrange interpolating basis functions
 (``l_{n}^{p}(x)``) are given by:
 
 ```math
-\frac{dl_{n}(x)}{dx} = \sum_{i=1, i\neq n}^{p+1}\prod_{j=1, j \neq n, j\neq i}^{p+1}\frac{1}{x_{n}-x_{i}}\frac{x-x_{j}}{x_{n}-x_{j}}
+\\frac{dl_{n}(x)}{dx} = \\sum_{i=1, i\\neq n}^{p+1}\\prod_{j=1, j \\neq n, j\\neq i}^{p+1}\\frac{1}{x_{n}-x_{i}}\\frac{x-x_{j}}{x_{n}-x_{j}}
 ```
 
 For computation at the nodes a more efficient and accurate formula can
 be used, see [Costa2000](@cite):
 
 ```math
-d_{k,j} = \left\{
-\begin{aligned}
-&\frac{c_{k}}{c_{j}}\frac{1}{x_{k}-x_{j}}, \qquad k \neq j\\
-&\sum_{l=1,l\neq k}^{p+1}\frac{1}{x_{k}-x_{l}}, \qquad k = j
-\end{aligned}
-\right.
+d_{k,j} = \\left\\{
+\\begin{aligned}
+&\\frac{c_{k}}{c_{j}}\\frac{1}{x_{k}-x_{j}}, \\qquad k \\neq j\\
+&\\sum_{l=1,l\\neq k}^{p+1}\\frac{1}{x_{k}-x_{l}}, \\qquad k = j
+\\end{aligned}
+\\right.
 ```
 with
 
 ```math
-c_{k} = \prod_{l=1,l\neq k}^{p+1} (x_{k}-x_{l})
+c_{k} = \\prod_{l=1,l\\neq k}^{p+1} (x_{k}-x_{l})
 ```
 
-It returns a 2-dimensional matrix, `D`, with the values of the derivative of
-the polynomials, $B_{j}$, of order `p`
+It returns a 2-dimensional matrix, ``D``, with the values of the derivative of
+the polynomials, ``B_{j}``, of order ``p``
 
 ```math
-D_{k,j} = \frac{\mathrm{d}B_{j}(x_{k})}{\mathrm{d}x}
+D_{k,j} = \\frac{\\mathrm{d}B_{j}(x_{k})}{\\mathrm{d}x}
 ```
 # Arguments
 - `nodes::Vector{Float64}`: ``(p+1)`` nodes that define a set of Lagrange polynomials of
-  degree ``p``, ``B_{j}^{p}(\xi)``, for which to compute the derivative matrix. Note that
-  the polynomials are such that ``B_{j}^{p}(\xi_{i}) = \delta_{j,i}`` with ``j,i = 1, \dots, p+1``,
-  `\xi_{i} \in [0.0, 1.0]`.
+  degree ``p``, ``B_{j}^{p}(\\xi)``, for which to compute the derivative matrix. Note that
+  the polynomials are such that ``B_{j}^{p}(\\xi_{i}) = \\delta_{j,i}`` with ``j,i = 1, \\dots, p+1``,
+  `\\xi_{i} \\in [0.0, 1.0]`.
 
 # Keyword arguments
-- `algorithm::Int64`: Flag to specify the algorithm to use
+- `algorithm::Int`: Flag to specify the algorithm to use
     1: <default> Stable algorithm using Eq. (7) in [1].
     2: Direct computation using Eq. (4) in [1].
 
 # Returns
 - `D::Array{Float64, 2}` :: The derivatives of the `(p+1)` polynomials evaluated at the `(p+1)` nodal points.
-   ``D_{k,j} = \frac{\mathrm{d}B_{j}(x_{k})}{\mathrm{d}x}``.
+   ``D_{k,j} = \\frac{\\mathrm{d}B_{j}(x_{k})}{\\mathrm{d}x}``.
    (size: [p+1, p+1])
 """
-function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
+function _derivative_matrix(nodes::AbstractVector{Float64}; algorithm::Int=1)
     #   Revisions:  2009-11-25 (apalha) First implementation.
     #               2014-12-03 (apalha) Removed pre-allocation of result.
     #                                   Replaced repmats by bsxfun for smaller
@@ -404,8 +354,8 @@ function _derivative_matrix(nodes::Vector{Float64}; algorithm::Int64=1)
     return D
 end
 
-@doc raw"""
-_derivative_matrix_next!(D_m::Array{Float64, 2}, m::Int64, D::Array{Float64, 2}, nodes::Vector{Float64})
+"""
+_derivative_matrix_next!(D_m::Array{Float64, 2}, m::Int, D::Array{Float64, 2}, nodes::Vector{Float64})
 
 Given the derivative matrix (of order 1), `D`, and the derivative matrix of order `n`, `D_m`,
 compute the derivative of order `(n+1)`.
@@ -417,21 +367,21 @@ We follow the algorithm proposed in section 4 of [Costa2000](@cite).
    evaluated at the `(p+1)` nodal points, following the same format as the derivative matrix `D` below.
    (size: [p+1, p+1])
 - `D::Array{Float64, 2}` :: The derivatives of the `(p+1)` polynomials evaluated at the `(p+1)` nodal points.
-   ``D_{k,j} = \frac{\mathrm{d}B_{j}(x_{k})}{\mathrm{d}x}``.
+   ``D_{k,j} = \\frac{\\mathrm{d}B_{j}(x_{k})}{\\mathrm{d}x}``.
    (size: [p+1, p+1])
 - `nodes::Vector{Float64}`: ``(p+1)`` nodes that define a set of Lagrange polynomials of
-   degree ``p``, ``B_{j}^{p}(\xi)``, for which to compute the derivative matrix. Note that
-   the polynomials are such that ``B_{j}^{p}(\xi_{i}) = \delta_{j,i}`` with ``j,i = 1, \dots, p+1``,
-   `\xi_{i} \in [0.0, 1.0]`.
+   degree ``p``, ``B_{j}^{p}(\\xi)``, for which to compute the derivative matrix. Note that
+   the polynomials are such that ``B_{j}^{p}(\\xi_{i}) = \\delta_{j,i}`` with ``j,i = 1, \\dots, p+1``,
+   `\\xi_{i} \\in [0.0, 1.0]`.
 
 # Returns
 - `D_m::Array{Float64, 2}` :: The derivatives or degree `(m+1)` of the `(p+1)` polynomials evaluated at the `(p+1)` nodal points.
-   ``D^{(m)}_{k,j} = \frac{\mathrm{d}^{m}B_{j}(x_{k})}{\mathrm{d}x^{m}}``. `D_m` given as input argument is updated with the new value.
+   ``D^{(m)}_{k,j} = \\frac{\\mathrm{d}^{m}B_{j}(x_{k})}{\\mathrm{d}x^{m}}``. `D_m` given as input argument is updated with the new value.
    (size: [p+1, p+1])
 
 """
 function _derivative_matrix_next!(
-    D_m::Array{Float64, 2}, m::Int64, D::Array{Float64, 2}, nodes::Vector{Float64}
+    D_m::Array{Float64, 2}, m::Int, D::Array{Float64, 2}, nodes::AbstractVector{Float64}
 )
     # Compute the differences ξ_{i} - ξ_{j}
     Δξ = broadcast(-, nodes, transpose(nodes))
@@ -458,7 +408,7 @@ function _derivative_matrix_next!(
 end
 
 """
-    build_two_scale_matrix(ect_space::AbstractECTSpaces, num_sub_elements::Int)
+    build_two_scale_matrix(ect_space::AbstractLagrangePolynomials, num_sub_elements::Int)
 
 Uniformly subdivides the ECT space into `num_sub_elements` sub-elements. It is assumed that
 `num_sub_elements` is a power of 2, else the method throws an argument error. It returns a

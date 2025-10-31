@@ -14,17 +14,24 @@ output_directory_tree = ["test", "data", "output", "Plot"]
 # Test Plotting of 3D Geometry (torus) -------------------------------------------
 deg = 2
 Wt = pi/2
+num_elements_θ = 4
+num_elements_r = 1
+box_size_θ = 4.0
+box_size_r = 1.0
+
 bθ = Mantis.FunctionSpaces.GeneralizedTrigonometric(deg, Wt)
-breakpoints = [0.0, 1.0, 2.0, 3.0, 4.0]
-patch = Mantis.Mesh.Patch1D(breakpoints)
-Bθ = Mantis.FunctionSpaces.BSplineSpace(patch, bθ, [-1, 1, 1, 1, -1])
-GBθ = Mantis.FunctionSpaces.GTBSplineSpace((Bθ,), [1])
-Br = Mantis.FunctionSpaces.BSplineSpace(Mantis.Mesh.Patch1D([0.0, 1.0]), 2, [-1, -1])
-geom_coeffs_tp, _, _ = Mantis.FunctionSpaces.build_standard_degenerate_control_points(Mantis.FunctionSpaces.get_num_basis(GBθ),Mantis.FunctionSpaces.get_num_basis(Br),1.0)
-PSplines, E = Mantis.FunctionSpaces.PolarSplineSpace(GBθ, Br, (geom_coeffs_tp[:,1,:],geom_coeffs_tp[:,2,:]))
-geom_coeffs_θr = (E[1] * E[1]') \ (E[1] * reshape(geom_coeffs_tp,:, 2))
-PSpline_spaces = Mantis.FunctionSpaces.get_component_spaces(PSplines)
-S_θrϕ = Mantis.FunctionSpaces.TensorProductSpace(tuple(PSpline_spaces..., GBθ))
+br = Mantis.FunctionSpaces.Bernstein(deg)
+
+space_θr, geom_coeffs_θr = Mantis.FunctionSpaces.create_polar_geometry_data(
+    (num_elements_θ, num_elements_r),
+    (deg, deg),
+    (deg-1, deg-1);
+    box_sizes = (box_size_θ, box_size_r)
+)
+tp_space_θr = Mantis.FunctionSpaces.get_patch_spaces(space_θr)[1]
+GBθ, Br = Mantis.FunctionSpaces.get_constituent_spaces(tp_space_θr)
+space_θrϕ = Mantis.FunctionSpaces.TensorProductSpace((space_θr, GBθ))
+
 # control points for geometry cross-section
 geom_coeffs_θr0 = [geom_coeffs_θr.+[4 0] zeros(size(geom_coeffs_θr,1))]
 # rotate the cross-section points around the y-axis to create control points for torus
@@ -36,7 +43,8 @@ for i ∈ 1:Mantis.FunctionSpaces.get_num_basis(GBθ)-1
     geom_coeffs_θrϕ[i+1] = geom_coeffs_θr0 * R'
 end
 geom_coeffs_θrϕ = vcat(geom_coeffs_θrϕ...)
-geom = Mantis.Geometry.FEGeometry(S_θrϕ, geom_coeffs_θrϕ)
+geom = Mantis.Geometry.FEGeometry(space_θrϕ, geom_coeffs_θrϕ)
+
 # Generate the plot
 output_filename = "fem_geometry_torus_test.vtu"
 output_file = Mantis.GeneralHelpers.export_path(output_directory_tree, output_filename)

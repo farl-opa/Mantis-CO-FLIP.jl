@@ -21,7 +21,7 @@ A brief description of what you can find in the `README.md`.
 
 ## Authors
 The `Mantis` package was created by
-- Diogo Costa Cabanas,
+- Diogo C. Cabanas,
 - Joey Dekker,
 - Artur Palha,
 - Deepesh Toshniwal,

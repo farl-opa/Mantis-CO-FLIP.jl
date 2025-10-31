@@ -44,16 +44,16 @@ higher_regularity_test = fill(polynomial_degree + 1, n)
 # Tests for known properties of B-Spline basis extraction coefficients
 
 for p in degrees_to_test, k in -1:p-1
-    local regularity = fill(k, n)
-    regularity[1] = -1
-    regularity[end] = -1
-    b_spline = BSplineSpace(test_patch, p, regularity)
+    regularity_vec = fill(k, n)
+    regularity_vec[1] = -1
+    regularity_vec[end] = -1
+    b_spline = BSplineSpace(test_patch, p, regularity_vec)
     # Extract the coefficients
     E = Mantis.FunctionSpaces.extract_bspline_to_section_space(
         b_spline.knot_vector, Mantis.FunctionSpaces.Bernstein(p)
     )
     for el in 1:1:n-1
-        ex_coeffs, _ = Mantis.FunctionSpaces.get_extraction(E, el)
+        ex_coeffs = Mantis.FunctionSpaces.get_extraction_coefficients(E, el)
         @test all(ex_coeffs .>= 0.0) # Test for non-negativity
         @test all(isapprox.(sum(ex_coeffs, dims=2) .- 1.0, 0.0, atol=1e-14)) # Test for partition of unity
     end

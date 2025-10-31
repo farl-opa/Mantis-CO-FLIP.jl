@@ -98,7 +98,6 @@ function jacobian(
     return J
 end
 
-
 struct MappedGeometry{manifold_dim, G, Map} <: AbstractGeometry{manifold_dim}
     geometry::G
     mapping::Map
@@ -126,7 +125,7 @@ function get_element_measure(geometry::MappedGeometry, element_id::Int)
 end
 
 function evaluate(
-    geometry::MappedGeometry, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}
+    geometry::MappedGeometry, element_idx::Int, xi::Points.AbstractPoints{manifold_dim}
 ) where {manifold_dim}
     x = evaluate(geometry.geometry, element_idx, xi)
     x_mapped = evaluate(geometry.mapping, x)
@@ -135,7 +134,7 @@ function evaluate(
 end
 
 function jacobian(
-    geometry::MappedGeometry, element_idx::Int, xi::NTuple{manifold_dim, Vector{Float64}}
+    geometry::MappedGeometry, element_idx::Int, xi::Points.AbstractPoints{manifold_dim}
 ) where {manifold_dim}
     # the Jacobian for the mapping from the elements to base geometry image
     J_1 = jacobian(geometry.geometry, element_idx, xi)
