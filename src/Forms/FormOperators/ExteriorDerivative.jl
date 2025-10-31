@@ -366,7 +366,7 @@ end
 function _evaluate_exterior_derivative(
     form::Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {
     manifold_dim,
     form_rank,
@@ -402,7 +402,7 @@ end
 function _evaluate_exterior_derivative(
     form::UnaryFormTransformation{manifold_dim, form_rank, expression_rank, G, F, T},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {
     manifold_dim,
     form_rank,
@@ -429,7 +429,7 @@ end
 function _evaluate_exterior_derivative(
     form::BinaryFormTransformation{manifold_dim, form_rank, expression_rank, F1, F2, G, T},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {
     manifold_dim,
     form_rank,
