@@ -13,7 +13,9 @@ if verbose
     println("Generating benchmarkable objects...")
 end
 
-group = add_benchmark_group!(group, "Bernstein", "Bernstein.jl")
+mod = include("Bernstein.jl")
+sub_group = getproperty(mod, :group)
+group["Bernstein"] = sub_group
 
 if verbose
     println("Done!")
