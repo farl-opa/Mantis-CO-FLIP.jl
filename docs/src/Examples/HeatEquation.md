@@ -56,7 +56,7 @@ at the image below
 ![wall-insulation](../assets/wall-insulation.jpg)
 
 The insulation wall is made up of several materials, each with their own thermal
-diffusivities $\alpha_i(x)$. Imagine that the temperature outside is 0 degrees, and your
+diffusivities ``\alpha_i(x)``. Imagine that the temperature outside is 0 degrees, and your
 heating system holds the temperature inside your house at 18 degrees. Then, these are the
 boundary conditions for the heat equation. Given an initial temperature distribution
 through the insulation wall, you could use the heat equation to find out how the
@@ -169,12 +169,12 @@ v_n(x) = \sum_{i=1}^n c_i \phi_{i}(x)\;,
 for some numbers ``c_i \in \mathbb{R}``.
 
 > **EXAMPLE:** ``V_n`` with ``(N,p,k) = (4, 1, 0)``.
-> Consider the space of functions that are linear polynomials over each mesh element, and
-> which are ``C^0`` smooth (or, equivalently, continuous) at the interfaces ``x_i``
-> between the elements. This space of functions has dimension:
-> ```math
-> n = (p+1)N - (k+1)(N-1) = 2\times 4 - 1 \times 3 = 5\;.
-> ```
+Consider the space of functions that are linear polynomials over each mesh element, and
+which are ``C^0`` smooth (or, equivalently, continuous) at the interfaces ``x_i``
+between the elements. This space of functions has dimension:
+```math
+n = (p+1)N - (k+1)(N-1) = 2\times 4 - 1 \times 3 = 5\;.
+```
 So, we can find 5 basis functions, ``\phi_{1}, \phi_{2}, \dots \phi_{5}``, that span the
 space ``V_n``. Run the code below to create such a ``V_n`` and look at one such choice of
 the basis functions called *hat functions*. Convince yourself that linear combinations of
@@ -238,14 +238,173 @@ for basis_idx in 1:dim_V
         form_eval, _ = Mantis.Forms.evaluate(BFF, element_idx, xi)
         x = Mantis.Geometry.evaluate(Mantis.Forms.get_geometry(BF), element_idx, xi)
 
-        lines!(ax, x[:], form_eval[1], color=color_i)
+        lines!(ax, x[:], form_eval[1], color=color_i, label=L"\phi_{%$basis_idx}")
 
         scatter!(ax, x[:][[1, end]], [0.0, 0.0], color=:tomato)
     end
 end
+fig[1, 2] = Legend(fig, ax, marge=true, unique=true)
 
 fig = DisplayAs.Text(DisplayAs.PNG(fig))
 ````
+
+> **EXAMPLE:** ``V_n`` with ``(N,p,k) = (4, 2, 1)``.
+Consider now the space of functions that are quadratic polynomials over each mesh
+element, and which are ``C^1`` smooth (or, equivalently, continuous and continuously
+differentiable) at the interfaces ``x_i`` between the elements. This space of functions
+has dimension:
+```math
+n = (p+1)N - (k+1)(N-1) = 3\times 4 - 2 \times 3 = 6\;.
+```
+So, we can find 6 basis functions, ``\phi_{1}, \phi_{2}, \dots \phi_{6}``, that span the
+space ``V_n``. Run the code below to create such a ``V_n`` and look at one such choice of
+the basis functions called *B-splines*. (Each function is plotted in a different color.)
+
+````@example HeatEquation
+p = 2
+k = 1
+n = N * (p + 1) - (k + 1) * (N - 1)
+
+B = Mantis.FunctionSpaces.BSplineSpace(patch, p, k)
+
+# Create a Form Space.
+BF = Mantis.Forms.FormSpace(0, line_geo, B, "b")
+
+fig = Figure()
+ax = Axis(fig[1, 1],
+    title = "Basis functions of V_n",
+    xlabel = "x",
+    ylabel = "b_i(x)",
+)
+
+n_elements = Mantis.Geometry.get_num_elements(line_geo)
+xi = Mantis.Points.CartesianPoints((LinRange(0.0, 1.0, n_plot_points_per_element),))
+BFF = Mantis.Forms.FormField(BF, " ")
+
+dim_V = Mantis.Forms.get_num_basis(BF)
+colors = [:blue, :green, :red, :purple, :orange, :black]
+for basis_idx in 1:dim_V
+
+    BFF.coefficients[basis_idx] = 1.0
+    if basis_idx > 1
+        BFF.coefficients[basis_idx - 1] = 0.0
+    end
+
+    color_i = colors[basis_idx]
+
+    for element_idx in 1:n_elements
+        form_eval, _ = Mantis.Forms.evaluate(BFF, element_idx, xi)
+        x = Mantis.Geometry.evaluate(Mantis.Forms.get_geometry(BF), element_idx, xi)
+
+        lines!(ax, x[:], form_eval[1], color=color_i, label=L"\phi_{%$basis_idx}")
+
+        scatter!(ax, x[:][[1, end]], [0.0, 0.0], color=:tomato)
+    end
+end
+fig[1, 2] = Legend(fig, ax, marge=true, unique=true)
+
+fig = DisplayAs.Text(DisplayAs.PNG(fig))
+````
+
+> **Note:** In both of the above examples, the only functions non-zero at ``x=0`` and
+> ``x=L`` are ``\phi_1`` and ``\phi_n``. This means that, in particular, the functions
+> ``\phi_2, \dots, \phi_{n-1}`` form a basis for ``W_n``. We will use this fact later on.
+Since, at each time instant ``t``, our approximate solution ``u_n(x,t)`` is represented
+as a linear combination of the basis functions ``\phi_i``, ``i = 1, \dots, n``, that
+span ``V_n``, this means that our approximate solution has the following form:
+```math
+u_n(x,t) = \sum_{i=1}^n c_i(t) \phi_i(x)\;.
+```
+In other words, the coefficients of the linear combination are time-dependent.
+But we can say more! Since ``u_n(0,t) = u_0`` and ``u_n(L,t) = u_L`` are the boundary
+conditions, then we must have:
+```math
+u_n(x,t) = u_0\phi_1(x) + \sum_{i=2}^{n-1} c_i(t) \phi_i(x) + u_L\phi_n(x)\;.
+```
+That is, the only unknown coefficients in the above expression are ``c_i(t)``,
+``i = 2, \dots, n-1``.
+
+> **_ASSUMPTION:_** For simplicity, we assume that ``u_0`` and ``u_L`` are constants.
+
+### B. Assembling the System of ODEs
+
+Now that we have arrived at an explicit form of our approximate solution to the weak
+problem, let us see how the discrete weak problem leads to a system of ODEs for the
+coefficients ``c_i(t)``. This process is called *assembly* and it leads to a system of
+ODEs that looks like:
+```math
+\mathbf{M}\frac{d\mathbf{C}}{dt} + \mathbf{K} \mathbf{C} = \mathbf{F} - u_{0}\mathbf{F}^{b,0} - u_{L}\mathbf{F}^{b,L}\;,
+```
+where we have arranged the *unknown* coefficients ``c_i(t)`` in a vector
+``\mathbf{C}(t) := [c_2(t), c_3(t), \dots, c_{n-1}(t)]``.
+
+Some terminology: in the above system of ODEs, ``\mathbf{M}`` is called the mass matrix,
+`` \mathbf{K} `` is called the stiffness matrix, `` \mathbf{F} `` is called the load
+vector, ``\mathbf{F}^{b,0}`` and ``\mathbf{F}^{b,L}`` are the contributions of the known
+coefficients (``c_1`` and ``c_n``) to the loading, respectively, and `` \mathbf{C} `` is
+the vector of unknown coefficients that define the solution.
+
+The idea behind assembly is simple. We substitute the assumed form of our discrete
+solution ``u_n`` into the discrete weak problem. This gives us:
+```math
+\int_{0}^{L} w_n\frac{\partial}{\partial t}(\sum_{j=1}^n c_j\phi_j)\;\mathrm{d}x + \int_{0}^{L} \alpha\frac{\partial w_n}{\partial x}\frac{\partial}{\partial x}(\sum_{j=1}^n c_j\phi_j) \,\mathrm{d}x = \int_0^L f w_n \, dx\,,\qquad \forall w_n\in W_n\;,
+```
+
+Since we need to satisfy the above equation for all ``w_n \in W_n``, and since the above
+equation is linear in ``w_n``, it is actually enough if we satisfy the above equation for
+the basis functions that span ``W_n``, i.e., ``\phi_i``, ``i = 2, \dots, n-1``.
+Then, choosing ``w_n = \phi_i`` gives us the following equation, and we get one such
+equation for each ``i = 2, \dots, n-1``,
+```math
+\int_{0}^{L} \phi_i\frac{\partial}{\partial t}(\sum_{j=1}^n c_j\phi_j)\;\mathrm{d}x + \int_{0}^{L} \alpha\frac{\partial \phi_i}{\partial x}\frac{\partial}{\partial x}(\sum_{j=1}^n c_j\phi_j) \,\mathrm{d}x = \int_0^L f \phi_i \, dx\;.
+```
+
+We can rearrange this equation as:
+```math
+\sum_{j=2}^{n-1}\frac{dc_j}{dt} \int_{0}^{L} \phi_i\phi_j\;\mathrm{d}x + \sum_{j=2}^{n-1}c_j\int_{0}^{L} \alpha\frac{d \phi_i}{d x}\frac{d \phi_j}{d x} \,\mathrm{d}x = \int_0^L f \phi_i - u_0\int_{0}^{L} \alpha\frac{d \phi_i}{d x}\frac{d \phi_1}{d x} \, dx - u_L\int_{0}^{L} \alpha\frac{d \phi_i}{d x}\frac{d \phi_n}{d x} \, dx\;.
+```
+
+Then, it is easy to see that this equation represents the ODE system at the beginning of
+this section by defining:
+* ``\mathbf{M}_{ij} = \int_0^L \phi_i\phi_j\;\mathrm{d}x``,
+* ``\mathbf{K}_{ij} = \int_0^L \frac{d\phi_i}{dx}\frac{d\phi_j}{dx}\;\mathrm{d}x``,
+* ``\mathbf{F}_{i} = \int_0^L \phi_i f\;\mathrm{d}x``,
+* ``\mathbf{F}^{b,0}_{i} = \int_{0}^{L} \alpha\frac{d \phi_i}{d x}\frac{d \phi_1}{d x} \, dx``,
+* ``\mathbf{F}^{b,L}_{i} = \int_{0}^{L} \alpha\frac{d \phi_i}{d x}\frac{d \phi_n}{d x} \, dx\;.``
+
+To assemble the matrices ``\boldsymbol{\mathsf{M}}`` and ``\boldsymbol{\mathsf{K}}`` and
+the vectors ``F``, ``F^{b,0}`` and ``F^{b,L}``, we first must define ``\alpha`` and ``f``.
+
+Before choosing our forcing term, it is relevant to briefly analyse the behavior of our
+solution. We saw that our weak form of the equation is
+```math
+\int_{0}^{L} w_n\frac{\partial u_n}{\partial t}\;\mathrm{d}x + \int_{0}^{L} \alpha \frac{\partial u_n}{\partial x}\frac{\partial w_n}{\partial x} \,\mathrm{d}x = \int_0^L f w_n \, dx\,,\qquad \forall w_n\in W_n\;,
+```
+
+Since we have Dirichlet boundary conditions (i.e., we enforce the value of the
+temperature on both sides of our interval), if we prescribe a stationary heat source, the
+solution will evolve to a stationary state. This stationary state, ``u_{h}^{s}`` will be
+the one that satisfies
+```math
+\int_{0}^{L} \alpha \frac{\partial u_n}{\partial x}\frac{\partial w_n}{\partial x} \,\mathrm{d}x = \int_0^L f w_n \, dx\,,\qquad \forall w_n\in W_n\;,
+```
+or in matrix form
+```math
+\mathbf{K} \mathbf{C} = \mathbf{F} - u_{0}\mathbf{F}^{b,0} - u_{L}\mathbf{F}^{b,L}\;.
+```
+
+Additionally, if ``\alpha`` is constant, and if the heat source ``f`` is smooth, then we
+can easily construct analytical solutions to the stationary state. For example,
+```math
+u^{s}(x, t) = 1 + \frac{1}{2}\cos\left(\frac{2\pi}{L} x\right)\,,
+```
+if the heat source is
+```math
+f(x, t) = \frac{2\alpha\pi^{2}}{L^{2}}\cos\left(\frac{2\pi}{L} x\right)\,.
+```
+We choose a finite element space with ``(N,p,k) = (10,2,1)``, i.e., with more elements
+ compared to the last example. This is to ensure that we have sufficient accuracy for
+computing a decent solution.
 
 ---
 

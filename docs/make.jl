@@ -46,7 +46,7 @@ Tutorials = [
         "Tutorials/CreatingDocsPage.md",
     ],
     "Running MANTIS" => [
-        "Tutorials/Test.md",
+        "Tutorials/RunningMantis.md",
     ]
 ]
 
@@ -56,10 +56,15 @@ DevelDocs = [
         "DevelDocs/Documentation.md",
     ],
     "Modules" => [
+        "DevelDocs/Modules/Analysis.md",
         "DevelDocs/Modules/Assemblers.md",
+        "DevelDocs/Modules/Forms.md",
         "DevelDocs/Modules/FunctionSpaces.md",
         "DevelDocs/Modules/GeneralHelpers.md",
         "DevelDocs/Modules/Geometry.md",
+        "DevelDocs/Modules/Mesh.md",
+        "DevelDocs/Modules/Plot.md",
+        "DevelDocs/Modules/Points.md",
         "DevelDocs/Modules/Quadrature.md",
     ],
 ]
