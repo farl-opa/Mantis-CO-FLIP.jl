@@ -59,7 +59,7 @@ function solve_one_form_hodge_laplacian(X⁰, X¹, f¹, dΩ)
     weak_form_inputs = Assemblers.WeakFormInputs((X⁰, X¹), (f¹,))
     lhs_expressions, rhs_expressions = one_form_hodge_laplacian(weak_form_inputs, dΩ)
     weak_form = WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
-    A, b = Assemblers.assemble(weak_form, dΩ)
+    A, b = Assemblers.assemble(weak_form)
     sol = vec(A \ b)
     δu¹ₕ, u¹ₕ = Forms.build_form_fields((X⁰, X¹), sol; labels=("δu¹ₕ", "u¹ₕ"))
 

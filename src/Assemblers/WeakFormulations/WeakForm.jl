@@ -34,6 +34,7 @@ struct WeakForm{manifold_dim, LHS, RHS, I}
     function WeakForm(
         lhs_expressions::LHS, rhs_expressions::RHS, inputs::I
     ) where {
+        manifold_dim,
         lhs_num_rows,
         lhs_num_cols,
         rhs_num_rows,
@@ -44,7 +45,7 @@ struct WeakForm{manifold_dim, LHS, RHS, I}
         RHS <: NTuple{
             rhs_num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
         },
-        I <: WeakFormInputs,
+        I <: WeakFormInputs{manifold_dim},
     }
         if lhs_num_rows != rhs_num_rows
             throw(
@@ -78,48 +79,8 @@ struct WeakForm{manifold_dim, LHS, RHS, I}
             )
         end
 
-        manifold_dim = 0
-        for row in 1:lhs_num_rows
-            for col in 1:lhs_num_cols
-                expression_type = typeof(lhs_expressions[row][col])
-                if expression_type <: Forms.AbstractRealValuedOperator
-                    manifold_dim = max(
-                        manifold_dim, Forms.get_manifold_dim(lhs_expressions[row][col])
-                    )
-                end
-
-                if expression_type == Int && lhs_expressions[row][col] != 0
-                    throw(
-                        ArgumentError(
-                            """The only supported integer value for the entry of a \
-                            weak-form is 0. The entry at row $(row), column $(col) of \
-                            the left-hand side has value $(lhs_expressions[row][col])."""
-                        ),
-                    )
-                end
-            end
-        end
-
-        for row in 1:rhs_num_rows
-            for col in 1:rhs_num_cols
-                expression_type = typeof(rhs_expressions[row][col])
-                if expression_type <: Forms.AbstractRealValuedOperator
-                    manifold_dim = max(
-                        manifold_dim, Forms.get_manifold_dim(rhs_expressions[row][col])
-                    )
-                end
-
-                if expression_type == Int && rhs_expressions[row][col] != 0
-                    throw(
-                        ArgumentError(
-                            """The only supported integer value for the entry of a \
-                            weak-form is 0. The entry at row $(row), column $(col) of \
-                            the right-hand side has value $(rhs_expressions[row][col])."""
-                        ),
-                    )
-                end
-            end
-        end
+        # TODO: We should think of how to incorporate expressions with different manifold
+        # dimensions (boundary integrals.)
 
         return new{manifold_dim, LHS, RHS, I}(lhs_expressions, rhs_expressions, inputs)
     end
@@ -138,14 +99,99 @@ get_forcings(wf::WeakForm) = get_forcings(get_inputs(wf))
 get_forcing(wf::WeakForm, id::Int=1) = get_forcing(get_inputs(wf), id)
 get_test_sizes(wf::WeakForm) = Forms.get_num_basis.(get_test_forms(wf))
 get_trial_sizes(wf::WeakForm) = Forms.get_num_basis.(get_trial_forms(wf))
-get_test_offsets(wf::WeakForm) = [0; cumsum(get_test_sizes(wf)[1:(end - 1)])...]
-get_trial_offsets(wf::WeakForm) = [0; cumsum(get_trial_sizes(wf)[1:(end - 1)])...]
 get_test_size(wf::WeakForm) = sum(get_test_sizes(wf))
 get_trial_size(wf::WeakForm) = sum(get_trial_sizes(wf))
-get_test_max_local_dim(wf::WeakForm) = sum(Forms.get_max_local_dim.(get_test_forms(wf)))
-get_trial_max_local_dim(wf::WeakForm) = sum(Forms.get_max_local_dim.(get_trial_forms(wf)))
-get_num_rhs_cols(wf::WeakForm) = length(get_rhs_expressions(wf)[1])
 get_lhs_size(wf::WeakForm) = get_test_size(wf), get_trial_size(wf)
+
+"""
+    get_test_offsets(
+        wf::WeakForm{manifold_dim, LHS, RHS, I}
+    ) where {
+        manifold_dim,
+        num_rows,
+        lhs_num_cols,
+        rhs_num_cols,
+        LHS <:
+        NTuple{
+            num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        RHS <:
+        NTuple{
+            num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        I,
+    }
+
+Returns the offsets of the test function spaces used in the weak form.
+
+# Arguments
+- `wf::WeakForm{manifold_dim, LHS, RHS, I}`: The weak form being used.
+
+# Returns
+- `NTuple{num_rows, Int}`: The offsets of the test function spaces.
+"""
+function get_test_offsets(
+    wf::WeakForm{manifold_dim, LHS, RHS, I}
+) where {
+    manifold_dim,
+    num_rows,
+    lhs_num_cols,
+    rhs_num_cols,
+    LHS <:
+    NTuple{num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    RHS <:
+    NTuple{num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    I,
+}
+    test_cumsum = [0; cumsum(get_test_sizes(wf)[1:(end - 1)])...]
+
+    return ntuple(exp_id -> test_cumsum[exp_id], num_rows)
+end
+
+"""
+    get_trial_offsets(
+        wf::WeakForm{manifold_dim, LHS, RHS, I}
+    ) where {
+        manifold_dim,
+        num_rows,
+        lhs_num_cols,
+        rhs_num_cols,
+        LHS <:
+        NTuple{
+            num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        RHS <:
+        NTuple{
+            num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}
+        },
+        I,
+    }
+
+Returns the offsets of the trial function spaces used in the weak form.
+
+# Arguments
+- `wf::WeakForm{manifold_dim, LHS, RHS, I}`: The weak form being used.
+
+# Returns
+- `NTuple{lhs_num_cols, lhs_num_cols}`: The offsets of the trial function spaces.
+"""
+function get_trial_offsets(
+    wf::WeakForm{manifold_dim, LHS, RHS, I}
+) where {
+    manifold_dim,
+    num_rows,
+    lhs_num_cols,
+    rhs_num_cols,
+    LHS <:
+    NTuple{num_rows, NTuple{lhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    RHS <:
+    NTuple{num_rows, NTuple{rhs_num_cols, Union{Int, Forms.AbstractRealValuedOperator}}},
+    I,
+}
+    trial_cumsum = [0; cumsum(get_trial_sizes(wf)[1:(end - 1)])...]
+
+    return ntuple(exp_id -> trial_cumsum[exp_id], lhs_num_cols)
+end
 
 function get_rhs_size(wf::WeakForm)
     if isnothing(get_forcing(wf))
@@ -153,44 +199,6 @@ function get_rhs_size(wf::WeakForm)
     end
 
     return get_test_size(wf), 1
-end
-
-"""
-    get_num_lhs_blocks(wf::WeakForm)
-
-Returns a tuple containing the number of row and column blocks, respectively, for the
-left-hand side of the weak-formulation.
-
-# Arguments
-- `wf::WeakForm`: The weak-formulation for which the number of blocks is to be determined.
-
-# Returns
-- `Tuple(Int, Int)`: The number of row and column blocks for the left-hand side of the weak
-    formulation.
-"""
-function get_num_lhs_blocks(wf::WeakForm)
-    inputs = get_inputs(wf)
-
-    return (get_num_test(inputs), get_num_trial(inputs))
-end
-
-"""
-    get_num_rhs_blocks(wf::WeakForm)
-
-Returns a tuple containing the number of row and column blocks, respectively, for the
-right-hand side of the weak-formulation.
-
-# Arguments
-- `wf::WeakForm`: The weak-formulation for which the number of blocks is to be determined.
-
-# Returns
-- `Tuple(Int, Int)`: The number of row and column blocks for the right-hand side of the weak
-    formulation.
-"""
-function get_num_rhs_blocks(wf::WeakForm)
-    inputs = get_inputs(wf)
-
-    return (get_num_test(inputs), get_num_rhs_cols(wf))
 end
 
 """
@@ -204,30 +212,26 @@ sides of the weak-formulation.
     to be determined.
 
 # Returns
-- `Tupe(Int, Int)`: The estimated number of non-zero entries per element for the left-hand
+- `Tuple(Int, Int)`: The estimated number of non-zero entries per element for the left-hand
     side and right-hand side of the weak-formulation, respectively.
 """
 function get_estimated_nnz_per_elem(wf::WeakForm)
     left_hand_nnz = 0
-    for lhs_row in get_lhs_expressions(wf)
-        for expression in lhs_row
-            if expression == 0
-                continue
-            end
-
-            left_hand_nnz += Forms.get_estimated_nnz_per_elem(expression)
+    for lhs_row in get_lhs_expressions(wf), expression in lhs_row
+        if expression == 0
+            continue
         end
+
+        left_hand_nnz += Forms.get_estimated_nnz_per_elem(expression)
     end
 
     right_hand_nnz = 0
-    for rhs_row in get_rhs_expressions(wf)
-        for expression in rhs_row
-            if expression == 0
-                continue
-            end
-
-            right_hand_nnz += Forms.get_estimated_nnz_per_elem(expression)
+    for rhs_row in get_rhs_expressions(wf), expression in rhs_row
+        if expression == 0
+            continue
         end
+
+        right_hand_nnz += Forms.get_estimated_nnz_per_elem(expression)
     end
 
     return (left_hand_nnz, right_hand_nnz)
@@ -245,14 +249,12 @@ Returns the number of elements over which the discrete weak-formulation is defin
 - `::Int`: The number of elements.
 """
 function get_num_elements(wf::WeakForm)
-    for lhs_row in get_lhs_expressions(wf)
-        for expression in lhs_row
-            if expression == 0
-                continue
-            end
-
-            return Forms.get_num_elements(expression)
+    for lhs_row in get_lhs_expressions(wf), expression in lhs_row
+        if expression == 0
+            continue
         end
+
+        return Forms.get_num_elements(expression)
     end
 
     throw(ArgumentError("No elements found in the left-hand side of the weak-formulation."))
@@ -273,28 +275,24 @@ is the max over all lhs and rhs expression blocks.
 """
 function get_num_evaluation_elements(wf::WeakForm)
     num_eval_elements = 0
-    for lhs_row in get_lhs_expressions(wf)
-        for expression in lhs_row
-            if expression == 0
-                continue
-            end
-
-            num_eval_elements = max(
-                num_eval_elements, Forms.get_num_evaluation_elements(expression)
-            )
+    for lhs_row in get_lhs_expressions(wf), expression in lhs_row
+        if expression == 0
+            continue
         end
+
+        num_eval_elements = max(
+            num_eval_elements, Forms.get_num_evaluation_elements(expression)
+        )
     end
 
-    for rhs_row in get_rhs_expressions(wf)
-        for expression in rhs_row
-            if expression == 0
-                continue
-            end
-
-            num_eval_elements = max(
-                num_eval_elements, Forms.get_num_evaluation_elements(expression)
-            )
+    for rhs_row in get_rhs_expressions(wf), expression in rhs_row
+        if expression == 0
+            continue
         end
+
+        num_eval_elements = max(
+            num_eval_elements, Forms.get_num_evaluation_elements(expression)
+        )
     end
 
     return num_eval_elements

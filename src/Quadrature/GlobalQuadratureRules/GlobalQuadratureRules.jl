@@ -59,7 +59,9 @@ Get the quadrature rule for a specific quadrature element index .
 - `AbstractElementQuadratureRule`: The quadrature rule for the specified quadrature element.
 """
 function get_element_quadrature_rule(::AbstractGlobalQuadratureRule, ::Int)
-    return throw(ArgumentError("Method not implemented for this type of global quadrature rule."))
+    return throw(
+        ArgumentError("Method not implemented for this type of global quadrature rule.")
+    )
 end
 
 # specific implementations

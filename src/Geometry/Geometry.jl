@@ -8,6 +8,7 @@ module Geometry
 import LinearAlgebra
 
 import ..FunctionSpaces
+import ..Points
 
 abstract type AbstractGeometry{manifold_dim} end
 abstract type AbstractAnalyticalGeometry{manifold_dim} <: AbstractGeometry{manifold_dim} end
@@ -142,7 +143,7 @@ end
     evaluate(
         geometry::AbstractGeometry{manifold_dim},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim}
 
 Computes the evaluation of the physical points, mapped from the canonical points `xi`, of
@@ -167,7 +168,7 @@ geometry type.
 function evaluate(
     geometry::AbstractGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     throw(ArgumentError("Method not defined for geometry of type $(typeof(geometry))."))
 end
@@ -176,7 +177,7 @@ end
     jacobian(
         geometry::AbstractGeometry{manifold_dim},
         element_id::Int,
-        xi::NTuple{manifold_dim, Vector{Float64}},
+        xi::Points.AbstractPoints{manifold_dim},
     ) where {manifold_dim}
 
 Computes the jacobian at the physical points, mapped from the canonical points `xi`, of the
@@ -201,7 +202,7 @@ geometry type.
 function jacobian(
     geometry::AbstractGeometry{manifold_dim},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim}
     throw(ArgumentError("Method not defined for geometry of type $(typeof(geometry))."))
 end

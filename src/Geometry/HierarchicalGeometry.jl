@@ -51,7 +51,7 @@ end
 function evaluate(
     geometry::HierarchicalGeometry{manifold_dim, H},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, H}
     element_vertices = FunctionSpaces.get_element_vertices(get_space(geometry), element_id)
     A = zeros(Float64, manifold_dim, manifold_dim)
@@ -70,7 +70,7 @@ end
 function jacobian(
     geometry::HierarchicalGeometry{manifold_dim, H},
     element_id::Int,
-    xi::NTuple{manifold_dim, Vector{Float64}},
+    xi::Points.AbstractPoints{manifold_dim},
 ) where {manifold_dim, H}
     element_vertices = FunctionSpaces.get_element_vertices(get_space(geometry), element_id)
     delta = zeros(Float64, manifold_dim)
@@ -78,7 +78,7 @@ function jacobian(
         delta[k] = (element_vertices[k][2] - element_vertices[k][1])
     end
 
-    num_points = prod(length.(xi))
+    num_points = Points.get_num_points(xi)
     J = zeros(Float64, num_points, manifold_dim, manifold_dim)
     for k in range(1, manifold_dim)
         for point in 1:num_points
