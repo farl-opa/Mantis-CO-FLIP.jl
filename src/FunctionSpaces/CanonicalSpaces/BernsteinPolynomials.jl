@@ -166,6 +166,44 @@ function _evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)
     return ders
 end
 
+@generated function _bpoly(p::Int, i::Int, xi::Float64)
+    quote
+        if i < 0 || i > p
+            return 0.0
+        else
+            return binomial(p, i) * xi^i * (1 - xi)^(p-i)
+        end
+    end
+end
+@generated function _dbpoly(p::Int, i::Int, k::Int, xi::Float64)
+    quote
+        val = 0.0
+        for r in max(0, i + k - p):min(i, k)
+            val += (-1)^(r+k) * binomial(k, r) * _bpoly(p-k, i-r, xi)
+        end
+        val *= factorial(p) / factorial(p - k)
+        return val
+    end
+end
+
+function _evaluate_alt(polynomial::Bernstein, xi::Float64, nderivatives::Int64)
+    # degree
+    p = get_polynomial_degree(polynomial)
+    # store the values and derivatives here
+    ders = zeros(Float64, p + 1, nderivatives + 1)
+    for k in 0:nderivatives
+        for i in 0:p
+            if k == 0
+                ders[i + 1, k + 1] = _bpoly(p, i, xi)
+            else
+                ders[i + 1, k + 1] = _dbpoly(p, i, k, xi)
+            end
+        end
+    end
+    return ders
+end
+
+
 """
     extract_monomial_to_bernstein(polynomial::Bernstein)
 
