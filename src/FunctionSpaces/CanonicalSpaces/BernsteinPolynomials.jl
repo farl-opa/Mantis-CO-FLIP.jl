@@ -104,7 +104,7 @@ function _dbpoly(p::Int, i::Int, k::Int, xi::Float64)
         for r in max(0, i + k - p):min(i, k)
             val += (-1)^(r+k) * binomial(k, r) * _bpoly(p-k, i-r, xi)
         end
-        return val * factorial(p) / factorial(p - k)
+        return val * prod((p - k + 1):p)
     end
 end
 
