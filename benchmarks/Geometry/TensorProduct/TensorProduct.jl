@@ -1,6 +1,5 @@
 module EvaluateTensorProductGeometryBenchmarks
 
-using Base: manifest_names
 using Mantis
 
 # Refer to the following file for method and variable definitions
@@ -94,7 +93,7 @@ end
 group = BenchmarkGroup()
 
 manifold_dims = (1, 2, 3)
-for manifold_dim in eachindex(manifold_dims)
+for manifold_dim in manifold_dims
     benchmarkable = run_problem(Val(manifold_dim))
     group["evaluate-$(manifold_dim)D"] = benchmarkable
 
