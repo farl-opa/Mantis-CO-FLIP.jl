@@ -24,7 +24,7 @@ include("FormsExports.jl")
 ############################################################################################
 
 """
-    AbstractFormExpression{manifold_dim, form_rank, G}
+    AbstractForm{manifold_dim, form_rank, G}
 
 Supertype for all form expressions representing differential forms.
 
@@ -36,11 +36,11 @@ Supertype for all form expressions representing differential forms.
     2. Higher ranks are not possible.
 - `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
 """
-abstract type AbstractFormExpression{manifold_dim, form_rank, expression_rank, G} end
+abstract type AbstractForm{manifold_dim, form_rank, expression_rank, G} end
 
 """
     AbstractFormField{manifold_dim, form_rank, G} <:
-    AbstractFormExpression{manifold_dim, form_rank, 0, G}
+    AbstractForm{manifold_dim, form_rank, 0, G}
 
 Supertype for all form fields.
 
@@ -50,11 +50,11 @@ Supertype for all form fields.
 - `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry
 """
 abstract type AbstractFormField{manifold_dim, form_rank, G} <:
-              AbstractFormExpression{manifold_dim, form_rank, 0, G} end
+              AbstractForm{manifold_dim, form_rank, 0, G} end
 
 """
     AbstractFormSpace{manifold_dim, form_rank, G} <:
-    AbstractFormExpression{manifold_dim, form_rank, 1, G}
+    AbstractForm{manifold_dim, form_rank, 1, G}
 
 Supertype for all form spaces. These all have expression rank 1, as they have a single set
 of basis functions.
@@ -65,7 +65,7 @@ of basis functions.
 - `G <: Geometry.AbstractGeometry{manifold_dim}`: Type of the underlying geometry.
 """
 abstract type AbstractFormSpace{manifold_dim, form_rank, G} <:
-              AbstractFormExpression{manifold_dim, form_rank, 1, G} end
+              AbstractForm{manifold_dim, form_rank, 1, G} end
 
 """
     AbstractRealValuedOperator{manifold_dim}
@@ -82,36 +82,36 @@ abstract type AbstractRealValuedOperator{manifold_dim} end
 ############################################################################################
 
 """
-    get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifold_dim}
+    get_manifold_dim(::AbstractForm{manifold_dim}) where {manifold_dim}
 
 Returns the manifold dimension of the given form expression.
 
 # Arguments
-- `::AbstractFormExpression{manifold_dim}`: The form expression.
+- `::AbstractForm{manifold_dim}`: The form expression.
 
 # Returns
 - `manifold_dim::Int`: The manifold dimension.
 """
-function get_manifold_dim(::AbstractFormExpression{manifold_dim}) where {manifold_dim}
+function get_manifold_dim(::AbstractForm{manifold_dim}) where {manifold_dim}
     return manifold_dim
 end
 
 """
-    get_geometry(form_expression::AbstractFormExpression)
+    get_geometry(form_expression::AbstractForm)
 
 Returns the geometry of the given form expression.
 
 # Arguments
-- `form_expression::AbstractFormExpression`: The form expression.
+- `form_expression::AbstractForm`: The form expression.
 
 # Returns
 - `<:Geometry.AbstractGeometry`: The geometry of the form expression.
 """
-get_geometry(form_expression::AbstractFormExpression) = form_expression.geometry
+get_geometry(form_expression::AbstractForm) = form_expression.geometry
 
 """
     get_geometry(
-        single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
+        single_form::AbstractForm, additional_forms::AbstractForm...
     )
 
 If, a single form is given, returns the geometry of that form. If additional forms are
@@ -119,15 +119,13 @@ given, checks if all the geometries of the different forms refer to the same obj
 memory, and then returns it.
 
 # Arguments
-- `single_form::AbstractFormExpression`: The first form.
-- `additional_forms::AbstractFormExpression...`: Arbitrary number of additional forms.
+- `single_form::AbstractForm`: The first form.
+- `additional_forms::AbstractForm...`: Arbitrary number of additional forms.
 
 # Returns
 - `<:Geometry.AbstractGeometry`: The geometry of the given form(s).
 """
-function get_geometry(
-    single_form::AbstractFormExpression, additional_forms::AbstractFormExpression...
-)
+function get_geometry(single_form::AbstractForm, additional_forms::AbstractForm...)
     all_forms = tuple(single_form, additional_forms...)
 
     for i in 1:(length(all_forms) - 1)
@@ -142,17 +140,17 @@ function get_geometry(
 end
 
 """
-    get_num_elements(form::AbstractFormExpression)
+    get_num_elements(form::AbstractForm)
 
 Returns the number of elements in the geometry of the given form expression.
 
 # Arguments
-- `form::AbstractFormExpression`: The form expression.
+- `form::AbstractForm`: The form expression.
 
 # Returns
 - `Int`: The number of elements in the geometry of the form expression.
 """
-function get_num_elements(form::AbstractFormExpression)
+function get_num_elements(form::AbstractForm)
     return Geometry.get_num_elements(get_geometry(form))
 end
 
@@ -162,7 +160,7 @@ end
         form_rank,
         expression_rank,
         G <: Geometry.AbstractGeometry{manifold_dim},
-        FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+        FE <: AbstractForm{manifold_dim, form_rank, expression_rank, G},
     }
 
 Returns the form rank of the given form expression.
@@ -174,14 +172,8 @@ Returns the form rank of the given form expression.
 - `::Int`: The form rank of the form.
 """
 function get_form_rank(
-    ::FE
-) where {
-    manifold_dim,
-    form_rank,
-    expression_rank,
-    G <: Geometry.AbstractGeometry{manifold_dim},
-    FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
-}
+    ::AbstractForm{manifold_dim, form_rank, expression_rank, G}
+) where {manifold_dim, form_rank, expression_rank, G}
     return form_rank
 end
 
@@ -191,7 +183,7 @@ end
         form_rank,
         expression_rank,
         G <: Geometry.AbstractGeometry{manifold_dim},
-        FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
+        FE <: AbstractForm{manifold_dim, form_rank, expression_rank, G},
     }
 
 Returns the `expression_rank`
@@ -203,79 +195,73 @@ Returns the `expression_rank`
 - `::Int`: The expression rank of the form.
 """
 function get_expression_rank(
-    ::FE
-) where {
-    manifold_dim,
-    form_rank,
-    expression_rank,
-    G <: Geometry.AbstractGeometry{manifold_dim},
-    FE <: AbstractFormExpression{manifold_dim, form_rank, expression_rank, G},
-}
+    ::AbstractForm{manifold_dim, form_rank, expression_rank, G}
+) where {manifold_dim, form_rank, expression_rank, G}
     return expression_rank
 end
 
 """
-    get_label(form::AbstractFormExpression)
+    get_label(form::AbstractForm)
 
 Returns the label of the form expression.
 
 # Arguments
-- `form::AbstractFormExpression`: The form expression.
+- `form::AbstractForm`: The form expression.
 
 # Returns
 - `String`: The label of the form expression.
 """
-get_label(form::AbstractFormExpression) = form.label
+get_label(form::AbstractForm) = form.label
 
 """
     get_estimated_nnz_per_elem(
-        form::AbstractFormExpression{manifold_dim, form_rank, expression_rank}
+        form::AbstractForm{manifold_dim, form_rank, expression_rank}
     ) where {manifold_dim, form_rank, expression_rank}
 
 Returns the estimated number of non-zero entries per element for the given form expression.
 
 # Arguments
-- `form::AbstractFormExpression{manifold_dim, form_rank, expression_rank}`:
+- `form::AbstractForm{manifold_dim, form_rank, expression_rank}`:
     The form expression.
 
 # Returns
 - `::Int`: The estimated number of non-zero entries per element.
 """
 function get_estimated_nnz_per_elem(
-    form::AbstractFormExpression{manifold_dim, form_rank, expression_rank}
+    form::AbstractForm{manifold_dim, form_rank, expression_rank}
 ) where {manifold_dim, form_rank, expression_rank}
     return prod(get_estimated_nnz_per_elem.(get_forms(form)))
 end
 
 function get_estimated_nnz_per_elem(
-    ::AbstractFormExpression{manifold_dim, form_rank, 0}
+    ::AbstractForm{manifold_dim, form_rank, 0}
 ) where {manifold_dim, form_rank}
     return 1
 end
 
 function get_estimated_nnz_per_elem(
-    form::AbstractFormExpression{manifold_dim, form_rank, 1}
+    form::AbstractForm{manifold_dim, form_rank, 1}
 ) where {manifold_dim, form_rank}
     return get_max_local_dim(get_form(form))
 end
 
 """
     get_max_local_dim(
-        form::AbstractFormExpression{manifold_dim, form_rank, expression_rank}
+        form::AbstractForm{manifold_dim, form_rank, expression_rank}
     ) where {manifold_dim, form_rank, expression_rank}
 
 Compute an upper bound of the element-local dimension of `form`. Note that this is not
 necessarily a tight upper bound.
 
 # Arguments
-- `form::AbstractFormExpression{manifold_dim, form_rank, expression_rank}`:
+- `form::AbstractForm{manifold_dim, form_rank, expression_rank}`:
     The form expression.
 
 # Returns
 - `::Int`: The element-local upper bound.
 """
 function get_max_local_dim(
-    form::AbstractFormExpression{manifold_dim, form_rank, 1}
+    form::AbstractForm{manifold_dim, form_rank, 1}
 ) where {manifold_dim, form_rank}
     return get_max_local_dim(get_form(form))
 end

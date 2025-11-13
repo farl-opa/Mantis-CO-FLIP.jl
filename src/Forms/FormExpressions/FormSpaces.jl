@@ -101,17 +101,17 @@ get_fe_space(form_space::AbstractFormSpace) = form_space.fem_space
     get_form_space_tree(form_space::AbstractFormSpace)
 
 Returns the list of spaces of forms of `expression_rank > 0` in the tree of the expression.
-Since `AbstractFormSpace` has a single form of `expression_rank = 1` it returns a `Tuple` 
+Since `AbstractFormSpace` has a single form of `expression_rank = 1` it returns a `Tuple`
 with the space of of the `AbstractFormSpace`.
 
 # Arguments
 - `form_space::AbstractFormSpace`: The AbstractFormSpace structure.
 
 # Returns
-- `Tuple(<:AbstractFormExpression)`: The list of forms present in the tree of the expression, in this case the form space.
+- `Tuple(<:AbstractForm)`: The list of forms present in the tree of the expression, in this case the form space.
 """
 function get_form_space_tree(form_space::AbstractFormSpace)
-    return (get_fe_space(form_space), )  # return a Tuple with a single element because AbstractFormSpace has only one form of expression_rank = 1
+    return (get_fe_space(form_space),)  # return a Tuple with a single element because AbstractFormSpace has only one form of expression_rank = 1
 end
 
 """
