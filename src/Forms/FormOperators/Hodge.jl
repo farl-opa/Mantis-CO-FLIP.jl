@@ -66,9 +66,7 @@ Symbolic wrapper for the hodge star operator. The unicode character command is `
 # Returns
 - `Hodge`: The hodge operator.
 """
-function ★(form::AbstractForm)
-    return Hodge(form)
-end
+const ★ = Hodge
 
 ############################################################################################
 #                                         Getters                                          #

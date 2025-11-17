@@ -55,9 +55,7 @@ struct ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
     end
 end
 
-function d(form::AbstractForm)
-    return ExteriorDerivative(form)
-end
+const d = ExteriorDerivative
 
 ############################################################################################
 #                                         Getters                                          #

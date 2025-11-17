@@ -57,9 +57,7 @@ Symbolic wrapper for the integral operator. The unicode character command is `\\
 # Returns
 - `Integral`: The integral operator.
 """
-function ∫(form::AbstractForm, quad_rule::Quadrature.AbstractGlobalQuadratureRule)
-    return Integral(form, quad_rule)
-end
+const ∫ = Integral
 
 ############################################################################################
 #                                         Getters                                          #

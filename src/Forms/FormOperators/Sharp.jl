@@ -37,9 +37,7 @@ struct Sharp{manifold_dim, G, F}
     end
 end
 
-function ♯(form::AbstractForm)
-    return Sharp(form)
-end
+const ♯ = Sharp
 
 ############################################################################################
 #                                         Getters                                          #
