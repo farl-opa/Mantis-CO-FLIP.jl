@@ -37,6 +37,12 @@ struct Sharp{manifold_dim, G, F}
     end
 end
 
+"""
+    ♯
+
+Symbolic wrapper for the sharp operator. The unicode character command is `\\sharp`. See
+[`Sharp`](@ref) for the details.
+"""
 const ♯ = Sharp
 
 ############################################################################################

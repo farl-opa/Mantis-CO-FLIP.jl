@@ -21,7 +21,7 @@ Represents a differential form field.
 - `FS`: Type of the form space.
 
 # Inner Constructors
-- `FormField(form_space::FS, coefficients::Vector{Int} label::String)`: General constructor
+- `FormField(form_space::FS, coefficients::Vector{Int}, label::String)`: General constructor
     for form fields.
 - `FormField(form_space::FS, label::String)`: Constructor with zero coefficients.
 """

@@ -55,6 +55,12 @@ struct ExteriorDerivative{manifold_dim, form_rank, expression_rank, G, F} <:
     end
 end
 
+"""
+    d
+
+Symbolic wrapper for the exterior derivative operator. See [`ExteriorDerivative`](@ref) for
+the details.
+"""
 const d = ExteriorDerivative
 
 ############################################################################################

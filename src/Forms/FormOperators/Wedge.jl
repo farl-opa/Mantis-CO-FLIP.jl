@@ -71,6 +71,12 @@ struct Wedge{manifold_dim, form_rank, expression_rank, G, F1, F2} <:
     end
 end
 
+"""
+    ∧
+
+Symbolic wrapper for the wedge operator. The unicode character command is `\\wedge`. See
+[`Wedge`](@ref) for the details.
+"""
 const ∧ = Wedge
 
 ############################################################################################

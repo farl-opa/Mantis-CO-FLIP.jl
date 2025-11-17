@@ -46,16 +46,10 @@ struct Integral{manifold_dim, F, Q} <: AbstractRealValuedOperator{manifold_dim}
 end
 
 """
-    ∫(form::AbstractForm)
+    ∫
 
-Symbolic wrapper for the integral operator. The unicode character command is `\\int`.
-
-# Arguments
-- `form::AbstractForm`: The form to be integrated.
-- `quad_rule::Quadrature.AbstractGlobalQuadratureRule`: The quadrature rule to be used.
-
-# Returns
-- `Integral`: The integral operator.
+Symbolic wrapper for the integral operator. The unicode character command is `\\int`. See
+[`Integral`](@ref) for the details.
 """
 const ∫ = Integral
 

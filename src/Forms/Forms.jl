@@ -38,9 +38,24 @@ Supertype for all form expressions representing differential forms.
 """
 abstract type AbstractForm{manifold_dim, form_rank, expression_rank, G} end
 
+"""
+    AbstractFormField{manifold_dim, form_rank, G} = AbstractForm{
+        manifold_dim, form_rank, 0, G
+
+Alias for `AbstractForm`s with expression rank 0, that is, a form without a basis. See
+[`AbstractForm`](@ref) for more details.
+"""
 const AbstractFormField{manifold_dim, form_rank, G} = AbstractForm{
     manifold_dim, form_rank, 0, G
 }
+
+"""
+    AbstractFormField{manifold_dim, form_rank, G} = AbstractForm{
+        manifold_dim, form_rank, 0, G
+
+Alias for `AbstractForm`s with expression rank 1, that is, a form with a basis. See
+[`AbstractForm`](@ref) for more details.
+"""
 const AbstractFormSpace{manifold_dim, form_rank, G} = AbstractForm{
     manifold_dim, form_rank, 1, G
 }
