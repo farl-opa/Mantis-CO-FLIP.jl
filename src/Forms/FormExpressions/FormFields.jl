@@ -161,22 +161,6 @@ Returns the form space associated with the form field.
 get_form_space(form_field::FormField) = form_field.form_space
 
 """
-    get_form_space_tree(form_field::AbstractFormField)
-
-Returns the list of spaces of forms of `expression_rank > 0` in the tree of the expression.
-Since `FormField` has a single form of `expression_rank = 0` it returns an empty `Tuple`.
-
-# Arguments
-- `form_field::AbstractFormField`: The AbstractFormField structure.
-
-# Returns
-- `Tuple(<:AbstractForm)`: The list of forms present in the tree of the expression, in this case empty.
-"""
-function get_form_space_tree(form_field::AbstractFormField)
-    return ()  # return an empty Tuple because AbstractFormField has only one form of expression_rank = 0
-end
-
-"""
     get_coefficients(form_field::FormField)
 
 Returns the coefficients of the form field.
@@ -249,12 +233,7 @@ function evaluate(
     form_field::FormField{manifold_dim, form_rank, G, FS},
     element_idx::Int,
     xi::Points.AbstractPoints{manifold_dim},
-) where {
-    manifold_dim,
-    form_rank,
-    G <: Geometry.AbstractGeometry{manifold_dim},
-    FS <: AbstractFormSpace{manifold_dim, form_rank, G},
-}
+) where {manifold_dim, form_rank, G, FS}
     n_form_components = binomial(manifold_dim, form_rank)
     form_basis_eval, form_basis_indices = evaluate(
         get_form_space(form_field), element_idx, xi

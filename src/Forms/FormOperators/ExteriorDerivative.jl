@@ -89,7 +89,7 @@ If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
 - `Tuple(<:AbstractForm)`: The list of spaces of forms present in the tree of the exterior derivative.
 """
 function get_form_space_tree(ext_der::ExteriorDerivative)
-    return get_form_space_tree(ext_der.form)
+    return get_form_space_tree(get_form(ext_der))
 end
 
 """
@@ -187,12 +187,10 @@ end
 ############################################################################################
 
 function _evaluate_exterior_derivative(
-    form_space::FS, element_id::Int, xi::Points.AbstractPoints{manifold_dim}
-) where {
-    manifold_dim,
-    G <: Geometry.AbstractGeometry{manifold_dim},
-    FS <: AbstractFormSpace{manifold_dim, 0, G},
-}
+    form_space::FormSpace{manifold_dim, 0, G},
+    element_id::Int,
+    xi::Points.AbstractPoints{manifold_dim},
+) where {manifold_dim, G <: Geometry.AbstractGeometry{manifold_dim}}
     # Preallocate memory for output array
     n_derivative_form_components = manifold_dim
     n_basis_functions = FunctionSpaces.get_num_basis(form_space.fem_space, element_id)
@@ -223,8 +221,8 @@ function _evaluate_exterior_derivative(
 end
 
 function _evaluate_exterior_derivative(
-    form_space::FS, element_id::Int, xi::Points.AbstractPoints{2}
-) where {G <: Geometry.AbstractGeometry{2}, FS <: AbstractFormSpace{2, 1, G}}
+    form_space::FormSpace{2, 1, G}, element_id::Int, xi::Points.AbstractPoints{2}
+) where {G <: Geometry.AbstractGeometry{2}}
     # manifold_dim = 2
     n_derivative_form_components = 1 # binomial(manifold_dim, 2)
     n_basis_functions = FunctionSpaces.get_num_basis(form_space.fem_space, element_id)
@@ -253,8 +251,8 @@ function _evaluate_exterior_derivative(
 end
 
 function _evaluate_exterior_derivative(
-    form_space::FS, element_id::Int, xi::Points.AbstractPoints{3}
-) where {G <: Geometry.AbstractGeometry{3}, FS <: AbstractFormSpace{3, 1, G}}
+    form_space::FormSpace{3, 1, G}, element_id::Int, xi::Points.AbstractPoints{3}
+) where {G <: Geometry.AbstractGeometry{3}}
     # manifold_dim = 3
     n_derivative_form_components = 3 # binomial(manifold_dim, 2)
 
@@ -292,8 +290,8 @@ function _evaluate_exterior_derivative(
 end
 
 function _evaluate_exterior_derivative(
-    form_space::FS, element_id::Int, xi::Points.AbstractPoints{3}
-) where {FS <: AbstractFormSpace{3, 2, G}} where {G <: Geometry.AbstractGeometry{3}}
+    form_space::FormSpace{3, 2, G}, element_id::Int, xi::Points.AbstractPoints{3}
+) where {G <: Geometry.AbstractGeometry{3}}
     # manifold_dim = 3
     n_derivative_form_components = 1 # binomial(manifold_dim, 2)
 

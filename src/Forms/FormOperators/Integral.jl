@@ -96,19 +96,6 @@ function get_form_space_tree(integral::Integral)
 end
 
 """
-    get_expression_rank(integral::Integral)
-
-Returns the rank of the expression associated with the integral operator.
-
-# Arguments
-- `integral::Integral`: The integral operator.
-
-# Returns
-- `::Int`: The rank of the expression associated with the integral operator.
-"""
-get_expression_rank(integral::Integral) = get_expression_rank(get_form(integral))
-
-"""
     get_quadrature_rule(integral::Integral)
 
 Returns the quadrature rule associated with the integral operator.

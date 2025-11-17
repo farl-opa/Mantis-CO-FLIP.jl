@@ -72,7 +72,7 @@ If `α` has expression_rank = 0, it returns only the spaces of `β` and `γ`.
 - `Tuple(<:AbstractForm)`: The list of forms present in the tree of the sharp.
 """
 function get_form_space_tree(sharp::Sharp)
-    return get_form_space_tree(sharp.form)
+    return get_form_space_tree(get_form(sharp))
 end
 
 ############################################################################################

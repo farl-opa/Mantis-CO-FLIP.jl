@@ -84,84 +84,10 @@ end
 ############################################################################################
 #                                   Getters and setters                                    #
 ############################################################################################
-"""
-    get_fe_space(form_space::AbstractFormSpace)
 
-Returns the finite element space associated with the given form space.
-
-# Arguments
-- `form_space::AbstractFormSpace`: The form space.
-
-# Returns
-- `<:FunctionSpaces.AbstractFESpace`: The finite element space.
-"""
-get_fe_space(form_space::AbstractFormSpace) = form_space.fem_space
-
-"""
-    get_form_space_tree(form_space::AbstractFormSpace)
-
-Returns the list of spaces of forms of `expression_rank > 0` in the tree of the expression.
-Since `AbstractFormSpace` has a single form of `expression_rank = 1` it returns a `Tuple`
-with the space of of the `AbstractFormSpace`.
-
-# Arguments
-- `form_space::AbstractFormSpace`: The AbstractFormSpace structure.
-
-# Returns
-- `Tuple(<:AbstractForm)`: The list of forms present in the tree of the expression, in this case the form space.
-"""
-function get_form_space_tree(form_space::AbstractFormSpace)
-    return (get_fe_space(form_space),)  # return a Tuple with a single element because AbstractFormSpace has only one form of expression_rank = 1
-end
-
-"""
-    get_num_basis(form_space::AbstractFormSpace)
-
-Returns the number of basis functions of the function space associated with the given form
-space.
-
-# Arguments
-- `form_space::AbstractFormSpace`: The form space.
-
-# Returns
-- `Int`: The number of basis functions of the function space.
-"""
-function get_num_basis(form_space::AbstractFormSpace)
-    return FunctionSpaces.get_num_basis(get_fe_space(form_space))
-end
-
-"""
-    get_num_basis(form_space::AbstractFormSpace, element_id::Int)
-
-Returns the number of basis functions at the given element of the function space associated
-the given form space.
-
-# Arguments
-- `form_space::AbstractFormSpace`: The form space.
-
-# Returns
-- `Int`: The number of basis functions at the given element.
-"""
-function get_num_basis(form_space::AbstractFormSpace, element_id::Int)
-    return FunctionSpaces.get_num_basis(get_fe_space(form_space), element_id)
-end
+get_form(form_space::FormSpace) = form_space
 
 get_estimated_nnz_per_elem(form_space::FormSpace) = get_max_local_dim(form_space)
-
-"""
-    get_max_local_dim(form_space::AbstractFormSpace)
-
-Compute an upper bound of the element-local dimension of `form_space`. Note that this is not
-necessarily a tight upper bound.
-
-# Arguments
-- `form_space::AbstractFormSpace`: The form space.
-# Returns
-- `::Int`: The element-local upper bound.
-"""
-function get_max_local_dim(form_space::AbstractFormSpace)
-    return FunctionSpaces.get_max_local_dim(get_fe_space(form_space))
-end
 
 ############################################################################################
 #                                     Evaluate methods                                     #
