@@ -1,7 +1,7 @@
 # Mantis
 
-[![Build Status](https://github.com/MantisFEM/MantisDev.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MantisFEM/MantisDev.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/MantisFEM/MantisDev.jl/graph/badge.svg?token=8Pc95jcbg8)](https://codecov.io/gh/MantisFEM/MantisDev.jl)
+[![Build Status](https://github.com/MantisFEM/Mantis.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MantisFEM/Mantis.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/MantisFEM/Mantis.jl/graph/badge.svg?token=ZWA3YV3IB6)](https://codecov.io/gh/MantisFEM/Mantis.jl)
 [![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/JuliaDiff/BlueStyle)
 
 
@@ -21,7 +21,7 @@ A brief description of what you can find in the `README.md`.
 
 ## Authors
 The `Mantis` package was created by
-- Diogo Costa Cabanas,
+- Diogo C. Cabanas,
 - Joey Dekker,
 - Artur Palha,
 - Deepesh Toshniwal,
