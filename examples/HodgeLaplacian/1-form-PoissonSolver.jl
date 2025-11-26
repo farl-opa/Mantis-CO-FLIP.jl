@@ -11,7 +11,7 @@ include("../HelperFunctions.jl")
 # Mesh
 starting_point = (0.0, 0.0)
 box_size = (1.0, 1.0)
-num_elements = (2, 2) .^ 7
+num_elements = (2, 2) .^ 1
 
 # B-spline parameters
 p = (3, 3) # Polynomial degrees.
@@ -64,25 +64,39 @@ function sinusoidal_solution(
     return Mantis.Forms.AnalyticalFormField(form_rank, my_sol, geo, "f")
 end
 
-
-Ψ_exact = sinusoidal_solution(0, ⊞) #Mantis.Forms.AnalyticalFormField(0, psi_expression, ⊞, "psi")
+# 1. Construct the divergence free velocity fi`eld
+# Define a stream function and the divergence-free velocity field is the curl of it 
+#    (u = dψ)
+ψ_exact = sinusoidal_solution(0, ⊞) #Mantis.Forms.AnalyticalFormField(0, psi_expression, ⊞, "psi")
 
 # Solve L2
-Ψ_h = Mantis.Assemblers.solve_L2_projection(ℜ0, Ψ_exact, dΩₐ)
+ψₕ = Mantis.Assemblers.solve_L2_projection(ℜ0, ψ_exact, dΩₐ)
+
+# Define the divergence-free velocity field 
+uₕ = d(ψₕ)
+
+# 2. Construct a perturbation velocity (non-divergence free component)
+# To do that compute a potential field and get the non-divergence free velocity as the
+# gradient of this potential (δϕ)
 
 # Forcing function and analytical solutions.
-v, δu, fₑ = sinusoidal_data(2, ⊞) #take a look at how this is built
+ϕ, δϕ, fₑ = sinusoidal_data(2, ⊞) #take a look at how this is built
 
 # Solve problem
-vₕ, δuₕ = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, fₑ, dΩₐ) #solve volume  n form
+δϕₕ, ϕₕ = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, fₑ, dΩₐ) #solve volume  n form
 
-u_h = d(Ψ_h) + vₕ
+# Define the perturbed velocity (divergence-free component plus non-divergence-free component)
+vₕ = δϕₕ + uₕ
 
-f2 = d(u_h)
+f2 = d(δϕₕ)  # the divergence of the perturbed velocity is just the d(δϕₕ) the perturbation
 
 # println(typeof(f2))
 
-phi, v_prime = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, f2, dΩₐ)
+# Recover the correction to subtract from the perturbed velocity
+u_correction, ϕ_correction = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, f2, dΩₐ)
+
+# Compute the divergence free velocity 
+u_recovered = vₕ - u_correction
 
 ############################################################################################
 #                                      Solution data                                       #
@@ -93,10 +107,11 @@ if export_vtk
     compt_file_name = "1-Form-Poisson-computed-p=$(p)-k=$(k)-nels=$(num_elements)"
     exact_file_name = "1-Form-Poisson-exact-p=$(p)-k=$(k)-nels=$(num_elements)"
 
-    # Plot.export_form_fields_to_vtk((uₕ, δuₕ), compt_file_name)
+    Plot.export_form_fields_to_vtk((uₕ, ), compt_file_name)
     # Plot.export_form_fields_to_vtk((u, δu), exact_file_name)
     # Plot.export_form_fields_to_vtk((Ψ_h,), "L2-projection-psi-p=$(p)-k=$(k)-nels=$(num_elements)")
-    Plot.export_form_fields_to_vtk((phi, v_prime), "Divergence part solution")
+    
+    Plot.export_form_fields_to_vtk((u_recovered, ), "Divergence-free recovered")
 end
 
 end
