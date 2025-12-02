@@ -99,10 +99,44 @@ function sinusoidal_solution(
     return Mantis.Forms.AnalyticalFormField(form_rank, my_sol, geo, "f")
 end
 
+function moderately_divergent_field(
+    form_rank::Int,
+    geo::Geometry.AbstractGeometry{manifold_dim};
+) where {manifold_dim}
+
+    n_form_components = binomial(manifold_dim, form_rank)
+    π = Base.MathConstants.pi
+
+    function my_sol(x::Matrix{Float64})
+        npts, ndim = size(x)
+        u = zeros(npts, ndim)
+
+        for i in 1:ndim
+            # u_i = sin(π * x_i) * product of (1 + x_j^2) for j ≠ i
+            prod_others = ones(npts)
+            for j in 1:ndim
+                if j != i
+                    prod_others .= prod_others .* (1 .+ x[:, j].^2)
+                end
+            end
+            u[:, i] .= sin.(π .* x[:, i]) .* prod_others
+        end
+
+        # Flatten to n_form_components (scalar pattern repeated)
+        u_vec = vec(sum(u; dims=2))
+        return repeat([u_vec], n_form_components)
+    end
+
+    return Mantis.Forms.AnalyticalFormField(form_rank, my_sol, geo, "f")
+end
+
+
 # Construct v_h
-v = sinusoidal_solution(1, hp.geo)
+v = moderately_divergent_field(1, hp.geo)
 
 v_h = Mantis.Assemblers.solve_L2_projection(hp.R1, v, hp.dΩ)
+
+div_vh = d(v_h)
 
 # -------------------------
 # Project to divergence-free
@@ -113,6 +147,8 @@ u_divfree = project(hp, v_h)
 div_f = d(u_divfree)
 
 # Export to VTK
+Plot.export_form_fields_to_vtk((v_h,), "Original Velocity")
+Plot.export_form_fields_to_vtk((div_vh,), "Divergence of Original Velocity")
 Plot.export_form_fields_to_vtk((u_divfree,), "Divergence Free Velocity")
 Plot.export_form_fields_to_vtk((div_f,), "Divergence Field")
 
