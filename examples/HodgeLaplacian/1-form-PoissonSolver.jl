@@ -35,8 +35,8 @@ export_vtk = true # Set to true to export the computed solutions.
 ℜ = Forms.create_tensor_product_bspline_de_rham_complex(
     starting_point, box_size, num_elements, p, k
 )
-# Only 0- and 1-forms are needed for the 1-form Hodge Laplacian.
-ℜ0, ℜ1, ℜ2  = ℜ[1], ℜ[2], ℜ[3] #for Poisson use 1 and 2 forms
+# Only 1- and 2-forms are needed for the 1-form Poisson.
+ℜ0, ℜ1, ℜ2  = ℜ[1], ℜ[2], ℜ[3] 
 
 # Geometry
 ⊞ = Forms.get_geometry(ℜ1)
@@ -64,12 +64,12 @@ function sinusoidal_solution(
     return Mantis.Forms.AnalyticalFormField(form_rank, my_sol, geo, "f")
 end
 
-# 1. Construct the divergence free velocity fi`eld
+# 1. Construct the divergence free velocity field
 # Define a stream function and the divergence-free velocity field is the curl of it 
 #    (u = dψ)
-ψ_exact = sinusoidal_solution(0, ⊞) #Mantis.Forms.AnalyticalFormField(0, psi_expression, ⊞, "psi")
+ψ_exact = sinusoidal_solution(0, ⊞) 
 
-# Solve L2
+# Solve L2 - projection to get discrete stream function
 ψₕ = Mantis.Assemblers.solve_L2_projection(ℜ0, ψ_exact, dΩₐ)
 
 # Define the divergence-free velocity field 
@@ -80,17 +80,15 @@ uₕ = d(ψₕ)
 # gradient of this potential (δϕ)
 
 # Forcing function and analytical solutions.
-ϕ, δϕ, fₑ = sinusoidal_data(2, ⊞) #take a look at how this is built
+ϕ, δϕ, fₑ = sinusoidal_data(2, ⊞) 
 
 # Solve problem
-δϕₕ, ϕₕ = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, fₑ, dΩₐ) #solve volume  n form
+δϕₕ, ϕₕ = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, fₑ, dΩₐ)
 
 # Define the perturbed velocity (divergence-free component plus non-divergence-free component)
 vₕ = δϕₕ + uₕ
 
 f2 = d(δϕₕ)  # the divergence of the perturbed velocity is just the d(δϕₕ) the perturbation
-
-# println(typeof(f2))
 
 # Recover the correction to subtract from the perturbed velocity
 u_correction, ϕ_correction = Assemblers.solve_volume_form_hodge_laplacian(ℜ1, ℜ2, f2, dΩₐ)
