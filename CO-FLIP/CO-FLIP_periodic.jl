@@ -7,6 +7,8 @@ using IterativeSolvers
 using LinearMaps
 using StaticArrays
 using CUDA
+using DelimitedFiles
+using Printf
 
 gr()
 
@@ -64,7 +66,14 @@ function GenerateDomain(nel::NTuple{2,Int}, p::NTuple{2,Int}, k::NTuple{2,Int})
     ∫ₐ, ∫ₑ = Quadrature.get_canonical_quadrature_rules(Quadrature.gauss_legendre, nq_assembly, nq_error)
     dΩ = Quadrature.StandardQuadrature(∫ₐ, prod(nel))
     
-    R = Forms.create_tensor_product_bspline_de_rham_complex(starting_point, box_size, nel, p, k)
+    R = Forms.create_tensor_product_bspline_de_rham_complex(
+        starting_point,
+        box_size,
+        nel,
+        p,
+        k;
+        periodic=(true, true),
+    )
     
     return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k, box_size)
 end
@@ -495,87 +504,37 @@ function build_B_matrix(p::Particles, d::Domain)
     return sparse(I_idx, J_idx, V_val, 2 * num_particles, num_dofs)
 end
 
-function transfer_particles_to_grid_pcg(p::Particles, d::Domain)
-    B = build_B_matrix(p, d)
+function solve_grid_velocity_lsqr(B, p)
+
     num_particles = length(p.x)
-    num_dofs = size(B, 2)
-    
-    # Build RHS V_p
-    V_p = Vector{Float64}(undef, 2 * num_particles)
+
+    V_p = Vector{Float64}(undef, 2*num_particles)
     @inbounds for i in 1:num_particles
         w = sqrt(p.volume[i])
-        V_p[2*i - 1] = p.my[i] * w
-        V_p[2*i]     = -p.mx[i] * w
+        V_p[2*i-1] =  p.my[i] * w
+        V_p[2*i]   = -p.mx[i] * w
     end
 
-    b_vec = Vector{Float64}(undef, num_dofs)
-    mul!(b_vec, B', V_p)
-    
-    # Optimization: Pre-allocate Scratch Buffer
-    temp_buffer = Vector{Float64}(undef, 2 * num_particles)
-
-    function calc_Ax!(y, x)
-        mul!(temp_buffer, B, x)
-        mul!(y, B', temp_buffer)
-        return y
+    function B_mul!(y, x)
+        mul!(y, B, x)
     end
 
-    A_map = LinearMap(calc_Ax!, num_dofs; ismutating=true, issymmetric=true, isposdef=true)
-
-    # Jacobi Preconditioner
-    diag_vals = zeros(Float64, num_dofs)
-    vals = nonzeros(B)
-    
-    @inbounds for j in 1:num_dofs
-        sum_sq = 0.0
-        for k in nzrange(B, j)
-            val = vals[k]
-            sum_sq += val^2
-        end
-        diag_vals[j] = sum_sq + 1e-8
-    end
-    P = Diagonal(1.0 ./ diag_vals) 
-
-    u_sol = cg(A_map, b_vec; Pl=P, reltol=1e-8, maxiter=1000)
-    return u_sol
-end
-
-function solve_grid_velocity_from_B(B, p)
-    num_particles = length(p.x)
-    num_dofs = size(B, 2)
-    
-    V_p = Vector{Float64}(undef, 2 * num_particles)
-    @inbounds for i in 1:num_particles
-        w = sqrt(p.volume[i])
-        V_p[2*i - 1] = p.my[i] * w
-        V_p[2*i]     = -p.mx[i] * w
+    function Bt_mul!(y, x)
+        mul!(y, B', x)
     end
 
-    b_vec = Vector{Float64}(undef, num_dofs)
-    mul!(b_vec, B', V_p)
-    
-    temp_buffer = Vector{Float64}(undef, 2 * num_particles)
-    function calc_Ax!(y, x)
-        mul!(temp_buffer, B, x)
-        mul!(y, B', temp_buffer)
-        return y
-    end
+    B_map = LinearMap(B_mul!, Bt_mul!, size(B,1), size(B,2); ismutating=true)
 
-    A_map = LinearMap(calc_Ax!, num_dofs; ismutating=true, issymmetric=true, isposdef=true)
+    result = lsqr(
+        B_map,
+        V_p;
+        atol = 1e-6,
+        btol = 1e-6,
+        conlim = 1e8,
+        maxiter = 5000
+    )
 
-    diag_vals = zeros(Float64, num_dofs)
-    vals = nonzeros(B)
-    @inbounds for j in 1:num_dofs
-        sum_sq = 0.0
-        for k in nzrange(B, j)
-            val = vals[k]
-            sum_sq += val^2
-        end
-        diag_vals[j] = sum_sq + 1e-6 # Regularization
-    end
-    P = Diagonal(1.0 ./ diag_vals) 
-
-    return cg(A_map, b_vec; Pl=P, reltol=1e-6, maxiter=500)
+    return result
 end
 
 function project_and_get_pressure(dom::Domain, v_h)
@@ -664,6 +623,56 @@ function ode_rhs(state, u_coeffs, d, cache)
     return SVector{4}(dx_dt, dy_dt, dmx_dt, dmy_dt)
 end
 
+function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
+                               x_out, y_out, mx_out, my_out)
+
+    num_p = length(x0)
+    Lx, Ly = d.box_size
+    max_err = Threads.Atomic{Float64}(0.0)
+    
+    n_threads = Threads.nthreads()
+    thread_caches = [EvaluationCache(32) for _ in 1:n_threads]
+    
+    Threads.@threads for i in 1:num_p
+        
+        tid = Threads.threadid()
+        if tid > length(thread_caches); tid = 1; end
+        cache = thread_caches[tid]
+        
+        state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
+        
+        # --- RK2 (Midpoint Method) ---
+        
+        k1 = ode_rhs(state, u_coeffs, d, cache)
+        
+        midpoint_state = state + 0.5 * dt * k1
+        
+        k2 = ode_rhs(midpoint_state, u_coeffs, d, cache)
+        
+        new_state = state + dt * k2
+        
+        # --- Error Calculation ---
+        
+        nx_raw, ny_raw = new_state[1], new_state[2]
+        ox, oy = x_out[i], y_out[i]
+        
+        dx = abs(nx_raw - ox)
+        dy = abs(ny_raw - oy)
+        
+        if dx > 0.5 * Lx; dx = Lx - dx; end
+        if dy > 0.5 * Ly; dy = Ly - dy; end
+        
+        Threads.atomic_max!(max_err, max(dx, dy))
+        
+        x_out[i]  = mod(nx_raw, Lx)
+        y_out[i]  = mod(ny_raw, Ly)
+        mx_out[i] = new_state[3]
+        my_out[i] = new_state[4]
+    end
+    
+    return max_err[]
+end
+
 function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out)
     num_p = length(x0)
     Lx, Ly = d.box_size
@@ -708,13 +717,16 @@ function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_ou
 end
 
 function coadjoint_step!(p::Particles, d::Domain, dt::Float64)
-    u_grid_n = transfer_particles_to_grid_pcg(p, d)
+    B = build_B_matrix(p, d)
+    u_grid_n = solve_grid_velocity_lsqr(B, p)
     u_grid_n_h = Forms.build_form_field(d.R1, u_grid_n)
     u_div_free_coeffs_n, _ = project_and_get_pressure(d, u_grid_n_h)
     return u_div_free_coeffs_n
 end
 
 function step_co_flip!(p::Particles, d::Domain, dt::Float64, boundary_dofs::Vector{Int})
+    step_t0 = time_ns()
+
     x_n  = copy(p.x)
     y_n  = copy(p.y)
     mx_n = copy(p.mx)
@@ -736,47 +748,68 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64, boundary_dofs::Vect
     tol = 0.005
     
     for iter in 1:max_iter
+        iter_t0 = time_ns()
+
         # Advect Particles
-        err = advect_particles_rk4!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1)
+        t0 = time_ns()
+        err = advect_particles_rk2!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1)
+        t_advect_ms = (time_ns() - t0) / 1.0e6
         
         # Project new particles to grid
+        t0 = time_ns()
         p.x, p.y = x_np1, y_np1
         # p.mx, p.my = mx_np1, my_np1
         particle_sorter!(p, d)
+        t_sort_ms = (time_ns() - t0) / 1.0e6
         
+        t0 = time_ns()
         B_np1 = build_B_matrix(p, d) 
+        t_build_B_ms = (time_ns() - t0) / 1.0e6
         
         # Solve Raw velocity from Particles
-        f_np1_raw = solve_grid_velocity_from_B(B_np1, p)
+        t0 = time_ns()
+        f_np1_raw = solve_grid_velocity_lsqr(B_np1, p)
+        t_solve_raw_ms = (time_ns() - t0) / 1.0e6
         
-        # -> ENFORCE BOUNDARY CONDITION ON RAW VELOCITY
-        #f_np1_raw[boundary_dofs] .= 0.0
-        
+        # Project to get Divergence-Free part
+        t0 = time_ns()
         f_np1_raw_h = Forms.build_form_field(d.R1, f_np1_raw)
         f_np1_proj, _ = project_and_get_pressure(d, f_np1_raw_h)
-        
-        # -> ENFORCE BOUNDARY CONDITION ON PROJECTED VELOCITY
-        #f_np1_proj[boundary_dofs] .= 0.0
+        t_project_ms = (time_ns() - t0) / 1.0e6
         
         # Energy Correction
+        t0 = time_ns()
         f_star_new = 0.5 .* (f_n .+ f_np1_proj)
         apply_energy_correction!(f_np1_proj, f_n, f_star_new, B_np1)
+        t_energy_ms = (time_ns() - t0) / 1.0e6
         
-        # -> ENFORCE ONCE MORE AFTER ENERGY CORRECTION
-        #f_np1_proj[boundary_dofs] .= 0.0
         
         @. f_star = 0.5 * (f_n + f_np1_proj)
+        t_iter_ms = (time_ns() - iter_t0) / 1.0e6
         
         println("  Iter $iter: Pos Change = $err")
+        println(
+            "    Timings [ms]: advect=$(round(t_advect_ms, digits=2)), sort=$(round(t_sort_ms, digits=2)), build_B=$(round(t_build_B_ms, digits=2)), solve_raw=$(round(t_solve_raw_ms, digits=2)), project=$(round(t_project_ms, digits=2)), energy=$(round(t_energy_ms, digits=2)), iter_total=$(round(t_iter_ms, digits=2))"
+        )
         if err < tol
             break
         end
     end
     
     # Apply Pressure Feedback
+    t0 = time_ns()
     tau_coeffs = f_np1_proj .- f_np1_raw
     apply_pressure_correction!(p, tau_coeffs, d)
+    t_pressure_ms = (time_ns() - t0) / 1.0e6
+
+    t0 = time_ns()
     particle_sorter!(p, d)
+    t_final_sort_ms = (time_ns() - t0) / 1.0e6
+
+    t_total_ms = (time_ns() - step_t0) / 1.0e6
+    println(
+        "  Post Timings [ms]: pressure_feedback=$(round(t_pressure_ms, digits=2)), final_sort=$(round(t_final_sort_ms, digits=2)), step_total=$(round(t_total_ms, digits=2))"
+    )
 end
 
 # ==============================================================================
@@ -786,13 +819,16 @@ end
 function main()
     println("Initializing Domain and Particles...")
 
+    # Avoid nested thread oversubscription between Julia threads and BLAS threads.
+    LinearAlgebra.BLAS.set_num_threads(1)
+
     # Configuration
     nel = (64, 64)
     p = (2, 2)
     k = (1, 1)
     
     # Particles per cell (PPC) = 16
-    num_particles = nel[1] * nel[2] * 20
+    num_particles = nel[1] * nel[2] * 16
 
     # 1. Generate the Domain
     domain = GenerateDomain(nel, p, k)
@@ -822,13 +858,45 @@ function main()
 
     # Time-stepping parameters
     dt = 0.01
-    T_final = 1.0
+    T_final = 0.25
     n_steps = floor(Int, T_final / dt)
     
     println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
 
     
-    anim = @animate for step in 1:n_steps
+    output_dir = "coflip_output"
+    mkpath(output_dir)
+
+    metadata_path = joinpath(output_dir, "metadata.txt")
+    open(metadata_path, "w") do io
+        println(io, "# CO-FLIP output metadata")
+        println(io, "nx_plot $nx_plot")
+        println(io, "ny_plot $ny_plot")
+        println(io, "n_steps $n_steps")
+        println(io, "dt $dt")
+        println(io, "Lx $(domain.box_size[1])")
+        println(io, "Ly $(domain.box_size[2])")
+    end
+
+    # Warmup run on a copied particle state to reduce first-step compilation noise.
+    println("Running warmup step...")
+    warmup_particles = Particles(
+        copy(particles.x),
+        copy(particles.y),
+        copy(particles.mx),
+        copy(particles.my),
+        copy(particles.volume),
+        copy(particles.can_x),
+        copy(particles.can_y),
+        copy(particles.head),
+        copy(particles.next),
+        copy(particles.elem_ids),
+    )
+    particle_sorter!(warmup_particles, domain)
+    step_co_flip!(warmup_particles, domain, dt, boundary_dofs)
+    println("Warmup done. Starting measured steps...")
+
+    for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step*dt, digits=3)))...")
 
         # 4. Advance the CO-FLIP state
@@ -842,23 +910,17 @@ function main()
         u_coeffs[boundary_dofs] .= 0.0
         
         u_grid = evaluate_field_at_probes(u_coeffs, grid_probes, domain)
-        mag = reshape(sqrt.(u_grid[:,1].^2 .+ u_grid[:,2].^2), nx_plot, ny_plot)
-        
-        heatmap(
-            x_range, y_range, mag',
-            aspect_ratio = :equal,
-            c = :viridis,
-            title = "CO-FLIP Velocity |u|: t = $(round(step*dt, digits=2))",
-            xlims = (0, 1), ylims = (0, 1),
-            clims = (0, 1.0), 
-            size = (600, 600)
-        )
+        vel_mag = sqrt.(u_grid[:, 1].^2 .+ u_grid[:, 2].^2)
+
+        # Columns: x, y, u, v, |u|
+        step_matrix = hcat(grid_x, grid_y, u_grid[:, 1], u_grid[:, 2], vel_mag)
+        step_file = joinpath(output_dir, @sprintf("step_%04d.txt", step))
+        writedlm(step_file, step_matrix)
+
+        println("  Saved $(step_file)")
     end
-    
-    
-    println("Saving Animation...")
-    mp4(anim, "co_flip_evolution.mp4", fps=10)
-    println("\nSimulation complete! Saved to 'co_flip_evolution.mp4'.")
+
+    println("\nSimulation complete! Step files written to '$(output_dir)'.")
 end
 
 function plot_flow()

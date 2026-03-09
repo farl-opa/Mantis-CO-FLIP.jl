@@ -142,6 +142,8 @@ function create_tensor_product_bspline_de_rham_complex(
     section_spaces::NTuple{manifold_dim, F},
     regularities::NTuple{manifold_dim, Int},
     geometry::G,
+    ;
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {
     manifold_dim,
     F <: FunctionSpaces.AbstractCanonicalSpace,
@@ -165,6 +167,7 @@ function create_tensor_product_bspline_de_rham_complex(
         regularities,
         n_dofs_left,
         n_dofs_right,
+        periodic=periodic,
     )
     # next, create all univariate FEM spaces corresponding to directional-one forms
     fem_spaces[2] = map(FunctionSpaces.get_derivative_space, fem_spaces[1])
@@ -227,13 +230,21 @@ function create_tensor_product_bspline_de_rham_complex(
     num_elements::NTuple{manifold_dim, Int},
     section_spaces::NTuple{manifold_dim, F},
     regularities::NTuple{manifold_dim, Int},
+    ;
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
 
     # create underlying box geometry
     geometry = Geometry.create_cartesian_box(starting_points, box_sizes, num_elements)
 
     return create_tensor_product_bspline_de_rham_complex(
-        starting_points, box_sizes, num_elements, section_spaces, regularities, geometry
+        starting_points,
+        box_sizes,
+        num_elements,
+        section_spaces,
+        regularities,
+        geometry;
+        periodic=periodic,
     )
 end
 
@@ -264,6 +275,8 @@ function create_tensor_product_bspline_de_rham_complex(
     num_elements::NTuple{manifold_dim, Int},
     degrees::NTuple{manifold_dim, Int},
     regularities::NTuple{manifold_dim, Int},
+    ;
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim}
     return create_tensor_product_bspline_de_rham_complex(
         starting_points,
@@ -271,6 +284,7 @@ function create_tensor_product_bspline_de_rham_complex(
         num_elements,
         map(FunctionSpaces.Bernstein, degrees),
         regularities,
+        periodic=periodic,
     )
 end
 
@@ -302,6 +316,7 @@ function create_curvilinear_tensor_product_bspline_de_rham_complex(
     section_spaces::NTuple{manifold_dim, F},
     regularities::NTuple{manifold_dim, Int};
     crazy_c::Float64=0.1,
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim, F <: FunctionSpaces.AbstractCanonicalSpace}
 
     # create underlying box geometry
@@ -310,7 +325,13 @@ function create_curvilinear_tensor_product_bspline_de_rham_complex(
     )
 
     return create_tensor_product_bspline_de_rham_complex(
-        starting_points, box_sizes, num_elements, section_spaces, regularities, geometry
+        starting_points,
+        box_sizes,
+        num_elements,
+        section_spaces,
+        regularities,
+        geometry;
+        periodic=periodic,
     )
 end
 
@@ -344,6 +365,7 @@ function create_curvilinear_tensor_product_bspline_de_rham_complex(
     degrees::NTuple{manifold_dim, Int},
     regularities::NTuple{manifold_dim, Int};
     crazy_c::Float64=0.1,
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim}
     return create_curvilinear_tensor_product_bspline_de_rham_complex(
         starting_points,
@@ -352,6 +374,7 @@ function create_curvilinear_tensor_product_bspline_de_rham_complex(
         map(FunctionSpaces.Bernstein, degrees),
         regularities;
         crazy_c=crazy_c,
+        periodic=periodic,
     )
 end
 

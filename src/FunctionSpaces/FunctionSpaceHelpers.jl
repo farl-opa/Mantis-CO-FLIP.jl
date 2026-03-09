@@ -271,6 +271,7 @@ function create_bspline_space(
     regularities::NTuple{manifold_dim, Int};
     n_dofs_left::NTuple{manifold_dim, Int}=Tuple(ones(Int, manifold_dim)),
     n_dofs_right::NTuple{manifold_dim, Int}=Tuple(ones(Int, manifold_dim)),
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim, F <: NTuple{manifold_dim, AbstractCanonicalSpace}}
     return TensorProductSpace(
         create_dim_wise_bspline_spaces(
@@ -281,6 +282,7 @@ function create_bspline_space(
             regularities,
             n_dofs_left,
             n_dofs_right,
+            periodic=periodic,
         ),
     )
 end
@@ -319,9 +321,11 @@ function create_dim_wise_bspline_spaces(
     regularities::NTuple{manifold_dim, Int},
     n_dofs_left::NTuple{manifold_dim, Int},
     n_dofs_right::NTuple{manifold_dim, Int},
+    ;
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim, F <: NTuple{manifold_dim, AbstractCanonicalSpace}}
     return ntuple(manifold_dim) do i
-        create_bspline_space(
+        B = create_bspline_space(
             starting_points[i],
             box_sizes[i],
             num_elements[i],
@@ -330,6 +334,10 @@ function create_dim_wise_bspline_spaces(
             n_dofs_left=n_dofs_left[i],
             n_dofs_right=n_dofs_right[i],
         )
+        if periodic[i]
+            return GTBSplineSpace((B,), [regularities[i]])
+        end
+        return B
     end
 end
 
@@ -366,6 +374,7 @@ function create_bspline_space(
     regularities::NTuple{manifold_dim, Int};
     n_dofs_left::NTuple{manifold_dim, Int}=Tuple(ones(Int, manifold_dim)),
     n_dofs_right::NTuple{manifold_dim, Int}=Tuple(ones(Int, manifold_dim)),
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim}
     return TensorProductSpace(
         create_dim_wise_bspline_spaces(
@@ -376,6 +385,7 @@ function create_bspline_space(
             regularities,
             n_dofs_left,
             n_dofs_right,
+            periodic=periodic,
         ),
     )
 end
@@ -414,9 +424,11 @@ function create_dim_wise_bspline_spaces(
     regularities::NTuple{manifold_dim, Int},
     n_dofs_left::NTuple{manifold_dim, Int},
     n_dofs_right::NTuple{manifold_dim, Int},
+    ;
+    periodic::NTuple{manifold_dim, Bool}=Tuple(fill(false, manifold_dim)),
 ) where {manifold_dim}
     return ntuple(manifold_dim) do i
-        create_bspline_space(
+        B = create_bspline_space(
             starting_points[i],
             box_sizes[i],
             num_elements[i],
@@ -425,6 +437,10 @@ function create_dim_wise_bspline_spaces(
             n_dofs_left=n_dofs_left[i],
             n_dofs_right=n_dofs_right[i],
         )
+        if periodic[i]
+            return GTBSplineSpace((B,), [regularities[i]])
+        end
+        return B
     end
 end
 
