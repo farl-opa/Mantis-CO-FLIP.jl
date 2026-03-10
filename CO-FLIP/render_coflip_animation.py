@@ -83,6 +83,16 @@ def main() -> None:
         default=None,
         help="Optional fixed upper color limit.",
     )
+    parser.add_argument(
+        "--limit-from-first",
+        type=int,
+        default=None,
+        help=(
+            "If provided, automatic vmin/vmax are computed from only the first N "
+            "frames. Useful when late-time blow-up would otherwise dominate the "
+            "color scale. Ignored when --vmin/--vmax are set explicitly."
+        ),
+    )
     args = parser.parse_args()
 
     metadata_path = args.input_dir / "metadata.txt"
@@ -105,15 +115,29 @@ def main() -> None:
     print(f"Reading {n_steps} frames from {args.input_dir} ...")
     frames = [load_step(p, nx, ny) for p in step_files]
 
+    if args.limit_from_first is not None:
+        if args.limit_from_first <= 0:
+            raise ValueError("--limit-from-first must be a positive integer")
+        n_limit = min(args.limit_from_first, n_steps)
+        frames_for_limits = frames[:n_limit]
+    else:
+        frames_for_limits = frames
+
     if args.vmin is None:
-        vmin = min(float(np.min(f)) for f in frames)
+        vmin = min(float(np.min(f)) for f in frames_for_limits)
     else:
         vmin = args.vmin
 
     if args.vmax is None:
-        vmax = max(float(np.max(f)) for f in frames)
+        vmax = max(float(np.max(f)) for f in frames_for_limits)
     else:
         vmax = args.vmax
+
+    if args.limit_from_first is not None and (args.vmin is None or args.vmax is None):
+        print(
+            "Auto color limits computed from first "
+            f"{len(frames_for_limits)} frame(s): vmin={vmin:.6g}, vmax={vmax:.6g}"
+        )
 
     fig, ax = plt.subplots(figsize=(6, 6), dpi=120)
     im = ax.imshow(

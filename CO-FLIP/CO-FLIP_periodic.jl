@@ -9,6 +9,7 @@ using StaticArrays
 using CUDA
 using DelimitedFiles
 using Printf
+using Memoization
 
 gr()
 
@@ -118,6 +119,10 @@ function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbo
             u, v = flow_double_gyre(px, py, Lx, Ly)
         elseif flow_type == :decay
             u, v = flow_decay(px, py, Lx, Ly)
+        elseif flow_type == :convecting
+            u, v = flow_convecting_vortex(px, py, Lx, Ly)
+        elseif flow_type == :merging
+            u, v = flow_merging_vortices(px, py, Lx, Ly)
         else
             error("Unknown flow type: $flow_type")
         end
@@ -190,7 +195,7 @@ function flow_lamb_oseen(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     cy = Ly / 2.0
     
     # Parameters
-    Gamma = 10.0   # Circulation strength
+    Gamma = 2.0   # Circulation strength
     r_core = min(Lx, Ly) / 8.0  # Radius where max velocity occurs
     
     dx = x - cx
@@ -263,6 +268,96 @@ function flow_decay(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     return u, v
 end
 
+# ------------------------------------------------------------------------------
+# 5. Convecting Vortex (Periodic Advection Test)
+# ------------------------------------------------------------------------------
+function flow_convecting_vortex(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
+    # 1. Background Convection Velocity (moves the flow bottom to top)
+    U_bg = 0.0
+    V_bg = 2.0  # Adjust this to change how fast it travels upwards
+
+    # 2. Initial Vortex Center (Start in the lower half to watch it rise)
+    cx = Lx / 2.0
+    cy = Ly / 4.0 
+    
+    # 3. Vortex Parameters
+    Gamma = 2.0                # Circulation strength
+    r_core = min(Lx, Ly) / 8.0  # Radius where max velocity occurs
+    
+    dx = x - cx
+    dy = y - cy
+    r2 = dx^2 + dy^2
+    r  = sqrt(r2)
+    
+    # Avoid singularity at center
+    if r < 1e-8
+        return U_bg, V_bg
+    end
+
+    # 4. Tangential velocity using a sharp exponential decay
+    # This ensures velocity perturbations are ~0 at the boundaries
+    v_theta = (Gamma / (2 * π * r)) * (1.0 - exp(-r2 / (r_core^2)))
+    
+    # 5. Convert polar to Cartesian and superimpose background flow
+    # u_total = u_bg + u_vortex
+    # v_total = v_bg + v_vortex
+    u = U_bg - v_theta * (dy / r)
+    v = V_bg + v_theta * (dx / r)
+    
+    return u, v
+end
+
+# ------------------------------------------------------------------------------
+# 6. Merging Vortices (Co-rotating Pair)
+# ------------------------------------------------------------------------------
+function flow_merging_vortices(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
+    # 1. Domain Center
+    cx = Lx / 2.0
+    cy = Ly / 2.0
+    
+    # 2. Vortex Parameters
+    Gamma = 3.0                # Both have the same positive circulation
+    r_core = min(Lx, Ly) / 15.0 # Core radius
+    separation = r_core * 3.5   # Distance between vortex centers
+    
+    # Centers of Vortex 1 and Vortex 2
+    cx1 = cx - separation / 2.0
+    cy1 = cy
+    
+    cx2 = cx + separation / 2.0
+    cy2 = cy
+    
+    # 3. Distance calculations
+    dx1 = x - cx1
+    dy1 = y - cy1
+    r1_2 = dx1^2 + dy1^2
+    r1   = sqrt(r1_2)
+    
+    dx2 = x - cx2
+    dy2 = y - cy2
+    r2_2 = dx2^2 + dy2^2
+    r2   = sqrt(r2_2)
+    
+    # 4. Initialize velocity components
+    u = 0.0
+    v = 0.0
+    
+    # 5. Add contribution from Vortex 1
+    if r1 > 1e-8
+        v_theta1 = (Gamma / (2 * π * r1)) * (1.0 - exp(-r1_2 / (r_core^2)))
+        u += -v_theta1 * (dy1 / r1)
+        v +=  v_theta1 * (dx1 / r1)
+    end
+    
+    # 6. Add contribution from Vortex 2
+    if r2 > 1e-8
+        v_theta2 = (Gamma / (2 * π * r2)) * (1.0 - exp(-r2_2 / (r_core^2)))
+        u += -v_theta2 * (dy2 / r2)
+        v +=  v_theta2 * (dx2 / r2)
+    end
+    
+    return u, v
+end
 
 # ==============================================================================
 #                            EVALUATION KERNELS
@@ -747,6 +842,57 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     )
 end
 
+function maybe_clear_memo_tables!(step::Int, clear_every::Int)
+    if clear_every > 0 && (step % clear_every == 0)
+        Memoization.empty_all_caches!()
+        # println("  Cleared memoization caches at step $step")
+    end
+end
+
+function estimate_cfl_number(p::Particles, d::Domain, dt::Float64)
+    nx, ny = d.nel
+    Lx, Ly = d.box_size
+    dx = Lx / nx
+    dy = Ly / ny
+
+    max_advective_rate = 0.0
+    @inbounds for i in 1:length(p.mx)
+        # Initial impulse equals velocity in this Cartesian setup.
+        u = p.mx[i]
+        v = p.my[i]
+        local_rate = abs(u) / dx + abs(v) / dy
+        if local_rate > max_advective_rate
+            max_advective_rate = local_rate
+        end
+    end
+
+    return dt * max_advective_rate
+end
+
+function compute_cfl_dt(p::Particles, d::Domain, target_cfl::Float64)
+    nx, ny = d.nel
+    Lx, Ly = d.box_size
+    dx = Lx / nx
+    dy = Ly / ny
+
+    max_advective_rate = 0.0
+    @inbounds for i in 1:length(p.mx)
+        # Initial impulse equals velocity in this Cartesian setup.
+        u = p.mx[i]
+        v = p.my[i]
+        local_rate = abs(u) / dx + abs(v) / dy
+        if local_rate > max_advective_rate
+            max_advective_rate = local_rate
+        end
+    end
+
+    if max_advective_rate <= eps(Float64)
+        return Inf
+    end
+
+    return target_cfl / max_advective_rate
+end
+
 # ==============================================================================
 #                                   MAIN
 # ==============================================================================
@@ -758,18 +904,18 @@ function main()
     LinearAlgebra.BLAS.set_num_threads(1)
 
     # Configuration
-    nel = (40, 40)
+    nel = (64, 64)
     p = (2, 2)
     k = (1, 1)
     
     # Particles per cell (PPC) = 16
-    num_particles = nel[1] * nel[2] * 16
+    num_particles = nel[1] * nel[2] * 20
 
     # 1. Generate the Domain
     domain = GenerateDomain(nel, p, k)
         
     # 2. Generate and Sort Particles
-    particles = generate_particles(num_particles, domain, :decay)
+    particles = generate_particles(num_particles, domain, :convecting)
     particle_sorter!(particles, domain)
 
     println("Initializing Visualization Grid...")
@@ -788,11 +934,20 @@ function main()
     )
 
     # Time-stepping parameters
-    dt = 0.01
-    T_final = 0.25
-    n_steps = floor(Int, T_final / dt)
+    target_cfl = 0.49
+    T_final = 1.0
+    dt_cfl = compute_cfl_dt(particles, domain, target_cfl)
+    if !isfinite(dt_cfl)
+        n_steps = 1
+        dt = T_final
+    else
+        n_steps = max(1, ceil(Int, T_final / dt_cfl))
+        dt = T_final / n_steps
+    end
+    cfl_used = estimate_cfl_number(particles, domain, dt)
+    clear_memo_every = 1
     
-    println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
+    println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps, CFL=$(round(cfl_used, digits=4)), CFL_target=$target_cfl)...")
 
     
     output_dir = "coflip_output"
@@ -846,6 +1001,7 @@ function main()
         writedlm(step_file, step_matrix)
 
         println("  Saved $(step_file)")
+        maybe_clear_memo_tables!(step, clear_memo_every)
     end
 
     println("\nSimulation complete! Step files written to '$(output_dir)'.")
