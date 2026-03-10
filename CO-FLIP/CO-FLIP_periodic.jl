@@ -453,28 +453,79 @@ function evaluate_field_at_probes(u_coeffs, probes::Particles, d::Domain)
     return u_mat
 end
 
+function evaluate_scalar_form_at_probes(form_expr, probes::Particles, d::Domain)
+    num_points = length(probes.x)
+    values = zeros(Float64, num_points)
+
+    num_elements = prod(d.nel)
+    can_batch_x = Float64[]
+    can_batch_y = Float64[]
+    pid_batch = Int[]
+    max_batch = 1024
+
+    for eid in 1:num_elements
+        empty!(can_batch_x)
+        empty!(can_batch_y)
+        empty!(pid_batch)
+
+        pid = probes.head[eid]
+        while pid != 0
+            push!(pid_batch, pid)
+            push!(can_batch_x, probes.can_x[pid])
+            push!(can_batch_y, probes.can_y[pid])
+            pid = probes.next[pid]
+        end
+
+        if isempty(pid_batch)
+            continue
+        end
+
+        total_points = length(pid_batch)
+        for chunk_start in 1:max_batch:total_points
+            chunk_end = min(chunk_start + max_batch - 1, total_points)
+            rng = chunk_start:chunk_end
+
+            xs_view = @view can_batch_x[rng]
+            ys_view = @view can_batch_y[rng]
+            pids_view = @view pid_batch[rng]
+            points = Mantis.Points.CartesianPoints((xs_view, ys_view))
+
+            eval_out, _ = Forms.evaluate(form_expr, eid, points)
+            local_vals = eval_out[1]
+
+            @inbounds for (i, global_pid) in enumerate(pids_view)
+                values[global_pid] = local_vals[i]
+            end
+        end
+    end
+
+    return values
+end
+
 function evaluate_velocity_and_vorticity_at_probes(u_coeffs, probes::Particles, d::Domain)
     num_points = length(probes.x)
     uvω_mat = zeros(Float64, num_points, 3)
     viz_cache = EvaluationCache(32)
 
+    # u_coeffs are stored in a rotated proxy convention. We first rotate with Hodge-star,
+    # then L2-project to a true 1-form field (Mantis supports d on FormField, not on
+    # Hodge(FormField) expressions), and finally compute scalar vorticity as *d(u_phys_form).
+    u_form = Forms.build_form_field(d.R1, u_coeffs)
+    u_phys_expr = ★(u_form)
+    u_phys_form = Assemblers.solve_L2_projection(d.R1, u_phys_expr, d.dΩ)
+    ω_form = ★(Forms.d(u_phys_form))
+    ω_vals = evaluate_scalar_form_at_probes(ω_form, probes, d)
+
     @inbounds for i in 1:num_points
-        raw_vel, raw_grad = probe_field_at_point(probes.x[i], probes.y[i], u_coeffs, d, viz_cache)
+        raw_vel, _ = probe_field_at_point(probes.x[i], probes.y[i], u_coeffs, d, viz_cache)
 
         # Convert from stored flux ordering to physical velocity components.
         u = -raw_vel[2]
         v =  raw_vel[1]
 
-        # Physical gradients after undoing component swap in the 1-form basis.
-        dv_dx =  raw_grad[1,1]
-        du_dy = -raw_grad[2,2]
-
-        # 2D scalar vorticity: ω = ∂v/∂x - ∂u/∂y.
-        ω = dv_dx - du_dy
-
         uvω_mat[i, 1] = u
         uvω_mat[i, 2] = v
-        uvω_mat[i, 3] = ω
+        uvω_mat[i, 3] = ω_vals[i]
     end
 
     return uvω_mat
@@ -957,8 +1008,9 @@ function main()
     grid_probes = Particles(
         grid_x, grid_y, 
         zeros(n_grid), zeros(n_grid), zeros(n_grid), 
-        zeros(n_grid), zeros(n_grid), Int[], Int[], Int[]
+        zeros(n_grid), zeros(n_grid), zeros(Int, prod(domain.nel)), zeros(Int, n_grid), zeros(Int, n_grid)
     )
+    particle_sorter!(grid_probes, domain)
 
     # Time-stepping parameters
     """
