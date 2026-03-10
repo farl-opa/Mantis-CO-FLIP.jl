@@ -453,6 +453,33 @@ function evaluate_field_at_probes(u_coeffs, probes::Particles, d::Domain)
     return u_mat
 end
 
+function evaluate_velocity_and_vorticity_at_probes(u_coeffs, probes::Particles, d::Domain)
+    num_points = length(probes.x)
+    uvω_mat = zeros(Float64, num_points, 3)
+    viz_cache = EvaluationCache(32)
+
+    @inbounds for i in 1:num_points
+        raw_vel, raw_grad = probe_field_at_point(probes.x[i], probes.y[i], u_coeffs, d, viz_cache)
+
+        # Convert from stored flux ordering to physical velocity components.
+        u = -raw_vel[2]
+        v =  raw_vel[1]
+
+        # Physical gradients after undoing component swap in the 1-form basis.
+        dv_dx =  raw_grad[1,1]
+        du_dy = -raw_grad[2,2]
+
+        # 2D scalar vorticity: ω = ∂v/∂x - ∂u/∂y.
+        ω = dv_dx - du_dy
+
+        uvω_mat[i, 1] = u
+        uvω_mat[i, 2] = v
+        uvω_mat[i, 3] = ω
+    end
+
+    return uvω_mat
+end
+
 # ==============================================================================
 #                            GRID OPERATIONS & SOLVERS
 # ==============================================================================
@@ -904,7 +931,7 @@ function main()
     LinearAlgebra.BLAS.set_num_threads(1)
 
     # Configuration
-    nel = (64, 64)
+    nel = (80, 80)
     p = (2, 2)
     k = (1, 1)
     
@@ -915,7 +942,7 @@ function main()
     domain = GenerateDomain(nel, p, k)
         
     # 2. Generate and Sort Particles
-    particles = generate_particles(num_particles, domain, :convecting)
+    particles = generate_particles(num_particles, domain, :merging)
     particle_sorter!(particles, domain)
 
     println("Initializing Visualization Grid...")
@@ -934,6 +961,7 @@ function main()
     )
 
     # Time-stepping parameters
+    """
     target_cfl = 0.49
     T_final = 1.0
     dt_cfl = compute_cfl_dt(particles, domain, target_cfl)
@@ -945,9 +973,13 @@ function main()
         dt = T_final / n_steps
     end
     cfl_used = estimate_cfl_number(particles, domain, dt)
+    """
+    T_final = 1.0
+    dt = 0.001
+    n_steps = ceil(Int, T_final / dt)
     clear_memo_every = 1
     
-    println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps, CFL=$(round(cfl_used, digits=4)), CFL_target=$target_cfl)...")
+    println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
 
     
     output_dir = "coflip_output"
@@ -962,6 +994,7 @@ function main()
         println(io, "dt $dt")
         println(io, "Lx $(domain.box_size[1])")
         println(io, "Ly $(domain.box_size[2])")
+        println(io, "has_vorticity 1")
     end
 
     # Warmup run on a copied particle state to reduce first-step compilation noise.
@@ -992,11 +1025,11 @@ function main()
         # Re-evaluate the velocity field to plot the results
         u_coeffs = coadjoint_step!(particles, domain)
         
-        u_grid = evaluate_field_at_probes(u_coeffs, grid_probes, domain)
-        vel_mag = sqrt.(u_grid[:, 1].^2 .+ u_grid[:, 2].^2)
+        uvω_grid = evaluate_velocity_and_vorticity_at_probes(u_coeffs, grid_probes, domain)
+        vel_mag = sqrt.(uvω_grid[:, 1].^2 .+ uvω_grid[:, 2].^2)
 
-        # Columns: x, y, u, v, |u|
-        step_matrix = hcat(grid_x, grid_y, u_grid[:, 1], u_grid[:, 2], vel_mag)
+        # Columns: x, y, u, v, |u|, ω
+        step_matrix = hcat(grid_x, grid_y, uvω_grid[:, 1], uvω_grid[:, 2], vel_mag, uvω_grid[:, 3])
         step_file = joinpath(output_dir, @sprintf("step_%04d.txt", step))
         writedlm(step_file, step_matrix)
 

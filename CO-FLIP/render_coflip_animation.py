@@ -7,8 +7,8 @@ Expected input folder layout:
 - step_0002.txt
 - ...
 
-Each step file must contain 5 whitespace-separated columns:
-x, y, u, v, |u|
+Each step file must contain at least 5 whitespace-separated columns:
+x, y, u, v, |u|[, omega]
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def read_metadata(metadata_path: Path) -> Dict[str, float]:
     return meta
 
 
-def load_step(step_path: Path, nx: int, ny: int) -> np.ndarray:
+def load_step(step_path: Path, nx: int, ny: int, field: str) -> np.ndarray:
     data = np.loadtxt(step_path)
     if data.ndim != 2 or data.shape[1] < 5:
         raise ValueError(f"Unexpected data format in {step_path}")
@@ -45,10 +45,23 @@ def load_step(step_path: Path, nx: int, ny: int) -> np.ndarray:
             f"got {data.shape[0]}, expected {nx * ny}"
         )
 
-    # Column 5 is |u|. Julia writes points with x varying fastest, then y,
+    if field == "speed":
+        # Column 5 is |u|.
+        values = data[:, 4]
+    elif field == "vorticity":
+        if data.shape[1] < 6:
+            raise ValueError(
+                f"Field 'vorticity' requested but {step_path} has only "
+                f"{data.shape[1]} columns (need 6)."
+            )
+        # Column 6 is scalar vorticity omega.
+        values = data[:, 5]
+    else:
+        raise ValueError(f"Unknown field: {field}")
+
+    # Julia writes points with x varying fastest, then y,
     # which maps naturally to a (ny, nx) image.
-    mag = data[:, 4].reshape((ny, nx))
-    return mag
+    return values.reshape((ny, nx))
 
 
 def main() -> None:
@@ -93,6 +106,13 @@ def main() -> None:
             "color scale. Ignored when --vmin/--vmax are set explicitly."
         ),
     )
+    parser.add_argument(
+        "--field",
+        type=str,
+        choices=("speed", "vorticity"),
+        default="speed",
+        help="Field to render: speed uses column 5 (|u|), vorticity uses column 6 (omega).",
+    )
     args = parser.parse_args()
 
     metadata_path = args.input_dir / "metadata.txt"
@@ -113,7 +133,7 @@ def main() -> None:
         raise FileNotFoundError(f"Missing step files, first missing: {missing[0]}")
 
     print(f"Reading {n_steps} frames from {args.input_dir} ...")
-    frames = [load_step(p, nx, ny) for p in step_files]
+    frames = [load_step(p, nx, ny, args.field) for p in step_files]
 
     if args.limit_from_first is not None:
         if args.limit_from_first <= 0:
@@ -140,6 +160,14 @@ def main() -> None:
         )
 
     fig, ax = plt.subplots(figsize=(6, 6), dpi=120)
+
+    if args.field == "speed":
+        field_label = "|u|"
+        title_prefix = "CO-FLIP Velocity |u|"
+    else:
+        field_label = "omega"
+        title_prefix = "CO-FLIP Vorticity omega"
+
     im = ax.imshow(
         frames[0],
         origin="lower",
@@ -151,14 +179,14 @@ def main() -> None:
         aspect="equal",
     )
     cbar = fig.colorbar(im, ax=ax)
-    cbar.set_label("|u|")
-    title = ax.set_title(f"CO-FLIP Velocity |u|: t = {dt:.2f}")
+    cbar.set_label(field_label)
+    title = ax.set_title(f"{title_prefix}: t = {dt:.2f}")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
 
     def update(frame_idx: int):
         im.set_data(frames[frame_idx])
-        title.set_text(f"CO-FLIP Velocity |u|: t = {(frame_idx + 1) * dt:.2f}")
+        title.set_text(f"{title_prefix}: t = {(frame_idx + 1) * dt:.2f}")
         return (im, title)
 
     anim = FuncAnimation(fig, update, frames=n_steps, interval=1000 / args.fps, blit=False)
