@@ -358,71 +358,6 @@ function evaluate_field_at_probes(u_coeffs, probes::Particles, d::Domain)
     return u_mat
 end
 
-function get_boundary_dofs(d::Domain)
-    fes = d.R1.fem_space
-    nx, ny = d.nel
-    
-    boundary_dofs = Set{Int}()
-    
-    # Helper function to probe an element boundary and extract active normal DoFs
-    function check_boundary(eid::Int, xi_eta::Tuple{Float64, Float64}, component_idx::Int)
-        # Create a point in canonical [0,1]x[0,1] element coordinates
-        points = Mantis.Points.CartesianPoints(([xi_eta[1]], [xi_eta[2]]))
-        
-        # Evaluate basis functions at this point
-        eval_out, dofs = FunctionSpaces.evaluate(fes, eid, points, 0)
-        
-        # Extract evaluations for the specific component (1 for x, 2 for y)
-        # eval_out[1][1][component] is a matrix of size (num_points, num_local_dofs)
-        vals = eval_out[1][1][component_idx]
-        
-        # If the basis function has a non-zero value here, it controls boundary flux!
-        for k in 1:length(dofs)
-            if abs(vals[1, k]) > 1e-10
-                push!(boundary_dofs, dofs[k])
-            end
-        end
-    end
-    
-    # For B-splines of degree p, a single point might not hit all boundary basis 
-    # functions if they are highly localized. We probe at 3 spots along the edge.
-    probe_points = (0.25, 0.50, 0.75)
-
-    # 1. Left Wall (x = 0 -> xi = 0.0). Normal is X (component 1)
-    for ej in 1:ny
-        eid = (ej - 1) * nx + 1
-        for p in probe_points
-            check_boundary(eid, (0.0, p), 1)
-        end
-    end
-    
-    # 2. Right Wall (x = Lx -> xi = 1.0). Normal is X (component 1)
-    for ej in 1:ny
-        eid = (ej - 1) * nx + nx
-        for p in probe_points
-            check_boundary(eid, (1.0, p), 1)
-        end
-    end
-    
-    # 3. Bottom Wall (y = 0 -> eta = 0.0). Normal is Y (component 2)
-    for ei in 1:nx
-        eid = ei
-        for p in probe_points
-            check_boundary(eid, (p, 0.0), 2)
-        end
-    end
-    
-    # 4. Top Wall (y = Ly -> eta = 1.0). Normal is Y (component 2)
-    for ei in 1:nx
-        eid = (ny - 1) * nx + ei
-        for p in probe_points
-            check_boundary(eid, (p, 1.0), 2)
-        end
-    end
-    
-    return collect(boundary_dofs)
-end
-
 # ==============================================================================
 #                            GRID OPERATIONS & SOLVERS
 # ==============================================================================
@@ -716,7 +651,7 @@ function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_ou
     return max_err[]
 end
 
-function coadjoint_step!(p::Particles, d::Domain, dt::Float64)
+function coadjoint_step!(p::Particles, d::Domain)
     B = build_B_matrix(p, d)
     u_grid_n = solve_grid_velocity_lsqr(B, p)
     u_grid_n_h = Forms.build_form_field(d.R1, u_grid_n)
@@ -724,7 +659,7 @@ function coadjoint_step!(p::Particles, d::Domain, dt::Float64)
     return u_div_free_coeffs_n
 end
 
-function step_co_flip!(p::Particles, d::Domain, dt::Float64, boundary_dofs::Vector{Int})
+function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     step_t0 = time_ns()
 
     x_n  = copy(p.x)
@@ -732,7 +667,7 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64, boundary_dofs::Vect
     mx_n = copy(p.mx)
     my_n = copy(p.my)
     
-    f_n = coadjoint_step!(p, d, 0.0)
+    f_n = coadjoint_step!(p, d)
     
     # Initialize Fixed Point variables
     f_star = copy(f_n)
@@ -823,7 +758,7 @@ function main()
     LinearAlgebra.BLAS.set_num_threads(1)
 
     # Configuration
-    nel = (64, 64)
+    nel = (40, 40)
     p = (2, 2)
     k = (1, 1)
     
@@ -832,12 +767,8 @@ function main()
 
     # 1. Generate the Domain
     domain = GenerateDomain(nel, p, k)
-    
-    # 2. Extract Boundary DoFs to enforce no-penetration
-    boundary_dofs = get_boundary_dofs(domain)
-    println("Identified $(length(boundary_dofs)) boundary DoFs to constrain.")
-    
-    # 3. Generate and Sort Particles
+        
+    # 2. Generate and Sort Particles
     particles = generate_particles(num_particles, domain, :decay)
     particle_sorter!(particles, domain)
 
@@ -893,21 +824,18 @@ function main()
         copy(particles.elem_ids),
     )
     particle_sorter!(warmup_particles, domain)
-    step_co_flip!(warmup_particles, domain, dt, boundary_dofs)
+    step_co_flip!(warmup_particles, domain, dt)
     println("Warmup done. Starting measured steps...")
 
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step*dt, digits=3)))...")
 
-        # 4. Advance the CO-FLIP state
-        step_co_flip!(particles, domain, dt, boundary_dofs)
+        # 3. Advance the CO-FLIP state
+        step_co_flip!(particles, domain, dt)
         
-        # 5. Visualization
+        # 4. Visualization
         # Re-evaluate the velocity field to plot the results
-        u_coeffs = coadjoint_step!(particles, domain, 0.0)
-        
-        # Make sure the visualization field respects the boundary
-        u_coeffs[boundary_dofs] .= 0.0
+        u_coeffs = coadjoint_step!(particles, domain)
         
         u_grid = evaluate_field_at_probes(u_coeffs, grid_probes, domain)
         vel_mag = sqrt.(u_grid[:, 1].^2 .+ u_grid[:, 2].^2)
@@ -933,8 +861,8 @@ function plot_flow()
     u_vals = zeros(length(x), length(y))
     v_vals = zeros(length(x), length(y))
 
-    for i in 1:length(x)
-        for j in 1:length(y)
+    for i in eachindex(x)
+        for j in eachindex(y)
             u_vals[i, j], v_vals[i, j] = flow_decay(x[i], y[j], Lx, Ly)
         end
     end
