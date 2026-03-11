@@ -82,7 +82,7 @@ def main() -> None:
     )
     parser.add_argument("--fps", type=int, default=10, help="Frames per second.")
     parser.add_argument(
-        "--cmap", type=str, default="viridis", help="Matplotlib colormap name."
+        "--cmap", type=str, default="jet", help="Matplotlib colormap name."
     )
     parser.add_argument(
         "--vmin",
@@ -127,12 +127,14 @@ def main() -> None:
     lx = float(meta["Lx"])
     ly = float(meta["Ly"])
 
-    step_files = [args.input_dir / f"step_{i:04d}.txt" for i in range(1, n_steps + 1)]
+    has_t0 = (args.input_dir / "step_0000.txt").exists()
+    start_idx = 0 if has_t0 else 1
+    step_files = [args.input_dir / f"step_{i:04d}.txt" for i in range(start_idx, n_steps + 1)]
     missing = [p for p in step_files if not p.exists()]
     if missing:
         raise FileNotFoundError(f"Missing step files, first missing: {missing[0]}")
 
-    print(f"Reading {n_steps} frames from {args.input_dir} ...")
+    print(f"Reading {len(step_files)} frames from {args.input_dir} ...")
     frames = [load_step(p, nx, ny, args.field) for p in step_files]
 
     if args.limit_from_first is not None:
@@ -180,16 +182,18 @@ def main() -> None:
     )
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label(field_label)
-    title = ax.set_title(f"{title_prefix}: t = {dt:.2f}")
+    t0 = 0.0 if has_t0 else dt
+    title = ax.set_title(f"{title_prefix}: t = {t0:.2f}")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
 
     def update(frame_idx: int):
         im.set_data(frames[frame_idx])
-        title.set_text(f"{title_prefix}: t = {(frame_idx + 1) * dt:.2f}")
+        time_val = frame_idx * dt if has_t0 else (frame_idx + 1) * dt
+        title.set_text(f"{title_prefix}: t = {time_val:.2f}")
         return (im, title)
 
-    anim = FuncAnimation(fig, update, frames=n_steps, interval=1000 / args.fps, blit=False)
+    anim = FuncAnimation(fig, update, frames=len(frames), interval=1000 / args.fps, blit=False)
 
     output_path = args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
