@@ -28,7 +28,38 @@ struct Domain{F0, F1, F2, G, Q}
     k::NTuple{2,Int}
     box_size::NTuple{2,Float64}
     eval_cache_size::Int
+    bcs
 end
+
+struct BoundaryConditions
+    left::Symbol
+    right::Symbol
+    bottom::Symbol
+    top::Symbol
+
+    function BoundaryConditions(left::Symbol, right::Symbol, bottom::Symbol, top::Symbol)
+        allowed = (:periodic, :free_space, :free_slip)
+        for (name, bc) in ((:left, left), (:right, right), (:bottom, bottom), (:top, top))
+            if !(bc in allowed)
+                error("Invalid boundary type '$bc' for wall '$name'. Allowed values: $(allowed)")
+            end
+        end
+
+        if (left == :periodic) != (right == :periodic)
+            error("Periodic x-boundary requires both left and right to be :periodic")
+        end
+        if (bottom == :periodic) != (top == :periodic)
+            error("Periodic y-boundary requires both bottom and top to be :periodic")
+        end
+
+        new(left, right, bottom, top)
+    end
+end
+
+periodic_axes(bcs::BoundaryConditions) = (
+    bcs.left == :periodic && bcs.right == :periodic,
+    bcs.bottom == :periodic && bcs.top == :periodic,
+)
 
 mutable struct Particles
     x::Vector{Float64}
@@ -60,7 +91,12 @@ end
 #                            DOMAIN GENERATION
 # ==============================================================================
 
-function GenerateDomain(nel::NTuple{2,Int}, p::NTuple{2,Int}, k::NTuple{2,Int})
+function GenerateDomain(
+    nel::NTuple{2,Int},
+    p::NTuple{2,Int},
+    k::NTuple{2,Int};
+    bcs::BoundaryConditions=BoundaryConditions(:periodic, :periodic, :periodic, :periodic),
+)
     starting_point = (0.0, 0.0)
     box_size       = (1.0, 1.0)
     nq_assembly = p .+ 1
@@ -68,13 +104,14 @@ function GenerateDomain(nel::NTuple{2,Int}, p::NTuple{2,Int}, k::NTuple{2,Int})
     ∫ₐ, ∫ₑ = Quadrature.get_canonical_quadrature_rules(Quadrature.gauss_legendre, nq_assembly, nq_error)
     dΩ = Quadrature.StandardQuadrature(∫ₐ, prod(nel))
     
+    periodic = periodic_axes(bcs)
     R = Forms.create_tensor_product_bspline_de_rham_complex(
         starting_point,
         box_size,
         nel,
         p,
         k;
-        periodic=(true, true),
+        periodic=periodic,
     )
 
     # The extraction permutation J can be shifted (e.g. 21:38), so the fast cache
@@ -95,6 +132,7 @@ function GenerateDomain(nel::NTuple{2,Int}, p::NTuple{2,Int}, k::NTuple{2,Int})
         k,
         box_size,
         eval_cache_size,
+        bcs,
     )
 end
 
@@ -121,13 +159,12 @@ function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbo
 
     # Initialize Particle States
     for i in 1:num_particles
-        # 1. Random Position (Stratified sampling is better, but random is fine for now)
         px = rand() * Lx
         py = rand() * Ly
         x[i] = px
         y[i] = py
         
-        # 2. Select Flow Type
+        # Select Flow Type
         u, v = 0.0, 0.0
         
         if flow_type == :tg
@@ -146,14 +183,12 @@ function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbo
             error("Unknown flow type: $flow_type")
         end
         
-        # 3. Assign Impulse
-        # In this metric (Cartesian), impulse (covector) components = velocity components
+        # Assign Impulse
         mx[i] = u
         my[i] = v
     end
     
     # Estimate particle volume (Area / N) for integration weights
-    # This helps the least-squares P2G solver converge better
     particle_vol = (Lx * Ly) / num_particles
     fill!(vol, particle_vol)
     
@@ -169,10 +204,22 @@ function particle_sorter!(p::Particles, d::Domain)
     dy = Ly / ny
     inv_dx = 1.0 / dx
     inv_dy = 1.0 / dy
+
+    bcs = d.bcs
+    periodic_x, periodic_y = periodic_axes(bcs)
     
     @inbounds for i in 1:length(p.x)
-        p.x[i] = mod(p.x[i], Lx)
-        p.y[i] = mod(p.y[i], Ly)
+        if periodic_x
+            p.x[i] = mod(p.x[i], Lx)
+        else
+            p.x[i] = clamp(p.x[i], 0.0, Lx)
+        end
+
+        if periodic_y
+            p.y[i] = mod(p.y[i], Ly)
+        else
+            p.y[i] = clamp(p.y[i], 0.0, Ly)
+        end
         
         ei = clamp(floor(Int, p.x[i] * inv_dx) + 1, 1, nx)
         ej = clamp(floor(Int, p.y[i] * inv_dy) + 1, 1, ny)
@@ -186,6 +233,60 @@ function particle_sorter!(p::Particles, d::Domain)
         p.next[i] = p.head[eid]
         p.head[eid] = i
     end
+end
+
+@inline function apply_axis_bc(pos::Float64, mom::Float64, L::Float64, low_bc::Symbol, high_bc::Symbol)
+    if low_bc == :periodic && high_bc == :periodic
+        return mod(pos, L), mom
+    end
+
+    x = pos
+    m = mom
+    for _ in 1:8
+        if x < 0.0
+            if low_bc == :free_slip
+                x = -x
+                m = -m
+            elseif low_bc == :free_space
+                x = 0.0
+                break
+            else
+                error("Unsupported low boundary type: $low_bc")
+            end
+        elseif x > L
+            if high_bc == :free_slip
+                x = 2.0 * L - x
+                m = -m
+            elseif high_bc == :free_space
+                x = L
+                break
+            else
+                error("Unsupported high boundary type: $high_bc")
+            end
+        else
+            break
+        end
+    end
+
+    return clamp(x, 0.0, L), m
+end
+
+@inline function apply_particle_boundary(x::Float64, y::Float64, mx::Float64, my::Float64, d::Domain)
+    Lx, Ly = d.box_size
+    bcs = d.bcs
+
+    x_b, mx_b = apply_axis_bc(x, mx, Lx, bcs.left, bcs.right)
+    y_b, my_b = apply_axis_bc(y, my, Ly, bcs.bottom, bcs.top)
+
+    return x_b, y_b, mx_b, my_b
+end
+
+@inline function boundary_distance(new_raw::Float64, old::Float64, L::Float64, is_periodic::Bool)
+    if !is_periodic
+        return abs(new_raw - old)
+    end
+    d = abs(new_raw - old)
+    return d > 0.5 * L ? (L - d) : d
 end
 
 # ==============================================================================
@@ -400,9 +501,10 @@ end
 function probe_field_at_point(x::Float64, y::Float64, u_coeffs, d::Domain, cache::EvaluationCache)
     Lx, Ly = d.box_size
     nx, ny = d.nel
-    
-    x_wrapped = mod(x, Lx)
-    y_wrapped = mod(y, Ly)
+
+    periodic_x, periodic_y = periodic_axes(d.bcs)
+    x_wrapped = periodic_x ? mod(x, Lx) : clamp(x, 0.0, Lx)
+    y_wrapped = periodic_y ? mod(y, Ly) : clamp(y, 0.0, Ly)
     
     dx = Lx / nx; dy = Ly / ny
     inv_dx = 1.0 / dx; inv_dy = 1.0 / dy
@@ -586,6 +688,10 @@ function build_B_matrix(p::Particles, d::Domain)
             vals_x_matrix = eval_out[1][1][1] 
             vals_y_matrix = eval_out[1][1][2] 
             num_local_basis = size(vals_x_matrix, 2)
+
+            if size(vals_y_matrix, 2) != num_local_basis || length(dof_indices) != num_local_basis
+                error("Inconsistent local basis evaluation in build_B_matrix for element $eid")
+            end
             
             # Assemble Sparse Entries
             for (i, global_pid) in enumerate(pids_view)
@@ -738,6 +844,7 @@ function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
 
     num_p = length(x0)
     Lx, Ly = d.box_size
+    periodic_x, periodic_y = periodic_axes(d.bcs)
     max_err = Threads.Atomic{Float64}(0.0)
     
     n_threads = Threads.nthreads()
@@ -766,18 +873,16 @@ function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
         nx_raw, ny_raw = new_state[1], new_state[2]
         ox, oy = x_out[i], y_out[i]
         
-        dx = abs(nx_raw - ox)
-        dy = abs(ny_raw - oy)
-        
-        if dx > 0.5 * Lx; dx = Lx - dx; end
-        if dy > 0.5 * Ly; dy = Ly - dy; end
+        dx = boundary_distance(nx_raw, ox, Lx, periodic_x)
+        dy = boundary_distance(ny_raw, oy, Ly, periodic_y)
         
         Threads.atomic_max!(max_err, max(dx, dy))
-        
-        x_out[i]  = mod(nx_raw, Lx)
-        y_out[i]  = mod(ny_raw, Ly)
-        mx_out[i] = new_state[3]
-        my_out[i] = new_state[4]
+
+        xb, yb, mxb, myb = apply_particle_boundary(nx_raw, ny_raw, new_state[3], new_state[4], d)
+        x_out[i]  = xb
+        y_out[i]  = yb
+        mx_out[i] = mxb
+        my_out[i] = myb
     end
     
     return max_err[]
@@ -786,6 +891,7 @@ end
 function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out)
     num_p = length(x0)
     Lx, Ly = d.box_size
+    periodic_x, periodic_y = periodic_axes(d.bcs)
     max_err = Threads.Atomic{Float64}(0.0)
     
     n_threads = Threads.nthreads()
@@ -809,18 +915,16 @@ function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_ou
         nx_raw, ny_raw = new_state[1], new_state[2]
         ox, oy = x_out[i], y_out[i]
         
-        dx = abs(nx_raw - ox)
-        dy = abs(ny_raw - oy)
-        
-        if dx > 0.5 * Lx; dx = Lx - dx; end
-        if dy > 0.5 * Ly; dy = Ly - dy; end
+        dx = boundary_distance(nx_raw, ox, Lx, periodic_x)
+        dy = boundary_distance(ny_raw, oy, Ly, periodic_y)
         
         Threads.atomic_max!(max_err, max(dx, dy))
-        
-        x_out[i]  = mod(nx_raw, Lx)
-        y_out[i]  = mod(ny_raw, Ly)
-        mx_out[i] = new_state[3]
-        my_out[i] = new_state[4]
+
+        xb, yb, mxb, myb = apply_particle_boundary(nx_raw, ny_raw, new_state[3], new_state[4], d)
+        x_out[i]  = xb
+        y_out[i]  = yb
+        mx_out[i] = mxb
+        my_out[i] = myb
     end
     
     return max_err[]
@@ -868,7 +972,7 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64)
         # Project new particles to grid
         t0 = time()
         p.x, p.y = x_np1, y_np1
-        # p.mx, p.my = mx_np1, my_np1
+        p.mx, p.my = mx_np1, my_np1
         particle_sorter!(p, d)
         t_sort_ms = (time() - t0)
         
@@ -967,12 +1071,21 @@ function main()
     nel = (64, 64)
     p = (2, 2)
     k = (1, 1)
+
+    # Per-wall boundary types: :periodic, :free_space, :free_slip.
+    # Note: periodic must be set on both opposing walls of an axis.
+    bcs = BoundaryConditions(
+        :free_space,  # left
+        :free_space,  # right
+        :free_space, # bottom
+        :free_space, # top
+    )
     
     # Particles per cell (PPC) = 16
     num_particles = nel[1] * nel[2] * 16
 
     # 1. Generate the Domain
-    domain = GenerateDomain(nel, p, k)
+    domain = GenerateDomain(nel, p, k; bcs=bcs)
         
     # 2. Generate and Sort Particles
     particles = generate_particles(num_particles, domain, :merging)

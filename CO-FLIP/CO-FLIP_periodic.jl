@@ -4,7 +4,6 @@ using LinearAlgebra
 using Plots
 using SparseArrays
 using IterativeSolvers
-using LinearMaps
 using StaticArrays
 using CUDA
 using DelimitedFiles
@@ -46,13 +45,19 @@ end
 struct EvaluationCache
     temp_mat::Matrix{Float64}
     results::Vector{Vector{Vector{Matrix{Float64}}}}
+    xi_buf::Vector{Float64}
+    eta_buf::Vector{Float64}
+    point_buf::Mantis.Points.CartesianPoints{2, Vector{Float64}, CartesianIndices{2, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}, LinearIndices{2, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}}
     
     function EvaluationCache(max_basis_size::Int)
         v0 = [[zeros(1, max_basis_size) for _ in 1:2]] 
         v1 = [[zeros(1, max_basis_size) for _ in 1:2] for _ in 1:2] 
         res = Vector{Vector{Vector{Matrix{Float64}}}}(undef, 2)
         res[1] = v0; res[2] = v1
-        return new(zeros(1, max_basis_size), res)
+        xi_buf = zeros(Float64, 1)
+        eta_buf = zeros(Float64, 1)
+        point_buf = Mantis.Points.CartesianPoints((xi_buf, eta_buf))
+        return new(zeros(1, max_basis_size), res, xi_buf, eta_buf, point_buf)
     end
 end
 
@@ -77,8 +82,6 @@ function GenerateDomain(nel::NTuple{2,Int}, p::NTuple{2,Int}, k::NTuple{2,Int})
         periodic=(true, true),
     )
 
-    # The extraction permutation J can be shifted (e.g. 21:38), so the fast cache
-    # must match the largest element-local basis span in this space.
     eval_cache_size = maximum(
         length(FunctionSpaces.get_basis_indices(R[2].fem_space, eid)) for
         eid in 1:FunctionSpaces.get_num_elements(R[2].fem_space)
@@ -104,56 +107,72 @@ end
 
 function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbol=:vortex)
     Lx, Ly = domain.box_size
-    
+    nx_el, ny_el = domain.nel
+    dx = Lx / nx_el
+    dy = Ly / ny_el
+    num_elements = nx_el * ny_el
+
+    # Compute how many particles land in each element (distribute remainder evenly)
+    base_ppc = div(num_particles, num_elements)
+    n_extra  = rem(num_particles, num_elements)
+
     x  = Vector{Float64}(undef, num_particles)
     y  = Vector{Float64}(undef, num_particles)
     mx = Vector{Float64}(undef, num_particles)
     my = Vector{Float64}(undef, num_particles)
-    vol = ones(Float64, num_particles) # Volume is 1.0/density roughly
+    vol = ones(Float64, num_particles)
     
-    # Pre-allocate arrays for sorting structures
-    can_x = zeros(Float64, num_particles)
-    can_y = zeros(Float64, num_particles)
-    num_elements = prod(domain.nel)
-    head = zeros(Int, num_elements)
-    next = zeros(Int, num_particles)
+    can_x    = zeros(Float64, num_particles)
+    can_y    = zeros(Float64, num_particles)
+    head     = zeros(Int, num_elements)
+    next     = zeros(Int, num_particles)
     elem_ids = zeros(Int, num_particles)
 
-    # Initialize Particle States
-    for i in 1:num_particles
-        # 1. Random Position (Stratified sampling is better, but random is fine for now)
-        px = rand() * Lx
-        py = rand() * Ly
-        x[i] = px
-        y[i] = py
-        
-        # 2. Select Flow Type
-        u, v = 0.0, 0.0
-        
-        if flow_type == :tg
-            u, v = flow_taylor_green(px, py, Lx, Ly)
-        elseif flow_type == :vortex
-            u, v = flow_lamb_oseen(px, py, Lx, Ly)
-        elseif flow_type == :gyre
-            u, v = flow_double_gyre(px, py, Lx, Ly)
-        elseif flow_type == :decay
-            u, v = flow_decay(px, py, Lx, Ly)
-        elseif flow_type == :convecting
-            u, v = flow_convecting_vortex(px, py, Lx, Ly)
-        elseif flow_type == :merging
-            u, v = flow_merging_vortices(px, py, Lx, Ly)
-        else
-            error("Unknown flow type: $flow_type")
+    particle_idx = 1
+    for ej in 1:ny_el
+        for ei in 1:nx_el
+            eid     = (ej - 1) * nx_el + ei
+            n_local = base_ppc + (eid <= n_extra ? 1 : 0)
+            if n_local == 0
+                continue
+            end
+
+
+            for local_idx in 1:n_local
+                # Purely random placement strictly within this element's bounds
+                ξ = rand()
+                η = rand()
+
+                px = (ei - 1 + ξ) * dx
+                py = (ej - 1 + η) * dy
+
+                x[particle_idx] = px
+                y[particle_idx] = py
+
+                u, v = 0.0, 0.0
+                if flow_type == :tg
+                    u, v = flow_taylor_green(px, py, Lx, Ly)
+                elseif flow_type == :vortex
+                    u, v = flow_lamb_oseen(px, py, Lx, Ly)
+                elseif flow_type == :gyre
+                    u, v = flow_double_gyre(px, py, Lx, Ly)
+                elseif flow_type == :decay
+                    u, v = flow_decay(px, py, Lx, Ly)
+                elseif flow_type == :convecting
+                    u, v = flow_convecting_vortex(px, py, Lx, Ly)
+                elseif flow_type == :merging
+                    u, v = flow_merging_vortices(px, py, Lx, Ly)
+                else
+                    error("Unknown flow type: $flow_type")
+                end
+
+                mx[particle_idx] = u
+                my[particle_idx] = v
+                particle_idx += 1
+            end
         end
-        
-        # 3. Assign Impulse
-        # In this metric (Cartesian), impulse (covector) components = velocity components
-        mx[i] = u
-        my[i] = v
     end
-    
-    # Estimate particle volume (Area / N) for integration weights
-    # This helps the least-squares P2G solver converge better
+
     particle_vol = (Lx * Ly) / num_particles
     fill!(vol, particle_vol)
     
@@ -319,26 +338,26 @@ function flow_merging_vortices(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
 
     # 2. Vortex Parameters 
     Gamma = 3.0     # Both have the same positive circulation 
-    r_core = min(Lx, Ly) / 15.0     # Core radius 
-    separation = r_core * 5     # Distance between vortex centers 
+    r_core = min(Lx, Ly) / 30.0     # Core radius 
+    separation = r_core * 4     # Distance between vortex centers 
 
     # Centers of Vortex 1 and Vortex 2 
-    cx1 = cx - separation / 2.0 
+    cx1 = cx - separation / 1.0 
     cy1 = cy 
 
-    cx2 = cx + separation / 2.0 
+    cx2 = cx + separation / 1.0 
     cy2 = cy 
 
     # 3. Distance calculations 
     dx1 = x - cx1 
     dy1 = y - cy1 
     r1_2 = dx1^2 + dy1^2 
-    r1 = sqrt(r1_2) 
+    r1 = sqrt(r1_2)*0.75
 
     dx2 = x - cx2 
     dy2 = y - cy2 
     r2_2 = dx2^2 + dy2^2 
-    r2 = sqrt(r2_2) 
+    r2 = sqrt(r2_2)*0.75
 
     # 4. Initialize velocity components 
     u = 0.0 
@@ -413,10 +432,10 @@ function probe_field_at_point(x::Float64, y::Float64, u_coeffs, d::Domain, cache
     
     xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
     eta = (y_wrapped - (ej - 1) * dy) * inv_dy
-    
-    points = Mantis.Points.CartesianPoints(([xi], [eta]))
-    
-    eval_out = evaluate_fast!(cache, d.R1.fem_space, elem_idx, points, 1)
+
+    cache.xi_buf[1] = xi
+    cache.eta_buf[1] = eta
+    eval_out = evaluate_fast!(cache, d.R1.fem_space, elem_idx, cache.point_buf, 1)
     dof_indices = FunctionSpaces.get_basis_indices(d.R1.fem_space, elem_idx)
     local_coeffs = @view u_coeffs[dof_indices]
     n_loc = length(local_coeffs)
@@ -586,6 +605,10 @@ function build_B_matrix(p::Particles, d::Domain)
             vals_x_matrix = eval_out[1][1][1] 
             vals_y_matrix = eval_out[1][1][2] 
             num_local_basis = size(vals_x_matrix, 2)
+
+            if size(vals_y_matrix, 2) != num_local_basis || length(dof_indices) != num_local_basis
+                error("Inconsistent local basis evaluation in build_B_matrix for element $eid")
+            end
             
             # Assemble Sparse Entries
             for (i, global_pid) in enumerate(pids_view)
@@ -625,23 +648,13 @@ function solve_grid_velocity_lsqr(B, p)
         V_p[2*i]   = -p.mx[i] * w
     end
 
-    function B_mul!(y, x)
-        mul!(y, B, x)
-    end
-
-    function Bt_mul!(y, x)
-        mul!(y, B', x)
-    end
-
-    B_map = LinearMap(B_mul!, Bt_mul!, size(B,1), size(B,2); ismutating=true)
-
     result = lsqr(
-        B_map,
+        B,
         V_p;
         atol = 1e-6,
         btol = 1e-6,
         conlim = 1e8,
-        maxiter = 105000
+        maxiter = 5000
     )
 
     return result
@@ -684,10 +697,8 @@ function apply_energy_correction!(f_next, f_curr, f_star, B)
     @. f_next = f_curr + (delta_f - scalar * f_star)
 end
 
-function apply_pressure_correction!(p::Particles, tau_coeffs, d::Domain)
-    n_threads = Threads.nthreads()
-    thread_caches = [EvaluationCache(d.eval_cache_size) for _ in 1:n_threads]
-
+function apply_pressure_correction!(p::Particles, tau_coeffs, d::Domain, thread_caches)
+    n_threads = length(thread_caches)
     Threads.@threads for i in 1:length(p.x)
         tid = Threads.threadid()
         if tid > n_threads
@@ -734,14 +745,11 @@ function ode_rhs(state, u_coeffs, d, cache)
 end
 
 function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
-                               x_out, y_out, mx_out, my_out)
+                               x_out, y_out, mx_out, my_out, thread_caches)
 
     num_p = length(x0)
     Lx, Ly = d.box_size
     max_err = Threads.Atomic{Float64}(0.0)
-    
-    n_threads = Threads.nthreads()
-    thread_caches = [EvaluationCache(d.eval_cache_size) for _ in 1:n_threads]
     
     Threads.@threads for i in 1:num_p
         
@@ -783,14 +791,11 @@ function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
     return max_err[]
 end
 
-function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out)
+function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out, thread_caches)
     num_p = length(x0)
     Lx, Ly = d.box_size
     max_err = Threads.Atomic{Float64}(0.0)
-    
-    n_threads = Threads.nthreads()
-    thread_caches = [EvaluationCache(d.eval_cache_size) for _ in 1:n_threads]
-    
+
     Threads.@threads for i in 1:num_p
         tid = Threads.threadid()
         if tid > length(thread_caches); tid = 1; end
@@ -836,6 +841,7 @@ end
 
 function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     step_t0 = time()
+    thread_caches = [EvaluationCache(d.eval_cache_size) for _ in 1:Threads.nthreads()]
 
     x_n  = copy(p.x)
     y_n  = copy(p.y)
@@ -854,21 +860,21 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     f_np1_raw = similar(f_n)
     f_np1_proj = similar(f_n)
     
-    max_iter = 5
-    tol = 1e-2
+    max_iter = 4
+    tol = 1e-3
     
     for iter in 1:max_iter
         iter_t0 = time()
 
         # Advect Particles
         t0 = time()
-        err = advect_particles_rk2!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1)
+        err = advect_particles_rk2!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1, thread_caches)
         t_advect_ms = (time() - t0)
         
         # Project new particles to grid
         t0 = time()
-        p.x, p.y = x_np1, y_np1
-        # p.mx, p.my = mx_np1, my_np1
+        p.x, p.y   = x_np1, y_np1
+        p.mx, p.my = mx_np1, my_np1
         particle_sorter!(p, d)
         t_sort_ms = (time() - t0)
         
@@ -909,7 +915,7 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     # Apply Pressure Feedback
     t0 = time()
     tau_coeffs = f_np1_proj .- f_np1_raw
-    apply_pressure_correction!(p, tau_coeffs, d)
+    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
     t_pressure_ms = (time() - t0)
 
     t0 = time()
@@ -969,17 +975,17 @@ function main()
     k = (1, 1)
     
     # Particles per cell (PPC) = 16
-    num_particles = nel[1] * nel[2] * 16
+    num_particles = nel[1] * nel[2] * 100
 
     # 1. Generate the Domain
     domain = GenerateDomain(nel, p, k)
         
     # 2. Generate and Sort Particles
-    particles = generate_particles(num_particles, domain, :merging)
+    particles = generate_particles(num_particles, domain, :tg)
     particle_sorter!(particles, domain)
 
     println("Initializing Visualization Grid...")
-    nx_plot, ny_plot = nel[1]*2, nel[2]*2
+    nx_plot, ny_plot = nel[1]*3, nel[2]*3
     x_range = range(0, domain.box_size[1], length=nx_plot)
     y_range = range(0, domain.box_size[2], length=ny_plot)
     
@@ -1007,11 +1013,13 @@ function main()
         dt = T_final / n_steps
     end
     
+    
     """
     T_final = 1.0
-    dt = 0.001
+    dt = 0.005
     n_steps = ceil(Int, T_final / dt)
     """
+
     clear_memo_every = 1
     
     println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
@@ -1036,6 +1044,7 @@ function main()
     # Export a true t=0 snapshot before any advancement of the simulation state.
     println("Saving true t=0 snapshot...")
     u_coeffs_0 = coadjoint_step!(particles, domain)
+
     uvω_grid_0 = evaluate_velocity_and_vorticity_at_probes(u_coeffs_0, grid_probes, domain)
     vel_mag_0 = sqrt.(uvω_grid_0[:, 1].^2 .+ uvω_grid_0[:, 2].^2)
 
@@ -1045,25 +1054,6 @@ function main()
     writedlm(step_file_0, step_matrix_0)
     println("  Saved $(step_file_0)")
 
-
-    # Warmup run on a copied particle state to reduce first-step compilation noise.
-    println("Running warmup step...")
-    warmup_particles = Particles(
-        copy(particles.x),
-        copy(particles.y),
-        copy(particles.mx),
-        copy(particles.my),
-        copy(particles.volume),
-        copy(particles.can_x),
-        copy(particles.can_y),
-        copy(particles.head),
-        copy(particles.next),
-        copy(particles.elem_ids),
-    )
-    particle_sorter!(warmup_particles, domain)
-    step_co_flip!(warmup_particles, domain, dt)
-    println("Warmup done. Starting measured steps at t=dt...")
-
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step*dt, digits=3)))...")
 
@@ -1072,10 +1062,16 @@ function main()
         
         # 4. Visualization
         # Re-evaluate the velocity field to plot the results
+        t0 = time()
         u_coeffs = coadjoint_step!(particles, domain)
+        t_coadjoint_ms = (time() - t0)
         
+        t0 = time()
         uvω_grid = evaluate_velocity_and_vorticity_at_probes(u_coeffs, grid_probes, domain)
         vel_mag = sqrt.(uvω_grid[:, 1].^2 .+ uvω_grid[:, 2].^2)
+        t_viz_ms = (time() - t0)
+        
+        println("  Visualization Timings [s]: coadjoint=$(round(t_coadjoint_ms, digits=2)), eval=$(round(t_viz_ms, digits=2))")
 
         # Columns: x, y, u, v, |u|, ω
         step_matrix = hcat(grid_x, grid_y, uvω_grid[:, 1], uvω_grid[:, 2], vel_mag, uvω_grid[:, 3])

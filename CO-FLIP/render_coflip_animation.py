@@ -82,7 +82,7 @@ def main() -> None:
     )
     parser.add_argument("--fps", type=int, default=10, help="Frames per second.")
     parser.add_argument(
-        "--cmap", type=str, default="jet", help="Matplotlib colormap name."
+        "--cmap", type=str, default="viridis", help="Matplotlib colormap name."
     )
     parser.add_argument(
         "--vmin",
