@@ -714,6 +714,37 @@ function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T},
     end
 end
 
+function integrate_form_expression(expr, dom::Domain)
+    total = 0.0
+    for element_id in 1:Quadrature.get_num_base_elements(dom.dΩ)
+        total += sum(Forms.evaluate(expr, element_id)[1])
+    end
+
+    return total
+end
+
+function compute_conservation_diagnostics(u_coeffs::AbstractVector{T}, dom::Domain) where {T<:Real}
+    u_h = Forms.build_form_field(dom.R1, u_coeffs; label="u_h")
+    ω_h = d(u_h)
+
+    energy = 0.5 * integrate_form_expression(∫(u_h ∧ ★(u_h), dom.dΩ), dom)
+    circulation = integrate_form_expression(∫(ω_h, dom.dΩ), dom)
+    enstrophy = 0.5 * integrate_form_expression(∫(ω_h ∧ ★(ω_h), dom.dΩ), dom)
+
+    return (; energy, circulation, enstrophy)
+end
+
+function print_conservation_diagnostics(step::Int, time_value::Real, diagnostics)
+    @printf(
+        "  Diagnostics [step=%d, t=%.6f]: energy=%.12e, circulation=%.12e, enstrophy=%.12e\n",
+        step,
+        time_value,
+        diagnostics.energy,
+        diagnostics.circulation,
+        diagnostics.enstrophy
+    )
+end
+
 # ==============================================================================
 #                          TIME INTEGRATION & STEPPING
 # ==============================================================================
@@ -1114,6 +1145,8 @@ function main()
         # 4. Visualization
         # Re-evaluate the velocity field to plot the results
         u_coeffs = coadjoint_step!(particles, domain)
+        diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
+        print_conservation_diagnostics(step, step * dt, diagnostics)
         
         uvω_grid = evaluate_velocity_and_vorticity_at_probes(u_coeffs, grid_probes, domain)
         vel_mag = sqrt.(uvω_grid[:, 1].^2 .+ uvω_grid[:, 2].^2)
