@@ -695,10 +695,11 @@ function apply_energy_correction!(f_next::AbstractVector{Tn}, f_curr::AbstractVe
     @. f_next = f_curr + (delta_f - scalar * f_star)
 end
 
-function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain) where {T<:Real}
+function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain, thread_caches::Vector{EvaluationCache}) where {T<:Real}
     n_threads = Threads.nthreads()
-    cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    if length(thread_caches) != n_threads
+        throw(ArgumentError("thread_caches length must match Threads.nthreads()"))
+    end
 
     Threads.@threads for i in 1:length(p.x)
         tid = Threads.threadid()
@@ -712,6 +713,13 @@ function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T},
         p.my[i] += val[1]       
         p.mx[i] -= val[2]       
     end
+end
+
+function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain) where {T<:Real}
+    n_threads = Threads.nthreads()
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
 end
 
 function integrate_form_expression(expr, dom::Domain)
@@ -778,20 +786,22 @@ function ode_rhs(state::SVector{4,Tstate}, u_coeffs::AbstractVector{Tcoeff}, d::
 end
 
 function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
-                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
+                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}, thread_caches::Vector{EvaluationCache}) where {T<:AbstractFloat, U<:Real}
 
     num_p = length(x0)
     Lx, Ly = d.box_size
-    max_err = Threads.Atomic{T}(zero(T))
-    
     n_threads = Threads.nthreads()
-    cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    if length(thread_caches) != n_threads
+        throw(ArgumentError("thread_caches length must match Threads.nthreads()"))
+    end
+    max_err_per_thread = fill(zero(T), n_threads)
     
     Threads.@threads for i in 1:num_p
         
         tid = Threads.threadid()
-        if tid > length(thread_caches); tid = 1; end
+        if tid > n_threads
+            tid = mod1(tid, n_threads)
+        end
         cache = thread_caches[tid]
         
         state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
@@ -816,8 +826,11 @@ function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::Abstract
         
         if dx > 0.5 * Lx; dx = Lx - dx; end
         if dy > 0.5 * Ly; dy = Ly - dy; end
-        
-        Threads.atomic_max!(max_err, max(dx, dy))
+
+        local_err = max(dx, dy)
+        if local_err > max_err_per_thread[tid]
+            max_err_per_thread[tid] = local_err
+        end
         
         x_out[i]  = mod(nx_raw, Lx)
         y_out[i]  = mod(ny_raw, Ly)
@@ -825,21 +838,32 @@ function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::Abstract
         my_out[i] = new_state[4]
     end
     
-    return max_err[]
+    return maximum(max_err_per_thread)
 end
 
-function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T, x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
-    num_p = length(x0)
-    Lx, Ly = d.box_size
-    max_err = Threads.Atomic{T}(zero(T))
-    
+function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
+                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
     n_threads = Threads.nthreads()
     cache_size = evaluation_cache_size(d)
     thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    return advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out, thread_caches)
+end
+
+function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
+                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}, thread_caches::Vector{EvaluationCache}) where {T<:AbstractFloat, U<:Real}
+    num_p = length(x0)
+    Lx, Ly = d.box_size
+    n_threads = Threads.nthreads()
+    if length(thread_caches) != n_threads
+        throw(ArgumentError("thread_caches length must match Threads.nthreads()"))
+    end
+    max_err_per_thread = fill(zero(T), n_threads)
     
     Threads.@threads for i in 1:num_p
         tid = Threads.threadid()
-        if tid > length(thread_caches); tid = 1; end
+        if tid > n_threads
+            tid = mod1(tid, n_threads)
+        end
         cache = thread_caches[tid]
         
         state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
@@ -860,8 +884,11 @@ function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::Abstract
         
         if dx > 0.5 * Lx; dx = Lx - dx; end
         if dy > 0.5 * Ly; dy = Ly - dy; end
-        
-        Threads.atomic_max!(max_err, max(dx, dy))
+
+        local_err = max(dx, dy)
+        if local_err > max_err_per_thread[tid]
+            max_err_per_thread[tid] = local_err
+        end
         
         x_out[i]  = mod(nx_raw, Lx)
         y_out[i]  = mod(ny_raw, Ly)
@@ -869,7 +896,15 @@ function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::Abstract
         my_out[i] = new_state[4]
     end
     
-    return max_err[]
+    return maximum(max_err_per_thread)
+end
+
+function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
+                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
+    n_threads = Threads.nthreads()
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    return advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out, thread_caches)
 end
 
 function coadjoint_step!(p::Particles, d::Domain)
@@ -882,6 +917,9 @@ end
 
 function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     step_t0 = time()
+    n_threads = Threads.nthreads()
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
 
     x_n  = copy(p.x)
     y_n  = copy(p.y)
@@ -908,7 +946,7 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64)
 
         # Advect Particles
         t0 = time()
-        err = advect_particles_rk2!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1)
+        err = advect_particles_rk2!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1, thread_caches)
         t_advect_ms = (time() - t0)
         
         # Project new particles to grid
@@ -955,7 +993,7 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64)
     # Apply Pressure Feedback
     t0 = time()
     tau_coeffs = f_np1_proj .- f_np1_raw
-    apply_pressure_correction!(p, tau_coeffs, d)
+    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
     t_pressure_ms = (time() - t0)
 
     t0 = time()
@@ -973,26 +1011,6 @@ function maybe_clear_memo_tables!(step::Int, clear_every::Int)
         Memoization.empty_all_caches!()
         # println("  Cleared memoization caches at step $step")
     end
-end
-
-function estimate_cfl_number(p::Particles, d::Domain, dt::T) where {T<:AbstractFloat}
-    nx, ny = d.nel
-    Lx, Ly = d.box_size
-    dx = Lx / nx
-    dy = Ly / ny
-
-    max_advective_rate = zero(T)
-    @inbounds for i in 1:length(p.mx)
-        # Initial impulse equals velocity in this Cartesian setup.
-        u = p.mx[i]
-        v = p.my[i]
-        local_rate = abs(u) / dx + abs(v) / dy
-        if local_rate > max_advective_rate
-            max_advective_rate = local_rate
-        end
-    end
-
-    return dt * max_advective_rate
 end
 
 function compute_cfl_dt(p::Particles, d::Domain, target_cfl::T) where {T<:AbstractFloat}
@@ -1041,7 +1059,7 @@ function main()
     domain = GenerateDomain(nel, p, k)
         
     # 2. Generate and Sort Particles
-    particles = generate_particles(num_particles, domain, :merging)
+    particles = generate_particles(num_particles, domain, :tg)
     particle_sorter!(particles, domain)
 
     println("Initializing Visualization Grid...")
@@ -1061,8 +1079,8 @@ function main()
     particle_sorter!(grid_probes, domain)
 
     # Time-stepping parameters
-    """
-    target_cfl = 0.49
+    
+    target_cfl = 0.5
     T_final = 1.0
     dt_cfl = compute_cfl_dt(particles, domain, target_cfl)
     if !isfinite(dt_cfl)
@@ -1072,11 +1090,12 @@ function main()
         n_steps = max(1, ceil(Int, T_final / dt_cfl))
         dt = T_final / n_steps
     end
-    cfl_used = estimate_cfl_number(particles, domain, dt)
     """
     T_final = 1.0
     dt = 0.001
     n_steps = ceil(Int, T_final / dt)
+    """
+
     clear_memo_every = 1
     
     println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
@@ -1197,4 +1216,5 @@ end
 
 
 main()
+
 
