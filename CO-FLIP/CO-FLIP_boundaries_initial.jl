@@ -363,7 +363,7 @@ end
 #                            EVALUATION KERNELS
 # ==============================================================================
 
-function evaluate_fast!(cache::EvaluationCache, space, element_id, xi, nderivatives)
+function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P, nderivatives::Int) where {S, P}
     # Reset cache
     for ord in 1:(nderivatives+1)
         for der in 1:length(cache.results[ord])
@@ -395,7 +395,7 @@ function evaluate_fast!(cache::EvaluationCache, space, element_id, xi, nderivati
     return cache.results
 end
 
-function probe_field_at_point(x::Float64, y::Float64, u_coeffs, d::Domain, cache::EvaluationCache)
+function probe_field_at_point(x::Float64, y::Float64, u_coeffs::AbstractVector{<:Real}, d::Domain, cache::EvaluationCache)
     Lx, Ly = d.box_size
     nx, ny = d.nel
     
@@ -440,7 +440,7 @@ function probe_field_at_point(x::Float64, y::Float64, u_coeffs, d::Domain, cache
     return SVector{2}(u, v), SMatrix{2,2}(du_dx, dv_dx, du_dy, dv_dy)
 end
 
-function evaluate_field_at_probes(u_coeffs, probes::Particles, d::Domain)
+function evaluate_field_at_probes(u_coeffs::AbstractVector{<:Real}, probes::Particles, d::Domain)
     num_points = length(probes.x)
     u_mat = zeros(Float64, num_points, 2)
     viz_cache = EvaluationCache(32)
@@ -453,7 +453,7 @@ function evaluate_field_at_probes(u_coeffs, probes::Particles, d::Domain)
     return u_mat
 end
 
-function evaluate_scalar_form_at_probes(form_expr, probes::Particles, d::Domain)
+function evaluate_scalar_form_at_probes(form_expr::F, probes::Particles, d::Domain) where {F}
     num_points = length(probes.x)
     values = zeros(Float64, num_points)
 
@@ -502,7 +502,7 @@ function evaluate_scalar_form_at_probes(form_expr, probes::Particles, d::Domain)
     return values
 end
 
-function evaluate_velocity_and_vorticity_at_probes(u_coeffs, probes::Particles, d::Domain)
+function evaluate_velocity_and_vorticity_at_probes(u_coeffs::AbstractVector{<:Real}, probes::Particles, d::Domain)
     num_points = length(probes.x)
     uvω_mat = zeros(Float64, num_points, 3)
     viz_cache = EvaluationCache(32)
@@ -612,7 +612,7 @@ function build_B_matrix(p::Particles, d::Domain)
     return sparse(I_idx, J_idx, V_val, 2 * num_particles, num_dofs)
 end
 
-function solve_grid_velocity_lsqr(B, p)
+function solve_grid_velocity_lsqr(B::AbstractMatrix{<:Real}, p::Particles)
 
     num_particles = length(p.x)
 
@@ -623,11 +623,11 @@ function solve_grid_velocity_lsqr(B, p)
         V_p[2*i]   = -p.mx[i] * w
     end
 
-    function B_mul!(y, x)
+    function B_mul!(y::AbstractVector{Float64}, x::AbstractVector{Float64})
         mul!(y, B, x)
     end
 
-    function Bt_mul!(y, x)
+    function Bt_mul!(y::AbstractVector{Float64}, x::AbstractVector{Float64})
         mul!(y, B', x)
     end
 
@@ -645,7 +645,7 @@ function solve_grid_velocity_lsqr(B, p)
     return result
 end
 
-function project_and_get_pressure(dom::Domain, v_h)
+function project_and_get_pressure(dom::Domain, v_h::V) where {V}
     f = d(v_h) # Exterior derivative
     u_corr, ϕ_corr = Assemblers.solve_volume_form_hodge_laplacian(dom.R1, dom.R2, f, dom.dΩ)
     div_free_coeffs = v_h.coefficients - u_corr.coefficients
@@ -656,14 +656,14 @@ end
 #                        PHYSICS & ENERGY CORRECTION
 # ==============================================================================
 
-function compute_metric_inner_product(u, v, B)
+function compute_metric_inner_product(u::AbstractVector{<:Real}, v::AbstractVector{<:Real}, B::AbstractMatrix{<:Real})
     # Computes <u, v>_B = u' * B' * B * v
     p_u = B * u
     p_v = B * v
     return dot(p_u, p_v)
 end
 
-function apply_energy_correction!(f_next, f_curr, f_star, B)
+function apply_energy_correction!(f_next::AbstractVector{<:Real}, f_curr::AbstractVector{<:Real}, f_star::AbstractVector{<:Real}, B::AbstractMatrix{<:Real})
     delta_f = f_next .- f_curr
     
     # Denominator: |f_star|^2_B
@@ -682,7 +682,7 @@ function apply_energy_correction!(f_next, f_curr, f_star, B)
     @. f_next = f_curr + (delta_f - scalar * f_star)
 end
 
-function apply_pressure_correction!(p::Particles, tau_coeffs, d::Domain)
+function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{<:Real}, d::Domain)
     n_threads = Threads.nthreads()
     thread_caches = [EvaluationCache(32) for _ in 1:n_threads]
 
@@ -704,7 +704,7 @@ end
 #                          TIME INTEGRATION & STEPPING
 # ==============================================================================
 
-function ode_rhs(state, u_coeffs, d, cache)
+function ode_rhs(state::SVector{4,Float64}, u_coeffs::AbstractVector{<:Real}, d::Domain, cache::EvaluationCache)
     x, y, mx, my = state
     
     # Probe Flux field (swapped components)
@@ -731,8 +731,8 @@ function ode_rhs(state, u_coeffs, d, cache)
     return SVector{4}(dx_dt, dy_dt, dmx_dt, dmy_dt)
 end
 
-function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
-                               x_out, y_out, mx_out, my_out)
+function advect_particles_rk2!(p::Particles, x0::AbstractVector{Float64}, y0::AbstractVector{Float64}, mx0::AbstractVector{Float64}, my0::AbstractVector{Float64}, u_coeffs::AbstractVector{<:Real}, d::Domain, dt::Float64,
+                               x_out::AbstractVector{Float64}, y_out::AbstractVector{Float64}, mx_out::AbstractVector{Float64}, my_out::AbstractVector{Float64})
 
     num_p = length(x0)
     Lx, Ly = d.box_size
@@ -781,7 +781,7 @@ function advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt,
     return max_err[]
 end
 
-function advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out)
+function advect_particles_rk4!(p::Particles, x0::AbstractVector{Float64}, y0::AbstractVector{Float64}, mx0::AbstractVector{Float64}, my0::AbstractVector{Float64}, u_coeffs::AbstractVector{<:Real}, d::Domain, dt::Float64, x_out::AbstractVector{Float64}, y_out::AbstractVector{Float64}, mx_out::AbstractVector{Float64}, my_out::AbstractVector{Float64})
     num_p = length(x0)
     Lx, Ly = d.box_size
     max_err = Threads.Atomic{Float64}(0.0)
