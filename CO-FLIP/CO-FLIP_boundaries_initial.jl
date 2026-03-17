@@ -26,6 +26,7 @@ struct Domain{F0, F1, F2, G, Q}
     nel::NTuple{2,Int}
     p::NTuple{2,Int}
     k::NTuple{2,Int}
+    eval_cache_size::Int
     box_size::NTuple{2,Float64}
 end
 
@@ -55,6 +56,10 @@ struct EvaluationCache
     end
 end
 
+probe_output_eltype(::Type{T}) where {T<:Real} = promote_type(Float64, T)
+
+evaluation_cache_size(d::Domain) = d.eval_cache_size
+
 # ==============================================================================
 #                            DOMAIN GENERATION
 # ==============================================================================
@@ -75,8 +80,12 @@ function GenerateDomain(nel::NTuple{2,Int}, p::NTuple{2,Int}, k::NTuple{2,Int})
         k;
         periodic=(true, true),
     )
+
+    eval_cache_size = maximum(
+        length(FunctionSpaces.get_basis_indices(R[2].fem_space, eid)) for eid in 1:prod(nel)
+    )
     
-    return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k, box_size)
+    return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k, eval_cache_size, box_size)
 end
 
 # ==============================================================================
@@ -395,7 +404,8 @@ function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P
     return cache.results
 end
 
-function probe_field_at_point(x::Float64, y::Float64, u_coeffs::AbstractVector{<:Real}, d::Domain, cache::EvaluationCache)
+function probe_field_at_point(x::Real, y::Real, u_coeffs::AbstractVector{T}, d::Domain, cache::EvaluationCache) where {T<:Real}
+    Tout = probe_output_eltype(T)
     Lx, Ly = d.box_size
     nx, ny = d.nel
     
@@ -437,13 +447,14 @@ function probe_field_at_point(x::Float64, y::Float64, u_coeffs::AbstractVector{<
     dv_dx = dot(dxi_v,  local_coeffs) * inv_dx
     dv_dy = dot(deta_v, local_coeffs) * inv_dy
     
-    return SVector{2}(u, v), SMatrix{2,2}(du_dx, dv_dx, du_dy, dv_dy)
+    return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
 end
 
-function evaluate_field_at_probes(u_coeffs::AbstractVector{<:Real}, probes::Particles, d::Domain)
+function evaluate_field_at_probes(u_coeffs::AbstractVector{T}, probes::Particles, d::Domain) where {T<:Real}
+    Tout = probe_output_eltype(T)
     num_points = length(probes.x)
-    u_mat = zeros(Float64, num_points, 2)
-    viz_cache = EvaluationCache(32)
+    u_mat = Matrix{Tout}(undef, num_points, 2)
+    viz_cache = EvaluationCache(evaluation_cache_size(d))
     
     @inbounds for i in 1:num_points
         vel, _ = probe_field_at_point(probes.x[i], probes.y[i], u_coeffs, d, viz_cache)
@@ -502,10 +513,11 @@ function evaluate_scalar_form_at_probes(form_expr::F, probes::Particles, d::Doma
     return values
 end
 
-function evaluate_velocity_and_vorticity_at_probes(u_coeffs::AbstractVector{<:Real}, probes::Particles, d::Domain)
+function evaluate_velocity_and_vorticity_at_probes(u_coeffs::AbstractVector{T}, probes::Particles, d::Domain) where {T<:Real}
+    Tout = probe_output_eltype(T)
     num_points = length(probes.x)
-    uvω_mat = zeros(Float64, num_points, 3)
-    viz_cache = EvaluationCache(32)
+    uvω_mat = Matrix{Tout}(undef, num_points, 3)
+    viz_cache = EvaluationCache(evaluation_cache_size(d))
 
     # u_coeffs are stored in a rotated proxy convention. We first rotate with Hodge-star,
     # then L2-project to a true 1-form field (Mantis supports d on FormField, not on
@@ -612,11 +624,12 @@ function build_B_matrix(p::Particles, d::Domain)
     return sparse(I_idx, J_idx, V_val, 2 * num_particles, num_dofs)
 end
 
-function solve_grid_velocity_lsqr(B::AbstractMatrix{<:Real}, p::Particles)
+function solve_grid_velocity_lsqr(B::AbstractMatrix{T}, p::Particles) where {T<:Real}
+    Tsol = promote_type(Float64, T)
 
     num_particles = length(p.x)
 
-    V_p = Vector{Float64}(undef, 2*num_particles)
+    V_p = Vector{Tsol}(undef, 2*num_particles)
     @inbounds for i in 1:num_particles
         w = sqrt(p.volume[i])
         V_p[2*i-1] =  p.my[i] * w
@@ -656,14 +669,14 @@ end
 #                        PHYSICS & ENERGY CORRECTION
 # ==============================================================================
 
-function compute_metric_inner_product(u::AbstractVector{<:Real}, v::AbstractVector{<:Real}, B::AbstractMatrix{<:Real})
+function compute_metric_inner_product(u::AbstractVector{Tu}, v::AbstractVector{Tv}, B::AbstractMatrix{Tb}) where {Tu<:Real, Tv<:Real, Tb<:Real}
     # Computes <u, v>_B = u' * B' * B * v
     p_u = B * u
     p_v = B * v
     return dot(p_u, p_v)
 end
 
-function apply_energy_correction!(f_next::AbstractVector{<:Real}, f_curr::AbstractVector{<:Real}, f_star::AbstractVector{<:Real}, B::AbstractMatrix{<:Real})
+function apply_energy_correction!(f_next::AbstractVector{Tn}, f_curr::AbstractVector{Tc}, f_star::AbstractVector{Ts}, B::AbstractMatrix{Tb}) where {Tn<:Real, Tc<:Real, Ts<:Real, Tb<:Real}
     delta_f = f_next .- f_curr
     
     # Denominator: |f_star|^2_B
@@ -682,9 +695,10 @@ function apply_energy_correction!(f_next::AbstractVector{<:Real}, f_curr::Abstra
     @. f_next = f_curr + (delta_f - scalar * f_star)
 end
 
-function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{<:Real}, d::Domain)
+function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain) where {T<:Real}
     n_threads = Threads.nthreads()
-    thread_caches = [EvaluationCache(32) for _ in 1:n_threads]
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
 
     Threads.@threads for i in 1:length(p.x)
         tid = Threads.threadid()
@@ -704,7 +718,8 @@ end
 #                          TIME INTEGRATION & STEPPING
 # ==============================================================================
 
-function ode_rhs(state::SVector{4,Float64}, u_coeffs::AbstractVector{<:Real}, d::Domain, cache::EvaluationCache)
+function ode_rhs(state::SVector{4,Tstate}, u_coeffs::AbstractVector{Tcoeff}, d::Domain, cache::EvaluationCache) where {Tstate<:Real, Tcoeff<:Real}
+    Tout = promote_type(Tstate, probe_output_eltype(Tcoeff))
     x, y, mx, my = state
     
     # Probe Flux field (swapped components)
@@ -728,18 +743,19 @@ function ode_rhs(state::SVector{4,Float64}, u_coeffs::AbstractVector{<:Real}, d:
     dmx_dt = -(ux * mx + vx * my)
     dmy_dt = -(uy * mx + vy * my)
     
-    return SVector{4}(dx_dt, dy_dt, dmx_dt, dmy_dt)
+    return SVector{4, Tout}(dx_dt, dy_dt, dmx_dt, dmy_dt)
 end
 
-function advect_particles_rk2!(p::Particles, x0::AbstractVector{Float64}, y0::AbstractVector{Float64}, mx0::AbstractVector{Float64}, my0::AbstractVector{Float64}, u_coeffs::AbstractVector{<:Real}, d::Domain, dt::Float64,
-                               x_out::AbstractVector{Float64}, y_out::AbstractVector{Float64}, mx_out::AbstractVector{Float64}, my_out::AbstractVector{Float64})
+function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
+                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
 
     num_p = length(x0)
     Lx, Ly = d.box_size
-    max_err = Threads.Atomic{Float64}(0.0)
+    max_err = Threads.Atomic{T}(zero(T))
     
     n_threads = Threads.nthreads()
-    thread_caches = [EvaluationCache(32) for _ in 1:n_threads]
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
     
     Threads.@threads for i in 1:num_p
         
@@ -781,13 +797,14 @@ function advect_particles_rk2!(p::Particles, x0::AbstractVector{Float64}, y0::Ab
     return max_err[]
 end
 
-function advect_particles_rk4!(p::Particles, x0::AbstractVector{Float64}, y0::AbstractVector{Float64}, mx0::AbstractVector{Float64}, my0::AbstractVector{Float64}, u_coeffs::AbstractVector{<:Real}, d::Domain, dt::Float64, x_out::AbstractVector{Float64}, y_out::AbstractVector{Float64}, mx_out::AbstractVector{Float64}, my_out::AbstractVector{Float64})
+function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T, x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
     num_p = length(x0)
     Lx, Ly = d.box_size
-    max_err = Threads.Atomic{Float64}(0.0)
+    max_err = Threads.Atomic{T}(zero(T))
     
     n_threads = Threads.nthreads()
-    thread_caches = [EvaluationCache(32) for _ in 1:n_threads]
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
     
     Threads.@threads for i in 1:num_p
         tid = Threads.threadid()
@@ -927,13 +944,13 @@ function maybe_clear_memo_tables!(step::Int, clear_every::Int)
     end
 end
 
-function estimate_cfl_number(p::Particles, d::Domain, dt::Float64)
+function estimate_cfl_number(p::Particles, d::Domain, dt::T) where {T<:AbstractFloat}
     nx, ny = d.nel
     Lx, Ly = d.box_size
     dx = Lx / nx
     dy = Ly / ny
 
-    max_advective_rate = 0.0
+    max_advective_rate = zero(T)
     @inbounds for i in 1:length(p.mx)
         # Initial impulse equals velocity in this Cartesian setup.
         u = p.mx[i]
@@ -947,13 +964,13 @@ function estimate_cfl_number(p::Particles, d::Domain, dt::Float64)
     return dt * max_advective_rate
 end
 
-function compute_cfl_dt(p::Particles, d::Domain, target_cfl::Float64)
+function compute_cfl_dt(p::Particles, d::Domain, target_cfl::T) where {T<:AbstractFloat}
     nx, ny = d.nel
     Lx, Ly = d.box_size
     dx = Lx / nx
     dy = Ly / ny
 
-    max_advective_rate = 0.0
+    max_advective_rate = zero(T)
     @inbounds for i in 1:length(p.mx)
         # Initial impulse equals velocity in this Cartesian setup.
         u = p.mx[i]
