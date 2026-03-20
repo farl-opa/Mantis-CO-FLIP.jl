@@ -46,13 +46,15 @@ end
 struct EvaluationCache
     temp_mat::Matrix{Float64}
     results::Vector{Vector{Vector{Matrix{Float64}}}}
-    
+    xi_buf::Vector{Float64}    # single-element buffer for canonical x
+    eta_buf::Vector{Float64}   # single-element buffer for canonical y
+
     function EvaluationCache(max_basis_size::Int)
-        v0 = [[zeros(1, max_basis_size) for _ in 1:2]] 
-        v1 = [[zeros(1, max_basis_size) for _ in 1:2] for _ in 1:2] 
+        v0  = [[zeros(1, max_basis_size) for _ in 1:2]]
+        v1  = [[zeros(1, max_basis_size) for _ in 1:2] for _ in 1:2]
         res = Vector{Vector{Vector{Matrix{Float64}}}}(undef, 2)
         res[1] = v0; res[2] = v1
-        return new(zeros(1, max_basis_size), res)
+        return new(zeros(1, max_basis_size), res, zeros(1), zeros(1))
     end
 end
 
@@ -92,6 +94,24 @@ end
 #                          PARTICLE GENERATION & SORTING
 # ==============================================================================
 
+function initial_velocity(flow_type::Symbol, px::Float64, py::Float64, Lx::Float64, Ly::Float64)
+    if flow_type == :tg
+        return flow_taylor_green(px, py, Lx, Ly)
+    elseif flow_type == :vortex
+        return flow_lamb_oseen(px, py, Lx, Ly)
+    elseif flow_type == :gyre
+        return flow_double_gyre(px, py, Lx, Ly)
+    elseif flow_type == :decay
+        return flow_decay(px, py, Lx, Ly)
+    elseif flow_type == :convecting
+        return flow_convecting_vortex(px, py, Lx, Ly)
+    elseif flow_type == :merging
+        return flow_merging_vortices(px, py, Lx, Ly)
+    else
+        error("Unknown flow type: $flow_type")
+    end
+end
+
 function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbol=:vortex)
     Lx, Ly = domain.box_size
     
@@ -118,23 +138,7 @@ function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbo
         y[i] = py
         
         # 2. Select Flow Type
-        u, v = 0.0, 0.0
-        
-        if flow_type == :tg
-            u, v = flow_taylor_green(px, py, Lx, Ly)
-        elseif flow_type == :vortex
-            u, v = flow_lamb_oseen(px, py, Lx, Ly)
-        elseif flow_type == :gyre
-            u, v = flow_double_gyre(px, py, Lx, Ly)
-        elseif flow_type == :decay
-            u, v = flow_decay(px, py, Lx, Ly)
-        elseif flow_type == :convecting
-            u, v = flow_convecting_vortex(px, py, Lx, Ly)
-        elseif flow_type == :merging
-            u, v = flow_merging_vortices(px, py, Lx, Ly)
-        else
-            error("Unknown flow type: $flow_type")
-        end
+        u, v = initial_velocity(flow_type, px, py, Lx, Ly)
         
         # 3. Assign Impulse
         # In this metric (Cartesian), impulse (covector) components = velocity components
@@ -187,8 +191,8 @@ end
 function flow_taylor_green(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     U0 = 1.0
     # Wavenumbers optimized for [0, Lx] x [0, Ly]
-    kx = 2 * π * x / Lx
-    ky = 2 * π * y / Ly
+    kx = 2*π * x / Lx
+    ky = 2*π * y / Ly
     
     u =  U0 * sin(kx) * cos(ky)
     v = -U0 * cos(kx) * sin(ky)
@@ -404,49 +408,52 @@ function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P
     return cache.results
 end
 
-function probe_field_at_point(x::Real, y::Real, u_coeffs::AbstractVector{T}, d::Domain, cache::EvaluationCache) where {T<:Real}
-    Tout = probe_output_eltype(T)
+function probe_field_at_point(
+    x::Real, y::Real,
+    u_coeffs::AbstractVector{T},
+    d::Domain,
+    cache::EvaluationCache,
+) where {T<:Real}
+    Tout   = probe_output_eltype(T)
     Lx, Ly = d.box_size
     nx, ny = d.nel
-    
+
     x_wrapped = mod(x, Lx)
     y_wrapped = mod(y, Ly)
-    
-    dx = Lx / nx; dy = Ly / ny
-    inv_dx = 1.0 / dx; inv_dy = 1.0 / dy
-    
+
+    dx = Lx / nx;  dy = Ly / ny
+    inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
+
     ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
     ej = clamp(floor(Int, y_wrapped * inv_dy) + 1, 1, ny)
     elem_idx = (ej - 1) * nx + ei
-    
-    xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
-    eta = (y_wrapped - (ej - 1) * dy) * inv_dy
-    
-    points = Mantis.Points.CartesianPoints(([xi], [eta]))
-    
-    eval_out = evaluate_fast!(cache, d.R1.fem_space, elem_idx, points, 1)
-    dof_indices = FunctionSpaces.get_basis_indices(d.R1.fem_space, elem_idx)
-    local_coeffs = @view u_coeffs[dof_indices]
-    n_loc = length(local_coeffs)
 
-    # --- Velocity (Order 0) ---
-    val_x = @view eval_out[1][1][1][1:n_loc]
-    val_y = @view eval_out[1][1][2][1:n_loc]
-    
-    u = dot(val_x, local_coeffs)
-    v = dot(val_y, local_coeffs)
-    
-    # --- Gradient (Order 1) ---
+    # Write into pre-allocated buffers — zero allocation
+    cache.xi_buf[1]  = (x_wrapped - (ei - 1) * dx) * inv_dx
+    cache.eta_buf[1] = (y_wrapped - (ej - 1) * dy) * inv_dy
+
+    points = Mantis.Points.CartesianPoints((cache.xi_buf, cache.eta_buf))
+
+    eval_out     = evaluate_fast!(cache, d.R1.fem_space, elem_idx, points, 1)
+    dof_indices  = FunctionSpaces.get_basis_indices(d.R1.fem_space, elem_idx)
+    local_coeffs = @view u_coeffs[dof_indices]
+    n_loc        = length(local_coeffs)
+
+    val_x  = @view eval_out[1][1][1][1:n_loc]
+    val_y  = @view eval_out[1][1][2][1:n_loc]
+    u      = dot(val_x, local_coeffs)
+    v      = dot(val_y, local_coeffs)
+
     dxi_u  = @view eval_out[2][1][1][1:n_loc]
     deta_u = @view eval_out[2][2][1][1:n_loc]
     dxi_v  = @view eval_out[2][1][2][1:n_loc]
     deta_v = @view eval_out[2][2][2][1:n_loc]
-    
+
     du_dx = dot(dxi_u,  local_coeffs) * inv_dx
     du_dy = dot(deta_u, local_coeffs) * inv_dy
     dv_dx = dot(dxi_v,  local_coeffs) * inv_dx
     dv_dy = dot(deta_v, local_coeffs) * inv_dy
-    
+
     return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
 end
 
@@ -543,84 +550,63 @@ function evaluate_velocity_and_vorticity_at_probes(u_coeffs::AbstractVector{T}, 
     return uvω_mat
 end
 
+function warmup_evaluation_memo!(d::Domain)
+    # Populate memoized derivative-index paths on a single thread before threaded probe calls.
+    cache = EvaluationCache(evaluation_cache_size(d))
+    points = Mantis.Points.CartesianPoints(([0.5], [0.5]))
+    evaluate_fast!(cache, d.R1.fem_space, 1, points, 1)
+    return nothing
+end
+
 # ==============================================================================
 #                            GRID OPERATIONS & SOLVERS
 # ==============================================================================
 
 function build_B_matrix(p::Particles, d::Domain)
-    fes = d.R1.fem_space 
+    fes = d.R1.fem_space
     num_particles = length(p.x)
     num_dofs = FunctionSpaces.get_num_basis(fes)
-    
-    estimated_nnz = num_particles * 16 
-    
+
+    # Use the same local evaluator path as probe_field_at_point to keep G2P and P2G consistent.
+    cache = EvaluationCache(evaluation_cache_size(d))
+
+    estimated_nnz = num_particles * 16
     I_idx = Vector{Int}(); sizehint!(I_idx, estimated_nnz)
     J_idx = Vector{Int}(); sizehint!(J_idx, estimated_nnz)
     V_val = Vector{Float64}(); sizehint!(V_val, estimated_nnz)
-    
-    num_elements = prod(d.nel)
-    
-    batch_xs = Float64[]
-    batch_ys = Float64[]
-    batch_pids = Int[]
-    MAX_BATCH = 1024 
 
-    for eid in 1:num_elements
-        # Collect all particles in this element
-        empty!(batch_xs); empty!(batch_ys); empty!(batch_pids)
-        
-        pid = p.head[eid]
-        while pid != 0
-            push!(batch_pids, pid)
-            push!(batch_xs, p.can_x[pid])
-            push!(batch_ys, p.can_y[pid])
-            pid = p.next[pid]
-        end
-        
-        if isempty(batch_pids) continue end
+    for pid in 1:num_particles
+        eid = p.elem_ids[pid]
+        points = Mantis.Points.CartesianPoints(([p.can_x[pid]], [p.can_y[pid]]))
+        eval_out = evaluate_fast!(cache, fes, eid, points, 0)
+        dof_indices = FunctionSpaces.get_basis_indices(fes, eid)
+        n_loc = length(dof_indices)
 
-        # Process in chunks
-        total_p_in_elem = length(batch_pids)
-        
-        for chunk_start in 1:MAX_BATCH:total_p_in_elem
-            chunk_end = min(chunk_start + MAX_BATCH - 1, total_p_in_elem)
-            rng = chunk_start:chunk_end
-            
-            xs_view = @view batch_xs[rng]
-            ys_view = @view batch_ys[rng]
-            pids_view = @view batch_pids[rng]
-            
-            points_wrapped = Mantis.Points.CartesianPoints((xs_view, ys_view))
-            eval_out, dof_indices = FunctionSpaces.evaluate(fes, eid, points_wrapped, 0)
-            
-            vals_x_matrix = eval_out[1][1][1] 
-            vals_y_matrix = eval_out[1][1][2] 
-            num_local_basis = size(vals_x_matrix, 2)
-            
-            # Assemble Sparse Entries
-            for (i, global_pid) in enumerate(pids_view)
-                w = sqrt(p.volume[global_pid])
-                
-                for k in 1:num_local_basis
-                    val_x = vals_x_matrix[i, k] * w
-                    val_y = vals_y_matrix[i, k] * w
-                    
-                    if abs(val_x) > 1e-15
-                        push!(I_idx, 2 * global_pid - 1)
-                        push!(J_idx, dof_indices[k])
-                        push!(V_val, val_x)
-                    end
-                    
-                    if abs(val_y) > 1e-15
-                        push!(I_idx, 2 * global_pid)
-                        push!(J_idx, dof_indices[k])
-                        push!(V_val, val_y)
-                    end
-                end
+        vals_x = @view eval_out[1][1][1][1, 1:n_loc]
+        vals_y = @view eval_out[1][1][2][1, 1:n_loc]
+
+        w = sqrt(p.volume[pid])
+        row_x = 2 * pid - 1
+        row_y = 2 * pid
+
+        @inbounds for k in 1:n_loc
+            val_x = vals_x[k] * w
+            val_y = vals_y[k] * w
+
+            if abs(val_x) > 1e-15
+                push!(I_idx, row_x)
+                push!(J_idx, dof_indices[k])
+                push!(V_val, val_x)
+            end
+
+            if abs(val_y) > 1e-15
+                push!(I_idx, row_y)
+                push!(J_idx, dof_indices[k])
+                push!(V_val, val_y)
             end
         end
     end
-    
+
     return sparse(I_idx, J_idx, V_val, 2 * num_particles, num_dofs)
 end
 
@@ -636,26 +622,8 @@ function solve_grid_velocity_lsqr(B::AbstractMatrix{T}, p::Particles) where {T<:
         V_p[2*i]   = -p.mx[i] * w
     end
 
-    function B_mul!(y::AbstractVector{Float64}, x::AbstractVector{Float64})
-        mul!(y, B, x)
-    end
-
-    function Bt_mul!(y::AbstractVector{Float64}, x::AbstractVector{Float64})
-        mul!(y, B', x)
-    end
-
-    B_map = LinearMap(B_mul!, Bt_mul!, size(B,1), size(B,2); ismutating=true)
-
-    result = lsqr(
-        B_map,
-        V_p;
-        atol = 1e-6,
-        btol = 1e-6,
-        conlim = 1e8,
-        maxiter = 5000
-    )
-
-    return result
+    # Always use direct sparse least-squares solve.
+    return B \ V_p
 end
 
 function project_and_get_pressure(dom::Domain, v_h::V) where {V}
@@ -676,49 +644,50 @@ function compute_metric_inner_product(u::AbstractVector{Tu}, v::AbstractVector{T
     return dot(p_u, p_v)
 end
 
-function apply_energy_correction!(f_next::AbstractVector{Tn}, f_curr::AbstractVector{Tc}, f_star::AbstractVector{Ts}, B::AbstractMatrix{Tb}) where {Tn<:Real, Tc<:Real, Ts<:Real, Tb<:Real}
-    delta_f = f_next .- f_curr
+function apply_energy_correction!(f_next::AbstractVector{Tn}, f_curr::AbstractVector{Tc}, f_target::AbstractVector{Tt}, f_tilde_star::AbstractVector{Ts}, B::AbstractMatrix{Tb}) where {Tn<:Real, Tc<:Real, Tt<:Real, Ts<:Real, Tb<:Real}
+    # Eq. (21c): delta_f = F(y(n+1)) - f(n)
+    delta_f = f_target .- f_curr
     
-    # Denominator: |f_star|^2_B
-    norm_sq = compute_metric_inner_product(f_star, f_star, B)
+    # Denominator: |f_tilde_star|^2_B
+    norm_sq = compute_metric_inner_product(f_tilde_star, f_tilde_star, B)
     
     if norm_sq < 1e-10
+        @. f_next = f_target
         return
     end
     
-    # Numerator: <f_star, delta_f>_B
-    projection_overlap = compute_metric_inner_product(f_star, delta_f, B)
+    # Numerator: <f_tilde_star, delta_f>_B
+    projection_overlap = compute_metric_inner_product(f_tilde_star, delta_f, B)
     scalar = projection_overlap / norm_sq
     scalar = clamp(scalar, -2.0, 2.0)
     
-    # P_perp(delta_f) = delta_f - scalar * f_star
-    @. f_next = f_curr + (delta_f - scalar * f_star)
+    # f(n+1) = f(n) + P_{f_tilde_star^perp}(delta_f)
+    @. f_next = f_curr + (delta_f - scalar * f_tilde_star)
 end
 
 function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain, thread_caches::Vector{EvaluationCache}) where {T<:Real}
-    n_threads = Threads.nthreads()
-    if length(thread_caches) != n_threads
-        throw(ArgumentError("thread_caches length must match Threads.nthreads()"))
+    n_thread_slots = Threads.maxthreadid()
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
     end
 
     Threads.@threads for i in 1:length(p.x)
         tid = Threads.threadid()
-        if tid > n_threads
-            tid = mod1(tid, n_threads)
-        end
         cache = thread_caches[tid]
         
         val, _ = probe_field_at_point(p.x[i], p.y[i], tau_coeffs, d, cache)
         
-        p.my[i] += val[1]       
-        p.mx[i] -= val[2]       
+        # probe_field_at_point returns rotated proxy components [v, -u].
+        # Convert back so impulses receive +tau in physical (mx,my) coordinates.
+        p.my[i] += val[1]
+        p.mx[i] -= val[2]
     end
 end
 
 function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain) where {T<:Real}
-    n_threads = Threads.nthreads()
+    n_thread_slots = Threads.maxthreadid()
     cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
     apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
 end
 
@@ -733,10 +702,13 @@ end
 
 function compute_conservation_diagnostics(u_coeffs::AbstractVector{T}, dom::Domain) where {T<:Real}
     u_h = Forms.build_form_field(dom.R1, u_coeffs; label="u_h")
-    ω_h = d(u_h)
+    u_phys_expr = ★(u_h)
+    u_phys_form = Assemblers.solve_L2_projection(dom.R1, u_phys_expr, dom.dΩ)
+    d_u_phys = Forms.d(u_phys_form)
+    ω_h = ★(d_u_phys)
 
     energy = 0.5 * integrate_form_expression(∫(u_h ∧ ★(u_h), dom.dΩ), dom)
-    circulation = integrate_form_expression(∫(ω_h, dom.dΩ), dom)
+    circulation = integrate_form_expression(∫(d_u_phys, dom.dΩ), dom)
     enstrophy = 0.5 * integrate_form_expression(∫(ω_h ∧ ★(ω_h), dom.dΩ), dom)
 
     return (; energy, circulation, enstrophy)
@@ -785,230 +757,353 @@ function ode_rhs(state::SVector{4,Tstate}, u_coeffs::AbstractVector{Tcoeff}, d::
     return SVector{4, Tout}(dx_dt, dy_dt, dmx_dt, dmy_dt)
 end
 
-function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
-                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}, thread_caches::Vector{EvaluationCache}) where {T<:AbstractFloat, U<:Real}
+function advect_particles_rk2!(
+    p::Particles,
+    x0::AbstractVector{T}, y0::AbstractVector{T},
+    mx0::AbstractVector{T}, my0::AbstractVector{T},
+    u_coeffs::AbstractVector{U},
+    d::Domain, dt::T,
+    x_out::AbstractVector{T}, y_out::AbstractVector{T},
+    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+    thread_caches::Vector{EvaluationCache},
+) where {T<:AbstractFloat, U<:Real}
 
-    num_p = length(x0)
-    Lx, Ly = d.box_size
-    n_threads = Threads.nthreads()
-    if length(thread_caches) != n_threads
-        throw(ArgumentError("thread_caches length must match Threads.nthreads()"))
-    end
-    max_err_per_thread = fill(zero(T), n_threads)
-    
-    Threads.@threads for i in 1:num_p
-        
-        tid = Threads.threadid()
-        if tid > n_threads
-            tid = mod1(tid, n_threads)
-        end
-        cache = thread_caches[tid]
-        
-        state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
-        
-        # --- RK2 (Midpoint Method) ---
-        
-        k1 = ode_rhs(state, u_coeffs, d, cache)
-        
-        midpoint_state = state + 0.5 * dt * k1
-        
-        k2 = ode_rhs(midpoint_state, u_coeffs, d, cache)
-        
-        new_state = state + dt * k2
-        
-        # --- Error Calculation ---
-        
-        nx_raw, ny_raw = new_state[1], new_state[2]
-        ox, oy = x_out[i], y_out[i]
-        
-        dx = abs(nx_raw - ox)
-        dy = abs(ny_raw - oy)
-        
-        if dx > 0.5 * Lx; dx = Lx - dx; end
-        if dy > 0.5 * Ly; dy = Ly - dy; end
+    num_p             = length(x0)
+    Lx, Ly            = d.box_size
+    n_thread_slots    = Threads.maxthreadid()
+    max_err_per_thread = fill(zero(T), n_thread_slots)
 
-        local_err = max(dx, dy)
-        if local_err > max_err_per_thread[tid]
-            max_err_per_thread[tid] = local_err
-        end
-        
-        x_out[i]  = mod(nx_raw, Lx)
-        y_out[i]  = mod(ny_raw, Ly)
-        mx_out[i] = new_state[3]
-        my_out[i] = new_state[4]
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
     end
-    
-    return maximum(max_err_per_thread)
+
+    n_workers = min(num_p, n_thread_slots)
+    if n_workers == 0
+        return zero(T)
+    end
+
+    # Split particle indices into fixed worker chunks. Each worker owns one
+    # cache slot, so this remains race-free without requiring :static or threadid().
+    Threads.@threads for worker in 1:n_workers
+        cache = thread_caches[worker]
+        i_start = ((worker - 1) * num_p) ÷ n_workers + 1
+        i_end   = (worker * num_p) ÷ n_workers
+        local_max_err = zero(T)
+
+        for i in i_start:i_end
+            state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
+
+            # RK2 midpoint method
+            k1             = ode_rhs(state,                    u_coeffs, d, cache)
+            k2             = ode_rhs(state + 0.5 * dt * k1,   u_coeffs, d, cache)
+            new_state      = state + dt * k2
+
+            # Periodic error (accounts for domain wrap-around)
+            nx_raw, ny_raw = new_state[1], new_state[2]
+            ox, oy         = x_out[i], y_out[i]
+
+            ex = abs(nx_raw - ox)
+            ey = abs(ny_raw - oy)
+            if ex > 0.5 * Lx; ex = Lx - ex; end
+            if ey > 0.5 * Ly; ey = Ly - ey; end
+
+            local_err = max(ex, ey)
+            if local_err > local_max_err
+                local_max_err = local_err
+            end
+
+            x_out[i]  = mod(nx_raw, Lx)
+            y_out[i]  = mod(ny_raw, Ly)
+            mx_out[i] = new_state[3]
+            my_out[i] = new_state[4]
+        end
+
+        max_err_per_thread[worker] = local_max_err
+    end
+
+    return maximum(@view max_err_per_thread[1:n_workers])
 end
 
-function advect_particles_rk2!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
-                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
-    n_threads = Threads.nthreads()
-    cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
-    return advect_particles_rk2!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out, thread_caches)
+# Convenience overload: allocates thread caches internally.
+# Use only when you don't already have caches from the outer step.
+function advect_particles_rk2!(
+    p::Particles,
+    x0::AbstractVector{T}, y0::AbstractVector{T},
+    mx0::AbstractVector{T}, my0::AbstractVector{T},
+    u_coeffs::AbstractVector{U},
+    d::Domain, dt::T,
+    x_out::AbstractVector{T}, y_out::AbstractVector{T},
+    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+) where {T<:AbstractFloat, U<:Real}
+    n_thread_slots = Threads.maxthreadid()
+    thread_caches = [EvaluationCache(evaluation_cache_size(d)) for _ in 1:n_thread_slots]
+    return advect_particles_rk2!(
+        p, x0, y0, mx0, my0, u_coeffs, d, dt,
+        x_out, y_out, mx_out, my_out,
+        thread_caches,
+    )
 end
 
-function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
-                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}, thread_caches::Vector{EvaluationCache}) where {T<:AbstractFloat, U<:Real}
-    num_p = length(x0)
-    Lx, Ly = d.box_size
-    n_threads = Threads.nthreads()
-    if length(thread_caches) != n_threads
-        throw(ArgumentError("thread_caches length must match Threads.nthreads()"))
-    end
-    max_err_per_thread = fill(zero(T), n_threads)
-    
-    Threads.@threads for i in 1:num_p
-        tid = Threads.threadid()
-        if tid > n_threads
-            tid = mod1(tid, n_threads)
-        end
-        cache = thread_caches[tid]
-        
-        state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
-        
-        k1 = ode_rhs(state, u_coeffs, d, cache)
-        k2 = ode_rhs(state + 0.5 * dt * k1, u_coeffs, d, cache)
-        k3 = ode_rhs(state + 0.5 * dt * k2, u_coeffs, d, cache)
-        k4 = ode_rhs(state + dt * k3, u_coeffs, d, cache)
-        
-        new_state = state + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
-        
-        # Error Calculation
-        nx_raw, ny_raw = new_state[1], new_state[2]
-        ox, oy = x_out[i], y_out[i]
-        
-        dx = abs(nx_raw - ox)
-        dy = abs(ny_raw - oy)
-        
-        if dx > 0.5 * Lx; dx = Lx - dx; end
-        if dy > 0.5 * Ly; dy = Ly - dy; end
+function advect_particles_rk4!(
+    p::Particles,
+    x0::AbstractVector{T}, y0::AbstractVector{T},
+    mx0::AbstractVector{T}, my0::AbstractVector{T},
+    u_coeffs::AbstractVector{U},
+    d::Domain, dt::T,
+    x_out::AbstractVector{T}, y_out::AbstractVector{T},
+    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+    thread_caches::Vector{EvaluationCache},
+) where {T<:AbstractFloat, U<:Real}
 
-        local_err = max(dx, dy)
-        if local_err > max_err_per_thread[tid]
-            max_err_per_thread[tid] = local_err
-        end
-        
-        x_out[i]  = mod(nx_raw, Lx)
-        y_out[i]  = mod(ny_raw, Ly)
-        mx_out[i] = new_state[3]
-        my_out[i] = new_state[4]
+    num_p             = length(x0)
+    Lx, Ly            = d.box_size
+    n_thread_slots    = Threads.maxthreadid()
+    max_err_per_thread = fill(zero(T), n_thread_slots)
+
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
     end
-    
-    return maximum(max_err_per_thread)
+
+    n_workers = min(num_p, n_thread_slots)
+    if n_workers == 0
+        return zero(T)
+    end
+
+    Threads.@threads for worker in 1:n_workers
+        cache = thread_caches[worker]
+        i_start = ((worker - 1) * num_p) ÷ n_workers + 1
+        i_end   = (worker * num_p) ÷ n_workers
+        local_max_err = zero(T)
+
+        for i in i_start:i_end
+            state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
+
+            # Classical RK4
+            k1        = ode_rhs(state,                   u_coeffs, d, cache)
+            k2        = ode_rhs(state + 0.5 * dt * k1,  u_coeffs, d, cache)
+            k3        = ode_rhs(state + 0.5 * dt * k2,  u_coeffs, d, cache)
+            k4        = ode_rhs(state +        dt * k3, u_coeffs, d, cache)
+            new_state = state + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
+
+            # Periodic error
+            nx_raw, ny_raw = new_state[1], new_state[2]
+            ox, oy         = x_out[i], y_out[i]
+
+            ex = abs(nx_raw - ox)
+            ey = abs(ny_raw - oy)
+            if ex > 0.5 * Lx; ex = Lx - ex; end
+            if ey > 0.5 * Ly; ey = Ly - ey; end
+
+            local_err = max(ex, ey)
+            if local_err > local_max_err
+                local_max_err = local_err
+            end
+
+            x_out[i]  = mod(nx_raw, Lx)
+            y_out[i]  = mod(ny_raw, Ly)
+            mx_out[i] = new_state[3]
+            my_out[i] = new_state[4]
+        end
+
+        max_err_per_thread[worker] = local_max_err
+    end
+
+    return maximum(@view max_err_per_thread[1:n_workers])
 end
 
-function advect_particles_rk4!(p::Particles, x0::AbstractVector{T}, y0::AbstractVector{T}, mx0::AbstractVector{T}, my0::AbstractVector{T}, u_coeffs::AbstractVector{U}, d::Domain, dt::T,
-                               x_out::AbstractVector{T}, y_out::AbstractVector{T}, mx_out::AbstractVector{T}, my_out::AbstractVector{T}) where {T<:AbstractFloat, U<:Real}
-    n_threads = Threads.nthreads()
-    cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
-    return advect_particles_rk4!(p, x0, y0, mx0, my0, u_coeffs, d, dt, x_out, y_out, mx_out, my_out, thread_caches)
+function advect_particles_rk4!(
+    p::Particles,
+    x0::AbstractVector{T}, y0::AbstractVector{T},
+    mx0::AbstractVector{T}, my0::AbstractVector{T},
+    u_coeffs::AbstractVector{U},
+    d::Domain, dt::T,
+    x_out::AbstractVector{T}, y_out::AbstractVector{T},
+    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+) where {T<:AbstractFloat, U<:Real}
+    n_thread_slots = Threads.maxthreadid()
+    thread_caches = [EvaluationCache(evaluation_cache_size(d)) for _ in 1:n_thread_slots]
+    return advect_particles_rk4!(
+        p, x0, y0, mx0, my0, u_coeffs, d, dt,
+        x_out, y_out, mx_out, my_out,
+        thread_caches,
+    )
 end
 
 function coadjoint_step!(p::Particles, d::Domain)
+    step_t0 = time()
+
+    t0 = time()
     B = build_B_matrix(p, d)
+    t_build_B_ms = time() - t0
+
+    t0 = time()
     u_grid_n = solve_grid_velocity_lsqr(B, p)
+    t_solve_raw_ms = time() - t0
+
+    t0 = time()
     u_grid_n_h = Forms.build_form_field(d.R1, u_grid_n)
     u_div_free_coeffs_n, _ = project_and_get_pressure(d, u_grid_n_h)
+    t_project_ms = time() - t0
+
+    t_total_ms = time() - step_t0
+
+    println(
+        "  Coadjoint Timings [ms]: " *
+        "build_B=$(round(t_build_B_ms, digits=2)), " *
+        "solve_raw=$(round(t_solve_raw_ms, digits=2)), " *
+        "project=$(round(t_project_ms, digits=2)), " *
+        "total=$(round(t_total_ms, digits=2))",
+    )
+
     return u_div_free_coeffs_n
 end
 
-function step_co_flip!(p::Particles, d::Domain, dt::Float64)
+function step_co_flip!(p::Particles, d::Domain, dt::Float64, f_n::AbstractVector{Tf}) where {Tf<:Real}
     step_t0 = time()
-    n_threads = Threads.nthreads()
+    n_thread_slots = Threads.maxthreadid()
     cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_threads]
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
 
     x_n  = copy(p.x)
     y_n  = copy(p.y)
     mx_n = copy(p.mx)
     my_n = copy(p.my)
     
-    f_n = coadjoint_step!(p, d)
-    
     # Initialize Fixed Point variables
     f_star = copy(f_n)
-    x_np1 = copy(x_n)
-    y_np1 = copy(y_n)
+    x_np1  = copy(x_n)
+    y_np1  = copy(y_n)
     mx_np1 = copy(mx_n)
     my_np1 = copy(my_n)
     
-    f_np1_raw = similar(f_n)
+    f_np1_raw  = similar(f_n)
     f_np1_proj = similar(f_n)
+    f_np1      = similar(f_n)
+    B_np1      = build_B_matrix(p, d)   # will be overwritten in loop; pre-alloc reference
     
     max_iter = 5
-    tol = 0.005
+    tol      = 1e-5
     
     for iter in 1:max_iter
         iter_t0 = time()
 
-        # Advect Particles
+        # ------------------------------------------------------------------
+        # 1. Advect particles from (x_n, mx_n) using current midpoint f_star
+        # ------------------------------------------------------------------
+        t0  = time()
+        err = advect_particles_rk2!(
+            p,
+            x_n, y_n, mx_n, my_n,
+            f_star, d, dt,
+            x_np1, y_np1, mx_np1, my_np1,
+            thread_caches,
+        )
+        t_advect_ms = time() - t0
+
+        # ------------------------------------------------------------------
+        # 2. Sort advected particles and build B(n+1)
+        # ------------------------------------------------------------------
         t0 = time()
-        err = advect_particles_rk2!(p, x_n, y_n, mx_n, my_n, f_star, d, dt, x_np1, y_np1, mx_np1, my_np1, thread_caches)
-        t_advect_ms = (time() - t0)
-        
-        # Project new particles to grid
-        t0 = time()
-        p.x, p.y = x_np1, y_np1
-        # p.mx, p.my = mx_np1, my_np1
+        p.x, p.y   = x_np1, y_np1
+        p.mx, p.my = mx_np1, my_np1
         particle_sorter!(p, d)
-        t_sort_ms = (time() - t0)
-        
-        t0 = time()
-        B_np1 = build_B_matrix(p, d) 
-        t_build_B_ms = (time() - t0)
-        
-        # Solve Raw velocity from Particles
-        t0 = time()
-        f_np1_raw = solve_grid_velocity_lsqr(B_np1, p)
-        t_solve_raw_ms = (time() - t0)
-        
-        # Project to get Divergence-Free part
-        t0 = time()
-        f_np1_raw_h = Forms.build_form_field(d.R1, f_np1_raw)
-        f_np1_proj, _ = project_and_get_pressure(d, f_np1_raw_h)
-        t_project_ms = (time() - t0)
-        
-        # Energy Correction
-        t0 = time()
-        f_star_new = 0.5 .* (f_n .+ f_np1_proj)
-        apply_energy_correction!(f_np1_proj, f_n, f_star_new, B_np1)
-        t_energy_ms = (time() - t0)
-        
-        
-        @. f_star = 0.5 * (f_n + f_np1_proj)
-        t_iter_ms = (time() - iter_t0)
-        
+        t_sort_ms = time() - t0
+
+        t0    = time()
+        B_np1 = build_B_matrix(p, d)
+        t_build_B_ms = time() - t0
+
+        # ------------------------------------------------------------------
+        # 3. P2G: least-squares solve for raw grid velocity
+        # ------------------------------------------------------------------
+        t0         = time()
+        f_np1_raw  = solve_grid_velocity_lsqr(B_np1, p)
+        t_solve_raw_ms = time() - t0
+
+        # ------------------------------------------------------------------
+        # 4. Pressure projection → divergence-free F(y(n+1))
+        # ------------------------------------------------------------------
+        t0              = time()
+        f_np1_raw_h     = Forms.build_form_field(d.R1, f_np1_raw)
+        f_np1_proj, _   = project_and_get_pressure(d, f_np1_raw_h)
+        t_project_ms    = time() - t0
+
+        # ------------------------------------------------------------------
+        # 5. Energy correction
+        # ------------------------------------------------------------------
+        t0            = time()
+        f_tilde_star  = 0.5 .* (f_n .+ f_np1_proj)
+        apply_energy_correction!(f_np1, f_n, f_np1_proj, f_tilde_star, B_np1)
+        @. f_star = 0.5 * (f_n + f_np1)
+        t_energy_ms = time() - t0
+
+        t_iter_ms = time() - iter_t0
         println("  Iter $iter: Pos Change = $err")
         println(
-            "    Timings [ms]: advect=$(round(t_advect_ms, digits=2)), sort=$(round(t_sort_ms, digits=2)), build_B=$(round(t_build_B_ms, digits=2)), solve_raw=$(round(t_solve_raw_ms, digits=2)), project=$(round(t_project_ms, digits=2)), energy=$(round(t_energy_ms, digits=2)), iter_total=$(round(t_iter_ms, digits=2))"
+            "    Timings [ms]: advect=$(round(t_advect_ms,   digits=2)), " *
+            "sort=$(round(t_sort_ms,       digits=2)), " *
+            "build_B=$(round(t_build_B_ms, digits=2)), " *
+            "solve_raw=$(round(t_solve_raw_ms, digits=2)), " *
+            "project=$(round(t_project_ms, digits=2)), " *
+            "energy=$(round(t_energy_ms,   digits=2)), " *
+            "iter_total=$(round(t_iter_ms, digits=2))",
         )
+
         if err < tol
             break
         end
     end
-    
-    # Apply Pressure Feedback
-    t0 = time()
-    tau_coeffs = f_np1_proj .- f_np1_raw
-    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
-    t_pressure_ms = (time() - t0)
 
+    # ----------------------------------------------------------------------
+    # 6. Pressure feedback to particle impulses
+    # ----------------------------------------------------------------------
+    t0          = time()
+    tau_coeffs  = f_np1 .- f_np1_raw
+    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
+    t_pressure_ms = time() - t0
+
+    # ----------------------------------------------------------------------
+    # 7. Re-sort after impulse update
+    # ----------------------------------------------------------------------
     t0 = time()
     particle_sorter!(p, d)
-    t_final_sort_ms = (time() - t0)
+    t_final_sort_ms = time() - t0
 
-    t_total_ms = (time() - step_t0)
+    t_total_ms  = time() - step_t0
+
     println(
-        "  Post Timings [ms]: pressure_feedback=$(round(t_pressure_ms, digits=2)), final_sort=$(round(t_final_sort_ms, digits=2)), step_total=$(round(t_total_ms, digits=2))"
+        "  Post Timings [ms]: " *
+        "pressure_feedback=$(round(t_pressure_ms,  digits=2)), " *
+        "final_sort=$(round(t_final_sort_ms,        digits=2)), " *
+        "step_total=$(round(t_total_ms,             digits=2))",
     )
+
+    return f_np1
 end
 
-function maybe_clear_memo_tables!(step::Int, clear_every::Int)
+function reset_particle_impulses!(p::Particles, f_grid::AbstractVector{T}, 
+                                   d::Domain) where {T<:Real}
+    # Replace particle impulses with grid-interpolated velocity.
+    # This kills accumulated kernel-mode noise.
+    n_thread_slots = Threads.maxthreadid()
+    cache_size = evaluation_cache_size(d)
+    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
+    
+    Threads.@threads for i in 1:length(p.x)
+        tid = Threads.threadid()
+        cache = thread_caches[tid]
+        
+        raw_vel, _ = probe_field_at_point(p.x[i], p.y[i], f_grid, d, cache)
+        # Convert proxy (f_x, f_y) → physical (u=−f_y, v=f_x) → store as impulse
+        p.mx[i] = -raw_vel[2]
+        p.my[i] =  raw_vel[1]
+    end
+end
+
+function maybe_clear_memo_tables!(step::Int, clear_every::Int, d::Domain)
     if clear_every > 0 && (step % clear_every == 0)
         Memoization.empty_all_caches!()
+        warmup_evaluation_memo!(d)
         # println("  Cleared memoization caches at step $step")
     end
 end
@@ -1048,7 +1143,7 @@ function main()
     LinearAlgebra.BLAS.set_num_threads(1)
 
     # Configuration
-    nel = (80, 80)
+    nel = (64, 64)
     p = (2, 2)
     k = (1, 1)
     
@@ -1063,7 +1158,8 @@ function main()
     particle_sorter!(particles, domain)
 
     println("Initializing Visualization Grid...")
-    nx_plot, ny_plot = 100, 100
+    cte = 3
+    nx_plot, ny_plot = nel[1]*cte, nel[2]*cte
     x_range = range(0, domain.box_size[1], length=nx_plot)
     y_range = range(0, domain.box_size[2], length=ny_plot)
     
@@ -1122,20 +1218,25 @@ function main()
     # Export a true t=0 snapshot before any advancement of the simulation state.
     println("Saving true t=0 snapshot...")
     u_coeffs = coadjoint_step!(particles, domain)
-    uvω_grid = evaluate_velocity_and_vorticity_at_probes(u_coeffs, grid_probes, domain)
-    vel_mag = sqrt.(uvω_grid[:, 1].^2 .+ uvω_grid[:, 2].^2)
+    u_form = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+    u_phys_expr = ★(u_form)
+    u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+    d_u_phys = Forms.d(u_phys_form)
+    ω_h = ★(d_u_phys)
+    Plot.export_form_fields_to_vtk((u_form,), "u_h_0000")
+    Plot.export_form_fields_to_vtk((ω_h,), "w_h_0000")
 
-    # Columns: x, y, u, v, |u|, ω
-    step_matrix_0 = hcat(grid_x, grid_y, uvω_grid[:, 1], uvω_grid[:, 2], vel_mag, uvω_grid[:, 3])
-    step_file_0 = joinpath(output_dir, "step_0000.txt")
-    writedlm(step_file_0, step_matrix_0)
-    println("  Saved $(step_file_0)")
+    # Particle columns: x, y, mx, my, |m|
+    u_part = copy(particles.mx)
+    v_part = copy(particles.my)
+    speed_part = sqrt.(u_part.^2 .+ v_part.^2)
 
-    # Particle columns: x, y, mx, my
-    particle_step_matrix_0 = hcat(particles.x, particles.y, particles.mx, particles.my)
     particle_step_file_0 = joinpath(particle_output_dir, "step_0000.txt")
-    writedlm(particle_step_file_0, particle_step_matrix_0)
-    println("  Saved $(particle_step_file_0)")
+    writedlm(particle_step_file_0, hcat(particles.x, particles.y, u_part, v_part, speed_part))
+    println("  Saved step 0")
+
+    # Warmup memoized FE evaluation paths on one thread before threaded advection.
+    warmup_evaluation_memo!(domain)
 
     # Warmup run on a copied particle state to reduce first-step compilation noise.
     println("Running warmup step...")
@@ -1152,36 +1253,52 @@ function main()
         copy(particles.elem_ids),
     )
     particle_sorter!(warmup_particles, domain)
-    step_co_flip!(warmup_particles, domain, dt)
+    warmup_f = coadjoint_step!(warmup_particles, domain)
+    step_co_flip!(warmup_particles, domain, dt, warmup_f)
     println("Warmup done. Starting measured steps...")
+
+    f_n = copy(u_coeffs)
+
+    reset_every = 200
 
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step*dt, digits=3)))...")
 
         # 3. Advance the CO-FLIP state
-        step_co_flip!(particles, domain, dt)
+        f_n = step_co_flip!(particles, domain, dt, f_n)
+
+        if step % reset_every == 0
+            reset_particle_impulses!(particles, f_n, domain)
+            particle_sorter!(particles, domain)
+            # Recompute f_n from the freshly reset particles
+            f_n = coadjoint_step!(particles, domain)
+            println("  Reset particle impulses at step $step")
+        end
         
         # 4. Visualization
-        # Re-evaluate the velocity field to plot the results
-        u_coeffs = coadjoint_step!(particles, domain)
+        # Use the carried grid state from Algorithm 2.
+        u_coeffs = f_n
+        u_form = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+        u_phys_expr = ★(u_form)
+        u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+        d_u_phys = Forms.d(u_phys_form)
+        ω_h = ★(d_u_phys)
+        Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_%04d", step))
+        Plot.export_form_fields_to_vtk((ω_h,), @sprintf("w_h_%04d", step))
         diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
         print_conservation_diagnostics(step, step * dt, diagnostics)
-        
-        uvω_grid = evaluate_velocity_and_vorticity_at_probes(u_coeffs, grid_probes, domain)
-        vel_mag = sqrt.(uvω_grid[:, 1].^2 .+ uvω_grid[:, 2].^2)
 
-        # Columns: x, y, u, v, |u|, ω
-        step_matrix = hcat(grid_x, grid_y, uvω_grid[:, 1], uvω_grid[:, 2], vel_mag, uvω_grid[:, 3])
-        step_file = joinpath(output_dir, @sprintf("step_%04d.txt", step))
-        writedlm(step_file, step_matrix)
+        # Particle columns: x, y, mx, my, |m|
+        u_part = copy(particles.mx)
+        v_part = copy(particles.my)
+        speed_part = sqrt.(u_part.^2 .+ v_part.^2)
 
-        # Particle columns: x, y, mx, my
-        particle_step_matrix = hcat(particles.x, particles.y, particles.mx, particles.my)
         particle_step_file = joinpath(particle_output_dir, @sprintf("step_%04d.txt", step))
-        writedlm(particle_step_file, particle_step_matrix)
+        writedlm(particle_step_file, hcat(particles.x, particles.y, u_part, v_part, speed_part))
+        println("  Saved $(particle_step_file_0)")
 
-        println("  Saved $(step_file)")
-        maybe_clear_memo_tables!(step, clear_memo_every)
+        println("  Saved step $step visualization and particle data.")
+        maybe_clear_memo_tables!(step, clear_memo_every, domain)
     end
 
     println("\nSimulation complete! Step files written to '$(output_dir)'.")
