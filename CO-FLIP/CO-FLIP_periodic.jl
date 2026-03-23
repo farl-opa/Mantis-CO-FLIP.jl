@@ -10,6 +10,7 @@ using CUDA
 using DelimitedFiles
 using Printf
 using Memoization
+using WriteVTK
 
 gr()
 
@@ -154,6 +155,104 @@ function generate_particles(num_particles::Int, domain::Domain, flow_type::Symbo
     return Particles(x, y, mx, my, vol, can_x, can_y, head, next, elem_ids)
 end
 
+function generate_particles_strat(num_particles::Int, domain::Domain, flow_type::Symbol=:vortex)
+    Lx, Ly = domain.box_size
+    nx, ny = domain.nel
+    
+    x  = Vector{Float64}(undef, num_particles)
+    y  = Vector{Float64}(undef, num_particles)
+    mx = Vector{Float64}(undef, num_particles)
+    my = Vector{Float64}(undef, num_particles)
+    vol = ones(Float64, num_particles)
+    
+    # Pre-allocate arrays for sorting structures
+    can_x = zeros(Float64, num_particles)
+    can_y = zeros(Float64, num_particles)
+    num_elements = prod(domain.nel)
+    head = zeros(Int, num_elements)
+    next = zeros(Int, num_particles)
+    elem_ids = zeros(Int, num_particles)
+    
+    # Cell dimensions
+    dx = Lx / nx
+    dy = Ly / ny
+    
+    # Compute particles per cell
+    total_cells = nx * ny
+    particles_per_cell = num_particles / total_cells
+    ppc_base = floor(Int, particles_per_cell)
+    remainder = num_particles - ppc_base * total_cells
+    
+    # Stratified grid within each cell
+    # For N particles per cell, create sqrt(N) × sqrt(N) regular grid with jitter
+    side_length = ceil(Int, sqrt(particles_per_cell))
+    particles_per_side = side_length  # sqrt(side_length^2) ≈ side_length
+    
+    particle_idx = 1
+    rng = MersenneTwister(42)  # Seed for reproducibility
+    
+    for j in 1:ny
+        for i in 1:nx
+            # Cell boundaries
+            cell_x_min = (i - 1) * dx
+            cell_y_min = (j - 1) * dy
+            
+            # Determine number of particles in this cell
+            cell_ppc = ppc_base + (i + (j - 1) * nx <= remainder ? 1 : 0)
+            
+            if cell_ppc == 0
+                continue
+            end
+            
+            # Compute the grid for stratified placement within the cell
+            cell_side = ceil(Int, sqrt(cell_ppc))
+            dx_cell = dx / cell_side
+            dy_cell = dy / cell_side
+            
+            particle_count = 0
+            for jj in 0:(cell_side - 1)
+                for ii in 0:(cell_side - 1)
+                    if particle_count >= cell_ppc
+                        break
+                    end
+                    
+                    # Base position within the sub-grid
+                    base_x = cell_x_min + (ii + 0.5) * dx_cell
+                    base_y = cell_y_min + (jj + 0.5) * dy_cell
+                    
+                    # Add small random perturbation (up to ±25% of sub-cell size)
+                    jitter_x = (rand(rng) - 0.5) * 0.5 * dx_cell
+                    jitter_y = (rand(rng) - 0.5) * 0.5 * dy_cell
+                    
+                    px = base_x + jitter_x
+                    py = base_y + jitter_y
+                    
+                    # Ensure within bounds (shouldn't exceed, but just in case)
+                    px = clamp(px, 0.0, Lx)
+                    py = clamp(py, 0.0, Ly)
+                    
+                    x[particle_idx] = px
+                    y[particle_idx] = py
+                    
+                    # Get velocity from flow type
+                    u, v = initial_velocity(flow_type, px, py, Lx, Ly)
+                    mx[particle_idx] = u
+                    my[particle_idx] = v
+                    
+                    particle_idx += 1
+                    particle_count += 1
+                end
+            end
+        end
+    end
+    
+    # Assign particle volumes (uniform distribution)
+    particle_vol = (Lx * Ly) / num_particles
+    fill!(vol, particle_vol)
+    
+    return Particles(x, y, mx, my, vol, can_x, can_y, head, next, elem_ids)
+end
+
 function particle_sorter!(p::Particles, d::Domain)
     fill!(p.head, 0)
     
@@ -180,6 +279,212 @@ function particle_sorter!(p::Particles, d::Domain)
         p.next[i] = p.head[eid]
         p.head[eid] = i
     end
+end
+
+function enforce_min_particles_per_element!(
+    p::Particles,
+    d::Domain,
+    min_particles_per_element::Int,
+    max_particles_per_element::Int,
+    min_particles_per_quarter::Int,
+    ref_grid_coeffs::AbstractVector{T},
+    ) where {T<:Real}
+    if min_particles_per_element <= 0 && max_particles_per_element <= 0 && min_particles_per_quarter <= 0
+        return 0, 0
+    end
+    if max_particles_per_element > 0 && min_particles_per_element > max_particles_per_element
+        throw(ArgumentError("min_particles_per_element must be <= max_particles_per_element"))
+    end
+    if max_particles_per_element > 0 && min_particles_per_quarter > 0 && max_particles_per_element < 4 * min_particles_per_quarter
+        throw(ArgumentError("max_particles_per_element must be >= 4 * min_particles_per_quarter"))
+    end
+
+    particle_sorter!(p, d)
+
+    num_elements = prod(d.nel)
+    min_elem_effective = max(min_particles_per_element, 4 * max(min_particles_per_quarter, 0))
+
+    counts_elem = zeros(Int, num_elements)
+    counts_quarter = zeros(Int, num_elements, 4)
+    add_quarter = zeros(Int, num_elements, 4)
+
+    @inbounds for pid in eachindex(p.x)
+        eid = p.elem_ids[pid]
+        qx = p.can_x[pid] >= 0.5 ? 2 : 1
+        qy = p.can_y[pid] >= 0.5 ? 1 : 0
+        qid = qx + 2 * qy
+        counts_elem[eid] += 1
+        counts_quarter[eid, qid] += 1
+    end
+
+    if min_particles_per_quarter > 0
+        @inbounds for eid in 1:num_elements
+            for qid in 1:4
+                deficit = min_particles_per_quarter - counts_quarter[eid, qid]
+                if deficit > 0
+                    add_quarter[eid, qid] += deficit
+                end
+            end
+        end
+    end
+
+    if min_elem_effective > 0
+        @inbounds for eid in 1:num_elements
+            base_after_quarter = counts_elem[eid] + sum(@view add_quarter[eid, :])
+            extra_needed = min_elem_effective - base_after_quarter
+            while extra_needed > 0
+                # Add to currently sparsest quarter to reduce clustering.
+                qbest = 1
+                cbest = counts_quarter[eid, 1] + add_quarter[eid, 1]
+                for qid in 2:4
+                    c = counts_quarter[eid, qid] + add_quarter[eid, qid]
+                    if c < cbest
+                        cbest = c
+                        qbest = qid
+                    end
+                end
+                add_quarter[eid, qbest] += 1
+                extra_needed -= 1
+            end
+        end
+    end
+
+    total_to_add = sum(add_quarter)
+
+    if total_to_add == 0 && max_particles_per_element <= 0
+        return 0, 0
+    end
+
+    nx, ny = d.nel
+    Lx, Ly = d.box_size
+    dx = Lx / nx
+    dy = Ly / ny
+
+    cache = EvaluationCache(evaluation_cache_size(d))
+    rng = Random.default_rng()
+
+    if total_to_add > 0
+        old_count = length(p.x)
+        new_count = old_count + total_to_add
+
+        resize!(p.x, new_count)
+        resize!(p.y, new_count)
+        resize!(p.mx, new_count)
+        resize!(p.my, new_count)
+        resize!(p.volume, new_count)
+        resize!(p.can_x, new_count)
+        resize!(p.can_y, new_count)
+        resize!(p.next, new_count)
+        resize!(p.elem_ids, new_count)
+
+        pid = old_count + 1
+        @inbounds for eid in 1:num_elements
+            ej = ((eid - 1) ÷ nx) + 1
+            ei = eid - (ej - 1) * nx
+
+            x0 = (ei - 1) * dx
+            y0 = (ej - 1) * dy
+
+            for qid in 1:4
+                n_add_q = add_quarter[eid, qid]
+                if n_add_q <= 0
+                    continue
+                end
+
+                qx = ((qid - 1) % 2)
+                qy = ((qid - 1) ÷ 2)
+                qx0 = x0 + qx * 0.5 * dx
+                qy0 = y0 + qy * 0.5 * dy
+                qdx = 0.5 * dx
+                qdy = 0.5 * dy
+
+                for _ in 1:n_add_q
+                    px = qx0 + rand(rng) * qdx
+                    py = qy0 + rand(rng) * qdy
+
+                    raw_vel, _ = probe_field_at_point(px, py, ref_grid_coeffs, d, cache)
+
+                    p.x[pid] = px
+                    p.y[pid] = py
+                    p.mx[pid] = -raw_vel[2]
+                    p.my[pid] = raw_vel[1]
+                    pid += 1
+                end
+            end
+        end
+
+        particle_sorter!(p, d)
+    end
+
+    total_to_remove = 0
+    if max_particles_per_element > 0 && length(p.x) > 0
+        n_particles = length(p.x)
+        keep_mask = trues(n_particles)
+        quarter_pids = [Int[] for _ in 1:(num_elements * 4)]
+        counts_elem .= 0
+        counts_quarter .= 0
+
+        @inbounds for pid in 1:n_particles
+            eid = p.elem_ids[pid]
+            qx = p.can_x[pid] >= 0.5 ? 2 : 1
+            qy = p.can_y[pid] >= 0.5 ? 1 : 0
+            qid = qx + 2 * qy
+            counts_elem[eid] += 1
+            counts_quarter[eid, qid] += 1
+            push!(quarter_pids[(eid - 1) * 4 + qid], pid)
+        end
+
+        @inbounds for eid in 1:num_elements
+            local_excess = counts_elem[eid] - max_particles_per_element
+            while local_excess > 0
+                qbest = 0
+                excess_best = 0
+                for qid in 1:4
+                    removable = counts_quarter[eid, qid] - max(min_particles_per_quarter, 0)
+                    if removable > excess_best
+                        excess_best = removable
+                        qbest = qid
+                    end
+                end
+
+                if qbest == 0
+                    break
+                end
+
+                qlist = quarter_pids[(eid - 1) * 4 + qbest]
+                while !isempty(qlist)
+                    victim = pop!(qlist)
+                    if keep_mask[victim]
+                        keep_mask[victim] = false
+                        counts_quarter[eid, qbest] -= 1
+                        counts_elem[eid] -= 1
+                        total_to_remove += 1
+                        local_excess -= 1
+                        break
+                    end
+                end
+            end
+        end
+
+        if total_to_remove > 0
+            keep_idx = findall(keep_mask)
+            p.x = p.x[keep_idx]
+            p.y = p.y[keep_idx]
+            p.mx = p.mx[keep_idx]
+            p.my = p.my[keep_idx]
+            p.volume = p.volume[keep_idx]
+            p.can_x = p.can_x[keep_idx]
+            p.can_y = p.can_y[keep_idx]
+            p.next = p.next[keep_idx]
+            p.elem_ids = p.elem_ids[keep_idx]
+            particle_sorter!(p, d)
+        end
+    end
+
+    # Keep quadrature weight mass consistent with the represented domain area.
+    fill!(p.volume, (Lx * Ly) / length(p.x))
+
+    return total_to_add, total_to_remove
 end
 
 # ==============================================================================
@@ -409,11 +714,11 @@ function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P
 end
 
 function probe_field_at_point(
-    x::Real, y::Real,
-    u_coeffs::AbstractVector{T},
-    d::Domain,
-    cache::EvaluationCache,
-) where {T<:Real}
+        x::Real, y::Real,
+        u_coeffs::AbstractVector{T},
+        d::Domain,
+        cache::EvaluationCache,
+    ) where {T<:Real}
     Tout   = probe_output_eltype(T)
     Lx, Ly = d.box_size
     nx, ny = d.nel
@@ -700,6 +1005,40 @@ function integrate_form_expression(expr, dom::Domain)
     return total
 end
 
+function export_particles_to_vtk(particles::Particles, output_path::String)
+    """
+    Export particles as an unstructured grid to VTK format.
+    Creates a VTK file with particle positions and impulse/speed data.
+    """
+    n_particles = length(particles.x)
+    
+    # Create 3D points (add z=0 for 2D particles)
+    points = zeros(3, n_particles)
+    points[1, :] .= particles.x
+    points[2, :] .= particles.y
+    # points[3, :] stays zero (2D in xy-plane)
+    
+    # Create cells: each particle is a single-point cell (VTK_VERTEX)
+    cells = [MeshCell(VTKCellTypes.VTK_VERTEX, vec([i])) for i in 1:n_particles]
+    
+    # Create VTK grid
+    vtkfile = vtk_grid(output_path, points, cells)
+    
+    # Add point data: impulse components and speed
+    u_part = copy(particles.mx)
+    v_part = copy(particles.my)
+    speed_part = sqrt.(u_part.^2 .+ v_part.^2)
+    
+    vtkfile["mx", VTKPointData()] = u_part
+    vtkfile["my", VTKPointData()] = v_part
+    vtkfile["speed", VTKPointData()] = speed_part
+    vtkfile["volume", VTKPointData()] = particles.volume
+    
+    # Write the file
+    outfiles = vtk_save(vtkfile)
+    return outfiles
+end
+
 function compute_conservation_diagnostics(u_coeffs::AbstractVector{T}, dom::Domain) where {T<:Real}
     u_h = Forms.build_form_field(dom.R1, u_coeffs; label="u_h")
     u_phys_expr = ★(u_h)
@@ -948,7 +1287,7 @@ function coadjoint_step!(p::Particles, d::Domain)
     t_total_ms = time() - step_t0
 
     println(
-        "  Coadjoint Timings [ms]: " *
+        "  Coadjoint Timings [s]: " *
         "build_B=$(round(t_build_B_ms, digits=2)), " *
         "solve_raw=$(round(t_solve_raw_ms, digits=2)), " *
         "project=$(round(t_project_ms, digits=2)), " *
@@ -958,11 +1297,33 @@ function coadjoint_step!(p::Particles, d::Domain)
     return u_div_free_coeffs_n
 end
 
-function step_co_flip!(p::Particles, d::Domain, dt::Float64, f_n::AbstractVector{Tf}) where {Tf<:Real}
+function step_co_flip!(
+        p::Particles,
+        d::Domain,
+        dt::Float64,
+        f_n::AbstractVector{Tf};
+        min_particles_per_element::Int=10,
+        max_particles_per_element::Int=25,
+        min_particles_per_quarter::Int=3,
+    ) where {Tf<:Real}
     step_t0 = time()
     n_thread_slots = Threads.maxthreadid()
     cache_size = evaluation_cache_size(d)
     thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
+
+    t0 = time()
+    added_start, removed_start = enforce_min_particles_per_element!(
+        p,
+        d,
+        min_particles_per_element,
+        max_particles_per_element,
+        min_particles_per_quarter,
+        f_n,
+    )
+    t_seed_start_ms = time() - t0
+    if added_start > 0 || removed_start > 0
+        println("  Particle rebalance before solve: +$added_start / -$removed_start")
+    end
 
     x_n  = copy(p.x)
     y_n  = copy(p.y)
@@ -1040,7 +1401,7 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64, f_n::AbstractVector
         t_iter_ms = time() - iter_t0
         println("  Iter $iter: Pos Change = $err")
         println(
-            "    Timings [ms]: advect=$(round(t_advect_ms,   digits=2)), " *
+            "    Timings [s]: advect=$(round(t_advect_ms,   digits=2)), " *
             "sort=$(round(t_sort_ms,       digits=2)), " *
             "build_B=$(round(t_build_B_ms, digits=2)), " *
             "solve_raw=$(round(t_solve_raw_ms, digits=2)), " *
@@ -1069,35 +1430,32 @@ function step_co_flip!(p::Particles, d::Domain, dt::Float64, f_n::AbstractVector
     particle_sorter!(p, d)
     t_final_sort_ms = time() - t0
 
+    t0 = time()
+    added_end, removed_end = enforce_min_particles_per_element!(
+        p,
+        d,
+        min_particles_per_element,
+        max_particles_per_element,
+        min_particles_per_quarter,
+        f_np1,
+    )
+    t_seed_end_ms = time() - t0
+    if added_end > 0 || removed_end > 0
+        println("  Particle rebalance after solve: +$added_end / -$removed_end")
+    end
+
     t_total_ms  = time() - step_t0
 
     println(
-        "  Post Timings [ms]: " *
+        "  Post Timings [s]: " *
+        "seed_start=$(round(t_seed_start_ms, digits=2)), " *
         "pressure_feedback=$(round(t_pressure_ms,  digits=2)), " *
         "final_sort=$(round(t_final_sort_ms,        digits=2)), " *
+        "seed_end=$(round(t_seed_end_ms,          digits=2)), " *
         "step_total=$(round(t_total_ms,             digits=2))",
     )
 
     return f_np1
-end
-
-function reset_particle_impulses!(p::Particles, f_grid::AbstractVector{T}, 
-                                   d::Domain) where {T<:Real}
-    # Replace particle impulses with grid-interpolated velocity.
-    # This kills accumulated kernel-mode noise.
-    n_thread_slots = Threads.maxthreadid()
-    cache_size = evaluation_cache_size(d)
-    thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
-    
-    Threads.@threads for i in 1:length(p.x)
-        tid = Threads.threadid()
-        cache = thread_caches[tid]
-        
-        raw_vel, _ = probe_field_at_point(p.x[i], p.y[i], f_grid, d, cache)
-        # Convert proxy (f_x, f_y) → physical (u=−f_y, v=f_x) → store as impulse
-        p.mx[i] = -raw_vel[2]
-        p.my[i] =  raw_vel[1]
-    end
 end
 
 function maybe_clear_memo_tables!(step::Int, clear_every::Int, d::Domain)
@@ -1202,19 +1560,6 @@ function main()
     particle_output_dir = "particle_output"
     mkpath(particle_output_dir)
 
-    metadata_path = joinpath(output_dir, "metadata.txt")
-    open(metadata_path, "w") do io
-        println(io, "# CO-FLIP output metadata")
-        println(io, "nx_plot $nx_plot")
-        println(io, "ny_plot $ny_plot")
-        println(io, "n_steps $n_steps")
-        println(io, "has_t0 1")
-        println(io, "dt $dt")
-        println(io, "Lx $(domain.box_size[1])")
-        println(io, "Ly $(domain.box_size[2])")
-        println(io, "has_vorticity 1")
-    end
-
     # Export a true t=0 snapshot before any advancement of the simulation state.
     println("Saving true t=0 snapshot...")
     u_coeffs = coadjoint_step!(particles, domain)
@@ -1223,57 +1568,24 @@ function main()
     u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
     d_u_phys = Forms.d(u_phys_form)
     ω_h = ★(d_u_phys)
-    Plot.export_form_fields_to_vtk((u_form,), "u_h_0000")
-    Plot.export_form_fields_to_vtk((ω_h,), "w_h_0000")
+    Plot.export_form_fields_to_vtk((u_form,), "u_h_0000"; output_directory_tree=["coflip_output"])
+    Plot.export_form_fields_to_vtk((ω_h,), "w_h_0000"; output_directory_tree=["coflip_output"])
 
-    # Particle columns: x, y, mx, my, |m|
-    u_part = copy(particles.mx)
-    v_part = copy(particles.my)
-    speed_part = sqrt.(u_part.^2 .+ v_part.^2)
-
-    particle_step_file_0 = joinpath(particle_output_dir, "step_0000.txt")
-    writedlm(particle_step_file_0, hcat(particles.x, particles.y, u_part, v_part, speed_part))
-    println("  Saved step 0")
+    # Export particles to VTK
+    particle_step_file_0 = joinpath(particle_output_dir, "particles_0000")
+    export_particles_to_vtk(particles, particle_step_file_0)
+    println("  Saved step 0 particles to VTK")
 
     # Warmup memoized FE evaluation paths on one thread before threaded advection.
     warmup_evaluation_memo!(domain)
 
-    # Warmup run on a copied particle state to reduce first-step compilation noise.
-    println("Running warmup step...")
-    warmup_particles = Particles(
-        copy(particles.x),
-        copy(particles.y),
-        copy(particles.mx),
-        copy(particles.my),
-        copy(particles.volume),
-        copy(particles.can_x),
-        copy(particles.can_y),
-        copy(particles.head),
-        copy(particles.next),
-        copy(particles.elem_ids),
-    )
-    particle_sorter!(warmup_particles, domain)
-    warmup_f = coadjoint_step!(warmup_particles, domain)
-    step_co_flip!(warmup_particles, domain, dt, warmup_f)
-    println("Warmup done. Starting measured steps...")
-
     f_n = copy(u_coeffs)
-
-    reset_every = 200
 
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step*dt, digits=3)))...")
 
         # 3. Advance the CO-FLIP state
         f_n = step_co_flip!(particles, domain, dt, f_n)
-
-        if step % reset_every == 0
-            reset_particle_impulses!(particles, f_n, domain)
-            particle_sorter!(particles, domain)
-            # Recompute f_n from the freshly reset particles
-            f_n = coadjoint_step!(particles, domain)
-            println("  Reset particle impulses at step $step")
-        end
         
         # 4. Visualization
         # Use the carried grid state from Algorithm 2.
@@ -1283,19 +1595,14 @@ function main()
         u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
         d_u_phys = Forms.d(u_phys_form)
         ω_h = ★(d_u_phys)
-        Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_%04d", step))
-        Plot.export_form_fields_to_vtk((ω_h,), @sprintf("w_h_%04d", step))
+        Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_%04d", step); output_directory_tree=["coflip_output"])
+        Plot.export_form_fields_to_vtk((ω_h,), @sprintf("w_h_%04d", step); output_directory_tree=["coflip_output"])
         diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
         print_conservation_diagnostics(step, step * dt, diagnostics)
 
-        # Particle columns: x, y, mx, my, |m|
-        u_part = copy(particles.mx)
-        v_part = copy(particles.my)
-        speed_part = sqrt.(u_part.^2 .+ v_part.^2)
-
-        particle_step_file = joinpath(particle_output_dir, @sprintf("step_%04d.txt", step))
-        writedlm(particle_step_file, hcat(particles.x, particles.y, u_part, v_part, speed_part))
-        println("  Saved $(particle_step_file_0)")
+        # Export particles to VTK
+        particle_step_file = joinpath(particle_output_dir, @sprintf("particles_%04d", step))
+        export_particles_to_vtk(particles, particle_step_file)
 
         println("  Saved step $step visualization and particle data.")
         maybe_clear_memo_tables!(step, clear_memo_every, domain)
