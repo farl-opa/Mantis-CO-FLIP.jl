@@ -281,6 +281,31 @@ function particle_sorter!(p::Particles, d::Domain)
     end
 end
 
+function set_g2p_velocity(
+        p::Particles,
+        pid::Int,
+        px::Float64,
+        py::Float64,
+        eid::Int,
+        x0::Float64,
+        y0::Float64,
+        dx::Float64,
+        dy::Float64,
+        ref_phys_form,
+    )
+    xi = (px - x0) / dx
+    eta = (py - y0) / dy
+    sample_points = Mantis.Points.CartesianPoints(([xi], [eta]))
+    pushfwd_eval, _ = Forms.evaluate_sharp_pushforward(ref_phys_form, eid, sample_points)
+
+    p.x[pid] = px
+    p.y[pid] = py
+    p.mx[pid] = reduce(+, pushfwd_eval[1], dims=2)[1]
+    p.my[pid] = reduce(+, pushfwd_eval[2], dims=2)[1]
+
+    return nothing
+end
+
 function enforce_min_particles_per_element!(
     p::Particles,
     d::Domain,
@@ -360,10 +385,16 @@ function enforce_min_particles_per_element!(
     dx = Lx / nx
     dy = Ly / ny
 
-    cache = EvaluationCache(evaluation_cache_size(d))
     rng = Random.default_rng()
 
     if total_to_add > 0
+        # Match spawned particle velocities to the physical field pipeline:
+        # proxy coefficients -> Hodge-star expression -> L2 projection -> sharp pushforward sample.
+        ref_coeffs_f64 = collect(Float64, ref_grid_coeffs)
+        ref_form = Forms.build_form_field(d.R1, ref_coeffs_f64)
+        ref_phys_expr = ★(ref_form)
+        ref_phys_form = Assemblers.solve_L2_projection(d.R1, ref_phys_expr, d.dΩ)
+
         old_count = length(p.x)
         new_count = old_count + total_to_add
 
@@ -402,12 +433,7 @@ function enforce_min_particles_per_element!(
                     px = qx0 + rand(rng) * qdx
                     py = qy0 + rand(rng) * qdy
 
-                    raw_vel, _ = probe_field_at_point(px, py, ref_grid_coeffs, d, cache)
-
-                    p.x[pid] = px
-                    p.y[pid] = py
-                    p.mx[pid] = -raw_vel[2]
-                    p.my[pid] = raw_vel[1]
+                    set_g2p_velocity(p, pid, px, py, eid, x0, y0, dx, dy, ref_phys_form)
                     pid += 1
                 end
             end
@@ -590,38 +616,31 @@ end
 # 5. Convecting Vortex (Periodic Advection Test)
 # ------------------------------------------------------------------------------
 function flow_convecting_vortex(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
-    # 1. Background Convection Velocity (moves the flow bottom to top)
-    U_bg = 0.0
-    V_bg = 2.0  # Adjust this to change how fast it travels upwards
+    # --- Parameters ---
+    U0 = 1.0              # background convection velocity
+    Γ  = 5.0              # vortex strength
+    σ  = 0.1 * min(Lx, Ly)  # vortex core size
 
-    # 2. Initial Vortex Center (Start in the lower half to watch it rise)
-    cx = Lx / 2.0
-    cy = Ly / 4.0 
-    
-    # 3. Vortex Parameters
-    Gamma = 2.0                # Circulation strength
-    r_core = min(Lx, Ly) / 8.0  # Radius where max velocity occurs
-    
-    dx = x - cx
-    dy = y - cy
+    # Vortex center (middle of domain)
+    x0 = 0.5 * Lx
+    y0 = 0.5 * Ly
+
+    # --- Relative coordinates ---
+    dx = x - x0
+    dy = y - y0
     r2 = dx^2 + dy^2
-    r  = sqrt(r2)
-    
-    # Avoid singularity at center
-    if r < 1e-8
-        return U_bg, V_bg
-    end
 
-    # 4. Tangential velocity using a sharp exponential decay
-    # This ensures velocity perturbations are ~0 at the boundaries
-    v_theta = (Gamma / (2 * π * r)) * (1.0 - exp(-r2 / (r_core^2)))
-    
-    # 5. Convert polar to Cartesian and superimpose background flow
-    # u_total = u_bg + u_vortex
-    # v_total = v_bg + v_vortex
-    u = U_bg - v_theta * (dy / r)
-    v = V_bg + v_theta * (dx / r)
-    
+    # --- Gaussian vortex (smooth, no singularity) ---
+    factor = (Γ / (2π)) * exp(-r2 / σ^2)
+
+    u_vortex = -factor * dy / σ^2
+    v_vortex =  factor * dx / σ^2
+
+    # Periodic advection benchmark: do not damp near boundaries.
+    # A boundary envelope artificially weakens the vortex as it approaches x=0/Lx or y=0/Ly.
+    u = u_vortex + U0
+    v = v_vortex
+
     return u, v
 end
 
@@ -863,6 +882,36 @@ function warmup_evaluation_memo!(d::Domain)
     return nothing
 end
 
+function export_particles_to_vtk(particles::Particles, output_path::String)
+    n_particles = length(particles.x)
+    
+    # Create 3D points (add z=0 for 2D particles)
+    points = zeros(3, n_particles)
+    points[1, :] .= particles.x
+    points[2, :] .= particles.y
+    # points[3, :] stays zero (2D in xy-plane)
+    
+    # Create cells: each particle is a single-point cell (VTK_VERTEX)
+    cells = [MeshCell(VTKCellTypes.VTK_VERTEX, vec([i])) for i in 1:n_particles]
+    
+    # Create VTK grid
+    vtkfile = vtk_grid(output_path, points, cells)
+    
+    # Add point data: impulse components and speed
+    u_part = copy(particles.mx)
+    v_part = copy(particles.my)
+    speed_part = sqrt.(u_part.^2 .+ v_part.^2)
+    
+    vtkfile["mx", VTKPointData()] = u_part
+    vtkfile["my", VTKPointData()] = v_part
+    vtkfile["speed", VTKPointData()] = speed_part
+    vtkfile["volume", VTKPointData()] = particles.volume
+    
+    # Write the file
+    outfiles = vtk_save(vtkfile)
+    return outfiles
+end
+
 # ==============================================================================
 #                            GRID OPERATIONS & SOLVERS
 # ==============================================================================
@@ -942,35 +991,51 @@ end
 #                        PHYSICS & ENERGY CORRECTION
 # ==============================================================================
 
-function compute_metric_inner_product(u::AbstractVector{Tu}, v::AbstractVector{Tv}, B::AbstractMatrix{Tb}) where {Tu<:Real, Tv<:Real, Tb<:Real}
-    # Computes <u, v>_B = u' * B' * B * v
-    p_u = B * u
-    p_v = B * v
-    return dot(p_u, p_v)
-end
+function apply_energy_correction!(
+    f_next::AbstractVector{Tn},
+    f_original::AbstractVector{To},
+    f_from_particles::AbstractVector{Tp},
+    f_midpoint::AbstractVector{Tm};
+    star_apply::Function,
+    tol::Float64=1e-9,
+    project_non_orthogonal::Bool=true,
+) where {Tn<:Real, To<:Real, Tp<:Real, Tm<:Real}
+    # C++ analogue (advectCOFLIPHelper):
+    # fluxes_diff = fluxes_from_particles - fluxes_original
+    # if no forcing/viscosity: project out component parallel to midpoint flow
+    # fluxes = fluxes_original + corrected_fluxes_diff
+    fluxes_diff = f_from_particles .- f_original
 
-function apply_energy_correction!(f_next::AbstractVector{Tn}, f_curr::AbstractVector{Tc}, f_target::AbstractVector{Tt}, f_tilde_star::AbstractVector{Ts}, B::AbstractMatrix{Tb}) where {Tn<:Real, Tc<:Real, Tt<:Real, Ts<:Real, Tb<:Real}
-    # Eq. (21c): delta_f = F(y(n+1)) - f(n)
-    delta_f = f_target .- f_curr
-    
-    # Denominator: |f_tilde_star|^2_B
-    norm_sq = compute_metric_inner_product(f_tilde_star, f_tilde_star, B)
-    
-    if norm_sq < 1e-10
-        @. f_next = f_target
-        return
+    if project_non_orthogonal
+        circulations_original = star_apply(f_midpoint)
+        original_energy = dot(f_midpoint, circulations_original)
+        if sqrt(abs(original_energy)) > tol
+            projected_fluxes_diff = dot(fluxes_diff, circulations_original)
+            @. fluxes_diff = fluxes_diff - projected_fluxes_diff * (f_midpoint / original_energy)
+        end
     end
-    
-    # Numerator: <f_tilde_star, delta_f>_B
-    projection_overlap = compute_metric_inner_product(f_tilde_star, delta_f, B)
-    scalar = projection_overlap / norm_sq
-    scalar = clamp(scalar, -2.0, 2.0)
-    
-    # f(n+1) = f(n) + P_{f_tilde_star^perp}(delta_f)
-    @. f_next = f_curr + (delta_f - scalar * f_tilde_star)
+
+    @. f_next = f_original + fluxes_diff
+    return nothing
 end
 
-function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain, thread_caches::Vector{EvaluationCache}) where {T<:Real}
+@inline function compute_pressure_delta(
+    f_projected::AbstractVector{Tp},
+    f_pre_projection::AbstractVector{Tq},
+) where {Tp<:Real, Tq<:Real}
+    return f_projected .- f_pre_projection
+end
+
+function apply_pressure_correction!(
+    p::Particles,
+    f_projected::AbstractVector{Tp},
+    f_pre_projection::AbstractVector{Tq},
+    d::Domain,
+    thread_caches::Vector{EvaluationCache};
+    delta_scale::Float64=1.0,
+) where {Tp<:Real, Tq<:Real}
+    tau_coeffs = compute_pressure_delta(f_projected, f_pre_projection)
+
     n_thread_slots = Threads.maxthreadid()
     if length(thread_caches) < n_thread_slots
         throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
@@ -979,21 +1044,35 @@ function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T},
     Threads.@threads for i in 1:length(p.x)
         tid = Threads.threadid()
         cache = thread_caches[tid]
-        
+
         val, _ = probe_field_at_point(p.x[i], p.y[i], tau_coeffs, d, cache)
-        
-        # probe_field_at_point returns rotated proxy components [v, -u].
-        # Convert back so impulses receive +tau in physical (mx,my) coordinates.
-        p.my[i] += val[1]
-        p.mx[i] -= val[2]
+
+        # Proxy components are [v, -u]; convert back to physical impulse increment.
+        p.my[i] += delta_scale * val[1]
+        p.mx[i] -= delta_scale * val[2]
     end
+
+    return tau_coeffs
 end
 
-function apply_pressure_correction!(p::Particles, tau_coeffs::AbstractVector{T}, d::Domain) where {T<:Real}
+function apply_pressure_correction!(
+    p::Particles,
+    f_projected::AbstractVector{Tp},
+    f_pre_projection::AbstractVector{Tq},
+    d::Domain;
+    delta_scale::Float64=1.0,
+) where {Tp<:Real, Tq<:Real}
     n_thread_slots = Threads.maxthreadid()
     cache_size = evaluation_cache_size(d)
     thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
-    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
+    return apply_pressure_correction!(
+        p,
+        f_projected,
+        f_pre_projection,
+        d,
+        thread_caches;
+        delta_scale=delta_scale,
+    )
 end
 
 function integrate_form_expression(expr, dom::Domain)
@@ -1003,40 +1082,6 @@ function integrate_form_expression(expr, dom::Domain)
     end
 
     return total
-end
-
-function export_particles_to_vtk(particles::Particles, output_path::String)
-    """
-    Export particles as an unstructured grid to VTK format.
-    Creates a VTK file with particle positions and impulse/speed data.
-    """
-    n_particles = length(particles.x)
-    
-    # Create 3D points (add z=0 for 2D particles)
-    points = zeros(3, n_particles)
-    points[1, :] .= particles.x
-    points[2, :] .= particles.y
-    # points[3, :] stays zero (2D in xy-plane)
-    
-    # Create cells: each particle is a single-point cell (VTK_VERTEX)
-    cells = [MeshCell(VTKCellTypes.VTK_VERTEX, vec([i])) for i in 1:n_particles]
-    
-    # Create VTK grid
-    vtkfile = vtk_grid(output_path, points, cells)
-    
-    # Add point data: impulse components and speed
-    u_part = copy(particles.mx)
-    v_part = copy(particles.my)
-    speed_part = sqrt.(u_part.^2 .+ v_part.^2)
-    
-    vtkfile["mx", VTKPointData()] = u_part
-    vtkfile["my", VTKPointData()] = v_part
-    vtkfile["speed", VTKPointData()] = speed_part
-    vtkfile["volume", VTKPointData()] = particles.volume
-    
-    # Write the file
-    outfiles = vtk_save(vtkfile)
-    return outfiles
 end
 
 function compute_conservation_diagnostics(u_coeffs::AbstractVector{T}, dom::Domain) where {T<:Real}
@@ -1068,35 +1113,140 @@ end
 #                          TIME INTEGRATION & STEPPING
 # ==============================================================================
 
-function ode_rhs(state::SVector{4,Tstate}, u_coeffs::AbstractVector{Tcoeff}, d::Domain, cache::EvaluationCache) where {Tstate<:Real, Tcoeff<:Real}
-    Tout = promote_type(Tstate, probe_output_eltype(Tcoeff))
-    x, y, mx, my = state
-    
-    # Probe Flux field (swapped components)
+@inline function apply_position_policy(x::T, y::T, Lx::T, Ly::T, mode::Symbol, tol::T) where {T<:AbstractFloat}
+    if mode === :periodic
+        return mod(x, Lx), mod(y, Ly)
+    elseif mode === :clamp
+        return clamp(x, tol, Lx - tol), clamp(y, tol, Ly - tol)
+    else
+        throw(ArgumentError("Unknown position mode: $mode. Use :periodic or :clamp"))
+    end
+end
+
+@inline function physical_velocity_and_jacobian(
+    x::T,
+    y::T,
+    u_coeffs::AbstractVector{U},
+    d::Domain,
+    cache::EvaluationCache,
+) where {T<:AbstractFloat, U<:Real}
     raw_vel, raw_grad = probe_field_at_point(x, y, u_coeffs, d, cache)
-    
-    # Un-swap to get Physical Velocity
+
+    # Convert proxy ordering [v, -u] back to physical [u, v] and ∇v.
     u = -raw_vel[2]
-    v =  raw_vel[1]
-    
-    # Un-swap Gradients
-    ux = -raw_grad[2,1]
-    vx =  raw_grad[1,1]
-    uy = -raw_grad[2,2]
-    vy =  raw_grad[1,2]
-    
-    # Advect Position
-    dx_dt = u
-    dy_dt = v
-    
-    # Advect Impulse (Covector Advection): d/dt(m) = - (∇v)ᵀ m
-    dmx_dt = -(ux * mx + vx * my)
-    dmy_dt = -(uy * mx + vy * my)
-    
-    return SVector{4, Tout}(dx_dt, dy_dt, dmx_dt, dmy_dt)
+    v = raw_vel[1]
+
+    ux = -raw_grad[2, 1]
+    uy = -raw_grad[2, 2]
+    vx = raw_grad[1, 1]
+    vy = raw_grad[1, 2]
+
+    vel = SVector{2, T}(u, v)
+    jac = SMatrix{2, 2, T, 4}(ux, vx, uy, vy)
+    return vel, jac
 end
 
-function advect_particles_rk2!(
+function clamp_pullback(
+    pullback::SMatrix{2, 2, T, 4};
+    tol::T,
+    max_iter::Int,
+) where {T<:AbstractFloat}
+    prev_mu = zero(T)
+    used_mu = zero(T)
+
+    pullback_transpose_inverse = try
+        inv(transpose(pullback))
+    catch
+        return pullback
+    end
+
+    mixed_trace = try
+        tr(inv(transpose(pullback) * pullback))
+    catch
+        return pullback
+    end
+
+    if !isfinite(mixed_trace) || abs(mixed_trace) <= eps(T)
+        return pullback
+    end
+
+    output_pullback = pullback + used_mu * pullback_transpose_inverse
+    mixed_det = det(output_pullback)
+
+    iter = 0
+    while abs(mixed_det - one(T)) > tol && iter < max_iter
+        used_mu = prev_mu + ((one(T) / mixed_det) - one(T)) / mixed_trace
+        if !isfinite(used_mu)
+            break
+        end
+        output_pullback = pullback + used_mu * pullback_transpose_inverse
+        prev_mu = used_mu
+        mixed_det = det(output_pullback)
+        iter += 1
+    end
+
+    if mixed_det > zero(T)
+        output_pullback /= sqrt(mixed_det)
+    end
+
+    return output_pullback
+end
+
+@inline function pullback_rk4_step(
+    pos::SVector{2, T},
+    input_pullback::SMatrix{2, 2, T, 4},
+    dt::T,
+    u_coeffs::AbstractVector{U},
+    d::Domain,
+    cache::EvaluationCache;
+    mode::Symbol,
+    pos_tol::T,
+    pullback_tol::T,
+    pullback_max_iter::Int,
+) where {T<:AbstractFloat, U<:Real}
+    Lx, Ly = d.box_size
+    c1 = dt / 6
+    c2 = dt / 3
+    c3 = dt / 3
+    c4 = dt / 6
+
+    v1, J1 = physical_velocity_and_jacobian(pos[1], pos[2], u_coeffs, d, cache)
+    Pdot1 = -(transpose(J1) * input_pullback)
+
+    midp1_raw = pos + (dt * 0.5) * v1
+    mx, my = apply_position_policy(midp1_raw[1], midp1_raw[2], Lx, Ly, mode, pos_tol)
+    midp1 = SVector{2, T}(mx, my)
+    midP1 = input_pullback + (dt * 0.5) * Pdot1
+
+    v2, J2 = physical_velocity_and_jacobian(midp1[1], midp1[2], u_coeffs, d, cache)
+    Pdot2 = -(transpose(J2) * midP1)
+
+    midp2_raw = pos + (dt * 0.5) * v2
+    mx, my = apply_position_policy(midp2_raw[1], midp2_raw[2], Lx, Ly, mode, pos_tol)
+    midp2 = SVector{2, T}(mx, my)
+    midP2 = input_pullback + (dt * 0.5) * Pdot2
+
+    v3, J3 = physical_velocity_and_jacobian(midp2[1], midp2[2], u_coeffs, d, cache)
+    Pdot3 = -(transpose(J3) * midP2)
+
+    midp3_raw = pos + dt * v3
+    mx, my = apply_position_policy(midp3_raw[1], midp3_raw[2], Lx, Ly, mode, pos_tol)
+    midp3 = SVector{2, T}(mx, my)
+    midP3 = input_pullback + dt * Pdot3
+
+    v4, J4 = physical_velocity_and_jacobian(midp3[1], midp3[2], u_coeffs, d, cache)
+    Pdot4 = -(transpose(J4) * midP3)
+
+    pullback = input_pullback + c1 * Pdot1 + c2 * Pdot2 + c3 * Pdot3 + c4 * Pdot4
+    pullback = clamp_pullback(pullback; tol=pullback_tol, max_iter=pullback_max_iter)
+
+    pos_raw = pos + c1 * v1 + c2 * v2 + c3 * v3 + c4 * v4
+    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, mode, pos_tol)
+
+    return SVector{2, T}(px, py), pullback
+end
+
+function advect_particles_pullback_rk4!(
     p::Particles,
     x0::AbstractVector{T}, y0::AbstractVector{T},
     mx0::AbstractVector{T}, my0::AbstractVector{T},
@@ -1104,12 +1254,15 @@ function advect_particles_rk2!(
     d::Domain, dt::T,
     x_out::AbstractVector{T}, y_out::AbstractVector{T},
     mx_out::AbstractVector{T}, my_out::AbstractVector{T},
-    thread_caches::Vector{EvaluationCache},
+    thread_caches::Vector{EvaluationCache};
+    position_mode::Symbol=:periodic,
+    position_tol::T=T(1e-12),
+    pullback_tol::T=T(1e-9),
+    pullback_max_iter::Int=200,
 ) where {T<:AbstractFloat, U<:Real}
-
-    num_p             = length(x0)
-    Lx, Ly            = d.box_size
-    n_thread_slots    = Threads.maxthreadid()
+    num_p = length(x0)
+    Lx, Ly = d.box_size
+    n_thread_slots = Threads.maxthreadid()
     max_err_per_thread = fill(zero(T), n_thread_slots)
 
     if length(thread_caches) < n_thread_slots
@@ -1121,40 +1274,49 @@ function advect_particles_rk2!(
         return zero(T)
     end
 
-    # Split particle indices into fixed worker chunks. Each worker owns one
-    # cache slot, so this remains race-free without requiring :static or threadid().
     Threads.@threads for worker in 1:n_workers
         cache = thread_caches[worker]
         i_start = ((worker - 1) * num_p) ÷ n_workers + 1
-        i_end   = (worker * num_p) ÷ n_workers
+        i_end = (worker * num_p) ÷ n_workers
         local_max_err = zero(T)
 
         for i in i_start:i_end
-            state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
+            sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_mode, position_tol)
+            pos = SVector{2, T}(sx, sy)
+            input_pullback = SMatrix{2, 2, T, 4}(one(T), zero(T), zero(T), one(T))
 
-            # RK2 midpoint method
-            k1             = ode_rhs(state,                    u_coeffs, d, cache)
-            k2             = ode_rhs(state + 0.5 * dt * k1,   u_coeffs, d, cache)
-            new_state      = state + dt * k2
+            pos_new, pullback = pullback_rk4_step(
+                pos,
+                input_pullback,
+                dt,
+                u_coeffs,
+                d,
+                cache;
+                mode=position_mode,
+                pos_tol=position_tol,
+                pullback_tol=pullback_tol,
+                pullback_max_iter=pullback_max_iter,
+            )
 
-            # Periodic error (accounts for domain wrap-around)
-            nx_raw, ny_raw = new_state[1], new_state[2]
-            ox, oy         = x_out[i], y_out[i]
+            m_old = SVector{2, T}(mx0[i], my0[i])
+            m_new = pullback * m_old
 
-            ex = abs(nx_raw - ox)
-            ey = abs(ny_raw - oy)
-            if ex > 0.5 * Lx; ex = Lx - ex; end
-            if ey > 0.5 * Ly; ey = Ly - ey; end
-
+            ox, oy = x_out[i], y_out[i]
+            ex = abs(pos_new[1] - ox)
+            ey = abs(pos_new[2] - oy)
+            if position_mode === :periodic
+                if ex > 0.5 * Lx; ex = Lx - ex; end
+                if ey > 0.5 * Ly; ey = Ly - ey; end
+            end
             local_err = max(ex, ey)
             if local_err > local_max_err
                 local_max_err = local_err
             end
 
-            x_out[i]  = mod(nx_raw, Lx)
-            y_out[i]  = mod(ny_raw, Ly)
-            mx_out[i] = new_state[3]
-            my_out[i] = new_state[4]
+            x_out[i] = pos_new[1]
+            y_out[i] = pos_new[2]
+            mx_out[i] = m_new[1]
+            my_out[i] = m_new[2]
         end
 
         max_err_per_thread[worker] = local_max_err
@@ -1163,108 +1325,23 @@ function advect_particles_rk2!(
     return maximum(@view max_err_per_thread[1:n_workers])
 end
 
-# Convenience overload: allocates thread caches internally.
-# Use only when you don't already have caches from the outer step.
-function advect_particles_rk2!(
+function advect_particles_pullback_rk4!(
     p::Particles,
     x0::AbstractVector{T}, y0::AbstractVector{T},
     mx0::AbstractVector{T}, my0::AbstractVector{T},
     u_coeffs::AbstractVector{U},
     d::Domain, dt::T,
     x_out::AbstractVector{T}, y_out::AbstractVector{T},
-    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+    mx_out::AbstractVector{T}, my_out::AbstractVector{T};
+    kwargs...
 ) where {T<:AbstractFloat, U<:Real}
     n_thread_slots = Threads.maxthreadid()
     thread_caches = [EvaluationCache(evaluation_cache_size(d)) for _ in 1:n_thread_slots]
-    return advect_particles_rk2!(
+    return advect_particles_pullback_rk4!(
         p, x0, y0, mx0, my0, u_coeffs, d, dt,
         x_out, y_out, mx_out, my_out,
-        thread_caches,
-    )
-end
-
-function advect_particles_rk4!(
-    p::Particles,
-    x0::AbstractVector{T}, y0::AbstractVector{T},
-    mx0::AbstractVector{T}, my0::AbstractVector{T},
-    u_coeffs::AbstractVector{U},
-    d::Domain, dt::T,
-    x_out::AbstractVector{T}, y_out::AbstractVector{T},
-    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
-    thread_caches::Vector{EvaluationCache},
-) where {T<:AbstractFloat, U<:Real}
-
-    num_p             = length(x0)
-    Lx, Ly            = d.box_size
-    n_thread_slots    = Threads.maxthreadid()
-    max_err_per_thread = fill(zero(T), n_thread_slots)
-
-    if length(thread_caches) < n_thread_slots
-        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
-    end
-
-    n_workers = min(num_p, n_thread_slots)
-    if n_workers == 0
-        return zero(T)
-    end
-
-    Threads.@threads for worker in 1:n_workers
-        cache = thread_caches[worker]
-        i_start = ((worker - 1) * num_p) ÷ n_workers + 1
-        i_end   = (worker * num_p) ÷ n_workers
-        local_max_err = zero(T)
-
-        for i in i_start:i_end
-            state = SVector{4}(x0[i], y0[i], mx0[i], my0[i])
-
-            # Classical RK4
-            k1        = ode_rhs(state,                   u_coeffs, d, cache)
-            k2        = ode_rhs(state + 0.5 * dt * k1,  u_coeffs, d, cache)
-            k3        = ode_rhs(state + 0.5 * dt * k2,  u_coeffs, d, cache)
-            k4        = ode_rhs(state +        dt * k3, u_coeffs, d, cache)
-            new_state = state + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
-
-            # Periodic error
-            nx_raw, ny_raw = new_state[1], new_state[2]
-            ox, oy         = x_out[i], y_out[i]
-
-            ex = abs(nx_raw - ox)
-            ey = abs(ny_raw - oy)
-            if ex > 0.5 * Lx; ex = Lx - ex; end
-            if ey > 0.5 * Ly; ey = Ly - ey; end
-
-            local_err = max(ex, ey)
-            if local_err > local_max_err
-                local_max_err = local_err
-            end
-
-            x_out[i]  = mod(nx_raw, Lx)
-            y_out[i]  = mod(ny_raw, Ly)
-            mx_out[i] = new_state[3]
-            my_out[i] = new_state[4]
-        end
-
-        max_err_per_thread[worker] = local_max_err
-    end
-
-    return maximum(@view max_err_per_thread[1:n_workers])
-end
-
-function advect_particles_rk4!(
-    p::Particles,
-    x0::AbstractVector{T}, y0::AbstractVector{T},
-    mx0::AbstractVector{T}, my0::AbstractVector{T},
-    u_coeffs::AbstractVector{U},
-    d::Domain, dt::T,
-    x_out::AbstractVector{T}, y_out::AbstractVector{T},
-    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
-) where {T<:AbstractFloat, U<:Real}
-    n_thread_slots = Threads.maxthreadid()
-    thread_caches = [EvaluationCache(evaluation_cache_size(d)) for _ in 1:n_thread_slots]
-    return advect_particles_rk4!(
-        p, x0, y0, mx0, my0, u_coeffs, d, dt,
-        x_out, y_out, mx_out, my_out,
-        thread_caches,
+        thread_caches;
+        kwargs...
     )
 end
 
@@ -1311,6 +1388,7 @@ function step_co_flip!(
     cache_size = evaluation_cache_size(d)
     thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
 
+    
     t0 = time()
     added_start, removed_start = enforce_min_particles_per_element!(
         p,
@@ -1324,6 +1402,8 @@ function step_co_flip!(
     if added_start > 0 || removed_start > 0
         println("  Particle rebalance before solve: +$added_start / -$removed_start")
     end
+    println("  Initial seeding time: $(round(t_seed_start_ms, digits=2)) s")
+    
 
     x_n  = copy(p.x)
     y_n  = copy(p.y)
@@ -1352,7 +1432,7 @@ function step_co_flip!(
         # 1. Advect particles from (x_n, mx_n) using current midpoint f_star
         # ------------------------------------------------------------------
         t0  = time()
-        err = advect_particles_rk2!(
+        err = advect_particles_pullback_rk4!(
             p,
             x_n, y_n, mx_n, my_n,
             f_star, d, dt,
@@ -1366,7 +1446,7 @@ function step_co_flip!(
         # ------------------------------------------------------------------
         t0 = time()
         p.x, p.y   = x_np1, y_np1
-        p.mx, p.my = mx_np1, my_np1
+        # p.mx, p.my = mx_np1, my_np1       FIGURE OUT WHY THIS BREAKS THE CODE IF UNCOMMENTED
         particle_sorter!(p, d)
         t_sort_ms = time() - t0
 
@@ -1382,21 +1462,29 @@ function step_co_flip!(
         t_solve_raw_ms = time() - t0
 
         # ------------------------------------------------------------------
-        # 4. Pressure projection → divergence-free F(y(n+1))
+        # 4. Energy correction (C++ order: before pressure projection)
         # ------------------------------------------------------------------
-        t0              = time()
-        f_np1_raw_h     = Forms.build_form_field(d.R1, f_np1_raw)
-        f_np1_proj, _   = project_and_get_pressure(d, f_np1_raw_h)
-        t_project_ms    = time() - t0
+        t0 = time()
+        star_apply = v -> (transpose(B_np1) * (B_np1 * v))
+        apply_energy_correction!(
+            f_np1,
+            f_n,
+            f_np1_raw,
+            f_star;
+            star_apply=star_apply,
+            tol=1e-9,
+            project_non_orthogonal=true,
+        )
+        t_energy_ms = time() - t0
 
         # ------------------------------------------------------------------
-        # 5. Energy correction
+        # 5. Pressure projection → divergence-free field
         # ------------------------------------------------------------------
-        t0            = time()
-        f_tilde_star  = 0.5 .* (f_n .+ f_np1_proj)
-        apply_energy_correction!(f_np1, f_n, f_np1_proj, f_tilde_star, B_np1)
-        @. f_star = 0.5 * (f_n + f_np1)
-        t_energy_ms = time() - t0
+        t0              = time()
+        f_np1_h         = Forms.build_form_field(d.R1, f_np1)
+        f_np1_proj, _   = project_and_get_pressure(d, f_np1_h)
+        @. f_star = 0.5 * (f_n + f_np1_proj)
+        t_project_ms    = time() - t0
 
         t_iter_ms = time() - iter_t0
         println("  Iter $iter: Pos Change = $err")
@@ -1419,8 +1507,14 @@ function step_co_flip!(
     # 6. Pressure feedback to particle impulses
     # ----------------------------------------------------------------------
     t0          = time()
-    tau_coeffs  = f_np1 .- f_np1_raw
-    apply_pressure_correction!(p, tau_coeffs, d, thread_caches)
+    tau_coeffs  = apply_pressure_correction!(
+        p,
+        f_np1_proj,
+        f_np1,
+        d,
+        thread_caches;
+        delta_scale=1.0,
+    )
     t_pressure_ms = time() - t0
 
     # ----------------------------------------------------------------------
@@ -1430,6 +1524,7 @@ function step_co_flip!(
     particle_sorter!(p, d)
     t_final_sort_ms = time() - t0
 
+    
     t0 = time()
     added_end, removed_end = enforce_min_particles_per_element!(
         p,
@@ -1437,25 +1532,25 @@ function step_co_flip!(
         min_particles_per_element,
         max_particles_per_element,
         min_particles_per_quarter,
-        f_np1,
+        f_np1_proj,
     )
     t_seed_end_ms = time() - t0
     if added_end > 0 || removed_end > 0
         println("  Particle rebalance after solve: +$added_end / -$removed_end")
     end
+    
 
     t_total_ms  = time() - step_t0
 
     println(
         "  Post Timings [s]: " *
-        "seed_start=$(round(t_seed_start_ms, digits=2)), " *
         "pressure_feedback=$(round(t_pressure_ms,  digits=2)), " *
         "final_sort=$(round(t_final_sort_ms,        digits=2)), " *
-        "seed_end=$(round(t_seed_end_ms,          digits=2)), " *
+        "final_rebalance=$(round(t_seed_end_ms,      digits=2)), " *
         "step_total=$(round(t_total_ms,             digits=2))",
     )
 
-    return f_np1
+    return f_np1_proj
 end
 
 function maybe_clear_memo_tables!(step::Int, clear_every::Int, d::Domain)
@@ -1512,7 +1607,7 @@ function main()
     domain = GenerateDomain(nel, p, k)
         
     # 2. Generate and Sort Particles
-    particles = generate_particles(num_particles, domain, :tg)
+    particles = generate_particles(num_particles, domain, :convecting)
     particle_sorter!(particles, domain)
 
     println("Initializing Visualization Grid...")
@@ -1563,9 +1658,37 @@ function main()
     # Export a true t=0 snapshot before any advancement of the simulation state.
     println("Saving true t=0 snapshot...")
     u_coeffs = coadjoint_step!(particles, domain)
+    
     u_form = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
     u_phys_expr = ★(u_form)
     u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+
+    # Ensure particles start the first step with divergence-free velocities from coadjoint_step!.
+    particle_sorter!(particles, domain)
+    nx, ny = domain.nel
+    Lx, Ly = domain.box_size
+    dx = Lx / nx
+    dy = Ly / ny
+    @inbounds for pid in eachindex(particles.x)
+        eid = particles.elem_ids[pid]
+        ej = ((eid - 1) ÷ nx) + 1
+        ei = eid - (ej - 1) * nx
+        x0 = (ei - 1) * dx
+        y0 = (ej - 1) * dy
+        set_g2p_velocity(
+            particles,
+            pid,
+            particles.x[pid],
+            particles.y[pid],
+            eid,
+            x0,
+            y0,
+            dx,
+            dy,
+            u_phys_form,
+        )
+    end
+
     d_u_phys = Forms.d(u_phys_form)
     ω_h = ★(d_u_phys)
     Plot.export_form_fields_to_vtk((u_form,), "u_h_0000"; output_directory_tree=["coflip_output"])
@@ -1579,20 +1702,16 @@ function main()
     # Warmup memoized FE evaluation paths on one thread before threaded advection.
     warmup_evaluation_memo!(domain)
 
-    f_n = copy(u_coeffs)
-
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step*dt, digits=3)))...")
 
-        # 3. Advance the CO-FLIP state
-        f_n = step_co_flip!(particles, domain, dt, f_n)
-        
-        # 4. Visualization
-        # Use the carried grid state from Algorithm 2.
-        u_coeffs = f_n
+        # Advance the CO-FLIP state
+        u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs)
         u_form = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
         u_phys_expr = ★(u_form)
         u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+
+        # Visualization
         d_u_phys = Forms.d(u_phys_form)
         ω_h = ★(d_u_phys)
         Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_%04d", step); output_directory_tree=["coflip_output"])
@@ -1637,6 +1756,8 @@ function plot_flow()
         xlims = (0, Lx), ylims = (0, Ly)
     )
 end
+
+
 
 
 main()
