@@ -32,7 +32,7 @@ int main(int argc, char** argv)
         std::cout << "Please specify correct parameters!" << std::endl;
         std::cout << "inputs: [Method] [Experiment]" << std::endl;
         std::cout << "Valid method numbers are [0-4] for 0: POLYPIC, 1: POLYFLIP, 2: R_POLYFLIP, 3: CF_POLYFLIP, 4: CO_FLIP" << std::endl;
-        std::cout << "Valid experiment numbers are [0-3] for 0: Vortex leapfrogging marathon, 1: Rayleigh-Taylor Instability, 2: Smoke Plume, 3: Vortex sheet" << std::endl;
+        std::cout << "Valid experiment numbers are [0-4] for 0: Vortex leapfrogging marathon, 1: Rayleigh-Taylor Instability, 2: Smoke Plume, 3: Vortex sheet, 4: Convecting vortex periodic box" << std::endl;
         exit(0);
     }
     sim_name = atoi(argv[1]);
@@ -42,15 +42,15 @@ int main(int argc, char** argv)
         std::cout << "Please enter valid method number!" << std::endl;
         std::cout << "inputs: [Method] [Experiment]" << std::endl;
         std::cout << "Valid method numbers are [0-4] for 0: POLYPIC, 1: POLYFLIP, 2: R_POLYFLIP, 3: CF_POLYFLIP, 4: CO_FLIP" << std::endl;
-        std::cout << "Valid experiment numbers are [0-3] for 0: Vortex leapfrogging marathon, 1: Rayleigh-Taylor Instability, 2: Smoke Plume, 3: Vortex sheet" << std::endl;
+        std::cout << "Valid experiment numbers are [0-4] for 0: Vortex leapfrogging marathon, 1: Rayleigh-Taylor Instability, 2: Smoke Plume, 3: Vortex sheet, 4: Convecting vortex periodic box" << std::endl;
         exit(0);
     }
-    if (experiment_name > 3 || experiment_name < 0)
+    if (experiment_name > 4 || experiment_name < 0)
     {
         std::cout << "Please enter valid experiment number!" << std::endl;
         std::cout << "inputs: [Method] [Experiment]" << std::endl;
         std::cout << "Valid method numbers are [0-4] for 0: POLYPIC, 1: POLYFLIP, 2: R_POLYFLIP, 3: CF_POLYFLIP, 4: CO_FLIP" << std::endl;
-        std::cout << "Valid experiment numbers are [0-3] for 0: Vortex leapfrogging marathon, 1: Rayleigh-Taylor Instability, 2: Smoke Plume, 3: Vortex sheet" << std::endl;
+        std::cout << "Valid experiment numbers are [0-4] for 0: Vortex leapfrogging marathon, 1: Rayleigh-Taylor Instability, 2: Smoke Plume, 3: Vortex sheet, 4: Convecting vortex periodic box" << std::endl;
         exit(0);
     }
     sim_scheme = static_cast<Scheme>(sim_name);
@@ -298,6 +298,78 @@ int main(int argc, char** argv)
                 }
             }
 
+        }
+        break;
+        // 2D Convecting vortex in a periodic unit box (Julia parity setup)
+        case 4:
+        {
+            std::cout << GREEN << "Start running 2D Convecting vortex periodic-box experiment!!!" << RESET << std::endl;
+            nx = 64;
+            ny = 64;
+            double target_cfl = 0.5;
+            L = 1.0;
+            N = 20;
+            double T_final = 1.0;
+            smoke_rise = 0.0;
+            smoke_drop = 0.0;
+            viscosity = 0.0;
+            PURE_NEUMANN = true;
+            bool use_pressure_solver = false;
+            TimeIntegration timeIntOrder = TimeIntegration::RK2;
+            delayed_reinit_frequency = 20;
+
+            std::string filepath = base_path + "/2D_convecting_vortex_periodic_res64" + "/" + enumToString(sim_scheme) + "/";
+            std::string filename = enumToString(sim_scheme) + "_convecting_vortex_";
+
+            COFLIPSolver2D smokeSimulator(nx, ny, L, N, PURE_NEUMANN, sim_scheme);
+            smokeSimulator.use_pressure_solver = use_pressure_solver;
+            smokeSimulator.timeIntOrder = timeIntOrder;
+            smokeSimulator.substep = 1.0;
+            smokeSimulator.adaptive_reset_cutoff = 3;
+            smokeSimulator.do_uniform_particle_seeding = true;
+            smokeSimulator.precond_reset_frequency = 1;
+            smokeSimulator.do_particle_sample_after_first = false;
+            smokeSimulator.viscosity = viscosity;
+            smokeSimulator.do_implicit = true;
+            smokeSimulator.min_PPC_count = 10;
+            smokeSimulator.setSmoke(smoke_rise, smoke_drop);
+            smokeSimulator.setBoundaryMask();
+            smokeSimulator.buildMultiGridWithVort();
+            if (sim_scheme != Scheme::CO_FLIP || use_pressure_solver) {
+                smokeSimulator.buildMultiGrid(PURE_NEUMANN);
+                smokeSimulator.projection_repeat_count = 2;
+            }
+
+            // Julia flow_convecting_vortex parameters.
+            const double U0 = 1.0;
+            const double Gamma = 5.0;
+            const double sigma = 0.1 * L;
+            const Vec2d center = Vec2d(0.5 * L, 0.5 * L);
+            smokeSimulator.setInitVelocityConvectingVortex(U0, Gamma, sigma, center);
+            smokeSimulator.pressureProjectVelField();
+
+            smokeSimulator.seedParticles(N, true);
+            smokeSimulator.sampleParticlesFromGrid();
+
+            smokeSimulator.getCFL();
+            double dt_cfl = target_cfl * smokeSimulator._cfl;
+            int n_steps = std::max(1, (int)std::ceil(T_final / dt_cfl));
+            dt = T_final / (double)n_steps;
+            total_frame = n_steps;
+
+            smokeSimulator.outputVortVisualized(filepath, filename, 0);
+            smokeSimulator.outputVorticityIntegral(filepath, 0.0);
+            smokeSimulator.outputEnergy(filepath, 0.0);
+
+            for (int i = 0; i < total_frame; i++)
+            {
+                smokeSimulator.advance(dt, i, delayed_reinit_frequency);
+                int curr_i = i + 1;
+                smokeSimulator.outputVortVisualized(filepath, filename, curr_i);
+                double curr_time = dt * double(curr_i);
+                smokeSimulator.outputVorticityIntegral(filepath, curr_time);
+                smokeSimulator.outputEnergy(filepath, curr_time);
+            }
         }
         break;
     }

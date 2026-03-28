@@ -992,14 +992,14 @@ end
 # ==============================================================================
 
 function apply_energy_correction!(
-    f_next::AbstractVector{Tn},
-    f_original::AbstractVector{To},
-    f_from_particles::AbstractVector{Tp},
-    f_midpoint::AbstractVector{Tm};
-    star_apply::Function,
-    tol::Float64=1e-9,
-    project_non_orthogonal::Bool=true,
-) where {Tn<:Real, To<:Real, Tp<:Real, Tm<:Real}
+        f_next::AbstractVector{Tn},
+        f_original::AbstractVector{To},
+        f_from_particles::AbstractVector{Tp},
+        f_midpoint::AbstractVector{Tm};
+        star_apply::Function,
+        tol::Float64=1e-9,
+        project_non_orthogonal::Bool=true,
+    ) where {Tn<:Real, To<:Real, Tp<:Real, Tm<:Real}
     # C++ analogue (advectCOFLIPHelper):
     # fluxes_diff = fluxes_from_particles - fluxes_original
     # if no forcing/viscosity: project out component parallel to midpoint flow
@@ -1020,20 +1020,20 @@ function apply_energy_correction!(
 end
 
 @inline function compute_pressure_delta(
-    f_projected::AbstractVector{Tp},
-    f_pre_projection::AbstractVector{Tq},
-) where {Tp<:Real, Tq<:Real}
+        f_projected::AbstractVector{Tp},
+        f_pre_projection::AbstractVector{Tq},
+    ) where {Tp<:Real, Tq<:Real}
     return f_projected .- f_pre_projection
 end
 
 function apply_pressure_correction!(
-    p::Particles,
-    f_projected::AbstractVector{Tp},
-    f_pre_projection::AbstractVector{Tq},
-    d::Domain,
-    thread_caches::Vector{EvaluationCache};
-    delta_scale::Float64=1.0,
-) where {Tp<:Real, Tq<:Real}
+        p::Particles,
+        f_projected::AbstractVector{Tp},
+        f_pre_projection::AbstractVector{Tq},
+        d::Domain,
+        thread_caches::Vector{EvaluationCache};
+        delta_scale::Float64=1.0,
+    ) where {Tp<:Real, Tq<:Real}
     tau_coeffs = compute_pressure_delta(f_projected, f_pre_projection)
 
     n_thread_slots = Threads.maxthreadid()
@@ -1051,17 +1051,15 @@ function apply_pressure_correction!(
         p.my[i] += delta_scale * val[1]
         p.mx[i] -= delta_scale * val[2]
     end
-
-    return tau_coeffs
 end
 
 function apply_pressure_correction!(
-    p::Particles,
-    f_projected::AbstractVector{Tp},
-    f_pre_projection::AbstractVector{Tq},
-    d::Domain;
-    delta_scale::Float64=1.0,
-) where {Tp<:Real, Tq<:Real}
+        p::Particles,
+        f_projected::AbstractVector{Tp},
+        f_pre_projection::AbstractVector{Tq},
+        d::Domain;
+        delta_scale::Float64=1.0,
+    ) where {Tp<:Real, Tq<:Real}
     n_thread_slots = Threads.maxthreadid()
     cache_size = evaluation_cache_size(d)
     thread_caches = [EvaluationCache(cache_size) for _ in 1:n_thread_slots]
@@ -1124,12 +1122,12 @@ end
 end
 
 @inline function physical_velocity_and_jacobian(
-    x::T,
-    y::T,
-    u_coeffs::AbstractVector{U},
-    d::Domain,
-    cache::EvaluationCache,
-) where {T<:AbstractFloat, U<:Real}
+        x::T,
+        y::T,
+        u_coeffs::AbstractVector{U},
+        d::Domain,
+        cache::EvaluationCache,
+    ) where {T<:AbstractFloat, U<:Real}
     raw_vel, raw_grad = probe_field_at_point(x, y, u_coeffs, d, cache)
 
     # Convert proxy ordering [v, -u] back to physical [u, v] and ∇v.
@@ -1147,10 +1145,10 @@ end
 end
 
 function clamp_pullback(
-    pullback::SMatrix{2, 2, T, 4};
-    tol::T,
-    max_iter::Int,
-) where {T<:AbstractFloat}
+        pullback::SMatrix{2, 2, T, 4};
+        tol::T,
+        max_iter::Int,
+    ) where {T<:AbstractFloat}
     prev_mu = zero(T)
     used_mu = zero(T)
 
@@ -1193,17 +1191,17 @@ function clamp_pullback(
 end
 
 @inline function pullback_rk4_step(
-    pos::SVector{2, T},
-    input_pullback::SMatrix{2, 2, T, 4},
-    dt::T,
-    u_coeffs::AbstractVector{U},
-    d::Domain,
-    cache::EvaluationCache;
-    mode::Symbol,
-    pos_tol::T,
-    pullback_tol::T,
-    pullback_max_iter::Int,
-) where {T<:AbstractFloat, U<:Real}
+        pos::SVector{2, T},
+        input_pullback::SMatrix{2, 2, T, 4},
+        dt::T,
+        u_coeffs::AbstractVector{U},
+        d::Domain,
+        cache::EvaluationCache;
+        mode::Symbol,
+        pos_tol::T,
+        pullback_tol::T,
+        pullback_max_iter::Int,
+    ) where {T<:AbstractFloat, U<:Real}
     Lx, Ly = d.box_size
     c1 = dt / 6
     c2 = dt / 3
@@ -1246,20 +1244,54 @@ end
     return SVector{2, T}(px, py), pullback
 end
 
+@inline function pullback_rk2_step(
+        pos::SVector{2, T},
+        input_pullback::SMatrix{2, 2, T, 4},
+        dt::T,
+        u_coeffs::AbstractVector{U},
+        d::Domain,
+        cache::EvaluationCache;
+        mode::Symbol,
+        pos_tol::T,
+        pullback_tol::T,
+        pullback_max_iter::Int,
+    ) where {T<:AbstractFloat, U<:Real}
+    Lx, Ly = d.box_size
+
+    v1, J1 = physical_velocity_and_jacobian(pos[1], pos[2], u_coeffs, d, cache)
+    Pdot1 = -(transpose(J1) * input_pullback)
+
+    midp_raw = pos + (dt * 0.5) * v1
+    mx, my = apply_position_policy(midp_raw[1], midp_raw[2], Lx, Ly, mode, pos_tol)
+    midp = SVector{2, T}(mx, my)
+    midP = input_pullback + (dt * 0.5) * Pdot1
+
+    v2, J2 = physical_velocity_and_jacobian(midp[1], midp[2], u_coeffs, d, cache)
+    Pdot2 = -(transpose(J2) * midP)
+
+    pullback = input_pullback + dt * Pdot2
+    pullback = clamp_pullback(pullback; tol=pullback_tol, max_iter=pullback_max_iter)
+
+    pos_raw = pos + dt * v2
+    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, mode, pos_tol)
+
+    return SVector{2, T}(px, py), pullback
+end
+
 function advect_particles_pullback_rk4!(
-    p::Particles,
-    x0::AbstractVector{T}, y0::AbstractVector{T},
-    mx0::AbstractVector{T}, my0::AbstractVector{T},
-    u_coeffs::AbstractVector{U},
-    d::Domain, dt::T,
-    x_out::AbstractVector{T}, y_out::AbstractVector{T},
-    mx_out::AbstractVector{T}, my_out::AbstractVector{T},
-    thread_caches::Vector{EvaluationCache};
-    position_mode::Symbol=:periodic,
-    position_tol::T=T(1e-12),
-    pullback_tol::T=T(1e-9),
-    pullback_max_iter::Int=200,
-) where {T<:AbstractFloat, U<:Real}
+        p::Particles,
+        x0::AbstractVector{T}, y0::AbstractVector{T},
+        mx0::AbstractVector{T}, my0::AbstractVector{T},
+        u_coeffs::AbstractVector{U},
+        d::Domain, dt::T,
+        x_out::AbstractVector{T}, y_out::AbstractVector{T},
+        mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+        thread_caches::Vector{EvaluationCache};
+        position_mode::Symbol=:periodic,
+        position_tol::T=T(1e-12),
+        pullback_tol::T=T(1e-9),
+        pullback_max_iter::Int=200,
+    ) where {T<:AbstractFloat, U<:Real}
     num_p = length(x0)
     Lx, Ly = d.box_size
     n_thread_slots = Threads.maxthreadid()
@@ -1325,19 +1357,118 @@ function advect_particles_pullback_rk4!(
     return maximum(@view max_err_per_thread[1:n_workers])
 end
 
+function advect_particles_pullback_rk2!(
+        p::Particles,
+        x0::AbstractVector{T}, y0::AbstractVector{T},
+        mx0::AbstractVector{T}, my0::AbstractVector{T},
+        u_coeffs::AbstractVector{U},
+        d::Domain, dt::T,
+        x_out::AbstractVector{T}, y_out::AbstractVector{T},
+        mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+        thread_caches::Vector{EvaluationCache};
+        position_mode::Symbol=:periodic,
+        position_tol::T=T(1e-12),
+        pullback_tol::T=T(1e-9),
+        pullback_max_iter::Int=200,
+    ) where {T<:AbstractFloat, U<:Real}
+    num_p = length(x0)
+    Lx, Ly = d.box_size
+    n_thread_slots = Threads.maxthreadid()
+    max_err_per_thread = fill(zero(T), n_thread_slots)
+
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
+    end
+
+    n_workers = min(num_p, n_thread_slots)
+    if n_workers == 0
+        return zero(T)
+    end
+
+    Threads.@threads for worker in 1:n_workers
+        cache = thread_caches[worker]
+        i_start = ((worker - 1) * num_p) ÷ n_workers + 1
+        i_end = (worker * num_p) ÷ n_workers
+        local_max_err = zero(T)
+
+        for i in i_start:i_end
+            sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_mode, position_tol)
+            pos = SVector{2, T}(sx, sy)
+            input_pullback = SMatrix{2, 2, T, 4}(one(T), zero(T), zero(T), one(T))
+
+            pos_new, pullback = pullback_rk2_step(
+                pos,
+                input_pullback,
+                dt,
+                u_coeffs,
+                d,
+                cache;
+                mode=position_mode,
+                pos_tol=position_tol,
+                pullback_tol=pullback_tol,
+                pullback_max_iter=pullback_max_iter,
+            )
+
+            m_old = SVector{2, T}(mx0[i], my0[i])
+            m_new = pullback * m_old
+
+            ox, oy = x_out[i], y_out[i]
+            ex = abs(pos_new[1] - ox)
+            ey = abs(pos_new[2] - oy)
+            if position_mode === :periodic
+                if ex > 0.5 * Lx; ex = Lx - ex; end
+                if ey > 0.5 * Ly; ey = Ly - ey; end
+            end
+            local_err = max(ex, ey)
+            if local_err > local_max_err
+                local_max_err = local_err
+            end
+
+            x_out[i] = pos_new[1]
+            y_out[i] = pos_new[2]
+            mx_out[i] = m_new[1]
+            my_out[i] = m_new[2]
+        end
+
+        max_err_per_thread[worker] = local_max_err
+    end
+
+    return maximum(@view max_err_per_thread[1:n_workers])
+end
+
 function advect_particles_pullback_rk4!(
-    p::Particles,
-    x0::AbstractVector{T}, y0::AbstractVector{T},
-    mx0::AbstractVector{T}, my0::AbstractVector{T},
-    u_coeffs::AbstractVector{U},
-    d::Domain, dt::T,
-    x_out::AbstractVector{T}, y_out::AbstractVector{T},
-    mx_out::AbstractVector{T}, my_out::AbstractVector{T};
-    kwargs...
-) where {T<:AbstractFloat, U<:Real}
+        p::Particles,
+        x0::AbstractVector{T}, y0::AbstractVector{T},
+        mx0::AbstractVector{T}, my0::AbstractVector{T},
+        u_coeffs::AbstractVector{U},
+        d::Domain, dt::T,
+        x_out::AbstractVector{T}, y_out::AbstractVector{T},
+        mx_out::AbstractVector{T}, my_out::AbstractVector{T};
+        kwargs...
+    ) where {T<:AbstractFloat, U<:Real}
     n_thread_slots = Threads.maxthreadid()
     thread_caches = [EvaluationCache(evaluation_cache_size(d)) for _ in 1:n_thread_slots]
     return advect_particles_pullback_rk4!(
+        p, x0, y0, mx0, my0, u_coeffs, d, dt,
+        x_out, y_out, mx_out, my_out,
+        thread_caches;
+        kwargs...
+    )
+end
+
+function advect_particles_pullback_rk2!(
+        p::Particles,
+        x0::AbstractVector{T}, y0::AbstractVector{T},
+        mx0::AbstractVector{T}, my0::AbstractVector{T},
+        u_coeffs::AbstractVector{U},
+        d::Domain, dt::T,
+        x_out::AbstractVector{T}, y_out::AbstractVector{T},
+        mx_out::AbstractVector{T}, my_out::AbstractVector{T};
+        kwargs...
+    ) where {T<:AbstractFloat, U<:Real}
+    n_thread_slots = Threads.maxthreadid()
+    thread_caches = [EvaluationCache(evaluation_cache_size(d)) for _ in 1:n_thread_slots]
+    return advect_particles_pullback_rk2!(
         p, x0, y0, mx0, my0, u_coeffs, d, dt,
         x_out, y_out, mx_out, my_out,
         thread_caches;
@@ -1432,7 +1563,7 @@ function step_co_flip!(
         # 1. Advect particles from (x_n, mx_n) using current midpoint f_star
         # ------------------------------------------------------------------
         t0  = time()
-        err = advect_particles_pullback_rk4!(
+        err = advect_particles_pullback_rk2!(
             p,
             x_n, y_n, mx_n, my_n,
             f_star, d, dt,
@@ -1446,7 +1577,7 @@ function step_co_flip!(
         # ------------------------------------------------------------------
         t0 = time()
         p.x, p.y   = x_np1, y_np1
-        # p.mx, p.my = mx_np1, my_np1       FIGURE OUT WHY THIS BREAKS THE CODE IF UNCOMMENTED
+        p.mx, p.my = mx_np1, my_np1       # FIGURE OUT WHY THIS BREAKS THE CODE IF UNCOMMENTED
         particle_sorter!(p, d)
         t_sort_ms = time() - t0
 
@@ -1507,7 +1638,7 @@ function step_co_flip!(
     # 6. Pressure feedback to particle impulses
     # ----------------------------------------------------------------------
     t0          = time()
-    tau_coeffs  = apply_pressure_correction!(
+    apply_pressure_correction!(
         p,
         f_np1_proj,
         f_np1,
@@ -1646,6 +1777,7 @@ function main()
     """
 
     clear_memo_every = 1
+    reset_every = 20
     
     println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
 
@@ -1707,13 +1839,39 @@ function main()
 
         # Advance the CO-FLIP state
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs)
+
+        # Visualization
         u_form = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
         u_phys_expr = ★(u_form)
         u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
 
-        # Visualization
+        if step % reset_every == 0
+            particle_sorter!(particles, domain)
+            @inbounds for pid in eachindex(particles.x)
+                eid = particles.elem_ids[pid]
+                ej = ((eid - 1) ÷ nx) + 1
+                ei = eid - (ej - 1) * nx
+                x0 = (ei - 1) * dx
+                y0 = (ej - 1) * dy
+                set_g2p_velocity(
+                    particles,
+                    pid,
+                    particles.x[pid],
+                    particles.y[pid],
+                    eid,
+                    x0,
+                    y0,
+                    dx,
+                    dy,
+                    u_phys_form,
+                )
+            end
+            println("  Periodic G2P reset at step $step")
+        end
+
         d_u_phys = Forms.d(u_phys_form)
         ω_h = ★(d_u_phys)
+        
         Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_%04d", step); output_directory_tree=["coflip_output"])
         Plot.export_form_fields_to_vtk((ω_h,), @sprintf("w_h_%04d", step); output_directory_tree=["coflip_output"])
         diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
@@ -1756,9 +1914,6 @@ function plot_flow()
         xlims = (0, Lx), ylims = (0, Ly)
     )
 end
-
-
-
 
 main()
 

@@ -332,6 +332,7 @@ public:
     void solveInterpDaggerVorticity(bool do_pressureSolve=false);
     void integratePressureForce(Array2d& un, Array2d& vn);
     void setInitVelocityVortexSheet(double radius, double rotational_speed, double eps_smooth_gap);
+    void setInitVelocityConvectingVortex(double U0, double Gamma, double sigma, const Vec2d& center);
 
     double h, h_uniform;
     double alpha_buoyancy, beta_buoyancy;
