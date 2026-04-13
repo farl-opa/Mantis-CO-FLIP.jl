@@ -1539,14 +1539,19 @@ function step_co_flip!(
         min_particles_per_element::Int=10,
         max_particles_per_element::Int=25,
         min_particles_per_quarter::Int=3,
+        max_fp_iter::Int=6,
+        fp_tol::Float64=1e-9,
     ) where {Tf<:Real}
 
     step_t0       = time()
     thread_caches = buf.thread_caches
 
+    # ---- Save f_n (caller's vector must not be mutated) ----
     copy!(buf.f_n_saved, f_n)
     f_n_saved = buf.f_n_saved
 
+    # ---- Particle rebalance before solve ----
+    
     t0 = time()
     added_start, removed_start = enforce_min_particles_per_element!(
         p, d,
@@ -1558,10 +1563,12 @@ function step_co_flip!(
         println("  Particle rebalance before solve: +$added_start / -$removed_start")
     end
     println("  Initial seeding time: $(round(t_seed_start, digits=2)) s")
+    
 
     num_p = length(p.x)
     ensure_particle_capacity!(buf, num_p)
 
+    # ---- Snapshot n-state particle positions and impulses ----
     x_n  = buf.x_n;   y_n  = buf.y_n
     mx_n = buf.mx_n;  my_n = buf.my_n
     @inbounds for i in 1:num_p
@@ -1571,114 +1578,165 @@ function step_co_flip!(
 
     x_np1  = buf.x_np1;   y_np1  = buf.y_np1
     mx_np1 = buf.mx_np1;  my_np1 = buf.my_np1
-    @inbounds for i in 1:num_p
-        x_np1[i]  = x_n[i];   y_np1[i]  = y_n[i]
-        mx_np1[i] = mx_n[i];  my_np1[i] = my_n[i]
-    end
 
-    f_star     = buf.f_star
-    f_np1      = buf.f_np1
-    f_np1_raw  = buf.f_np1_raw
-    f_np1_proj = buf.f_np1_proj
+    f_star     = buf.f_star       # midpoint estimate, updated each iteration
+    f_np1      = buf.f_np1        # energy-corrected field
+    f_np1_raw  = buf.f_np1_raw    # raw P2G output
+    f_np1_proj = buf.f_np1_proj   # divergence-free projected (final output)
 
+    # ---- f_star initialised to f_n (first iteration = explicit Euler bootstrap) ----
     copy!(f_star, f_n_saved)
 
-    max_iter = 5
-    tol      = 1e-5
+    # For the convergence criterion we track the change in f_np1_proj
+    # between successive fixed-point iterations.
+    # f_np1_proj_prev holds the result from the PREVIOUS iteration.
+    # Initialise to f_n so the first error is well-defined.
+    f_np1_proj_prev = similar(f_n_saved)
+    copy!(f_np1_proj_prev, f_n_saved)
 
-    B_np1 = build_B_matrix(p, d)
+    f0_norm = norm(f_n_saved)
 
-    for iter in 1:max_iter
+    # ----------------------------------------------------------------
+    # Fixed-point iteration  (Algorithm 2 in the paper)
+    # ----------------------------------------------------------------
+    for iter in 1:max_fp_iter
         iter_t0 = time()
 
-        # 1. Advect n-state particles using current midpoint f_star.
-        t0  = time()
-        err = advect_particles_pullback_rk2!(
+        # ------------------------------------------------------------------
+        # Step 1: Advect n-state particles using current f_star as velocity.
+        #
+        # On iter=1  f_star = f_n      → explicit Euler bootstrap
+        # On iter≥2  f_star = ½(f_n + f_np1_proj_prev)  → true midpoint
+        #
+        # The pullback kernel already starts from the identity matrix, so
+        # the advected impulse is: u_new = pullback(f_star) * u_old
+        # ------------------------------------------------------------------
+        t0 = time()
+        advect_particles_pullback_rk2!(
             p,
             @view(x_n[1:num_p]),  @view(y_n[1:num_p]),
             @view(mx_n[1:num_p]), @view(my_n[1:num_p]),
             f_star, d, dt,
             @view(x_np1[1:num_p]),  @view(y_np1[1:num_p]),
             @view(mx_np1[1:num_p]), @view(my_np1[1:num_p]),
-            thread_caches,
+            thread_caches;
+            position_mode=:periodic,
         )
         t_advect = time() - t0
 
-        # 2. Copy only (n+1) POSITIONS into p — impulses stay at n-state
-        #    throughout the iteration so that the P2G RHS is stable.
+        # ------------------------------------------------------------------
+        # Step 2: Copy the FULLY ADVECTED state (positions AND impulses)
+        #         into p.  The P2G minimisation is over (x_new, u_new) —
+        #         both must come from the advection output.
+        #
+        # BUG FIX vs previous code: the old code only copied positions and
+        # left p.mx/my at the n-state, so the P2G was minimising at the
+        # wrong impulse values.
+        # ------------------------------------------------------------------
         t0 = time()
         @inbounds for i in 1:num_p
-            p.x[i] = x_np1[i]
-            p.y[i] = y_np1[i]
+            p.x[i]  = x_np1[i];   p.y[i]  = y_np1[i]
+            p.mx[i] = mx_np1[i];  p.my[i] = my_np1[i]   # advected impulses
         end
         particle_sorter!(p, d)
         t_sort = time() - t0
 
-        # 3. Build B at (n+1) positions.
+        # ------------------------------------------------------------------
+        # Step 3: Build the interpolation matrix at the new positions and
+        #         perform the P2G least-squares solve.
+        # ------------------------------------------------------------------
         t0    = time()
         B_np1 = build_B_matrix(p, d)
         t_build_B = time() - t0
 
-        # 4. P2G: maps n-state impulses (p.mx/my) at (n+1) positions.
         t0      = time()
-        raw_sol = solve_grid_velocity_lsqr(B_np1, p, buf.V_p)
+        raw_sol = solve_grid_velocity_lsqr(B_np1, p)
         copy!(f_np1_raw, raw_sol)
         t_solve = time() - t0
 
-        # 5. Energy correction using exact, stationary mass matrix.
+        # ------------------------------------------------------------------
+        # Step 4: Energy-based correction  (Algorithm 2, line 6).
+        #
+        # Project Δf = F(y^{n+1}) − f^n onto the orthogonal complement of
+        # the midpoint f̃* = f_star (which equals ½(f_n + f_np1_proj_prev)).
+        #
+        # f_np1  = f_n  +  P_{f̃*⊥}( f_np1_raw − f_n )
+        # ------------------------------------------------------------------
         t0         = time()
-        star_apply = v -> mass_matrix_1form * v  # <-- NOW USES EXACT GRID MASS MATRIX
+        star_apply = v -> mass_matrix_1form * v
         apply_energy_correction!(
             f_np1, f_n_saved, f_np1_raw, f_star;
             star_apply=star_apply,
-            tol=1e-9,
+            tol=1e-14,
             project_non_orthogonal=true,
         )
         t_energy = time() - t0
 
-        # 6. Pressure projection.
+        # ------------------------------------------------------------------
+        # Step 5: Pressure-project f_np1 to get a divergence-free field.
+        # ------------------------------------------------------------------
         t0             = time()
         f_np1_h        = Forms.build_form_field(d.R1, f_np1)
         proj_result, _ = project_and_get_pressure(d, f_np1_h)
         copy!(f_np1_proj, proj_result)
-        @. f_star = 0.5 * (f_n_saved + f_np1_proj)
         t_project = time() - t0
 
+        # ------------------------------------------------------------------
+        # Step 6: Convergence check.
+        #
+        # Error = || F(y^{n+1})_new − F(y^{n+1})_prev || / || f^n ||
+        #
+        # This is the change in the projected grid-velocity field between
+        # successive fixed-point iterations, normalised by the initial norm.
+        # Matches the C++ criterion:
+        #   error = (fluxes - fluxes_temp).norm() / fluxes0_norm
+        # ------------------------------------------------------------------
+        err = norm(@view(f_np1_proj[1:end]) .- @view(f_np1_proj_prev[1:end]))
+        err /= (f0_norm + eps(Float64))
+
         t_iter = time() - iter_t0
-        println("  Iter $iter: Pos Change = $err")
+        println("  Iter $iter: Grid-vel error = $(Printf.@sprintf("%.6e", err))")
         println(
             "    Timings [s]: advect=$(round(t_advect,   digits=2)), " *
             "sort=$(round(t_sort,         digits=2)), " *
             "build_B=$(round(t_build_B,   digits=2)), " *
             "solve_raw=$(round(t_solve,   digits=2)), " *
-            "project=$(round(t_project,   digits=2)), " *
             "energy=$(round(t_energy,     digits=2)), " *
+            "project=$(round(t_project,   digits=2)), " *
             "iter_total=$(round(t_iter,   digits=2))",
         )
 
-        err < tol && break
+        # ------------------------------------------------------------------
+        # Step 7: Update midpoint estimate for the next iteration.
+        #
+        # f_star  ←  ½ (f_n + f_np1_proj)
+        #
+        # Save current f_np1_proj for next iteration's error computation.
+        # ------------------------------------------------------------------
+        copy!(f_np1_proj_prev, f_np1_proj)
+        @. f_star = 0.5 * (f_n_saved + f_np1_proj)
+
+        err < fp_tol && break
     end
 
-    # Iteration converged. Now commit the final advected impulses into p
-    # before the pressure correction acts on them.
-    @inbounds for i in 1:num_p
-        p.mx[i] = mx_np1[i]
-        p.my[i] = my_np1[i]
-    end
+    # ---- After convergence: p already holds the fully advected np1 state ----
+    # (positions and impulses were written inside the loop)
 
-    # 7. Pressure feedback to particle impulses.
+    # ---- Pressure feedback to particle impulses ----
+    # Adds ∇p correction so particles stay close to divergence-free.
     t0 = time()
     apply_pressure_correction!(
         p, f_np1_proj, f_np1, d, thread_caches; delta_scale=1.0,
     )
     t_pressure = time() - t0
 
-    # 8. Final sort.
+    # ---- Final sort ----
     t0 = time()
     particle_sorter!(p, d)
     t_final_sort = time() - t0
 
-    # 9. Particle rebalance after solve.
+    # ---- Particle rebalance after solve ----
+    
     t0 = time()
     added_end, removed_end = enforce_min_particles_per_element!(
         p, d,
@@ -1689,14 +1747,15 @@ function step_co_flip!(
     if added_end > 0 || removed_end > 0
         println("  Particle rebalance after solve: +$added_end / -$removed_end")
     end
+    
 
     t_total = time() - step_t0
     println(
         "  Post Timings [s]: " *
-        "pressure_feedback=$(round(t_pressure,      digits=2)), " *
-        "final_sort=$(round(t_final_sort,            digits=2)), " *
-        "final_rebalance=$(round(t_seed_end,          digits=2)), " *
-        "step_total=$(round(t_total,                 digits=2))",
+        "pressure_feedback=$(round(t_pressure,    digits=2)), " *
+        "final_sort=$(round(t_final_sort,          digits=2)), " *
+        "final_rebalance=$(round(t_seed_end,       digits=2)), " *
+        "step_total=$(round(t_total,               digits=2))",
     )
 
     return f_np1_proj
@@ -1772,7 +1831,7 @@ function main()
     println("Starting Time Integration (T_final=$T_final, dt=$dt, steps=$n_steps)...")
 
     output_dir         = "coflip_output";       mkpath(output_dir)
-    particle_output_dir = "particle_output";    mkpath(particle_output_dir)
+    particle_output_dir = "coflip_output";    mkpath(particle_output_dir)
 
     # ---- t = 0 snapshot ----
     println("Saving true t=0 snapshot...")
