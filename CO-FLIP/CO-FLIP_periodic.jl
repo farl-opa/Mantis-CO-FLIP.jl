@@ -156,7 +156,7 @@ Base.@kwdef struct SimulationConfig
     max_fp_iter::Int               = 6
     fp_tol::Float64                = 1e-9
     enable_energy_correction::Bool = true     # FIX [6.1]
-    enable_pressure_kick::Bool     = false    # FIX [8.1] — pure CO-FLIP
+    enable_pressure_kick::Bool     = true    # FIX [8.1] — pure CO-FLIP
     # particle management
     min_particles_per_element::Int = 10
     max_particles_per_element::Int = 25
@@ -173,6 +173,8 @@ Base.@kwdef struct SimulationConfig
     lsqr_maxiter::Int              = 2000
     # projection / null space (FIX [7.1/7.2])
     projection_mean_subtract::Bool = true
+    # advection integrator selector for particle + pullback transport
+    advection_time_integrator::Symbol = :rk2   # allowed: :rk2, :rk4
 end
 
 probe_output_eltype(::Type{T}) where {T<:Real} = promote_type(Float64, T)
@@ -659,7 +661,7 @@ function flow_convecting_vortex(x::Float64, y::Float64, Lx::Float64, Ly::Float64
     U0 = 1.0
     Γ  = 5.0
     σ  = 0.1 * min(Lx, Ly)
-    x0 = 0.5 * Lx;  y0 = 0.5 * Ly
+    x0 = 0.5 * Lx;  y0 = 0.2 * Ly
 
     dx = x - x0;  dy = y - y0
     r2 = dx^2 + dy^2
@@ -1281,9 +1283,41 @@ end
     return SVector{2, T}(px, py), pullback
 end
 
-# FIX [4.1]: RK2 single-step kernel removed (dead code). All advection goes
-# through the RK4 kernel, which is second-order consistent with the paper and
-# matches the C++ reference.
+@inline function pullback_rk2_step(
+        pos::SVector{2, T},
+        input_pullback::SMatrix{2, 2, T, 4},
+        dt::T,
+        u_coeffs::AbstractVector{U},
+        d::Domain,
+        cache::EvaluationCache;
+        mode::Symbol,
+        pos_tol::T,
+        pullback_tol::T,
+        pullback_max_iter::Int,
+    ) where {T<:AbstractFloat, U<:Real}
+    Lx, Ly = d.box_size
+
+    v1, J1 = physical_velocity_and_jacobian(pos[1], pos[2], u_coeffs, d, cache)
+    Pdot1 = -(transpose(J1) * input_pullback)
+
+    midp_raw = pos + (dt * 0.5) * v1
+    mx, my = apply_position_policy(midp_raw[1], midp_raw[2], Lx, Ly, mode, pos_tol)
+    midp = SVector{2, T}(mx, my)
+    midP = input_pullback + (dt * 0.5) * Pdot1
+
+    v2, J2 = physical_velocity_and_jacobian(midp[1], midp[2], u_coeffs, d, cache)
+    Pdot2 = -(transpose(J2) * midP)
+
+    pullback = input_pullback + dt * Pdot2
+    pullback = clamp_pullback(pullback; tol=pullback_tol, max_iter=pullback_max_iter)
+
+    pos_raw = pos + dt * v2
+    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, mode, pos_tol)
+
+    return SVector{2, T}(px, py), pullback
+end
+
+# RK4 pullback advection kernel.
 # FIX [4.2]: kernel now also writes the shorterm pullback to dedicated buffers,
 # which step_co_flip! later composes into each particle's longterm pullback.
 # FIX [12.1]: max_err_per_thread is passed in (preallocated), not allocated here.
@@ -1353,6 +1387,81 @@ function advect_particles_pullback_rk4!(
         my_out[i] = m_new[2]
 
         # FIX [4.2]: store per-particle short-term pullback.
+        short_P11[i] = pullback[1, 1]
+        short_P12[i] = pullback[1, 2]
+        short_P21[i] = pullback[2, 1]
+        short_P22[i] = pullback[2, 2]
+    end
+
+    return maximum(@view max_err_per_thread[1:n_thread_slots])
+end
+
+# RK2 pullback advection kernel (midpoint method).
+# Mirrors advect_particles_pullback_rk4! but uses pullback_rk2_step.
+function advect_particles_pullback_rk2!(
+        p::Particles,
+        x0::AbstractVector{T}, y0::AbstractVector{T},
+        mx0::AbstractVector{T}, my0::AbstractVector{T},
+        u_coeffs::AbstractVector{U},
+        d::Domain, dt::T,
+        x_out::AbstractVector{T}, y_out::AbstractVector{T},
+        mx_out::AbstractVector{T}, my_out::AbstractVector{T},
+        short_P11::AbstractVector{T}, short_P12::AbstractVector{T},
+        short_P21::AbstractVector{T}, short_P22::AbstractVector{T},
+        thread_caches::Vector{EvaluationCache},
+        max_err_per_thread::Vector{T};
+        position_mode::Symbol=:periodic,
+        position_tol::T=T(1e-12),
+        pullback_tol::T=T(1e-9),
+        pullback_max_iter::Int=200,
+    ) where {T<:AbstractFloat, U<:Real}
+
+    num_p          = length(x0)
+    Lx, Ly         = d.box_size
+    n_thread_slots = Threads.maxthreadid()
+
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
+    end
+    if length(max_err_per_thread) < n_thread_slots
+        throw(ArgumentError("max_err_per_thread length must be at least Threads.maxthreadid()"))
+    end
+    @inbounds for i in 1:n_thread_slots
+        max_err_per_thread[i] = zero(T)
+    end
+
+    Threads.@threads :static for i in 1:num_p
+        tid   = Threads.threadid()
+        cache = thread_caches[tid]
+
+        sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_mode, position_tol)
+        pos    = SVector{2, T}(sx, sy)
+        input_pullback = SMatrix{2, 2, T, 4}(one(T), zero(T), zero(T), one(T))
+
+        pos_new, pullback = pullback_rk2_step(
+            pos, input_pullback, dt, u_coeffs, d, cache;
+            mode=position_mode, pos_tol=position_tol,
+            pullback_tol=pullback_tol, pullback_max_iter=pullback_max_iter,
+        )
+
+        m_old = SVector{2, T}(mx0[i], my0[i])
+        m_new = pullback * m_old
+
+        ox, oy = x_out[i], y_out[i]
+        ex = abs(pos_new[1] - ox)
+        ey = abs(pos_new[2] - oy)
+        if position_mode === :periodic
+            ex > 0.5 * Lx && (ex = Lx - ex)
+            ey > 0.5 * Ly && (ey = Ly - ey)
+        end
+        local_err = max(ex, ey)
+        local_err > max_err_per_thread[tid] && (max_err_per_thread[tid] = local_err)
+
+        x_out[i]  = pos_new[1]
+        y_out[i]  = pos_new[2]
+        mx_out[i] = m_new[1]
+        my_out[i] = m_new[2]
+
         short_P11[i] = pullback[1, 1]
         short_P12[i] = pullback[1, 2]
         short_P21[i] = pullback[2, 1]
@@ -1475,23 +1584,38 @@ function step_co_flip!(
 
         # ------------------------------------------------------------------
         # Step 1: Advect n-state particles using current f_star as velocity.
-        # FIX [4.1]: RK4 (replaces prior RK2 call at this site).
-        # FIX [4.2]: short-term pullback is output to buf.short_Pxx.
-        # FIX [12.1]: preallocated per-thread error buffer.
+        # Choose RK2 or RK4 with cfg.advection_time_integrator.
         # ------------------------------------------------------------------
         t0 = time()
-        advect_particles_pullback_rk4!(
-            p,
-            @view(x_n[1:num_p]),  @view(y_n[1:num_p]),
-            @view(mx_n[1:num_p]), @view(my_n[1:num_p]),
-            f_star, d, dt,
-            @view(x_np1[1:num_p]),  @view(y_np1[1:num_p]),
-            @view(mx_np1[1:num_p]), @view(my_np1[1:num_p]),
-            @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
-            @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
-            thread_caches, buf.max_err_per_thread;
-            position_mode=:periodic,
-        )
+        if cfg.advection_time_integrator === :rk2
+            advect_particles_pullback_rk2!(
+                p,
+                @view(x_n[1:num_p]),  @view(y_n[1:num_p]),
+                @view(mx_n[1:num_p]), @view(my_n[1:num_p]),
+                f_star, d, dt,
+                @view(x_np1[1:num_p]),  @view(y_np1[1:num_p]),
+                @view(mx_np1[1:num_p]), @view(my_np1[1:num_p]),
+                @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
+                @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
+                thread_caches, buf.max_err_per_thread;
+                position_mode=:periodic,
+            )
+        elseif cfg.advection_time_integrator === :rk4
+            advect_particles_pullback_rk4!(
+                p,
+                @view(x_n[1:num_p]),  @view(y_n[1:num_p]),
+                @view(mx_n[1:num_p]), @view(my_n[1:num_p]),
+                f_star, d, dt,
+                @view(x_np1[1:num_p]),  @view(y_np1[1:num_p]),
+                @view(mx_np1[1:num_p]), @view(my_np1[1:num_p]),
+                @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
+                @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
+                thread_caches, buf.max_err_per_thread;
+                position_mode=:periodic,
+            )
+        else
+            throw(ArgumentError("Unknown advection_time_integrator=$(cfg.advection_time_integrator). Use :rk2 or :rk4"))
+        end
         t_advect = time() - t0
 
         # Step 2: commit advected state to p so the P2G is at the right (x,u).
