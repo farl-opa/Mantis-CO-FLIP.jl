@@ -14,7 +14,7 @@ using WriteVTK
 
 gr()
 
-struct Domain{F0, F1, F2, G, Q, MH, NH, MM}
+struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF}
     R0::F0
     R1::F1
     R2::F2
@@ -24,6 +24,7 @@ struct Domain{F0, F1, F2, G, Q, MH, NH, MM}
     p::NTuple{2,Int}
     k::NTuple{2,Int}
     LHS_Hodge::MH
+    LHS_Hodge_fact::HF
     N_Hodge::NH
     Mass_matrix::MM
     eval_cache_size::Int
@@ -104,6 +105,10 @@ mutable struct SimulationBuffers
     elem_basis_indices::Vector{Vector{Int}}
 
     max_err_per_thread::Vector{Float64}
+
+    v_coeffs_buf::Vector{Float64}
+    b_buf::Vector{Float64}
+    sol_buf::Vector{Float64}
 end
 
 """Allocates scratch buffers for particle-to-grid transfer and time stepping."""
@@ -139,12 +144,15 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
         Vector{Float64}(undef, max_nnz),
         [Int[] for _ in 1:num_elements],
         zeros(Float64, n_threads),
+        zeros(Float64, size(d.N_Hodge, 1)),
+        zeros(Float64, size(d.N_Hodge, 1)),
+        zeros(Float64, size(d.N_Hodge, 1)),
     )
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (96, 96)
-    p::NTuple{2,Int}                  = (2, 2)
+    nel::NTuple{2,Int}                = (64, 64)
+    p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (1.0, 1.0)
     starting_point::NTuple{2,Float64} = (0.0, 0.0)
@@ -154,12 +162,12 @@ Base.@kwdef struct SimulationConfig
     volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
     flow_type::Symbol                 = :leapfrog
-    target_cfl::Float64               = 1.0
+    target_cfl::Float64               = 0.5
     T_final::Float64                  = 0.5
     max_fp_iter::Int                  = 6
     fp_tol::Float64                   = 5e-9
     enable_energy_correction::Bool    = true
-    enable_pressure_kick::Bool        = false
+    enable_pressure_kick::Bool        = true
     pic_blend_alpha::Float64          = 0.0
     min_particles_per_element::Int    = 10
     max_particles_per_element::Int    = 25
@@ -216,13 +224,14 @@ function GenerateDomain(
     )
 
     A, N = assemble_hodge_laplacian_matrices(R[2], R[3], dΩ)
+    A_fact = lu(A)
     M = assemble_1form_mass_matrix(R[2], dΩ)
 
     eval_cache_size = maximum(
         length(FunctionSpaces.get_basis_indices(R[2].fem_space, eid)) for eid in 1:prod(nel)
     )
 
-    return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k, A, N, M, eval_cache_size, box_size)
+    return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k, A, A_fact, N, M, eval_cache_size, box_size)
 end
 
 """Evaluate analytic velocity field at specified point."""
@@ -848,7 +857,7 @@ end
 
 """Leapfrog: two coaxial dipoles arranged horizontally with different separations; both propagate in +y and leapfrog through each other (mirrors C++ COFLIPSolver2D::sampleLeapfrog)."""
 function flow_leapfrog(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
-    cx = Lx / 2.0;  cy = Ly / 4.0
+    cx = Lx / 2.0;  cy = Ly / 2.0
     Γ = 2.0
     r_core = min(Lx, Ly) / 35.0
     dist_a = min(Lx, Ly) / 4.0
@@ -1147,22 +1156,18 @@ function solve_grid_velocity_lsqr(
 end
 
 """Project to divergence-free space via Hodge-Laplace and return pressure."""
-function project_and_get_pressure(dom::Domain, v_h::V; subtract_mean::Bool=true) where {V}
-    size_zero = size(dom.N_Hodge,1)
-    v_coeffs = zeros(size_zero)
-    v_coeffs[1:length(v_h.coefficients)] = v_h.coefficients
+function project_and_get_pressure(dom::Domain, v_h::V, buf::SimulationBuffers; subtract_mean::Bool=true) where {V}
+    fill!(buf.v_coeffs_buf, 0.0)
+    copyto!(buf.v_coeffs_buf, 1, v_h.coefficients, 1, length(v_h.coefficients))
 
-    b = dom.N_Hodge * v_coeffs
-    sol = vec(dom.LHS_Hodge \ b)
-    u_corr, ϕ_corr = Forms.build_form_fields((dom.R1, dom.R2), sol; labels=("u¹ₕ", "ϕ²ₕ"))
-
-    ϕ_coeffs = copy(ϕ_corr.coefficients)
-    if subtract_mean && !isempty(ϕ_coeffs)
-        ϕ_coeffs .-= sum(ϕ_coeffs) / length(ϕ_coeffs)
-    end
+    mul!(buf.b_buf, dom.N_Hodge, buf.v_coeffs_buf)
+    copyto!(buf.sol_buf, buf.b_buf)
+    ldiv!(dom.LHS_Hodge_fact, buf.sol_buf)
+    u_corr, _ = Forms.build_form_fields((dom.R1, dom.R2), buf.sol_buf; labels=("u¹ₕ", "ϕ²ₕ"))
 
     div_free_coeffs = v_h.coefficients - u_corr.coefficients
-    return div_free_coeffs, ϕ_coeffs
+
+    return div_free_coeffs
 end
 
 """Assemble Hodge-Laplace system matrices."""
@@ -1677,7 +1682,7 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
 
     t0 = time()
     u_grid_n_h             = Forms.build_form_field(d.R1, u_grid_n)
-    u_div_free_coeffs_n, _ = project_and_get_pressure(d, u_grid_n_h;
+    u_div_free_coeffs_n = project_and_get_pressure(d, u_grid_n_h, buf;
                                                       subtract_mean=projection_mean_subtract)
     t_project_ms = time() - t0
 
@@ -1831,8 +1836,8 @@ function step_co_flip!(
 
         t0             = time()
         f_np1_h        = Forms.build_form_field(d.R1, f_np1)
-        proj_result, _ = project_and_get_pressure(d, f_np1_h;
-                                                   subtract_mean=cfg.projection_mean_subtract)
+        proj_result = project_and_get_pressure(d, f_np1_h, buf;
+                               subtract_mean=cfg.projection_mean_subtract)
         copy!(f_np1_proj, proj_result)
         t_project = time() - t0
 
