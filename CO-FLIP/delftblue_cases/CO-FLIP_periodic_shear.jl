@@ -848,18 +848,18 @@ function flow_dipole(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     return u, v
 end
 
-"""Leapfrog: two co-axial dipoles with different vertical separations — they pass through each other periodically."""
+"""Leapfrog: two coaxial dipoles arranged horizontally with different separations; both propagate in +y and leapfrog through each other (mirrors C++ COFLIPSolver2D::sampleLeapfrog)."""
 function flow_leapfrog(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
-    cx = Lx / 4.0;  cy = Ly / 2.0
+    cx = Lx / 2.0;  cy = Ly / 4.0
     Γ = 2.0
     r_core = min(Lx, Ly) / 35.0
-    d1 = min(Lx, Ly) / 12.0
-    d2 = min(Lx, Ly) / 6.0
+    dist_a = min(Lx, Ly) / 4.0
+    dist_b = min(Lx, Ly) / 2.0
 
-    centers = ((cx, cy + d1/2, +Γ),
-               (cx, cy - d1/2, -Γ),
-               (cx, cy + d2/2, +Γ),
-               (cx, cy - d2/2, -Γ))
+    centers = ((cx - 0.5*dist_a, cy, +Γ),
+               (cx + 0.5*dist_a, cy, -Γ),
+               (cx - 0.5*dist_b, cy, +Γ),
+               (cx + 0.5*dist_b, cy, -Γ))
 
     u = 0.0;  v = 0.0
     for (xc, yc, Γi) in centers
@@ -1172,7 +1172,7 @@ function assemble_hodge_laplacian_matrices(R1, R2, dΩ)
     weak_form_inputs = Assemblers.WeakFormInputs((R1, R2))
     lhs_expressions, rhs_expressions = get_lhs_rhs_hodge_laplacian(weak_form_inputs, dΩ)
     weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
-    A, N = Assemblers.assemble(weak_form)
+    A, N = Assemblers.assemble(weak_form; rhs_type=SparseArrays.SparseMatrixCSC{Float64, Int})
 
     return A, N
 
@@ -1206,7 +1206,7 @@ function assemble_1form_mass_matrix(R1_space::F, dΩ::Q) where {F, Q}
     rhs_expressions = ((0,),)
 
     weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
-    M, _ = Assemblers.assemble(weak_form)
+    M, _ = Assemblers.assemble(weak_form; rhs_type=SparseArrays.SparseMatrixCSC{Float64, Int})
     return M
 end
 
