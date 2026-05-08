@@ -2222,6 +2222,7 @@ function run_diagnostic_simulation(cfg::SimulationConfig;
         save_vtk::Bool=false,
         output_dir::String="diag_output",
         record_every::Int=1,
+        case_name::String="",
     )
     LinearAlgebra.BLAS.set_num_threads(1)
     save_vtk && mkpath(output_dir)
@@ -2286,6 +2287,7 @@ function run_diagnostic_simulation(cfg::SimulationConfig;
     history = [(t=0.0, energy=d0.energy, enstrophy=d0.enstrophy, circulation=d0.circulation)]
 
     for step in 1:n_steps
+        println(@sprintf("Step %d/%d, case: %s", step, n_steps, case_name))
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
 
         u_form_loc      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
@@ -2372,7 +2374,8 @@ function run_test_suite(;
             result = run_diagnostic_simulation(cfg;
                 save_vtk=save_vtk,
                 output_dir=joinpath(output_dir, case.name),
-                record_every=1)
+                record_every=1,
+                case_name=case.name)
         catch err
             @warn "$(case.name) FAILED" exception=err
             push!(summary_rows, @sprintf("%-13s | FAILED: %s", case.name, err))
