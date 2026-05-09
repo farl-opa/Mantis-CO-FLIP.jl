@@ -151,7 +151,7 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (64, 64)
+    nel::NTuple{2,Int}                = (96, 96)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (1.0, 1.0)
@@ -172,9 +172,9 @@ Base.@kwdef struct SimulationConfig
     min_particles_per_element::Int    = 10
     max_particles_per_element::Int    = 25
     min_particles_per_quarter::Int    = 3
-    ftle_threshold::Float64           = 1.0
+    ftle_threshold::Float64           = 0.3
     max_longterm_delta_t::Float64     = 1.0
-    ftle_use_rate::Bool               = false
+    ftle_use_rate::Bool               = true
     global_ftle_gate::Float64         = -Inf
     delayed_reinit_frequency::Int     = 0
     output_every::Int                 = 1

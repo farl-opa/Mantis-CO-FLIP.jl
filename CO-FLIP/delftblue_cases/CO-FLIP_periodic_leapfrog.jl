@@ -153,7 +153,7 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (64, 64)
+    nel::NTuple{2,Int}                = (96, 96)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (1.0, 1.0)
@@ -161,9 +161,9 @@ Base.@kwdef struct SimulationConfig
     boundary_condition::Symbol        = :periodic
     particles_per_cell::Int           = 20
     stratified_seeding::Bool          = true
-    volume_convention::Symbol         = :cell_fraction
+    volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
-    flow_type::Symbol                 = :convecting
+    flow_type::Symbol                 = :leapfrog
     target_cfl::Float64               = 0.5
     T_final::Float64                  = 1.0
     max_fp_iter::Int                  = 6
@@ -2356,7 +2356,7 @@ function run_test_suite(;
     mkpath(output_dir)
 
     cases = (
-        (name="leapfrog",     flow=:leapfrog,    T=2.0, note="Two coaxial dipoles"),
+        (name="leapfrog",     flow=:leapfrog,    T=1.0, note="Two coaxial dipoles"),
     )
 
     println("\n========== CO-FLIP TEST SUITE (nel=$(nel)) ==========")
