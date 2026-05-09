@@ -2350,7 +2350,7 @@ function run_test_suite(;
         output_dir::String=joinpath(DEFAULT_OUTPUT_DIR, "test_results"),
         save_vtk::Bool=true,
         T_factor::Float64=1.0,
-        nel::NTuple{2,Int}=(64, 64),
+        nel::NTuple{2,Int}=(96, 96),
         particles_per_cell::Int=20,
     )
     mkpath(output_dir)
