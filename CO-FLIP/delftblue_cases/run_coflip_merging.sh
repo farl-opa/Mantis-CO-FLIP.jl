@@ -2,8 +2,8 @@
 #SBATCH --job-name=coflip_merging
 #SBATCH --partition=compute-p1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem-per-cpu=3G
+#SBATCH --cpus-per-task=12
+#SBATCH --mem-per-cpu=3900M
 #SBATCH --time=15:00:00
 #SBATCH --output=coflip_merging_%j.out 
 #SBATCH --error=coflip_merging_%j.err

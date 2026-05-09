@@ -153,7 +153,7 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (64, 64)
+    nel::NTuple{2,Int}                = (96, 96)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (1.0, 1.0)
