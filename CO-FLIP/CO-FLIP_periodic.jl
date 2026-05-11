@@ -161,9 +161,9 @@ Base.@kwdef struct SimulationConfig
     stratified_seeding::Bool          = true
     volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
-    flow_type::Symbol                 = :tg
+    flow_type::Symbol                 = :convecting
     target_cfl::Float64               = 0.5
-    T_final::Float64                  = 0.5
+    T_final::Float64                  = 1.0
     max_fp_iter::Int                  = 6
     fp_tol::Float64                   = 5e-9
     enable_energy_correction::Bool    = true
