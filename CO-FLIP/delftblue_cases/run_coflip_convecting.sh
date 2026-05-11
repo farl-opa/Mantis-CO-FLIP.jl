@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem-per-cpu=3900M
-#SBATCH --time=25:00:00
+#SBATCH --time=20:00:00
 #SBATCH --output=coflip_convecting_%j.out 
 #SBATCH --error=coflip_convecting_%j.err
 
