@@ -161,7 +161,7 @@ Base.@kwdef struct SimulationConfig
     stratified_seeding::Bool          = true
     volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
-    flow_type::Symbol                 = :leapfrog
+    flow_type::Symbol                 = :tg
     target_cfl::Float64               = 0.5
     T_final::Float64                  = 0.5
     max_fp_iter::Int                  = 6
@@ -415,6 +415,71 @@ function set_g2p_velocity(
     p.mx[pid] = reduce(+, pushfwd_eval[1], dims=2)[1]
     p.my[pid] = reduce(+, pushfwd_eval[2], dims=2)[1]
 
+    return nothing
+end
+
+"""
+Physically reorder particle arrays so particles in the same element are contiguous in memory.
+This significantly improves cache locality during RK advection loops by ensuring threads
+access the same grid coefficients repeatedly rather than scattered lookups.
+Call this periodically (e.g., every few timesteps) for maximum benefit.
+"""
+function physical_spatial_sort!(p::Particles, d::Domain)
+    num_p    = length(p.x)
+    num_elem = prod(d.nel)
+    
+    # Create a permutation array based on element IDs
+    # Elements are already computed in particle_sorter
+    perm = sortperm(p.elem_ids[1:num_p])
+    
+    # Create temporary storage for reordered data
+    x_new     = similar(p.x, num_p)
+    y_new     = similar(p.y, num_p)
+    mx_new    = similar(p.mx, num_p)
+    my_new    = similar(p.my, num_p)
+    vol_new   = similar(p.volume, num_p)
+    can_x_new = similar(p.can_x, num_p)
+    can_y_new = similar(p.can_y, num_p)
+    P11_new   = similar(p.P11, num_p)
+    P12_new   = similar(p.P12, num_p)
+    P21_new   = similar(p.P21, num_p)
+    P22_new   = similar(p.P22, num_p)
+    elem_ids_new = similar(p.elem_ids, num_p)
+    
+    # Reorder all particle data according to element locality
+    @inbounds for i in 1:num_p
+        old_idx = perm[i]
+        x_new[i]     = p.x[old_idx]
+        y_new[i]     = p.y[old_idx]
+        mx_new[i]    = p.mx[old_idx]
+        my_new[i]    = p.my[old_idx]
+        vol_new[i]   = p.volume[old_idx]
+        can_x_new[i] = p.can_x[old_idx]
+        can_y_new[i] = p.can_y[old_idx]
+        P11_new[i]   = p.P11[old_idx]
+        P12_new[i]   = p.P12[old_idx]
+        P21_new[i]   = p.P21[old_idx]
+        P22_new[i]   = p.P22[old_idx]
+        elem_ids_new[i] = p.elem_ids[old_idx]
+    end
+    
+    # Copy reordered data back into particle arrays
+    copyto!(p.x, 1, x_new, 1, num_p)
+    copyto!(p.y, 1, y_new, 1, num_p)
+    copyto!(p.mx, 1, mx_new, 1, num_p)
+    copyto!(p.my, 1, my_new, 1, num_p)
+    copyto!(p.volume, 1, vol_new, 1, num_p)
+    copyto!(p.can_x, 1, can_x_new, 1, num_p)
+    copyto!(p.can_y, 1, can_y_new, 1, num_p)
+    copyto!(p.P11, 1, P11_new, 1, num_p)
+    copyto!(p.P12, 1, P12_new, 1, num_p)
+    copyto!(p.P21, 1, P21_new, 1, num_p)
+    copyto!(p.P22, 1, P22_new, 1, num_p)
+    copyto!(p.elem_ids, 1, elem_ids_new, 1, num_p)
+    
+    # After physical reordering, rebuild the head/next linked list structure
+    particle_sorter!(p, d)
+    
     return nothing
 end
 
@@ -997,6 +1062,67 @@ function probe_field_at_point(
     return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
 end
 
+"""
+Evaluate velocity and Jacobian at point with element hint for faster lookup.
+If the point remains in the hinted element (xi, eta both in [0,1]), avoid element lookup.
+Otherwise, fall back to standard element lookup.
+"""
+@inline function probe_field_at_point_with_hint(
+        x::Real, y::Real,
+        u_coeffs::AbstractVector{T},
+        d::Domain,
+        cache::EvaluationCache,
+        hint_elem::Int,  # Previous element ID as hint
+    ) where {T<:Real}
+    Tout   = probe_output_eltype(T)
+    Lx, Ly = d.box_size
+    nx, ny = d.nel
+
+    x_wrapped = mod(x, Lx)
+    y_wrapped = mod(y, Ly)
+
+    dx = Lx / nx;  dy = Ly / ny
+    inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
+
+    ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
+    ej = clamp(floor(Int, y_wrapped * inv_dy) + 1, 1, ny)
+    elem_idx = (ej - 1) * nx + ei
+
+    xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
+    eta = (y_wrapped - (ej - 1) * dy) * inv_dy
+
+    # If point is still in hinted element and reference coords in [0,1], skip element lookup
+    # Otherwise, recalculate element
+    if hint_elem != elem_idx || xi < 0.0 || xi > 1.0 || eta < 0.0 || eta > 1.0
+        # Point moved to a different element; use standard lookup
+        elem_idx = (ej - 1) * nx + ei
+    end
+
+    points = Mantis.Points.CartesianPoints((SVector{1,Float64}(xi), SVector{1,Float64}(eta)))
+
+    eval_out     = evaluate_fast!(cache, d.R1.fem_space, elem_idx, points, 1)
+    dof_indices  = FunctionSpaces.get_basis_indices(d.R1.fem_space, elem_idx)
+    local_coeffs = @view u_coeffs[dof_indices]
+    n_loc        = length(local_coeffs)
+
+    val_x  = @view eval_out[1][1][1][1:n_loc]
+    val_y  = @view eval_out[1][1][2][1:n_loc]
+    u      = dot(val_x, local_coeffs)
+    v      = dot(val_y, local_coeffs)
+
+    dxi_u  = @view eval_out[2][1][1][1:n_loc]
+    deta_u = @view eval_out[2][2][1][1:n_loc]
+    dxi_v  = @view eval_out[2][1][2][1:n_loc]
+    deta_v = @view eval_out[2][2][2][1:n_loc]
+
+    du_dx = dot(dxi_u,  local_coeffs) * inv_dx
+    du_dy = dot(deta_u, local_coeffs) * inv_dy
+    dv_dx = dot(dxi_v,  local_coeffs) * inv_dx
+    dv_dy = dot(deta_v, local_coeffs) * inv_dy
+
+    return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
+end
+
 """Warm up memoization cache with initial basis evaluation."""
 function warmup_evaluation_memo!(d::Domain)
     cache  = EvaluationCache(evaluation_cache_size(d))
@@ -1041,19 +1167,30 @@ function ensure_B_triplet_capacity!(buf::SimulationBuffers, num_p::Int, d::Domai
     return nothing
 end
 
-"""Build particle-to-grid least-squares matrix."""
+"""Count non-zero particles in each element (used for analysis and diagnostics)."""
+function count_particles_per_element!(counts_elem::Vector{Int}, p::Particles, d::Domain)
+    fill!(counts_elem, 0)
+    @inbounds for eid in 1:length(counts_elem)
+        pid = p.head[eid]
+        while pid != 0
+            counts_elem[eid] += 1
+            pid = p.next[pid]
+        end
+    end
+    return counts_elem
+end
+
+"""Build particle-to-grid least-squares matrix with parallelization."""
 function build_B_matrix(p::Particles, d::Domain, buf::SimulationBuffers)
     fes      = d.R1.fem_space
     num_p    = length(p.x)
     num_dofs = FunctionSpaces.get_num_basis(fes)
     num_elem = prod(d.nel)
-    cache    = buf.thread_caches[1]
 
     ensure_B_triplet_capacity!(buf, num_p, d)
     I_idx  = buf.B_I
     J_idx  = buf.B_J
     V_val  = buf.B_V
-    cursor = 1
 
     if length(buf.elem_basis_indices) != num_elem
         resize!(buf.elem_basis_indices, num_elem)
@@ -1062,16 +1199,50 @@ function build_B_matrix(p::Particles, d::Domain, buf::SimulationBuffers)
         end
     end
 
+    # Pre-compute basis indices for all elements
     @inbounds for eid in 1:num_elem
-        pid = p.head[eid]
-        pid == 0 && continue
-
         dof_indices = buf.elem_basis_indices[eid]
         if isempty(dof_indices)
             dof_indices = collect(FunctionSpaces.get_basis_indices(fes, eid))
             buf.elem_basis_indices[eid] = dof_indices
         end
+    end
+
+    # STEP 1: Count particles per element and compute offsets
+    counts_elem = buf.counts_elem
+    count_particles_per_element!(counts_elem, p, d)
+    
+    offsets = Vector{Int}(undef, num_elem + 1)
+    offsets[1] = 1
+    
+    @inbounds for eid in 1:num_elem
+        n_loc = length(buf.elem_basis_indices[eid])
+        num_particles_in_elem = counts_elem[eid]
+        nnz_this_elem = num_particles_in_elem * n_loc * 2
+        offsets[eid + 1] = offsets[eid] + nnz_this_elem
+    end
+    
+    upper_bound_nnz = offsets[end] - 1
+    ensure_B_triplet_capacity!(buf, upper_bound_nnz, d)
+
+    # STEP 2: Parallel element loop with thread-local writes
+    # Track actual cursor position for each element
+    final_cursors = Vector{Int}(undef, num_elem)
+    
+    Threads.@threads :static for eid in 1:num_elem
+        tid   = Threads.threadid()
+        cache = buf.thread_caches[tid]
+        
+        pid = p.head[eid]
+        if pid == 0
+            final_cursors[eid] = offsets[eid]
+            continue
+        end
+
+        dof_indices = buf.elem_basis_indices[eid]
         n_loc = length(dof_indices)
+        
+        cursor = offsets[eid]
 
         while pid != 0
             points = Mantis.Points.CartesianPoints((
@@ -1107,13 +1278,34 @@ function build_B_matrix(p::Particles, d::Domain, buf::SimulationBuffers)
 
             pid = p.next[pid]
         end
+        
+        final_cursors[eid] = cursor
     end
 
-    actual = cursor - 1
+    # STEP 3: Compact triplet arrays to remove gaps created by filtering
+    # After parallel assembly, element eid has valid entries from offsets[eid] to final_cursors[eid]-1
+    # We need to compact these into a contiguous block
+    write_pos = 1
+    @inbounds for eid in 1:num_elem
+        read_start = offsets[eid]
+        read_end   = final_cursors[eid] - 1
+        num_to_copy = max(0, read_end - read_start + 1)
+        
+        if num_to_copy > 0
+            # Copy valid entries from this element to the next contiguous write position
+            copyto!(I_idx, write_pos, I_idx, read_start, num_to_copy)
+            copyto!(J_idx, write_pos, J_idx, read_start, num_to_copy)
+            copyto!(V_val, write_pos, V_val, read_start, num_to_copy)
+            write_pos += num_to_copy
+        end
+    end
+    
+    actual_nnz = write_pos - 1
+
     return sparse(
-        @view(I_idx[1:actual]),
-        @view(J_idx[1:actual]),
-        @view(V_val[1:actual]),
+        @view(I_idx[1:actual_nnz]),
+        @view(J_idx[1:actual_nnz]),
+        @view(V_val[1:actual_nnz]),
         2num_p, num_dofs,
     )
 end
@@ -1369,6 +1561,31 @@ end
     return vel, jac
 end
 
+"""
+Evaluate physical velocity and Jacobian at point with element hint for optimization.
+During RK sub-steps, particles move minimally, so the element hint reduces redundant lookups.
+"""
+@inline function physical_velocity_and_jacobian_hint(
+        x::T, y::T,
+        u_coeffs::AbstractVector{U},
+        d::Domain, cache::EvaluationCache,
+        hint_elem::Int,
+    ) where {T<:AbstractFloat, U<:Real}
+    raw_vel, raw_grad = probe_field_at_point_with_hint(x, y, u_coeffs, d, cache, hint_elem)
+
+    u = -raw_vel[2]
+    v =  raw_vel[1]
+
+    ux = -raw_grad[2, 1]
+    uy = -raw_grad[2, 2]
+    vx =  raw_grad[1, 1]
+    vy =  raw_grad[1, 2]
+
+    vel = SVector{2, T}(u, v)
+    jac = SMatrix{2, 2, T, 4}(ux, vx, uy, vy)
+    return vel, jac
+end
+
 """Iteratively rescale pullback to unit determinant."""
 @inline function clamp_pullback(
         pullback::SMatrix{2, 2, T, 4};
@@ -1430,12 +1647,22 @@ end
         pullback_max_iter::Int,
     ) where {T<:AbstractFloat, U<:Real}
     Lx, Ly = d.box_size
+    nx, ny = d.nel
     c1 = dt / 6
     c2 = dt / 3
     c3 = dt / 3
     c4 = dt / 6
 
-    v1, J1 = physical_velocity_and_jacobian(pos[1], pos[2], u_coeffs, d, cache)
+    # Calculate initial element as hint for RK stages
+    x_wrapped = mod(pos[1], Lx)
+    y_wrapped = mod(pos[2], Ly)
+    dx = Lx / nx;  dy = Ly / ny
+    inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
+    ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
+    ej = clamp(floor(Int, y_wrapped * inv_dy) + 1, 1, ny)
+    hint_elem = (ej - 1) * nx + ei
+
+    v1, J1 = physical_velocity_and_jacobian_hint(pos[1], pos[2], u_coeffs, d, cache, hint_elem)
     Pdot1 = -(transpose(J1) * input_pullback)
 
     midp1_raw = pos + (dt * 0.5) * v1
@@ -1443,7 +1670,7 @@ end
     midp1 = SVector{2, T}(mx, my)
     midP1 = input_pullback + (dt * 0.5) * Pdot1
 
-    v2, J2 = physical_velocity_and_jacobian(midp1[1], midp1[2], u_coeffs, d, cache)
+    v2, J2 = physical_velocity_and_jacobian_hint(midp1[1], midp1[2], u_coeffs, d, cache, hint_elem)
     Pdot2 = -(transpose(J2) * midP1)
 
     midp2_raw = pos + (dt * 0.5) * v2
@@ -1451,7 +1678,7 @@ end
     midp2 = SVector{2, T}(mx, my)
     midP2 = input_pullback + (dt * 0.5) * Pdot2
 
-    v3, J3 = physical_velocity_and_jacobian(midp2[1], midp2[2], u_coeffs, d, cache)
+    v3, J3 = physical_velocity_and_jacobian_hint(midp2[1], midp2[2], u_coeffs, d, cache, hint_elem)
     Pdot3 = -(transpose(J3) * midP2)
 
     midp3_raw = pos + dt * v3
@@ -1459,7 +1686,7 @@ end
     midp3 = SVector{2, T}(mx, my)
     midP3 = input_pullback + dt * Pdot3
 
-    v4, J4 = physical_velocity_and_jacobian(midp3[1], midp3[2], u_coeffs, d, cache)
+    v4, J4 = physical_velocity_and_jacobian_hint(midp3[1], midp3[2], u_coeffs, d, cache, hint_elem)
     Pdot4 = -(transpose(J4) * midP3)
 
     pullback = input_pullback + c1 * Pdot1 + c2 * Pdot2 + c3 * Pdot3 + c4 * Pdot4
@@ -1471,7 +1698,7 @@ end
     return SVector{2, T}(px, py), pullback
 end
 
-"""Advance position and pullback by one RK2 step."""
+"""Advance position and pullback by one RK2 step with element hint optimization."""
 @inline function pullback_rk2_step(
         pos::SVector{2, T},
         input_pullback::SMatrix{2, 2, T, 4},
@@ -1485,8 +1712,18 @@ end
         pullback_max_iter::Int,
     ) where {T<:AbstractFloat, U<:Real}
     Lx, Ly = d.box_size
+    nx, ny = d.nel
 
-    v1, J1 = physical_velocity_and_jacobian(pos[1], pos[2], u_coeffs, d, cache)
+    # Calculate initial element as hint for RK stages
+    x_wrapped = mod(pos[1], Lx)
+    y_wrapped = mod(pos[2], Ly)
+    dx = Lx / nx;  dy = Ly / ny
+    inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
+    ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
+    ej = clamp(floor(Int, y_wrapped * inv_dy) + 1, 1, ny)
+    hint_elem = (ej - 1) * nx + ei
+
+    v1, J1 = physical_velocity_and_jacobian_hint(pos[1], pos[2], u_coeffs, d, cache, hint_elem)
     Pdot1 = -(transpose(J1) * input_pullback)
 
     midp_raw = pos + (dt * 0.5) * v1
@@ -1494,7 +1731,7 @@ end
     midp = SVector{2, T}(mx, my)
     midP = input_pullback + (dt * 0.5) * Pdot1
 
-    v2, J2 = physical_velocity_and_jacobian(midp[1], midp[2], u_coeffs, d, cache)
+    v2, J2 = physical_velocity_and_jacobian_hint(midp[1], midp[2], u_coeffs, d, cache, hint_elem)
     Pdot2 = -(transpose(J2) * midP)
 
     pullback = input_pullback + dt * Pdot2
@@ -2494,6 +2731,10 @@ function main(cfg::SimulationConfig=SimulationConfig())
 
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step * dt, digits=3)))...")
+
+        if mod(step, 5) == 0
+            physical_spatial_sort!(particles, domain)  # Every 5 steps
+        end
 
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
 
