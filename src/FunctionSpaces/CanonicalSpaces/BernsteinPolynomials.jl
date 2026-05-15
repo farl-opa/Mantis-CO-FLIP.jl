@@ -61,6 +61,33 @@ Memoization.@memoize function evaluate(
 end
 
 """
+    evaluate_at!(out::AbstractMatrix{Float64}, polynomial::Bernstein, xi::Float64, nderivatives::Int)
+
+Allocation-free leaf evaluator for a single point. Writes Bernstein basis values and
+derivatives at `xi` ∈ [0,1] into `out`, which must be sized at least `(p+1, nderivatives+1)`.
+
+Layout: `out[i+1, k+1] = (dᵏ/dξᵏ) Bᵢ,ₚ(ξ)` for `i ∈ 0:p`, `k ∈ 0:nderivatives`.
+
+Unlike the memoized `evaluate(::Bernstein, ::AbstractPoints{1}, nderivatives)`, this method
+does not allocate or touch the memoization cache — intended for hot per-particle probes
+where `ξ` varies continuously (cache miss every call).
+"""
+@inline function evaluate_at!(
+    out::AbstractMatrix{Float64},
+    polynomial::Bernstein,
+    xi::Float64,
+    nderivatives::Int,
+)
+    p = get_polynomial_degree(polynomial)
+    @inbounds for k in 0:nderivatives
+        for i in 0:p
+            out[i + 1, k + 1] = _dbpoly(p, i, k, xi)
+        end
+    end
+    return out
+end
+
+"""
     _evaluate(polynomial::Bernstein, xi::Float64, nderivatives::Int64)
 
 Compute derivatives up to order `nderivatives` for all Bernstein polynomials of degree `p`

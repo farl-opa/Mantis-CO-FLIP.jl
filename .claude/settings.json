@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(julia \"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/delftblue_cases/_apply_optimizations.jl\")",
+      "Bash(julia \"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/delftblue_cases/_apply_curl_consistent.jl\")"
+    ]
+  }
+}

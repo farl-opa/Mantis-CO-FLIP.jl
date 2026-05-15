@@ -16,7 +16,7 @@ gr()
 
 const DEFAULT_OUTPUT_DIR = get(ENV, "OUTPUT_DIR", pwd())
 
-struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF}
+struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F}
     R0::F0
     R1::F1
     R2::F2
@@ -29,8 +29,13 @@ struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF}
     LHS_Hodge_fact::HF
     N_Hodge::NH
     Mass_matrix::MM
+    K_R0::KR0
+    K_R0_fact::KR0F
+    G_R0_R1::GG
+    Mass1_fact::M1F
     eval_cache_size::Int
     box_size::NTuple{2,Float64}
+    R1_basis_indices::Vector{Vector{Int}}
 end
 
 mutable struct Particles
@@ -52,10 +57,14 @@ mutable struct Particles
 end
 
 struct EvaluationCache
-    temp_mat::Matrix{Float64}
     results::Vector{Vector{Vector{Matrix{Float64}}}}
-    xi_buf::Vector{Float64}
-    eta_buf::Vector{Float64}
+    # Scratch buffers for the allocation-free 2D fast-path (per dimension):
+    # bern_buf[d]  is (p+1, nder+1)  — Bernstein values
+    # bsp_vals[d]  is (nder+1, n_bsp) — after BSpline extraction
+    # gtb_vals[d]  is (nder+1, n_gtb) — after GTBSpline extraction
+    bern_buf::NTuple{2, Matrix{Float64}}
+    bsp_vals::NTuple{2, Matrix{Float64}}
+    gtb_vals::NTuple{2, Matrix{Float64}}
 
     """Allocates basis-evaluation storage for fast local element evaluations."""
     function EvaluationCache(max_basis_size::Int)
@@ -63,7 +72,15 @@ struct EvaluationCache
         v1  = [[zeros(1, max_basis_size) for _ in 1:2] for _ in 1:2]
         res = Vector{Vector{Vector{Matrix{Float64}}}}(undef, 2)
         res[1] = v0; res[2] = v1
-        return new(zeros(1, max_basis_size), res, zeros(1), zeros(1))
+
+        # Oversized to handle p ≤ 11 and nderivatives ≤ 3 (current use is p=3, nder=1)
+        MAX_P1  = 12
+        MAX_ND1 = 4
+        bern = (zeros(MAX_P1, MAX_ND1), zeros(MAX_P1, MAX_ND1))
+        bsp  = (zeros(MAX_ND1, MAX_P1), zeros(MAX_ND1, MAX_P1))
+        gtb  = (zeros(MAX_ND1, MAX_P1), zeros(MAX_ND1, MAX_P1))
+
+        return new(res, bern, bsp, gtb)
     end
 end
 
@@ -170,6 +187,7 @@ Base.@kwdef struct SimulationConfig
     fp_tol::Float64                   = 5e-9
     enable_energy_correction::Bool    = true
     enable_pressure_kick::Bool        = true
+    pressure_kick_method::Symbol      = :curl_consistent
     pic_blend_alpha::Float64          = 0.0
     min_particles_per_element::Int    = 10
     max_particles_per_element::Int    = 25
@@ -228,12 +246,26 @@ function GenerateDomain(
     A, N = assemble_hodge_laplacian_matrices(R[2], R[3], dΩ)
     A_fact = lu(A)
     M = assemble_1form_mass_matrix(R[2], dΩ)
+    M_fact = lu(M)
 
-    eval_cache_size = maximum(
-        length(FunctionSpaces.get_basis_indices(R[2].fem_space, eid)) for eid in 1:prod(nel)
-    )
+    K_R0 = assemble_R0_stiffness_matrix(R[1], dΩ)
+    G_R0_R1 = assemble_R0_R1_weak_grad_matrix(R[1], R[2], dΩ)
 
-    return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k, A, A_fact, N, M, eval_cache_size, box_size)
+    n0 = size(K_R0, 1)
+    ridge_R0 = 1e-10 * (sum(abs, diag(K_R0)) / max(n0, 1) + 1.0)
+    K_R0_reg = K_R0 + ridge_R0 * sparse(I, n0, n0)
+    K_R0_fact = lu(K_R0_reg)
+
+    num_elements_R1 = prod(nel)
+    R1_basis_indices = Vector{Vector{Int}}(undef, num_elements_R1)
+    for eid in 1:num_elements_R1
+        R1_basis_indices[eid] = collect(FunctionSpaces.get_basis_indices(R[2].fem_space, eid))
+    end
+    eval_cache_size = maximum(length(bi) for bi in R1_basis_indices)
+
+    return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k,
+                  A, A_fact, N, M, K_R0, K_R0_fact, G_R0_R1, M_fact,
+                  eval_cache_size, box_size, R1_basis_indices)
 end
 
 """Evaluate analytic velocity field at specified point."""
@@ -924,7 +956,7 @@ end
 
 """Evaluate basis and derivatives at sample point with caching."""
 function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P, nderivatives::Int) where {S, P}
-    for ord in 1:(nderivatives+1)
+    @inbounds for ord in 1:(nderivatives+1)
         for der in 1:length(cache.results[ord])
             for comp in 1:2
                 fill!(cache.results[ord][der][comp], 0.0)
@@ -934,7 +966,7 @@ function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P
 
     num_components = 2
 
-    for component_idx in 1:num_components
+    @inbounds for component_idx in 1:num_components
         extraction_coefficients, J = FunctionSpaces.get_extraction(space, element_id, component_idx)
         component_basis = FunctionSpaces.get_local_basis(space, element_id, xi, nderivatives, component_idx)
 
@@ -947,6 +979,117 @@ function evaluate_fast!(cache::EvaluationCache, space::S, element_id::Int, xi::P
             end
         end
     end
+    return cache.results
+end
+
+"""
+Allocation-free, thread-safe 2D fast-path evaluator that bypasses Mantis's allocating
+`evaluate` chain for the CO-FLIP setup. Expects `space` to be a DirectSumSpace with 2
+TensorProductSpace components, each having 2 1D GTBSplineSpace constituents (1 patch
+each, single BSplineSpace inside). Writes into `cache.results` in the same layout as
+`evaluate_fast!`.
+
+Caller passes (xi, eta) ∈ [0,1] reference coords for the element directly — no
+CartesianPoints wrapping. nderivatives ≤ 1 is supported in this implementation.
+"""
+@inline function evaluate_fast_2d!(
+    cache::EvaluationCache,
+    space,
+    element_id::Int,
+    xi_d1::Float64,
+    xi_d2::Float64,
+    nderivatives::Int,
+)
+    @inbounds for ord in 1:(nderivatives + 1)
+        for der in 1:length(cache.results[ord])
+            for comp in 1:2
+                fill!(cache.results[ord][der][comp], 0.0)
+            end
+        end
+    end
+
+    J_offset = 0
+    @inbounds for c in 1:2
+        tp_space    = space.component_spaces[c]
+        gtb_space_1 = tp_space.constituent_spaces[1]
+        gtb_space_2 = tp_space.constituent_spaces[2]
+
+        cart_idx = tp_space.cart_num_elements[element_id]
+        e1 = cart_idx[1]
+        e2 = cart_idx[2]
+
+        # Single-patch GTBSpline assumed (CO-FLIP setup): patch_id = 1
+        bsp_space_1 = gtb_space_1.patch_spaces[1]
+        bsp_space_2 = gtb_space_2.patch_spaces[1]
+
+        bsp_ext_1 = bsp_space_1.extraction_op.extraction_coefficients[e1][1]
+        bsp_ext_2 = bsp_space_2.extraction_op.extraction_coefficients[e2][1]
+        gtb_ext_1 = gtb_space_1.extraction_op.extraction_coefficients[e1][1]
+        gtb_ext_2 = gtb_space_2.extraction_op.extraction_coefficients[e2][1]
+
+        polynomial_1 = bsp_space_1.polynomials
+        polynomial_2 = bsp_space_2.polynomials
+        p1 = polynomial_1.p
+        p2 = polynomial_2.p
+        nd1 = nderivatives + 1
+        n_bsp_1 = size(bsp_ext_1, 2)
+        n_bsp_2 = size(bsp_ext_2, 2)
+        n_gtb_1 = size(gtb_ext_1, 2)
+        n_gtb_2 = size(gtb_ext_2, 2)
+
+        # Leaf Bernstein evals — allocation-free
+        bern_1 = @view cache.bern_buf[1][1:(p1 + 1), 1:nd1]
+        bern_2 = @view cache.bern_buf[2][1:(p2 + 1), 1:nd1]
+        Mantis.FunctionSpaces.evaluate_at!(bern_1, polynomial_1, xi_d1, nderivatives)
+        Mantis.FunctionSpaces.evaluate_at!(bern_2, polynomial_2, xi_d2, nderivatives)
+
+        # Apply BSpline extraction: (nd1, p+1) × (p+1, n_bsp) → (nd1, n_bsp)
+        bsp_vals_1 = @view cache.bsp_vals[1][1:nd1, 1:n_bsp_1]
+        bsp_vals_2 = @view cache.bsp_vals[2][1:nd1, 1:n_bsp_2]
+        mul!(bsp_vals_1, transpose(bern_1), bsp_ext_1)
+        mul!(bsp_vals_2, transpose(bern_2), bsp_ext_2)
+
+        # Apply GTBSpline extraction: (nd1, n_bsp) × (n_bsp, n_gtb) → (nd1, n_gtb)
+        gtb_vals_1 = @view cache.gtb_vals[1][1:nd1, 1:n_gtb_1]
+        gtb_vals_2 = @view cache.gtb_vals[2][1:nd1, 1:n_gtb_2]
+        mul!(gtb_vals_1, bsp_vals_1, gtb_ext_1)
+        mul!(gtb_vals_2, bsp_vals_2, gtb_ext_2)
+
+        # 2D kron pattern (matches Mantis): result_2d[(i-1)*n_gtb_1 + j] = vals_2[i] * vals_1[j]
+        # Value key (0,0):
+        out_val = cache.results[1][1][c]
+        for i in 1:n_gtb_2
+            v2 = gtb_vals_2[1, i]
+            base = J_offset + (i - 1) * n_gtb_1
+            for j in 1:n_gtb_1
+                out_val[1, base + j] = v2 * gtb_vals_1[1, j]
+            end
+        end
+
+        if nderivatives >= 1
+            # d/dxi key (1,0): k_1=1, k_2=0
+            out_dxi = cache.results[2][1][c]
+            for i in 1:n_gtb_2
+                v2 = gtb_vals_2[1, i]
+                base = J_offset + (i - 1) * n_gtb_1
+                for j in 1:n_gtb_1
+                    out_dxi[1, base + j] = v2 * gtb_vals_1[2, j]
+                end
+            end
+            # d/deta key (0,1): k_1=0, k_2=1
+            out_deta = cache.results[2][2][c]
+            for i in 1:n_gtb_2
+                v2 = gtb_vals_2[2, i]
+                base = J_offset + (i - 1) * n_gtb_1
+                for j in 1:n_gtb_1
+                    out_deta[1, base + j] = v2 * gtb_vals_1[1, j]
+                end
+            end
+        end
+
+        J_offset += n_gtb_1 * n_gtb_2
+    end
+
     return cache.results
 end
 
@@ -974,10 +1117,8 @@ function probe_field_at_point(
     xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
     eta = (y_wrapped - (ej - 1) * dy) * inv_dy
 
-    points = Mantis.Points.CartesianPoints((SVector{1,Float64}(xi), SVector{1,Float64}(eta)))
-
-    eval_out     = evaluate_fast!(cache, d.R1.fem_space, elem_idx, points, 1)
-    dof_indices  = FunctionSpaces.get_basis_indices(d.R1.fem_space, elem_idx)
+    eval_out     = evaluate_fast_2d!(cache, d.R1.fem_space, elem_idx, xi, eta, 1)
+    dof_indices  = d.R1_basis_indices[elem_idx]
     local_coeffs = @view u_coeffs[dof_indices]
     n_loc        = length(local_coeffs)
 
@@ -999,11 +1140,13 @@ function probe_field_at_point(
     return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
 end
 
-"""Warm up memoization cache with initial basis evaluation."""
+"""Warm up basis-evaluation paths (compilation, memoization)."""
 function warmup_evaluation_memo!(d::Domain)
     cache  = EvaluationCache(evaluation_cache_size(d))
     points = Mantis.Points.CartesianPoints(([0.5], [0.5]))
     evaluate_fast!(cache, d.R1.fem_space, 1, points, 1)
+    evaluate_fast_2d!(cache, d.R1.fem_space, 1, 0.5, 0.5, 1)
+    evaluate_fast_2d!(cache, d.R1.fem_space, 1, 0.5, 0.5, 0)
     return nothing
 end
 
@@ -1118,7 +1261,7 @@ end
         u_coeffs::AbstractVector{T},
         d::Domain,
         cache::EvaluationCache,
-        hint_elem::Int,
+        _hint_elem::Int,  # reserved for future hint optimization
     ) where {T<:Real}
     Tout   = probe_output_eltype(T)
     Lx, Ly = d.box_size
@@ -1137,16 +1280,8 @@ end
     xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
     eta = (y_wrapped - (ej - 1) * dy) * inv_dy
 
-    # If point is still in hinted element and reference coords in [0,1], skip element lookup
-    if hint_elem != elem_idx || xi < 0.0 || xi > 1.0 || eta < 0.0 || eta > 1.0
-        # Point moved to a different element; use standard lookup
-        elem_idx = (ej - 1) * nx + ei
-    end
-
-    points = Mantis.Points.CartesianPoints((SVector{1,Float64}(xi), SVector{1,Float64}(eta)))
-
-    eval_out     = evaluate_fast!(cache, d.R1.fem_space, elem_idx, points, 1)
-    dof_indices  = FunctionSpaces.get_basis_indices(d.R1.fem_space, elem_idx)
+    eval_out     = evaluate_fast_2d!(cache, d.R1.fem_space, elem_idx, xi, eta, 1)
+    dof_indices  = d.R1_basis_indices[elem_idx]
     local_coeffs = @view u_coeffs[dof_indices]
     n_loc        = length(local_coeffs)
 
@@ -1254,11 +1389,7 @@ function build_B_matrix(p::Particles, d::Domain, buf::SimulationBuffers)
         cursor = offsets[eid]
 
         while pid != 0
-            points = Mantis.Points.CartesianPoints((
-                SVector{1,Float64}(p.can_x[pid]),
-                SVector{1,Float64}(p.can_y[pid]),
-            ))
-            eval_out = evaluate_fast!(cache, fes, eid, points, 0)
+            eval_out = evaluate_fast_2d!(cache, fes, eid, p.can_x[pid], p.can_y[pid], 0)
 
             vals_x = @view eval_out[1][1][1][1, 1:n_loc]
             vals_y = @view eval_out[1][1][2][1, 1:n_loc]
@@ -1415,6 +1546,44 @@ function assemble_1form_mass_matrix(R1_space::F, dΩ::Q) where {F, Q}
     return M
 end
 
+"""Assemble scalar Laplacian (R0 stiffness): K[i,j] = ∫(d(ψᵢ) ∧ ★ d(ψⱼ))."""
+function assemble_R0_stiffness_matrix(R0_space::F, dΩ::Q) where {F, Q}
+    weak_form_inputs = Assemblers.WeakFormInputs(R0_space)
+    ε⁰ = Assemblers.get_test_form(weak_form_inputs)
+    u⁰ = Assemblers.get_trial_form(weak_form_inputs)
+
+    A = ∫(d(ε⁰) ∧ ★(d(u⁰)), dΩ)
+
+    lhs_expressions = ((A,),)
+    rhs_expressions = ((0,),)
+
+    weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
+    K, _ = Assemblers.assemble(weak_form; rhs_type=SparseArrays.SparseMatrixCSC{Float64, Int})
+    return K
+end
+
+"""
+Assemble rectangular weak-gradient block G[i,j] = ∫(d(ψᵢ⁰) ∧ ★ φⱼ¹) coupling R0 (rows)
+with R1 (cols). Provides the weak-divergence operator τ̃ ↦ G·τ̃ ∈ R0 and, via its
+transpose, satisfies M₁·d₀ = Gᵀ for the FEEC complex.
+"""
+function assemble_R0_R1_weak_grad_matrix(R0_space::F0, R1_space::F1, dΩ::Q) where {F0, F1, Q}
+    weak_form_inputs = Assemblers.WeakFormInputs((R0_space, R1_space))
+    ε⁰, _ε¹ = Assemblers.get_test_forms(weak_form_inputs)
+    _u⁰, u¹ = Assemblers.get_trial_forms(weak_form_inputs)
+
+    A_12 = ∫(d(ε⁰) ∧ ★(u¹), dΩ)
+    lhs_expressions = ((0, A_12), (0, 0))
+    rhs_expressions = ((0, 0), (0, 0))
+
+    weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
+    sys, _ = Assemblers.assemble(weak_form; rhs_type=SparseArrays.SparseMatrixCSC{Float64, Int})
+
+    n0 = FunctionSpaces.get_num_basis(R0_space.fem_space)
+    n1 = FunctionSpaces.get_num_basis(R1_space.fem_space)
+    return sys[1:n0, (n0 + 1):(n0 + n1)]
+end
+
 """Apply energy-conserving correction orthogonal to midpoint velocity."""
 function apply_energy_correction!(
         f_next::AbstractVector{Tn},
@@ -1470,13 +1639,110 @@ function apply_pressure_correction!(
     if isempty(thread_caches)
         throw(ArgumentError("thread_caches must not be empty"))
     end
-
-    cache = thread_caches[1]
-    @inbounds for i in 1:length(p.x)
-        val, _ = probe_field_at_point(p.x[i], p.y[i], tau_coeffs, d, cache)
-        p.my[i] += delta_scale * val[1]
-        p.mx[i] -= delta_scale * val[2]
+    n_thread_slots = Threads.maxthreadid()
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
     end
+
+    num_p = length(p.x)
+    Threads.@threads :static for i in 1:num_p
+        cache = thread_caches[Threads.threadid()]
+        @inbounds begin
+            val, _ = probe_field_at_point(p.x[i], p.y[i], tau_coeffs, d, cache)
+            p.my[i] += delta_scale * val[1]
+            p.mx[i] -= delta_scale * val[2]
+        end
+    end
+end
+
+"""
+Curl-consistent pressure-force kick (Section 6.2.2 of the CO-FLIP paper).
+
+Given τ = f_projected − f_pre_projection on the grid (stored in R1 with flux-form
+convention), this routine:
+  1. interpolates τ to the particles as a flux form (same read-out as the
+     div-consistent path), producing per-particle physical force vectors;
+  2. inverse-interpolates those particle force vectors back to a discrete 1-form τ̃
+     ∈ R1 (1-form storage) via the LSQR P2G operator B;
+  3. solves the weak Poisson reconstruction
+         K_R0 · p̃ = G_R0_R1 · τ̃
+     (regularised with a tiny diagonal ridge and mean-pinned) to find the closest
+     exact 1-form;
+  4. computes d₀p̃ in R1 via the FEEC identity M₁ · d₀ = (G_R0_R1)ᵀ and probes the
+     result at every particle, adding the curl-free physical gradient to (mx, my).
+"""
+function apply_pressure_correction_curl!(
+        p::Particles,
+        f_projected::AbstractVector{Tp},
+        f_pre_projection::AbstractVector{Tq},
+        d::Domain,
+        buf::SimulationBuffers,
+        thread_caches::Vector{EvaluationCache};
+        delta_scale::Float64=1.0,
+        atol::Float64=1e-9,
+        btol::Float64=1e-9,
+        maxiter::Int=2000,
+        error_on_nonconvergence::Bool=true,
+    ) where {Tp<:Real, Tq<:Real}
+    if isempty(thread_caches)
+        throw(ArgumentError("thread_caches must not be empty"))
+    end
+    n_thread_slots = Threads.maxthreadid()
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
+    end
+
+    tau_coeffs = compute_pressure_delta(f_projected, f_pre_projection)
+    num_p = length(p.x)
+
+    Fx = Vector{Float64}(undef, num_p)
+    Fy = Vector{Float64}(undef, num_p)
+
+    Threads.@threads :static for i in 1:num_p
+        cache = thread_caches[Threads.threadid()]
+        @inbounds begin
+            val, _ = probe_field_at_point(p.x[i], p.y[i], tau_coeffs, d, cache)
+            Fx[i] = -val[2]
+            Fy[i] =  val[1]
+        end
+    end
+
+    B = build_B_matrix(p, d, buf)
+
+    V_p = @view buf.V_p[1:(2 * num_p)]
+    @inbounds for i in 1:num_p
+        w = sqrt(p.volume[i])
+        V_p[2i - 1] = Fx[i] * w
+        V_p[2i]     = Fy[i] * w
+    end
+
+    tilde_tau = zeros(Float64, size(B, 2))
+    _, ch = IterativeSolvers.lsqr!(tilde_tau, B, V_p; atol=atol, btol=btol,
+                                   maxiter=maxiter, log=true)
+    if !ch.isconverged && error_on_nonconvergence
+        @error "Curl-consistent P2G LSQR did not converge" iters=ch.iters atol=atol btol=btol maxiter=maxiter
+    end
+
+    rhs_R0 = d.G_R0_R1 * tilde_tau
+    rhs_mean = sum(rhs_R0) / length(rhs_R0)
+    @. rhs_R0 -= rhs_mean
+
+    p_tilde = d.K_R0_fact \ rhs_R0
+    p_mean = sum(p_tilde) / length(p_tilde)
+    @. p_tilde -= p_mean
+
+    rhs1 = transpose(d.G_R0_R1) * p_tilde
+    g_R1 = d.Mass1_fact \ rhs1
+
+    Threads.@threads :static for i in 1:num_p
+        cache = thread_caches[Threads.threadid()]
+        @inbounds begin
+            val, _ = probe_field_at_point(p.x[i], p.y[i], g_R1, d, cache)
+            p.mx[i] += delta_scale * val[1]
+            p.my[i] += delta_scale * val[2]
+        end
+    end
+    return nothing
 end
 
 """Blend particle velocity toward grid velocity."""
@@ -1492,16 +1758,23 @@ function apply_pic_blend!(
     if isempty(thread_caches)
         throw(ArgumentError("thread_caches must not be empty"))
     end
+    n_thread_slots = Threads.maxthreadid()
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
+    end
 
-    cache = thread_caches[1]
-    @inbounds for i in 1:length(p.x)
-        raw_vel, _ = probe_field_at_point(p.x[i], p.y[i], f_coeffs, d, cache)
+    num_p = length(p.x)
+    Threads.@threads :static for i in 1:num_p
+        cache = thread_caches[Threads.threadid()]
+        @inbounds begin
+            raw_vel, _ = probe_field_at_point(p.x[i], p.y[i], f_coeffs, d, cache)
 
-        u_g = -raw_vel[2]
-        v_g =  raw_vel[1]
+            u_g = -raw_vel[2]
+            v_g =  raw_vel[1]
 
-        p.mx[i] = (1.0 - alpha) * p.mx[i] + alpha * u_g
-        p.my[i] = (1.0 - alpha) * p.my[i] + alpha * v_g
+            p.mx[i] = (1.0 - alpha) * p.mx[i] + alpha * u_g
+            p.my[i] = (1.0 - alpha) * p.my[i] + alpha * v_g
+        end
     end
     return nothing
 end
@@ -2095,10 +2368,25 @@ function step_co_flip!(
 
     if cfg.enable_pressure_kick
         t0 = time()
-        apply_pressure_correction!(
-            p, f_np1_proj, f_np1, d, thread_caches; delta_scale=1.0,
-        )
-        println("  [pressure kick enabled — FLIP/hybrid] t=$(round(time()-t0,digits=2))s")
+        if cfg.pressure_kick_method === :div_consistent
+            apply_pressure_correction!(
+                p, f_np1_proj, f_np1, d, thread_caches; delta_scale=1.0,
+            )
+            println("  [pressure kick enabled — div-consistent (FLIP/hybrid)] t=$(round(time()-t0,digits=2))s")
+        elseif cfg.pressure_kick_method === :curl_consistent
+            apply_pressure_correction_curl!(
+                p, f_np1_proj, f_np1, d, buf, thread_caches;
+                delta_scale=1.0,
+                atol=cfg.lsqr_atol, btol=cfg.lsqr_btol,
+                maxiter=cfg.lsqr_maxiter,
+                error_on_nonconvergence=cfg.lsqr_error_on_nonconvergence,
+            )
+            println("  [pressure kick enabled — curl-consistent (FEEC Poisson)] t=$(round(time()-t0,digits=2))s")
+        else
+            throw(ArgumentError(
+                "pressure_kick_method must be :div_consistent or :curl_consistent, got $(cfg.pressure_kick_method)"
+            ))
+        end
     end
 
     apply_pic_blend!(p, f_np1_proj, d, thread_caches, cfg.pic_blend_alpha)
