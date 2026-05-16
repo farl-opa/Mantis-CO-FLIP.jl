@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(julia \"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/delftblue_cases/_apply_optimizations.jl\")",
-      "Bash(julia \"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/delftblue_cases/_apply_curl_consistent.jl\")"
+      "Bash(julia \"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/delftblue_cases/_apply_curl_consistent.jl\")",
+      "Bash(julia --color=no -e 'Meta.parseall\\(read\\(\"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\)')",
+      "Bash(julia --color=no --project -e ' *)",
+      "Bash(julia --color=no --project --threads=1 -e ' *)",
+      "Bash(julia \"c:/Users/opele/Mantis-CO-FLIP.jl/CO-FLIP/delftblue_cases/_apply_lsqr_preconditioning.jl\")"
     ]
   }
 }

@@ -16,7 +16,7 @@ gr()
 
 const DEFAULT_OUTPUT_DIR = get(ENV, "OUTPUT_DIR", pwd())
 
-struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F}
+struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F, CS}
     R0::F0
     R1::F1
     R2::F2
@@ -29,6 +29,7 @@ struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F}
     LHS_Hodge_fact::HF
     N_Hodge::NH
     Mass_matrix::MM
+    Curl_stiffness_R1::CS
     K_R0::KR0
     K_R0_fact::KR0F
     G_R0_R1::GG
@@ -36,6 +37,13 @@ struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F}
     eval_cache_size::Int
     box_size::NTuple{2,Float64}
     R1_basis_indices::Vector{Vector{Int}}
+    # Per-axis boundary condition (:periodic or :wall). Walls enforce u·n = 0
+    # (free-slip) on both sides of the corresponding axis.
+    bc::NTuple{2,Symbol}
+    # Global indices of R1 1-form DOFs whose physical proxy is the wall-normal
+    # velocity component. Pinned to zero so wall normal velocity vanishes
+    # exactly. Empty when bc is fully periodic.
+    wall_dofs_R1::Vector{Int}
 end
 
 mutable struct Particles
@@ -175,7 +183,10 @@ Base.@kwdef struct SimulationConfig
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (1.0, 1.0)
     starting_point::NTuple{2,Float64} = (0.0, 0.0)
-    boundary_condition::Symbol        = :periodic
+    # :periodic (back-compat shorthand for both axes), or per-axis NTuple
+    # like (:periodic, :wall) or (:wall, :wall). :wall means free-slip
+    # (u·n = 0 on both sides of that axis).
+    boundary_condition::Union{Symbol, NTuple{2,Symbol}} = :periodic
     particles_per_cell::Int           = 20
     stratified_seeding::Bool          = true
     volume_convention::Symbol         = :cell_fraction
@@ -183,6 +194,7 @@ Base.@kwdef struct SimulationConfig
     flow_type::Symbol                 = :convecting
     target_cfl::Float64               = 0.5
     T_final::Float64                  = 1.0
+    viscosity::Float64                = 0.0
     max_fp_iter::Int                  = 6
     fp_tol::Float64                   = 5e-9
     enable_energy_correction::Bool    = true
@@ -216,6 +228,151 @@ probe_output_eltype(::Type{T}) where {T<:Real} = promote_type(Float64, T)
 """Get maximum local basis size for evaluation cache."""
 evaluation_cache_size(d::Domain) = d.eval_cache_size
 
+"""Normalize a user-supplied boundary_condition to per-axis NTuple{2,Symbol}."""
+function normalize_bc(bc)::NTuple{2,Symbol}
+    if bc isa Symbol
+        if bc === :periodic
+            return (:periodic, :periodic)
+        elseif bc === :wall
+            return (:wall, :wall)
+        elseif bc === :neumann
+            @warn "boundary_condition :neumann is a legacy stub; treating as :periodic."
+            return (:periodic, :periodic)
+        else
+            throw(ArgumentError(
+                "boundary_condition Symbol must be :periodic or :wall, got $bc"
+            ))
+        end
+    elseif bc isa NTuple{2,Symbol}
+        for s in bc
+            s === :periodic || s === :wall || throw(ArgumentError(
+                "per-axis boundary_condition entries must be :periodic or :wall, got $s"
+            ))
+        end
+        return bc
+    else
+        throw(ArgumentError(
+            "boundary_condition must be Symbol or NTuple{2,Symbol}, got $(typeof(bc))"
+        ))
+    end
+end
+
+"""True if BC has any walled axis (pure-periodic returns false)."""
+has_walls(bc::NTuple{2,Symbol}) = any(s -> s === :wall, bc)
+
+"""Per-axis position policy modes derived from BC."""
+@inline bc_to_position_modes(bc::NTuple{2,Symbol}) =
+    (bc[1] === :wall ? :clamp : :periodic, bc[2] === :wall ? :clamp : :periodic)
+
+"""
+Compute global R1 DOF indices that must vanish for free-slip (u·n=0) walls.
+
+The R1 1-form has two TensorProductSpace components in a DirectSumSpace:
+- component 1 (dx-form, basis combination [1]): D_x ⊗ P_y. Its rotated proxy is
+  the physical y-velocity, so it must vanish on y-walls (top/bottom).
+- component 2 (dy-form, basis combination [2]): P_x ⊗ D_y. Its rotated proxy
+  is the (negated) physical x-velocity, so it must vanish on x-walls.
+
+For an open-knot non-periodic B-spline, only the first and last univariate
+basis functions are nonzero at the endpoints, so we pick those by univariate
+index. For periodic axes we skip the corresponding wall.
+"""
+function compute_wall_dofs_R1(R1_space, bc::NTuple{2,Symbol})::Vector{Int}
+    has_walls(bc) || return Int[]
+
+    components   = FunctionSpaces.get_component_spaces(R1_space.fem_space)
+    dof_offsets  = FunctionSpaces.get_dof_offsets(R1_space.fem_space)
+    wall_set     = Set{Int}()
+
+    # Component 1 = D_x ⊗ P_y, kills v on y-walls (axis 2)
+    if bc[2] === :wall
+        comp1   = components[1]
+        nbasis1 = FunctionSpaces.get_constituent_num_basis(comp1)  # (n_dx, n_py)
+        n_py    = nbasis1[2]
+        for bid in 1:FunctionSpaces.get_num_basis(comp1)
+            cb = FunctionSpaces.get_constituent_basis_id(comp1, bid)
+            if cb[2] == 1 || cb[2] == n_py
+                push!(wall_set, dof_offsets[1] + bid)
+            end
+        end
+    end
+
+    # Component 2 = P_x ⊗ D_y, kills u on x-walls (axis 1)
+    if bc[1] === :wall
+        comp2   = components[2]
+        nbasis2 = FunctionSpaces.get_constituent_num_basis(comp2)  # (n_px, n_dy)
+        n_px    = nbasis2[1]
+        for bid in 1:FunctionSpaces.get_num_basis(comp2)
+            cb = FunctionSpaces.get_constituent_basis_id(comp2, bid)
+            if cb[1] == 1 || cb[1] == n_px
+                push!(wall_set, dof_offsets[2] + bid)
+            end
+        end
+    end
+
+    return sort!(collect(wall_set))
+end
+
+"""
+Apply symmetric strong-Dirichlet zeroing to a sparse matrix in place: zero
+rows and columns indexed by `dofs`, then place 1.0 on the diagonal. Preserves
+symmetry; the resulting linear system pins those DOFs to zero when the RHS
+also has zeros at those rows.
+"""
+function apply_dirichlet_zero!(A::SparseMatrixCSC, dofs::AbstractVector{Int})
+    isempty(dofs) && return A
+    mask = falses(size(A, 1))
+    @inbounds for i in dofs; mask[i] = true; end
+
+    # Walk CSC columns and zero out rows in `dofs`; if the column itself is in
+    # `dofs`, zero the entire column.
+    @inbounds for col in 1:size(A, 2)
+        col_in_dofs = mask[col]
+        for k in A.colptr[col]:(A.colptr[col + 1] - 1)
+            row = A.rowval[k]
+            if col_in_dofs || mask[row]
+                A.nzval[k] = 0.0
+            end
+        end
+    end
+    @inbounds for i in dofs
+        A[i, i] = 1.0
+    end
+    dropzeros!(A)
+    return A
+end
+
+"""Zero the rows of `A` indexed by `dofs`."""
+function zero_rows!(A::SparseMatrixCSC, dofs::AbstractVector{Int})
+    isempty(dofs) && return A
+    mask = falses(size(A, 1))
+    @inbounds for i in dofs; mask[i] = true; end
+    @inbounds for col in 1:size(A, 2)
+        for k in A.colptr[col]:(A.colptr[col + 1] - 1)
+            if mask[A.rowval[k]]
+                A.nzval[k] = 0.0
+            end
+        end
+    end
+    dropzeros!(A)
+    return A
+end
+
+"""Zero entire columns of `A` indexed by `dofs`. Used to make a rectangular
+operator (e.g. weak-gradient G[R0,R1]) ignore the wall-pinned R1 DOFs in its
+column space."""
+function zero_cols!(A::SparseMatrixCSC, dofs::AbstractVector{Int})
+    isempty(dofs) && return A
+    @inbounds for col in dofs
+        (col < 1 || col > size(A, 2)) && continue
+        for k in A.colptr[col]:(A.colptr[col + 1] - 1)
+            A.nzval[k] = 0.0
+        end
+    end
+    dropzeros!(A)
+    return A
+end
+
 """Build De Rham complex with quadrature and assembled Hodge-Laplace/mass operators."""
 function GenerateDomain(
         nel::NTuple{2,Int},
@@ -223,54 +380,77 @@ function GenerateDomain(
         k::NTuple{2,Int};
         box_size::NTuple{2,Float64}=(1.0, 1.0),
         starting_point::NTuple{2,Float64}=(0.0, 0.0),
-        boundary_condition::Symbol=:periodic,
+        boundary_condition=:periodic,
     )
-    if boundary_condition === :neumann
-        @warn "GenerateDomain: :neumann boundary path is a stub; falling back to periodic."
-    elseif boundary_condition !== :periodic
-        throw(ArgumentError(
-            "boundary_condition must be :periodic or :neumann, got $(boundary_condition)"
-        ))
-    end
+    bc = normalize_bc(boundary_condition)
 
     nq_assembly    = p .+ 1
     nq_error       = nq_assembly .* 2
     ∫ₐ, ∫ₑ = Quadrature.get_canonical_quadrature_rules(Quadrature.gauss_legendre, nq_assembly, nq_error)
     dΩ = Quadrature.StandardQuadrature(∫ₐ, prod(nel))
 
-    periodic_flags = (boundary_condition === :periodic, boundary_condition === :periodic)
+    periodic_flags = (bc[1] === :periodic, bc[2] === :periodic)
     R = Forms.create_tensor_product_bspline_de_rham_complex(
         starting_point, box_size, nel, p, k; periodic=periodic_flags,
     )
 
+    wall_dofs_R1 = compute_wall_dofs_R1(R[2], bc)
+
     A, N = assemble_hodge_laplacian_matrices(R[2], R[3], dΩ)
+    M    = assemble_1form_mass_matrix(R[2], dΩ)
+    L_R1 = assemble_1form_curl_stiffness_matrix(R[2], dΩ)
+
+    if !isempty(wall_dofs_R1)
+        # Pin wall normal-trace 1-form DOFs to zero in the Hodge-Laplace and
+        # mass solves so the projected/lifted velocity satisfies u·n = 0 strongly.
+        apply_dirichlet_zero!(A, wall_dofs_R1)
+        apply_dirichlet_zero!(M, wall_dofs_R1)
+        apply_dirichlet_zero!(L_R1, wall_dofs_R1)
+    end
+
     A_fact = lu(A)
-    M = assemble_1form_mass_matrix(R[2], dΩ)
     M_fact = lu(M)
 
-    K_R0 = assemble_R0_stiffness_matrix(R[1], dΩ)
+    K_R0    = assemble_R0_stiffness_matrix(R[1], dΩ)
     G_R0_R1 = assemble_R0_R1_weak_grad_matrix(R[1], R[2], dΩ)
+
+    if !isempty(wall_dofs_R1)
+        # Wall DOFs hold u·n = 0; the weak-gradient operator's R1 column
+        # space should not couple to them. Zeroing G_R0_R1 columns at
+        # wall_dofs_R1 means (a) the discrete divergence G·u ignores wall
+        # normal components, and (b) Gᵀ·p (used to map pressure back to
+        # R1 in the projection / curl-consistent kick) has zero rows at
+        # wall_dofs_R1, so the resulting R1 update keeps u·n=0.
+        zero_cols!(G_R0_R1, wall_dofs_R1)
+    end
 
     n0 = size(K_R0, 1)
     ridge_R0 = 1e-10 * (sum(abs, diag(K_R0)) / max(n0, 1) + 1.0)
     K_R0_reg = K_R0 + ridge_R0 * sparse(I, n0, n0)
     K_R0_fact = lu(K_R0_reg)
 
-    num_elements_R1 = prod(nel)
-    R1_basis_indices = Vector{Vector{Int}}(undef, num_elements_R1)
-    for eid in 1:num_elements_R1
+    num_elements = prod(nel)
+    R1_basis_indices = Vector{Vector{Int}}(undef, num_elements)
+    for eid in 1:num_elements
         R1_basis_indices[eid] = collect(FunctionSpaces.get_basis_indices(R[2].fem_space, eid))
     end
     eval_cache_size = maximum(length(bi) for bi in R1_basis_indices)
 
     return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k,
-                  A, A_fact, N, M, K_R0, K_R0_fact, G_R0_R1, M_fact,
-                  eval_cache_size, box_size, R1_basis_indices)
+                  A, A_fact, N, M, L_R1, K_R0, K_R0_fact, G_R0_R1, M_fact,
+                  eval_cache_size, box_size, R1_basis_indices,
+                  bc, wall_dofs_R1)
 end
 
-"""Evaluate analytic velocity field at specified point."""
-function initial_velocity(flow_type::Symbol, px::Float64, py::Float64, Lx::Float64, Ly::Float64)
+"""Evaluate analytic velocity field at specified point. `bc` selects per-axis
+boundary type so flows that depend on it (e.g. leapfrog with wall images) can
+produce a BC-consistent velocity."""
+function initial_velocity(
+        flow_type::Symbol, px::Float64, py::Float64, Lx::Float64, Ly::Float64;
+        bc::NTuple{2,Symbol}=(:periodic, :periodic),
+    )
     if flow_type == :tg;             return flow_taylor_green(px, py, Lx, Ly)
+    elseif flow_type == :decaying_tg; return flow_decaying_tg(px, py, Lx, Ly)
     elseif flow_type == :vortex;     return flow_lamb_oseen(px, py, Lx, Ly)
     elseif flow_type == :gyre;       return flow_double_gyre(px, py, Lx, Ly)
     elseif flow_type == :decay;      return flow_decay(px, py, Lx, Ly)
@@ -280,7 +460,7 @@ function initial_velocity(flow_type::Symbol, px::Float64, py::Float64, Lx::Float
     elseif flow_type == :shear;       return flow_shear(px, py, Lx, Ly)
     elseif flow_type == :kh;          return flow_kelvin_helmholtz(px, py, Lx, Ly)
     elseif flow_type == :dipole;      return flow_dipole(px, py, Lx, Ly)
-    elseif flow_type == :leapfrog;    return flow_leapfrog(px, py, Lx, Ly)
+    elseif flow_type == :leapfrog;    return flow_leapfrog(px, py, Lx, Ly; bc=bc)
     elseif flow_type == :four_vortex; return flow_four_vortex(px, py, Lx, Ly)
     elseif flow_type == :stuart;      return flow_stuart(px, py, Lx, Ly)
     else; error("Unknown flow type: $flow_type")
@@ -295,7 +475,7 @@ function generate_particles(
         stratified_seeding::Bool=true,
         rng_seed::Union{Int,Nothing}=nothing,
         volume_convention::Symbol=:physical,
-        boundary_condition::Symbol=:periodic,
+        boundary_condition=:periodic,
     )
     if rng_seed !== nothing
         Random.seed!(rng_seed)
@@ -307,6 +487,8 @@ function generate_particles(
         ))
     end
 
+    bc    = normalize_bc(boundary_condition)
+    modes = bc_to_position_modes(bc)
     Lx, Ly = domain.box_size
     nx, ny = domain.nel
     dx     = Lx / nx
@@ -341,30 +523,22 @@ function generate_particles(
             x0 = (ei - 1) * dx
             y0 = (ej - 1) * dy
             for jj in 0:(used_N - 1), ii in 0:(used_N - 1)
-                px = x0 + ((ii + rand()) / used_N) * dx
-                py = y0 + ((jj + rand()) / used_N) * dy
-                if boundary_condition === :periodic
-                    px = mod(px, Lx)
-                    py = mod(py, Ly)
-                end
+                px = wrap_axis(x0 + ((ii + rand()) / used_N) * dx, Lx, modes[1], 1e-12)
+                py = wrap_axis(y0 + ((jj + rand()) / used_N) * dy, Ly, modes[2], 1e-12)
                 x[pid]  = px
                 y[pid]  = py
-                u, v    = initial_velocity(flow_type, px, py, Lx, Ly)
+                u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
                 mx[pid] = u
                 my[pid] = v
                 pid += 1
             end
             remainder = base_ppc - used_N * used_N
             for _ in 1:remainder
-                px = x0 + rand() * dx
-                py = y0 + rand() * dy
-                if boundary_condition === :periodic
-                    px = mod(px, Lx)
-                    py = mod(py, Ly)
-                end
+                px = wrap_axis(x0 + rand() * dx, Lx, modes[1], 1e-12)
+                py = wrap_axis(y0 + rand() * dy, Ly, modes[2], 1e-12)
                 x[pid]  = px
                 y[pid]  = py
-                u, v    = initial_velocity(flow_type, px, py, Lx, Ly)
+                u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
                 mx[pid] = u
                 my[pid] = v
                 pid += 1
@@ -375,7 +549,7 @@ function generate_particles(
             py = rand() * Ly
             x[pid]  = px
             y[pid]  = py
-            u, v    = initial_velocity(flow_type, px, py, Lx, Ly)
+            u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
             mx[pid] = u
             my[pid] = v
             pid += 1
@@ -386,7 +560,7 @@ function generate_particles(
             py = rand() * Ly
             x[i]  = px
             y[i]  = py
-            u, v  = initial_velocity(flow_type, px, py, Lx, Ly)
+            u, v  = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
             mx[i] = u
             my[i] = v
         end
@@ -411,10 +585,26 @@ function particle_sorter!(p::Particles, d::Domain)
     Lx, Ly = d.box_size
     dx = Lx / nx;  dy = Ly / ny
     inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
+    modes  = bc_to_position_modes(d.bc)
+    tol    = 1e-12
+    # Slab thickness in which wall-normal momentum is zeroed. Anything in
+    # the outermost ~5% of a cell is treated as a wall straggler, otherwise
+    # round-off-clamped particles never get cleaned up.
+    near_wall_tol_x = max(2 * tol, 0.05 * dx)
+    near_wall_tol_y = max(2 * tol, 0.05 * dy)
+    wall_x = modes[1] === :clamp
+    wall_y = modes[2] === :clamp
 
     @inbounds for i in 1:length(p.x)
-        p.x[i] = mod(p.x[i], Lx)
-        p.y[i] = mod(p.y[i], Ly)
+        p.x[i] = wrap_axis(p.x[i], Lx, modes[1], tol)
+        p.y[i] = wrap_axis(p.y[i], Ly, modes[2], tol)
+
+        if wall_x && (p.x[i] <= near_wall_tol_x || p.x[i] >= Lx - near_wall_tol_x)
+            p.mx[i] = 0.0
+        end
+        if wall_y && (p.y[i] <= near_wall_tol_y || p.y[i] >= Ly - near_wall_tol_y)
+            p.my[i] = 0.0
+        end
 
         ei = clamp(floor(Int, p.x[i] * inv_dx) + 1, 1, nx)
         ej = clamp(floor(Int, p.y[i] * inv_dy) + 1, 1, ny)
@@ -434,10 +624,11 @@ function set_g2p_velocity(
         p::Particles, pid::Int,
         px::Float64, py::Float64, eid::Int,
         x0::Float64, y0::Float64, dx::Float64, dy::Float64,
-        ref_phys_form, Lx::Float64, Ly::Float64,
+        ref_phys_form, Lx::Float64, Ly::Float64;
+        modes::NTuple{2,Symbol}=(:periodic, :periodic),
     )
-    pxw = mod(px, Lx)
-    pyw = mod(py, Ly)
+    pxw = wrap_axis(px, Lx, modes[1], 1e-12)
+    pyw = wrap_axis(py, Ly, modes[2], 1e-12)
 
     xi  = (pxw - x0) / dx
     eta = (pyw - y0) / dy
@@ -449,6 +640,71 @@ function set_g2p_velocity(
     p.mx[pid] = reduce(+, pushfwd_eval[1], dims=2)[1]
     p.my[pid] = reduce(+, pushfwd_eval[2], dims=2)[1]
 
+    return nothing
+end
+
+"""
+Physically reorder particle arrays so particles in the same element are contiguous in memory.
+This significantly improves cache locality during RK advection loops by ensuring threads
+access the same grid coefficients repeatedly rather than scattered lookups.
+Call this periodically (e.g., every few timesteps) for maximum benefit.
+"""
+function physical_spatial_sort!(p::Particles, d::Domain)
+    num_p    = length(p.x)
+    num_elem = prod(d.nel)
+    
+    # Create a permutation array based on element IDs
+    # Elements are already computed in particle_sorter
+    perm = sortperm(p.elem_ids[1:num_p])
+    
+    # Create temporary storage for reordered data
+    x_new     = similar(p.x, num_p)
+    y_new     = similar(p.y, num_p)
+    mx_new    = similar(p.mx, num_p)
+    my_new    = similar(p.my, num_p)
+    vol_new   = similar(p.volume, num_p)
+    can_x_new = similar(p.can_x, num_p)
+    can_y_new = similar(p.can_y, num_p)
+    P11_new   = similar(p.P11, num_p)
+    P12_new   = similar(p.P12, num_p)
+    P21_new   = similar(p.P21, num_p)
+    P22_new   = similar(p.P22, num_p)
+    elem_ids_new = similar(p.elem_ids, num_p)
+    
+    # Reorder all particle data according to element locality
+    @inbounds for i in 1:num_p
+        old_idx = perm[i]
+        x_new[i]     = p.x[old_idx]
+        y_new[i]     = p.y[old_idx]
+        mx_new[i]    = p.mx[old_idx]
+        my_new[i]    = p.my[old_idx]
+        vol_new[i]   = p.volume[old_idx]
+        can_x_new[i] = p.can_x[old_idx]
+        can_y_new[i] = p.can_y[old_idx]
+        P11_new[i]   = p.P11[old_idx]
+        P12_new[i]   = p.P12[old_idx]
+        P21_new[i]   = p.P21[old_idx]
+        P22_new[i]   = p.P22[old_idx]
+        elem_ids_new[i] = p.elem_ids[old_idx]
+    end
+    
+    # Copy reordered data back into particle arrays
+    copyto!(p.x, 1, x_new, 1, num_p)
+    copyto!(p.y, 1, y_new, 1, num_p)
+    copyto!(p.mx, 1, mx_new, 1, num_p)
+    copyto!(p.my, 1, my_new, 1, num_p)
+    copyto!(p.volume, 1, vol_new, 1, num_p)
+    copyto!(p.can_x, 1, can_x_new, 1, num_p)
+    copyto!(p.can_y, 1, can_y_new, 1, num_p)
+    copyto!(p.P11, 1, P11_new, 1, num_p)
+    copyto!(p.P12, 1, P12_new, 1, num_p)
+    copyto!(p.P21, 1, P21_new, 1, num_p)
+    copyto!(p.P22, 1, P22_new, 1, num_p)
+    copyto!(p.elem_ids, 1, elem_ids_new, 1, num_p)
+    
+    # After physical reordering, rebuild the head/next linked list structure
+    particle_sorter!(p, d)
+    
     return nothing
 end
 
@@ -579,10 +835,11 @@ function enforce_min_particles_per_element!(
                 qdx = 0.5 * dx
                 qdy = 0.5 * dy
 
+                modes = bc_to_position_modes(d.bc)
                 for _ in 1:n_add_q
                     px = qx0 + rand(rng) * qdx
                     py = qy0 + rand(rng) * qdy
-                    set_g2p_velocity(p, pid, px, py, eid, x0, y0, dx, dy, ref_phys_form, Lx, Ly)
+                    set_g2p_velocity(p, pid, px, py, eid, x0, y0, dx, dy, ref_phys_form, Lx, Ly; modes=modes)
                     p.P11[pid]     = 1.0
                     p.P12[pid]     = 0.0
                     p.P21[pid]     = 0.0
@@ -744,6 +1001,17 @@ function flow_taylor_green(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     return u, v
 end
 
+"""Initial condition for the decaying (viscous) Taylor–Green vortex.
+
+t=0 snapshot of the analytical Navier–Stokes solution
+  u(x,y,t) =  U₀·sin(kx·x)·cos(ky·y)·exp(-ν·(kx²+ky²)·t)
+  v(x,y,t) = -U₀·cos(kx·x)·sin(ky·y)·exp(-ν·(kx²+ky²)·t)
+Energy decays as E(t) = E₀·exp(-2ν·(kx²+ky²)·t); use as validation when
+cfg.viscosity > 0. Requires periodic boundaries."""
+function flow_decaying_tg(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
+    return flow_taylor_green(x, y, Lx, Ly)
+end
+
 """Lamb-Oseen vortex centered in domain."""
 function flow_lamb_oseen(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     cx = Lx / 2.0;  cy = Ly / 2.0
@@ -889,27 +1157,69 @@ function flow_dipole(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     return u, v
 end
 
-"""Leapfrog: two coaxial dipoles arranged horizontally with different separations; both propagate in +y and leapfrog through each other (mirrors C++ COFLIPSolver2D::sampleLeapfrog)."""
-function flow_leapfrog(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
-    cx = Lx / 2.0;  cy = Ly / 4.0
-    Γ = 2.0
-    r_core = min(Lx, Ly) / 35.0
-    dist_a = min(Lx, Ly) / 4.0
-    dist_b = min(Lx, Ly) / 2.0
+"""Velocity field induced at (x, y) by a single Gaussian vortex blob centered
+at (xc, yc) with circulation Γ and core radius `r_core` (Gaussian σ on the
+vorticity profile)."""
+@inline function _gauss_vortex_velocity(x::Float64, y::Float64,
+                                       xc::Float64, yc::Float64,
+                                       Γ::Float64, r_core::Float64)
+    dx = x - xc;  dy = y - yc
+    r2 = dx^2 + dy^2
+    r  = sqrt(r2)
+    r > 1e-8 || return 0.0, 0.0
+    v_theta = (Γ / (2π * r)) * (1.0 - exp(-r2 / r_core^2))
+    return -v_theta * dy / r, v_theta * dx / r
+end
 
-    centers = ((cx - 0.5*dist_a, cy, +Γ),
-               (cx + 0.5*dist_a, cy, -Γ),
-               (cx - 0.5*dist_b, cy, +Γ),
-               (cx + 0.5*dist_b, cy, -Γ))
+"""
+Leapfrog: four coaxial vortices in two stacked dipoles that leapfrog through
+each other (mirrors C++ COFLIPSolver2D::sampleLeapfrog). Defaults match the
+C++ leapfrog experiment on an L=2π box: vortex y-position Ly/4, separations
+0.239·Lx and 0.477·Lx (= 1.5 and 3.0 for Lx=2π).
+
+When `bc` declares any axis as a wall, image vortices are added across each
+wall (with sign-flipped circulation) so the resulting velocity satisfies
+u·n=0 on those walls — same free-slip / no-penetration outcome as the C++
+streamfunction-Dirichlet-on-wall construction, just expressed analytically
+via the method of images. `n_images` controls how many image rings are
+summed (1 ≈ exact for vortices far from walls)."""
+function flow_leapfrog(x::Float64, y::Float64, Lx::Float64, Ly::Float64;
+        bc::NTuple{2,Symbol}=(:periodic, :periodic),
+        n_images::Int=2,
+    )
+    # Real vortex centers + circulations. C++: dist_a=1.5, dist_b=3.0 on L=2π.
+    cx = Lx / 2.0;  cy = Ly / 4.0
+    Γ      = 2.0
+    r_core = min(Lx, Ly) / 35.0
+    dist_a = 0.2387324 * min(Lx, Ly)   # ≈ 1.5 / (2π)
+    dist_b = 0.4774648 * min(Lx, Ly)   # ≈ 3.0 / (2π)
+    real_vortices = ((cx - 0.5*dist_a, cy, +Γ),
+                     (cx + 0.5*dist_a, cy, -Γ),
+                     (cx - 0.5*dist_b, cy, +Γ),
+                     (cx + 0.5*dist_b, cy, -Γ))
+
+    wall_x = bc[1] === :wall
+    wall_y = bc[2] === :wall
+
+    # Image lattice for free-slip on a rectangle: for each real vortex at
+    # (xc, yc, Γ), the image positions are (sx·xc + 2k·Lx, sy·yc + 2m·Ly) with
+    # sx, sy ∈ {+1, -1} and k, m ∈ ℤ, carrying circulation sx·sy·Γ. The
+    # (sx=+1, sy=+1, k=m=0) entry is the real vortex itself. When an axis is
+    # periodic instead of walled, we suppress its image factor by restricting
+    # the corresponding sx (or sy) to +1 and k (or m) to 0.
+    sx_choices = wall_x ? (1, -1) : (1,)
+    sy_choices = wall_y ? (1, -1) : (1,)
+    k_range    = wall_x ? (-n_images:n_images) : 0:0
+    m_range    = wall_y ? (-n_images:n_images) : 0:0
 
     u = 0.0;  v = 0.0
-    for (xc, yc, Γi) in centers
-        dx = x - xc;  dy = y - yc
-        r2 = dx^2 + dy^2;  r = sqrt(r2)
-        if r > 1e-8
-            v_theta = (Γi / (2π * r)) * (1.0 - exp(-r2 / r_core^2))
-            u += -v_theta * dy / r
-            v +=  v_theta * dx / r
+    for (xc, yc, Γi) in real_vortices
+        for sy in sy_choices, sx in sx_choices, m in m_range, k in k_range
+            xim = sx * xc + 2 * k * Lx
+            yim = sy * yc + 2 * m * Ly
+            Γim = sx * sy * Γi
+            du, dv = _gauss_vortex_velocity(x, y, xim, yim, Γim, r_core)
+            u += du;  v += dv
         end
     end
     return u, v
@@ -1010,22 +1320,25 @@ CartesianPoints wrapping. nderivatives ≤ 1 is supported in this implementation
 
     J_offset = 0
     @inbounds for c in 1:2
-        tp_space    = space.component_spaces[c]
-        gtb_space_1 = tp_space.constituent_spaces[1]
-        gtb_space_2 = tp_space.constituent_spaces[2]
+        tp_space  = space.component_spaces[c]
+        leaf_1    = tp_space.constituent_spaces[1]
+        leaf_2    = tp_space.constituent_spaces[2]
 
         cart_idx = tp_space.cart_num_elements[element_id]
         e1 = cart_idx[1]
         e2 = cart_idx[2]
 
-        # Single-patch GTBSpline assumed (CO-FLIP setup): patch_id = 1
-        bsp_space_1 = gtb_space_1.patch_spaces[1]
-        bsp_space_2 = gtb_space_2.patch_spaces[1]
+        # Periodic axes wrap a BSplineSpace inside a GTBSplineSpace (the GTB
+        # extraction identifies endpoints). Non-periodic axes use the
+        # BSplineSpace directly with no outer extraction layer. Detect both.
+        is_gtb_1 = leaf_1 isa Mantis.FunctionSpaces.GTBSplineSpace
+        is_gtb_2 = leaf_2 isa Mantis.FunctionSpaces.GTBSplineSpace
+
+        bsp_space_1 = is_gtb_1 ? leaf_1.patch_spaces[1] : leaf_1
+        bsp_space_2 = is_gtb_2 ? leaf_2.patch_spaces[1] : leaf_2
 
         bsp_ext_1 = bsp_space_1.extraction_op.extraction_coefficients[e1][1]
         bsp_ext_2 = bsp_space_2.extraction_op.extraction_coefficients[e2][1]
-        gtb_ext_1 = gtb_space_1.extraction_op.extraction_coefficients[e1][1]
-        gtb_ext_2 = gtb_space_2.extraction_op.extraction_coefficients[e2][1]
 
         polynomial_1 = bsp_space_1.polynomials
         polynomial_2 = bsp_space_2.polynomials
@@ -1034,8 +1347,6 @@ CartesianPoints wrapping. nderivatives ≤ 1 is supported in this implementation
         nd1 = nderivatives + 1
         n_bsp_1 = size(bsp_ext_1, 2)
         n_bsp_2 = size(bsp_ext_2, 2)
-        n_gtb_1 = size(gtb_ext_1, 2)
-        n_gtb_2 = size(gtb_ext_2, 2)
 
         # Leaf Bernstein evals — allocation-free
         bern_1 = @view cache.bern_buf[1][1:(p1 + 1), 1:nd1]
@@ -1049,11 +1360,27 @@ CartesianPoints wrapping. nderivatives ≤ 1 is supported in this implementation
         mul!(bsp_vals_1, transpose(bern_1), bsp_ext_1)
         mul!(bsp_vals_2, transpose(bern_2), bsp_ext_2)
 
-        # Apply GTBSpline extraction: (nd1, n_bsp) × (n_bsp, n_gtb) → (nd1, n_gtb)
-        gtb_vals_1 = @view cache.gtb_vals[1][1:nd1, 1:n_gtb_1]
-        gtb_vals_2 = @view cache.gtb_vals[2][1:nd1, 1:n_gtb_2]
-        mul!(gtb_vals_1, bsp_vals_1, gtb_ext_1)
-        mul!(gtb_vals_2, bsp_vals_2, gtb_ext_2)
+        # When the axis is periodic, apply the GTBSpline extraction layer on top
+        # to produce the final (n_gtb) basis values; otherwise the BSpline values
+        # are themselves the final basis values.
+        if is_gtb_1
+            gtb_ext_1  = leaf_1.extraction_op.extraction_coefficients[e1][1]
+            n_gtb_1    = size(gtb_ext_1, 2)
+            gtb_vals_1 = @view cache.gtb_vals[1][1:nd1, 1:n_gtb_1]
+            mul!(gtb_vals_1, bsp_vals_1, gtb_ext_1)
+        else
+            n_gtb_1    = n_bsp_1
+            gtb_vals_1 = bsp_vals_1
+        end
+        if is_gtb_2
+            gtb_ext_2  = leaf_2.extraction_op.extraction_coefficients[e2][1]
+            n_gtb_2    = size(gtb_ext_2, 2)
+            gtb_vals_2 = @view cache.gtb_vals[2][1:nd1, 1:n_gtb_2]
+            mul!(gtb_vals_2, bsp_vals_2, gtb_ext_2)
+        else
+            n_gtb_2    = n_bsp_2
+            gtb_vals_2 = bsp_vals_2
+        end
 
         # 2D kron pattern (matches Mantis): result_2d[(i-1)*n_gtb_1 + j] = vals_2[i] * vals_1[j]
         # Value key (0,0):
@@ -1103,9 +1430,63 @@ function probe_field_at_point(
     Tout   = probe_output_eltype(T)
     Lx, Ly = d.box_size
     nx, ny = d.nel
+    modes  = bc_to_position_modes(d.bc)
 
-    x_wrapped = mod(x, Lx)
-    y_wrapped = mod(y, Ly)
+    x_wrapped = wrap_axis(Float64(x), Lx, modes[1], 1e-12)
+    y_wrapped = wrap_axis(Float64(y), Ly, modes[2], 1e-12)
+
+    dx = Lx / nx;  dy = Ly / ny
+    inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
+
+    ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
+    ej = clamp(floor(Int, y_wrapped * inv_dy) + 1, 1, ny)
+    elem_idx = (ej - 1) * nx + ei
+
+    xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
+    eta = (y_wrapped - (ej - 1) * dy) * inv_dy
+
+    eval_out     = evaluate_fast_2d!(cache, d.R1.fem_space, elem_idx, xi, eta, 1)
+    dof_indices  = d.R1_basis_indices[elem_idx]
+    local_coeffs = @view u_coeffs[dof_indices]
+    n_loc        = length(local_coeffs)
+
+    val_x  = @view eval_out[1][1][1][1:n_loc]
+    val_y  = @view eval_out[1][1][2][1:n_loc]
+    u      = dot(val_x, local_coeffs)
+    v      = dot(val_y, local_coeffs)
+
+    dxi_u  = @view eval_out[2][1][1][1:n_loc]
+    deta_u = @view eval_out[2][2][1][1:n_loc]
+    dxi_v  = @view eval_out[2][1][2][1:n_loc]
+    deta_v = @view eval_out[2][2][2][1:n_loc]
+
+    du_dx = dot(dxi_u,  local_coeffs) * inv_dx
+    du_dy = dot(deta_u, local_coeffs) * inv_dy
+    dv_dx = dot(dxi_v,  local_coeffs) * inv_dx
+    dv_dy = dot(deta_v, local_coeffs) * inv_dy
+
+    return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
+end
+
+"""
+Evaluate velocity and Jacobian at point with element hint for faster lookup.
+If the point remains in the hinted element (xi, eta both in [0,1]), avoid element lookup.
+Otherwise, fall back to standard element lookup.
+"""
+@inline function probe_field_at_point_with_hint(
+        x::Real, y::Real,
+        u_coeffs::AbstractVector{T},
+        d::Domain,
+        cache::EvaluationCache,
+        _hint_elem::Int,  # reserved for future hint optimization
+    ) where {T<:Real}
+    Tout   = probe_output_eltype(T)
+    Lx, Ly = d.box_size
+    nx, ny = d.nel
+    modes  = bc_to_position_modes(d.bc)
+
+    x_wrapped = wrap_axis(Float64(x), Lx, modes[1], 1e-12)
+    y_wrapped = wrap_axis(Float64(y), Ly, modes[2], 1e-12)
 
     dx = Lx / nx;  dy = Ly / ny
     inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
@@ -1186,6 +1567,7 @@ function ensure_B_triplet_capacity!(buf::SimulationBuffers, num_p::Int, d::Domai
     return nothing
 end
 
+"""Count non-zero particles in each element (used for analysis and diagnostics)."""
 function count_particles_per_element!(counts_elem::Vector{Int}, p::Particles, d::Domain)
     fill!(counts_elem, 0)
     @inbounds for eid in 1:length(counts_elem)
@@ -1196,132 +1578,6 @@ function count_particles_per_element!(counts_elem::Vector{Int}, p::Particles, d:
         end
     end
     return counts_elem
-end
-
-function physical_spatial_sort!(p::Particles, d::Domain)
-    num_p    = length(p.x)
-    num_elem = prod(d.nel)
-    
-    # Create a permutation array based on element IDs
-    perm = sortperm(p.elem_ids[1:num_p])
-    
-    # Create temporary storage for reordered data
-    x_new     = similar(p.x, num_p)
-    y_new     = similar(p.y, num_p)
-    mx_new    = similar(p.mx, num_p)
-    my_new    = similar(p.my, num_p)
-    vol_new   = similar(p.volume, num_p)
-    can_x_new = similar(p.can_x, num_p)
-    can_y_new = similar(p.can_y, num_p)
-    P11_new   = similar(p.P11, num_p)
-    P12_new   = similar(p.P12, num_p)
-    P21_new   = similar(p.P21, num_p)
-    P22_new   = similar(p.P22, num_p)
-    elem_ids_new = similar(p.elem_ids, num_p)
-    
-    # Reorder all particle data according to element locality
-    @inbounds for i in 1:num_p
-        old_idx = perm[i]
-        x_new[i]     = p.x[old_idx]
-        y_new[i]     = p.y[old_idx]
-        mx_new[i]    = p.mx[old_idx]
-        my_new[i]    = p.my[old_idx]
-        vol_new[i]   = p.volume[old_idx]
-        can_x_new[i] = p.can_x[old_idx]
-        can_y_new[i] = p.can_y[old_idx]
-        P11_new[i]   = p.P11[old_idx]
-        P12_new[i]   = p.P12[old_idx]
-        P21_new[i]   = p.P21[old_idx]
-        P22_new[i]   = p.P22[old_idx]
-        elem_ids_new[i] = p.elem_ids[old_idx]
-    end
-    
-    # Copy reordered data back into particle arrays
-    copyto!(p.x, 1, x_new, 1, num_p)
-    copyto!(p.y, 1, y_new, 1, num_p)
-    copyto!(p.mx, 1, mx_new, 1, num_p)
-    copyto!(p.my, 1, my_new, 1, num_p)
-    copyto!(p.volume, 1, vol_new, 1, num_p)
-    copyto!(p.can_x, 1, can_x_new, 1, num_p)
-    copyto!(p.can_y, 1, can_y_new, 1, num_p)
-    copyto!(p.P11, 1, P11_new, 1, num_p)
-    copyto!(p.P12, 1, P12_new, 1, num_p)
-    copyto!(p.P21, 1, P21_new, 1, num_p)
-    copyto!(p.P22, 1, P22_new, 1, num_p)
-    copyto!(p.elem_ids, 1, elem_ids_new, 1, num_p)
-    
-    # After physical reordering, rebuild the head/next linked list structure
-    particle_sorter!(p, d)
-    
-    return nothing
-end
-
-@inline function probe_field_at_point_with_hint(
-        x::Real, y::Real,
-        u_coeffs::AbstractVector{T},
-        d::Domain,
-        cache::EvaluationCache,
-        _hint_elem::Int,  # reserved for future hint optimization
-    ) where {T<:Real}
-    Tout   = probe_output_eltype(T)
-    Lx, Ly = d.box_size
-    nx, ny = d.nel
-
-    x_wrapped = mod(x, Lx)
-    y_wrapped = mod(y, Ly)
-
-    dx = Lx / nx;  dy = Ly / ny
-    inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
-
-    ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
-    ej = clamp(floor(Int, y_wrapped * inv_dy) + 1, 1, ny)
-    elem_idx = (ej - 1) * nx + ei
-
-    xi  = (x_wrapped - (ei - 1) * dx) * inv_dx
-    eta = (y_wrapped - (ej - 1) * dy) * inv_dy
-
-    eval_out     = evaluate_fast_2d!(cache, d.R1.fem_space, elem_idx, xi, eta, 1)
-    dof_indices  = d.R1_basis_indices[elem_idx]
-    local_coeffs = @view u_coeffs[dof_indices]
-    n_loc        = length(local_coeffs)
-
-    val_x  = @view eval_out[1][1][1][1:n_loc]
-    val_y  = @view eval_out[1][1][2][1:n_loc]
-    u      = dot(val_x, local_coeffs)
-    v      = dot(val_y, local_coeffs)
-
-    dxi_u  = @view eval_out[2][1][1][1:n_loc]
-    deta_u = @view eval_out[2][2][1][1:n_loc]
-    dxi_v  = @view eval_out[2][1][2][1:n_loc]
-    deta_v = @view eval_out[2][2][2][1:n_loc]
-
-    du_dx = dot(dxi_u,  local_coeffs) * inv_dx
-    du_dy = dot(deta_u, local_coeffs) * inv_dy
-    dv_dx = dot(dxi_v,  local_coeffs) * inv_dx
-    dv_dy = dot(deta_v, local_coeffs) * inv_dy
-
-    return SVector{2, Tout}(u, v), SMatrix{2,2,Tout,4}(du_dx, dv_dx, du_dy, dv_dy)
-end
-
-@inline function physical_velocity_and_jacobian_hint(
-        x::T, y::T,
-        u_coeffs::AbstractVector{U},
-        d::Domain, cache::EvaluationCache,
-        hint_elem::Int,
-    ) where {T<:AbstractFloat, U<:Real}
-    raw_vel, raw_grad = probe_field_at_point_with_hint(x, y, u_coeffs, d, cache, hint_elem)
-
-    u = -raw_vel[2]
-    v =  raw_vel[1]
-
-    ux = -raw_grad[2, 1]
-    uy = -raw_grad[2, 2]
-    vx =  raw_grad[1, 1]
-    vy =  raw_grad[1, 2]
-
-    vel = SVector{2, T}(u, v)
-    jac = SMatrix{2, 2, T, 4}(ux, vx, uy, vy)
-    return vel, jac
 end
 
 """Build particle-to-grid least-squares matrix with parallelization."""
@@ -1423,6 +1679,8 @@ function build_B_matrix(p::Particles, d::Domain, buf::SimulationBuffers)
     end
 
     # STEP 3: Compact triplet arrays to remove gaps created by filtering
+    # After parallel assembly, element eid has valid entries from offsets[eid] to final_cursors[eid]-1
+    # We need to compact these into a contiguous block
     write_pos = 1
     @inbounds for eid in 1:num_elem
         read_start = offsets[eid]
@@ -1430,6 +1688,7 @@ function build_B_matrix(p::Particles, d::Domain, buf::SimulationBuffers)
         num_to_copy = max(0, read_end - read_start + 1)
         
         if num_to_copy > 0
+            # Copy valid entries from this element to the next contiguous write position
             copyto!(I_idx, write_pos, I_idx, read_start, num_to_copy)
             copyto!(J_idx, write_pos, J_idx, read_start, num_to_copy)
             copyto!(V_val, write_pos, V_val, read_start, num_to_copy)
@@ -1457,6 +1716,67 @@ function build_lsqr_rhs!(V_p::AbstractVector{Float64}, p::Particles)
     return V_p
 end
 
+"""
+Solve `min ‖B·x − b‖₂` via LSQR with Jacobi (column-norm) right preconditioning.
+
+Equivalent to scaling B's columns to unit ℓ²-norm before the iteration: we solve
+`min ‖(B·D)·y − b‖₂` with `D = diag(1/‖B[:,j]‖₂)`, then recover `x = D·y`. This change
+of variables typically halves or quarters the LSQR iteration count on FEM P2G systems
+where column norms vary by 10×–100× depending on how many particles touch each DOF.
+
+`B` is modified **in place** (columns are scaled). `x` carries the warm-start in
+original x-space on entry and the converged solution in original x-space on exit.
+Returns the LSQR convergence info (`ConvergenceHistory`).
+"""
+function solve_lsqr_jacobi!(
+        x::AbstractVector{Float64},
+        B::SparseMatrixCSC{Float64,Int},
+        b::AbstractVector{Float64};
+        atol::Float64=1e-9,
+        btol::Float64=1e-9,
+        maxiter::Int=2000,
+    )
+    ncols = size(B, 2)
+    length(x) == ncols || throw(DimensionMismatch("x length $(length(x)) ≠ ncols $ncols"))
+
+    # Column 2-norms (and clamp empty columns to 1.0 to avoid divide-by-zero)
+    col_norms = Vector{Float64}(undef, ncols)
+    colptr = B.colptr
+    nzval  = B.nzval
+    @inbounds for j in 1:ncols
+        s = 0.0
+        for k in colptr[j]:(colptr[j + 1] - 1)
+            v = nzval[k]
+            s += v * v
+        end
+        cn = sqrt(s)
+        col_norms[j] = cn > eps() ? cn : 1.0
+    end
+
+    # Scale B in place: B := B · diag(1/col_norms)
+    @inbounds for j in 1:ncols
+        inv_n = 1.0 / col_norms[j]
+        for k in colptr[j]:(colptr[j + 1] - 1)
+            nzval[k] *= inv_n
+        end
+    end
+
+    # Warm-start change of variables: y = D⁻¹·x = x .* col_norms
+    @inbounds for j in 1:ncols
+        x[j] *= col_norms[j]
+    end
+
+    _, ch = IterativeSolvers.lsqr!(x, B, b; atol=atol, btol=btol,
+                                   maxiter=maxiter, log=true)
+
+    # Recover x = D·y = y ./ col_norms
+    @inbounds for j in 1:ncols
+        x[j] /= col_norms[j]
+    end
+
+    return ch
+end
+
 """Solve P2G least-squares system with warm-start for grid velocity."""
 function solve_grid_velocity_lsqr(
         B::SparseMatrixCSC{Float64,Int},
@@ -1476,8 +1796,7 @@ function solve_grid_velocity_lsqr(
     if length(x0) != size(B, 2)
         x0 = zeros(size(B, 2))
     end
-    _, ch = IterativeSolvers.lsqr!(x0, B, V_p; atol=atol, btol=btol,
-                                   maxiter=maxiter, log=true)
+    ch = solve_lsqr_jacobi!(x0, B, V_p; atol=atol, btol=btol, maxiter=maxiter)
     if !ch.isconverged && error_on_nonconvergence
         @error "P2G LSQR did not converge" iters=ch.iters atol=atol btol=btol maxiter=maxiter
     end
@@ -1492,15 +1811,64 @@ function project_and_get_pressure(dom::Domain, v_h::V, buf::SimulationBuffers; s
     mul!(buf.b_buf, dom.N_Hodge, buf.v_coeffs_buf)
     copyto!(buf.sol_buf, buf.b_buf)
     ldiv!(dom.LHS_Hodge_fact, buf.sol_buf)
-    u_corr, ϕ_corr = Forms.build_form_fields((dom.R1, dom.R2), buf.sol_buf; labels=("u¹ₕ", "ϕ²ₕ"))
-
-    ϕ_coeffs = copy(ϕ_corr.coefficients)
-    if subtract_mean && !isempty(ϕ_coeffs)
-        ϕ_coeffs .-= sum(ϕ_coeffs) / length(ϕ_coeffs)
-    end
+    u_corr, _ = Forms.build_form_fields((dom.R1, dom.R2), buf.sol_buf; labels=("u¹ₕ", "ϕ²ₕ"))
 
     div_free_coeffs = v_h.coefficients - u_corr.coefficients
-    return div_free_coeffs, ϕ_coeffs
+
+    return div_free_coeffs
+end
+
+"""
+Apply one implicit FEEC viscous diffusion step to grid 1-form coefficients.
+
+Solves the linear system:
+    (M + ν·Δt·L) · f_out = M · f_in
+
+where:
+  M   = discrete 1-form mass matrix (Hodge star on R1)
+  L   = curl-curl stiffness matrix on R1  (assembles δd)
+  ν   = kinematic viscosity
+  Δt  = timestep
+
+The system is assembled fresh each call (since ν·Δt changes with adaptive CFL),
+factorised with `lu`, and solved. For divergence-free inputs the dominant
+dissipation term is exactly δdf, so no codifferential correction is needed.
+
+Wall DOFs are pinned to zero before and after the solve to preserve free-slip BCs.
+Returns the diffused coefficient vector (overwrites f_out in place).
+"""
+function apply_viscous_diffusion_feec!(
+        f_out::AbstractVector{Float64},
+        f_in::AbstractVector{Float64},
+        domain::Domain,
+        ν::Float64,
+        dt::Float64,
+    )
+    ν <= 0.0 && (copyto!(f_out, f_in); return f_out)
+
+    M = domain.Mass_matrix
+    L = domain.Curl_stiffness_R1
+
+    A_diff = M + (ν * dt) .* L
+
+    if !isempty(domain.wall_dofs_R1)
+        apply_dirichlet_zero!(A_diff, domain.wall_dofs_R1)
+    end
+
+    rhs = M * f_in
+
+    @inbounds for i in domain.wall_dofs_R1
+        rhs[i] = 0.0
+    end
+
+    A_fact = lu(A_diff)
+    copyto!(f_out, A_fact \ rhs)
+
+    @inbounds for i in domain.wall_dofs_R1
+        f_out[i] = 0.0
+    end
+
+    return f_out
 end
 
 """Assemble Hodge-Laplace system matrices."""
@@ -1544,6 +1912,30 @@ function assemble_1form_mass_matrix(R1_space::F, dΩ::Q) where {F, Q}
     weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
     M, _ = Assemblers.assemble(weak_form; rhs_type=SparseArrays.SparseMatrixCSC{Float64, Int})
     return M
+end
+
+"""
+Assemble the FEEC curl-curl stiffness matrix for 1-forms.
+
+L[i,j] = ∫(d(φᵢ) ∧ ★(d(φⱼ))), dΩ)
+
+This gives the viscous Laplacian restricted to divergence-free 1-forms:
+  Δ f ≈ δ d f,   so   L corresponds to the codifferential-of-exterior-derivative term.
+Used to build the implicit diffusion system (M + ν·Δt·L)·f^{n+1} = M·f*.
+"""
+function assemble_1form_curl_stiffness_matrix(R1_space::F, dΩ::Q) where {F, Q}
+    weak_form_inputs = Assemblers.WeakFormInputs(R1_space)
+    vᵏ = Assemblers.get_test_form(weak_form_inputs)
+    uᵏ = Assemblers.get_trial_form(weak_form_inputs)
+
+    A = ∫(d(vᵏ) ∧ ★(d(uᵏ)), dΩ)
+
+    lhs_expressions = ((A,),)
+    rhs_expressions = ((0,),)
+
+    weak_form = Assemblers.WeakForm(lhs_expressions, rhs_expressions, weak_form_inputs)
+    L, _ = Assemblers.assemble(weak_form; rhs_type=SparseArrays.SparseMatrixCSC{Float64, Int})
+    return L
 end
 
 """Assemble scalar Laplacian (R0 stiffness): K[i,j] = ∫(d(ψᵢ) ∧ ★ d(ψⱼ))."""
@@ -1717,10 +2109,12 @@ function apply_pressure_correction_curl!(
     end
 
     tilde_tau = zeros(Float64, size(B, 2))
-    _, ch = IterativeSolvers.lsqr!(tilde_tau, B, V_p; atol=atol, btol=btol,
-                                   maxiter=maxiter, log=true)
+    ch = solve_lsqr_jacobi!(tilde_tau, B, V_p; atol=atol, btol=btol, maxiter=maxiter)
     if !ch.isconverged && error_on_nonconvergence
         @error "Curl-consistent P2G LSQR did not converge" iters=ch.iters atol=atol btol=btol maxiter=maxiter
+    end
+    @inbounds for i in d.wall_dofs_R1
+        tilde_tau[i] = 0.0
     end
 
     rhs_R0 = d.G_R0_R1 * tilde_tau
@@ -1733,6 +2127,9 @@ function apply_pressure_correction_curl!(
 
     rhs1 = transpose(d.G_R0_R1) * p_tilde
     g_R1 = d.Mass1_fact \ rhs1
+    @inbounds for i in d.wall_dofs_R1
+        g_R1[i] = 0.0
+    end
 
     Threads.@threads :static for i in 1:num_p
         cache = thread_caches[Threads.threadid()]
@@ -1812,15 +2209,28 @@ function print_conservation_diagnostics(step::Int, time_value::Real, diagnostics
     )
 end
 
-"""Apply periodic wrapping or clamping to position."""
-@inline function apply_position_policy(x::T, y::T, Lx::T, Ly::T, mode::Symbol, tol::T) where {T<:AbstractFloat}
+"""Apply periodic wrapping or clamping to a single axis position."""
+@inline function wrap_axis(x::T, L::T, mode::Symbol, tol::T) where {T<:AbstractFloat}
     if mode === :periodic
-        return mod(x, Lx), mod(y, Ly)
+        return mod(x, L)
     elseif mode === :clamp
-        return clamp(x, tol, Lx - tol), clamp(y, tol, Ly - tol)
+        return clamp(x, tol, L - tol)
     else
         throw(ArgumentError("Unknown position mode: $mode. Use :periodic or :clamp"))
     end
+end
+
+"""Apply position policy uniformly to both axes (legacy two-axis form)."""
+@inline function apply_position_policy(x::T, y::T, Lx::T, Ly::T, mode::Symbol, tol::T) where {T<:AbstractFloat}
+    return wrap_axis(x, Lx, mode, tol), wrap_axis(y, Ly, mode, tol)
+end
+
+"""Apply per-axis position policy."""
+@inline function apply_position_policy(
+        x::T, y::T, Lx::T, Ly::T,
+        modes::NTuple{2,Symbol}, tol::T,
+    ) where {T<:AbstractFloat}
+    return wrap_axis(x, Lx, modes[1], tol), wrap_axis(y, Ly, modes[2], tol)
 end
 
 """Evaluate physical velocity and Jacobian at point."""
@@ -1830,6 +2240,31 @@ end
         d::Domain, cache::EvaluationCache,
     ) where {T<:AbstractFloat, U<:Real}
     raw_vel, raw_grad = probe_field_at_point(x, y, u_coeffs, d, cache)
+
+    u = -raw_vel[2]
+    v =  raw_vel[1]
+
+    ux = -raw_grad[2, 1]
+    uy = -raw_grad[2, 2]
+    vx =  raw_grad[1, 1]
+    vy =  raw_grad[1, 2]
+
+    vel = SVector{2, T}(u, v)
+    jac = SMatrix{2, 2, T, 4}(ux, vx, uy, vy)
+    return vel, jac
+end
+
+"""
+Evaluate physical velocity and Jacobian at point with element hint for optimization.
+During RK sub-steps, particles move minimally, so the element hint reduces redundant lookups.
+"""
+@inline function physical_velocity_and_jacobian_hint(
+        x::T, y::T,
+        u_coeffs::AbstractVector{U},
+        d::Domain, cache::EvaluationCache,
+        hint_elem::Int,
+    ) where {T<:AbstractFloat, U<:Real}
+    raw_vel, raw_grad = probe_field_at_point_with_hint(x, y, u_coeffs, d, cache, hint_elem)
 
     u = -raw_vel[2]
     v =  raw_vel[1]
@@ -1899,7 +2334,7 @@ end
         u_coeffs::AbstractVector{U},
         d::Domain,
         cache::EvaluationCache;
-        mode::Symbol,
+        modes::NTuple{2,Symbol},
         pos_tol::T,
         pullback_tol::T,
         pullback_max_iter::Int,
@@ -1912,8 +2347,8 @@ end
     c4 = dt / 6
 
     # Calculate initial element as hint for RK stages
-    x_wrapped = mod(pos[1], Lx)
-    y_wrapped = mod(pos[2], Ly)
+    x_wrapped = wrap_axis(pos[1], Lx, modes[1], pos_tol)
+    y_wrapped = wrap_axis(pos[2], Ly, modes[2], pos_tol)
     dx = Lx / nx;  dy = Ly / ny
     inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
     ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
@@ -1924,7 +2359,7 @@ end
     Pdot1 = -(transpose(J1) * input_pullback)
 
     midp1_raw = pos + (dt * 0.5) * v1
-    mx, my = apply_position_policy(midp1_raw[1], midp1_raw[2], Lx, Ly, mode, pos_tol)
+    mx, my = apply_position_policy(midp1_raw[1], midp1_raw[2], Lx, Ly, modes, pos_tol)
     midp1 = SVector{2, T}(mx, my)
     midP1 = input_pullback + (dt * 0.5) * Pdot1
 
@@ -1932,7 +2367,7 @@ end
     Pdot2 = -(transpose(J2) * midP1)
 
     midp2_raw = pos + (dt * 0.5) * v2
-    mx, my = apply_position_policy(midp2_raw[1], midp2_raw[2], Lx, Ly, mode, pos_tol)
+    mx, my = apply_position_policy(midp2_raw[1], midp2_raw[2], Lx, Ly, modes, pos_tol)
     midp2 = SVector{2, T}(mx, my)
     midP2 = input_pullback + (dt * 0.5) * Pdot2
 
@@ -1940,7 +2375,7 @@ end
     Pdot3 = -(transpose(J3) * midP2)
 
     midp3_raw = pos + dt * v3
-    mx, my = apply_position_policy(midp3_raw[1], midp3_raw[2], Lx, Ly, mode, pos_tol)
+    mx, my = apply_position_policy(midp3_raw[1], midp3_raw[2], Lx, Ly, modes, pos_tol)
     midp3 = SVector{2, T}(mx, my)
     midP3 = input_pullback + dt * Pdot3
 
@@ -1951,7 +2386,7 @@ end
     pullback = clamp_pullback(pullback; tol=pullback_tol, max_iter=pullback_max_iter)
 
     pos_raw = pos + c1 * v1 + c2 * v2 + c3 * v3 + c4 * v4
-    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, mode, pos_tol)
+    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, modes, pos_tol)
 
     return SVector{2, T}(px, py), pullback
 end
@@ -1964,7 +2399,7 @@ end
         u_coeffs::AbstractVector{U},
         d::Domain,
         cache::EvaluationCache;
-        mode::Symbol,
+        modes::NTuple{2,Symbol},
         pos_tol::T,
         pullback_tol::T,
         pullback_max_iter::Int,
@@ -1973,8 +2408,8 @@ end
     nx, ny = d.nel
 
     # Calculate initial element as hint for RK stages
-    x_wrapped = mod(pos[1], Lx)
-    y_wrapped = mod(pos[2], Ly)
+    x_wrapped = wrap_axis(pos[1], Lx, modes[1], pos_tol)
+    y_wrapped = wrap_axis(pos[2], Ly, modes[2], pos_tol)
     dx = Lx / nx;  dy = Ly / ny
     inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
     ei = clamp(floor(Int, x_wrapped * inv_dx) + 1, 1, nx)
@@ -1985,7 +2420,7 @@ end
     Pdot1 = -(transpose(J1) * input_pullback)
 
     midp_raw = pos + (dt * 0.5) * v1
-    mx, my = apply_position_policy(midp_raw[1], midp_raw[2], Lx, Ly, mode, pos_tol)
+    mx, my = apply_position_policy(midp_raw[1], midp_raw[2], Lx, Ly, modes, pos_tol)
     midp = SVector{2, T}(mx, my)
     midP = input_pullback + (dt * 0.5) * Pdot1
 
@@ -1996,7 +2431,7 @@ end
     pullback = clamp_pullback(pullback; tol=pullback_tol, max_iter=pullback_max_iter)
 
     pos_raw = pos + dt * v2
-    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, mode, pos_tol)
+    px, py = apply_position_policy(pos_raw[1], pos_raw[2], Lx, Ly, modes, pos_tol)
 
     return SVector{2, T}(px, py), pullback
 end
@@ -2014,7 +2449,7 @@ function advect_particles_pullback_rk4!(
         short_P21::AbstractVector{T}, short_P22::AbstractVector{T},
         thread_caches::Vector{EvaluationCache},
         max_err_per_thread::Vector{T};
-        position_mode::Symbol=:periodic,
+        position_modes::NTuple{2,Symbol}=(:periodic, :periodic),
         position_tol::T=T(1e-12),
         pullback_tol::T=T(1e-9),
         pullback_max_iter::Int=200,
@@ -2023,6 +2458,8 @@ function advect_particles_pullback_rk4!(
     num_p          = length(x0)
     Lx, Ly         = d.box_size
     n_thread_slots = Threads.maxthreadid()
+    is_per_x       = position_modes[1] === :periodic
+    is_per_y       = position_modes[2] === :periodic
 
     if length(thread_caches) < n_thread_slots
         throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
@@ -2038,13 +2475,13 @@ function advect_particles_pullback_rk4!(
         tid   = Threads.threadid()
         cache = thread_caches[tid]
 
-        sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_mode, position_tol)
+        sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_modes, position_tol)
         pos    = SVector{2, T}(sx, sy)
         input_pullback = SMatrix{2, 2, T, 4}(one(T), zero(T), zero(T), one(T))
 
         pos_new, pullback = pullback_rk4_step(
             pos, input_pullback, dt, u_coeffs, d, cache;
-            mode=position_mode, pos_tol=position_tol,
+            modes=position_modes, pos_tol=position_tol,
             pullback_tol=pullback_tol, pullback_max_iter=pullback_max_iter,
         )
 
@@ -2054,10 +2491,8 @@ function advect_particles_pullback_rk4!(
         ox, oy = x_out[i], y_out[i]
         ex = abs(pos_new[1] - ox)
         ey = abs(pos_new[2] - oy)
-        if position_mode === :periodic
-            ex > 0.5 * Lx && (ex = Lx - ex)
-            ey > 0.5 * Ly && (ey = Ly - ey)
-        end
+        is_per_x && ex > 0.5 * Lx && (ex = Lx - ex)
+        is_per_y && ey > 0.5 * Ly && (ey = Ly - ey)
         local_err = max(ex, ey)
         local_err > max_err_per_thread[tid] && (max_err_per_thread[tid] = local_err)
 
@@ -2088,7 +2523,7 @@ function advect_particles_pullback_rk2!(
         short_P21::AbstractVector{T}, short_P22::AbstractVector{T},
         thread_caches::Vector{EvaluationCache},
         max_err_per_thread::Vector{T};
-        position_mode::Symbol=:periodic,
+        position_modes::NTuple{2,Symbol}=(:periodic, :periodic),
         position_tol::T=T(1e-12),
         pullback_tol::T=T(1e-9),
         pullback_max_iter::Int=200,
@@ -2097,6 +2532,8 @@ function advect_particles_pullback_rk2!(
     num_p          = length(x0)
     Lx, Ly         = d.box_size
     n_thread_slots = Threads.maxthreadid()
+    is_per_x       = position_modes[1] === :periodic
+    is_per_y       = position_modes[2] === :periodic
 
     if length(thread_caches) < n_thread_slots
         throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
@@ -2112,13 +2549,13 @@ function advect_particles_pullback_rk2!(
         tid   = Threads.threadid()
         cache = thread_caches[tid]
 
-        sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_mode, position_tol)
+        sx, sy = apply_position_policy(x0[i], y0[i], Lx, Ly, position_modes, position_tol)
         pos    = SVector{2, T}(sx, sy)
         input_pullback = SMatrix{2, 2, T, 4}(one(T), zero(T), zero(T), one(T))
 
         pos_new, pullback = pullback_rk2_step(
             pos, input_pullback, dt, u_coeffs, d, cache;
-            mode=position_mode, pos_tol=position_tol,
+            modes=position_modes, pos_tol=position_tol,
             pullback_tol=pullback_tol, pullback_max_iter=pullback_max_iter,
         )
 
@@ -2128,10 +2565,8 @@ function advect_particles_pullback_rk2!(
         ox, oy = x_out[i], y_out[i]
         ex = abs(pos_new[1] - ox)
         ey = abs(pos_new[2] - oy)
-        if position_mode === :periodic
-            ex > 0.5 * Lx && (ex = Lx - ex)
-            ey > 0.5 * Ly && (ey = Ly - ey)
-        end
+        is_per_x && ex > 0.5 * Lx && (ex = Lx - ex)
+        is_per_y && ey > 0.5 * Ly && (ey = Ly - ey)
         local_err = max(ex, ey)
         local_err > max_err_per_thread[tid] && (max_err_per_thread[tid] = local_err)
 
@@ -2172,12 +2607,17 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
                                         atol=lsqr_atol, btol=lsqr_btol,
                                         maxiter=lsqr_maxiter,
                                         error_on_nonconvergence=lsqr_error_on_nonconvergence)
+    # Pin wall normal-trace DOFs to zero (free-slip). LSQR fits particle data
+    # without any BC awareness, so the constraint must be enforced afterwards.
+    @inbounds for i in d.wall_dofs_R1
+        u_grid_n[i] = 0.0
+    end
     copy!(buf.lsqr_warm, u_grid_n)
     t_solve_raw_ms = time() - t0
 
     t0 = time()
     u_grid_n_h             = Forms.build_form_field(d.R1, u_grid_n)
-    u_div_free_coeffs_n, _ = project_and_get_pressure(d, u_grid_n_h, buf;
+    u_div_free_coeffs_n = project_and_get_pressure(d, u_grid_n_h, buf;
                                                       subtract_mean=projection_mean_subtract)
     t_project_ms = time() - t0
 
@@ -2271,7 +2711,7 @@ function step_co_flip!(
                 @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
                 @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
                 thread_caches, buf.max_err_per_thread;
-                position_mode=:periodic,
+                position_modes=bc_to_position_modes(d.bc),
             )
         elseif cfg.advection_time_integrator === :rk4
             advect_particles_pullback_rk4!(
@@ -2284,7 +2724,7 @@ function step_co_flip!(
                 @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
                 @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
                 thread_caches, buf.max_err_per_thread;
-                position_mode=:periodic,
+                position_modes=bc_to_position_modes(d.bc),
             )
         else
             throw(ArgumentError("Unknown advection_time_integrator=$(cfg.advection_time_integrator). Use :rk2 or :rk4"))
@@ -2311,6 +2751,9 @@ function step_co_flip!(
                                            atol=cfg.lsqr_atol, btol=cfg.lsqr_btol,
                                            maxiter=cfg.lsqr_maxiter,
                                            error_on_nonconvergence=cfg.lsqr_error_on_nonconvergence)
+        @inbounds for i in d.wall_dofs_R1
+            raw_sol[i] = 0.0
+        end
         copy!(f_np1_raw, raw_sol)
         copy!(buf.lsqr_warm, raw_sol)
         t_solve = time() - t0
@@ -2331,8 +2774,8 @@ function step_co_flip!(
 
         t0             = time()
         f_np1_h        = Forms.build_form_field(d.R1, f_np1)
-        proj_result, _ = project_and_get_pressure(d, f_np1_h, buf;
-                                                   subtract_mean=cfg.projection_mean_subtract)
+        proj_result = project_and_get_pressure(d, f_np1_h, buf;
+                               subtract_mean=cfg.projection_mean_subtract)
         copy!(f_np1_proj, proj_result)
         t_project = time() - t0
 
@@ -2363,6 +2806,51 @@ function step_co_flip!(
         end
         prev_err = err
     end
+
+    # --- Viscous split-step diffusion (FEEC) ---
+    # f_np1_proj holds the inviscid divergence-free field f*. Apply one implicit
+    # (M + ν·Δt·L)·f = M·f* step, then re-project to restore divergence-free.
+    if cfg.viscosity > 0.0
+        t0 = time()
+        apply_viscous_diffusion_feec!(
+            f_np1_proj,
+            f_np1_proj,
+            d,
+            cfg.viscosity,
+            dt,
+        )
+        f_np1_proj_h = Forms.build_form_field(d.R1, f_np1_proj)
+        proj_after_diff = project_and_get_pressure(d, f_np1_proj_h, buf;
+                              subtract_mean=cfg.projection_mean_subtract)
+        copy!(f_np1_proj, proj_after_diff)
+        println("  Viscous diffusion step (ν=$(cfg.viscosity)): t=$(round(time()-t0, digits=2))s")
+    end
+
+    # --- [STUB] Metriplectic viscosity (Approach 2) ---
+    # The metriplectic formulation embeds dissipation directly into the geometric
+    # structure via the evolution law:
+    #   dF/dt = {F, G} + (F, G)
+    # where {·,·} is the antisymmetric Lie–Poisson bracket (handled by CO-FLIP)
+    # and (·,·) is a symmetric metric bracket generating entropy production.
+    #
+    # Discrete implementation sketch:
+    #   1. At each timestep, compute the dissipation bracket contribution:
+    #          Δf_metriplectic = -dt · M⁻¹ · L · f_np1_proj
+    #      where L is the curl-curl stiffness (same as FEEC approach).
+    #   2. Apply the update:
+    #          f_np1_proj += Δf_metriplectic
+    #   3. Project to divergence-free subspace.
+    #
+    # The key difference from split-step: instead of solving (M + ν·Δt·L)·f = M·f*
+    # implicitly, the metric bracket drives an *explicit* dissipative update on f,
+    # maintaining thermodynamic consistency (dS/dt ≥ 0, dH/dt = 0 in the bracket
+    # decomposition). Long-time stability benefits require implicit or Runge–Kutta
+    # discretization of the metric bracket.
+    #
+    # Reference: Kraus & Hirvijoki (2017), "Metriplectic integrators for the
+    # Landau collision operator", PoP. Morrison (1984), Physica D.
+    #
+    # TODO: implement cfg.viscosity_method = :metriplectic branch here.
 
     compose_longterm_pullback!(p, buf, dt, num_p)
 
@@ -2496,7 +2984,8 @@ function apply_ftle_reset!(
             set_g2p_velocity(
                 p, pid, p.x[pid], p.y[pid], eid,
                 (ei - 1) * dx, (ej - 1) * dy, dx, dy,
-                u_phys_form, Lx, Ly,
+                u_phys_form, Lx, Ly;
+                modes=bc_to_position_modes(d.bc),
             )
             p.P11[pid] = 1.0;  p.P12[pid] = 0.0
             p.P21[pid] = 0.0;  p.P22[pid] = 1.0
@@ -2542,6 +3031,7 @@ function global_reseed_from_grid!(
         Random.seed!(rng_seed)
     end
 
+    modes = bc_to_position_modes(dom.bc)
     pid = 1
     if cfg.particles_per_cell > 0
         used_N = max(1, floor(Int, sqrt(base_ppc) + 1e-12))
@@ -2550,16 +3040,12 @@ function global_reseed_from_grid!(
             y0 = (ej - 1) * dy
             eid = (ej - 1) * nx + ei
             for jj in 0:(used_N - 1), ii in 0:(used_N - 1)
-                px = x0 + ((ii + rand()) / used_N) * dx
-                py = y0 + ((jj + rand()) / used_N) * dy
-                if cfg.boundary_condition === :periodic
-                    px = mod(px, Lx)
-                    py = mod(py, Ly)
-                end
+                px = wrap_axis(x0 + ((ii + rand()) / used_N) * dx, Lx, modes[1], 1e-12)
+                py = wrap_axis(y0 + ((jj + rand()) / used_N) * dy, Ly, modes[2], 1e-12)
                 p.x[pid] = px
                 p.y[pid] = py
                 set_g2p_velocity(p, pid, px, py, eid, x0, y0, dx, dy,
-                                 u_phys_form, Lx, Ly)
+                                 u_phys_form, Lx, Ly; modes=modes)
                 p.P11[pid] = 1.0; p.P12[pid] = 0.0
                 p.P21[pid] = 0.0; p.P22[pid] = 1.0
                 p.delta_t[pid] = 0.0
@@ -2569,16 +3055,12 @@ function global_reseed_from_grid!(
             end
             remainder = base_ppc - used_N * used_N
             for _ in 1:remainder
-                px = x0 + rand() * dx
-                py = y0 + rand() * dy
-                if cfg.boundary_condition === :periodic
-                    px = mod(px, Lx)
-                    py = mod(py, Ly)
-                end
+                px = wrap_axis(x0 + rand() * dx, Lx, modes[1], 1e-12)
+                py = wrap_axis(y0 + rand() * dy, Ly, modes[2], 1e-12)
                 p.x[pid] = px
                 p.y[pid] = py
                 set_g2p_velocity(p, pid, px, py, eid, x0, y0, dx, dy,
-                                 u_phys_form, Lx, Ly)
+                                 u_phys_form, Lx, Ly; modes=modes)
                 p.P11[pid] = 1.0; p.P12[pid] = 0.0
                 p.P21[pid] = 0.0; p.P22[pid] = 1.0
                 p.delta_t[pid] = 0.0
@@ -2598,7 +3080,7 @@ function global_reseed_from_grid!(
             p.x[pid] = px
             p.y[pid] = py
             set_g2p_velocity(p, pid, px, py, eid, x0, y0, dx, dy,
-                             u_phys_form, Lx, Ly)
+                             u_phys_form, Lx, Ly; modes=modes)
             p.P11[pid] = 1.0; p.P12[pid] = 0.0
             p.P21[pid] = 0.0; p.P22[pid] = 1.0
             p.delta_t[pid] = 0.0
@@ -2734,8 +3216,8 @@ Slimmed-down counterpart to `main()` — skips VTK/particle dumps unless `save_v
 Returns initial and final velocity coefficients so callers can compute custom error norms.
 """
 function run_diagnostic_simulation(cfg::SimulationConfig;
-        save_vtk::Bool=false,
-        output_dir::String=joinpath(DEFAULT_OUTPUT_DIR, "diag_output"),
+        save_vtk::Bool=true,
+        output_dir::String=joinpath(DEFAULT_OUTPUT_DIR, "test_results"),
         record_every::Int=1,
         case_name::String="",
     )
@@ -2792,8 +3274,8 @@ function run_diagnostic_simulation(cfg::SimulationConfig;
     if save_vtk
         d_u_phys_0 = Forms.d(u_phys_form)
         ω_h_0      = ★(d_u_phys_0)
-        Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_0000"); output_directory_tree=[output_dir])
-        Plot.export_form_fields_to_vtk((ω_h_0,),  @sprintf("w_h_0000"); output_directory_tree=[output_dir])
+        Plot.export_form_fields_to_vtk((u_form,), "u_h_0000"; output_directory_tree=[output_dir])
+        Plot.export_form_fields_to_vtk((ω_h_0,),  "w_h_0000"; output_directory_tree=[output_dir])
     end
 
     warmup_evaluation_memo!(domain)
@@ -2868,13 +3350,20 @@ function run_test_suite(;
 
     for case in cases
         println("\n--- $(case.name): $(case.note) ---")
-        cfg = SimulationConfig(;
+        cfg_kwargs = (
             flow_type=case.flow,
             T_final=case.T * T_factor,
             nel=nel,
             particles_per_cell=particles_per_cell,
             output_every=0,
         )
+        if hasproperty(case, :bc)
+            cfg_kwargs = merge(cfg_kwargs, (boundary_condition=case.bc,))
+        end
+        if hasproperty(case, :viscosity)
+            cfg_kwargs = merge(cfg_kwargs, (viscosity=case.viscosity,))
+        end
+        cfg = SimulationConfig(; cfg_kwargs...)
 
         result = nothing
         try
@@ -2920,6 +3409,7 @@ function run_test_suite(;
 
     return summary_rows
 end
+
 
 """Run complete CO-FLIP simulation."""
 function main(cfg::SimulationConfig=SimulationConfig())
@@ -2996,6 +3486,10 @@ function main(cfg::SimulationConfig=SimulationConfig())
 
     for step in 1:n_steps
         println("Step $step / $n_steps (t = $(round(step * dt, digits=3)))...")
+
+        if mod(step, 5) == 0
+            physical_spatial_sort!(particles, domain)  # Every 5 steps
+        end
 
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
 
