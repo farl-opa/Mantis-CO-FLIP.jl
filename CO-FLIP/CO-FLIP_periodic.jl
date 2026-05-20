@@ -11,10 +11,11 @@ using DelimitedFiles
 using Printf
 using Memoization
 using WriteVTK
+import ReadVTK
 
 gr()
 
-struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F, M0M}
+struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F, M0M, OBS}
     R0::F0
     R1::F1
     R2::F2
@@ -35,13 +36,31 @@ struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F, M0M}
     eval_cache_size::Int
     box_size::NTuple{2,Float64}
     R1_basis_indices::Vector{Vector{Int}}
-    # Per-axis boundary condition (:periodic or :wall). Walls enforce u·n = 0
-    # (free-slip) on both sides of the corresponding axis.
-    bc::NTuple{2,Symbol}
-    # Global indices of R1 1-form DOFs whose physical proxy is the wall-normal
-    # velocity component. Pinned to zero so wall normal velocity vanishes
-    # exactly. Empty when bc is fully periodic.
-    wall_dofs_R1::Vector{Int}
+    # Per-side boundary condition in the order (left, right, bottom, top),
+    # i.e. (x-min, x-max, y-min, y-max). Each side is one of :periodic, :wall,
+    # :inlet, :outlet. Periodicity must agree on both sides of an axis.
+    bc_sides::NTuple{4,Symbol}
+    # Wall-normal-trace R1 DOFs partitioned by side type. Both sets are
+    # symmetrically pinned to definite values in the operator factorisations
+    # (rows/cols zeroed, diagonal 1.0); what differs is the RHS handling:
+    #   - homogeneous_dofs_R1 carry u·n = 0 (walls + outlet in stage 2).
+    #   - dirichlet_dofs_R1 are set to lift_g_R1 (inlet, non-zero u·n).
+    # Together they form the same set the old `wall_dofs_R1` represented.
+    homogeneous_dofs_R1::Vector{Int}
+    dirichlet_dofs_R1::Vector{Int}
+    # Inlet lift coefficient vector for R1, length = num R1 basis. Zero
+    # everywhere except `dirichlet_dofs_R1`. Populated lazily on the first
+    # P2G fit so the FEM normalisation is automatically consistent with how
+    # particles get mapped to R1 coefficients elsewhere in the solver.
+    lift_g_R1::Vector{Float64}
+    # Obstacle metadata for immersed-boundary penalisation. `nothing` for
+    # plain box domains; otherwise a NamedTuple describing the obstacle
+    # geometry, e.g. `(kind=:cylinder, center=(cx,cy), radius=rc)`. R1 DOFs
+    # whose support lies entirely inside the obstacle are merged into
+    # `homogeneous_dofs_R1` at construction; particles that wander inside
+    # are projected to the surface with zero velocity each step (Brinkman /
+    # immersed-boundary penalisation, τ→0 limit).
+    obstacle::OBS
 end
 
 mutable struct Particles
@@ -176,23 +195,34 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (96, 96)
+    nel::NTuple{2,Int}                = (96, 48)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
-    box_size::NTuple{2,Float64}       = (2π, 2π)
+    box_size::NTuple{2,Float64}       = (40, 20)
     starting_point::NTuple{2,Float64} = (0.0, 0.0)
-    # :periodic (back-compat shorthand for both axes), or per-axis NTuple
-    # like (:periodic, :wall) or (:wall, :wall). :wall means free-slip
-    # (u·n = 0 on both sides of that axis).
-    boundary_condition::Union{Symbol, NTuple{2,Symbol}} = (:wall, :wall)
+    # Boundary condition. Accepted forms:
+    #   - Symbol: :periodic or :wall applied to all four sides.
+    #   - NTuple{2,Symbol}: legacy per-axis (axis_x, axis_y).
+    #   - NTuple{4,Symbol}: explicit per-side (left, right, bottom, top).
+    # Per-side tags: :periodic, :wall, :inlet, :outlet.
+    boundary_condition::Union{Symbol, NTuple{2,Symbol}, NTuple{4,Symbol}} = (:inlet, :outlet, :periodic, :periodic)
+    # Uniform inlet x-speed (signed: positive points into the domain through
+    # the inlet's inward normal). Zero disables the inlet replenishment
+    # machinery; configs with no `:inlet` side use 0 and incur zero overhead.
+    inlet_U_inf::Float64              = 0.0
+    # Immersed-boundary obstacle. `nothing` = plain box; otherwise a
+    # NamedTuple describing the obstacle, e.g.
+    # `(kind=:cylinder, center=(cx,cy), radius=rc)`. Only `:cylinder` is
+    # supported in stage 5.
+    obstacle::Union{Nothing,NamedTuple} = (kind=:cylinder, center=(10.0, 10.0), radius=1.0)
     particles_per_cell::Int           = 10
     stratified_seeding::Bool          = true
     volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
-    flow_type::Symbol                 = :leapfrog
-    target_cfl::Float64               = 0.75
-    T_final::Float64                  = 10.0
-    viscosity::Float64                = 0.0
+    flow_type::Symbol                 = :cylinder
+    target_cfl::Float64               = 0.5
+    T_final::Float64                  = 40.0
+    viscosity::Float64                = 0.02
     max_fp_iter::Int                  = 6
     fp_tol::Float64                   = 5e-9
     enable_energy_correction::Bool    = true
@@ -203,7 +233,7 @@ Base.@kwdef struct SimulationConfig
     min_particles_per_quarter::Int    = 1
     ftle_threshold::Float64           = 1.0
     max_longterm_delta_t::Float64     = 1.0
-    ftle_use_rate::Bool               = false
+    ftle_use_rate::Bool               = true
     global_ftle_gate::Float64         = -Inf
     delayed_reinit_frequency::Int     = 0
     output_every::Int                 = 1
@@ -214,9 +244,9 @@ Base.@kwdef struct SimulationConfig
     lsqr_maxiter::Int                 = 2000
     lsqr_error_on_nonconvergence::Bool = true
     cfl_recheck_tolerance::Float64    = 0.5
-    cfl_adaptive::Bool                = false
+    cfl_adaptive::Bool                = true
     projection_mean_subtract::Bool    = true
-    advection_time_integrator::Symbol = :rk2
+    advection_time_integrator::Symbol = :rk4
 end
 
 """Promote coefficient type for field probe output."""
@@ -225,16 +255,36 @@ probe_output_eltype(::Type{T}) where {T<:Real} = promote_type(Float64, T)
 """Get maximum local basis size for evaluation cache."""
 evaluation_cache_size(d::Domain) = d.eval_cache_size
 
-"""Normalize a user-supplied boundary_condition to per-axis NTuple{2,Symbol}."""
-function normalize_bc(bc)::NTuple{2,Symbol}
+"""Per-side BC tags currently understood by the parser. Inlet/outlet are
+accepted here so future stages can ship without changing the parser, but
+this stage classifies them as homogeneous walls (zero u·n) — the inlet
+lift and outlet free-DOF handling live in later stages."""
+const VALID_BC_SIDES = (:periodic, :wall, :inlet, :outlet)
+
+"""
+Normalize a user-supplied boundary_condition to a per-side `NTuple{4,Symbol}`
+in the order `(left, right, bottom, top)` (i.e. (x-min, x-max, y-min, y-max)).
+
+Accepted input forms:
+- `Symbol`: `:periodic` or `:wall` applied to all four sides.
+- `NTuple{2,Symbol}`: legacy per-axis `(axis_x, axis_y)`; each axis value is
+  broadcast to both of its sides.
+- `NTuple{4,Symbol}`: explicit per-side specification.
+
+Axis-consistency rule for periodicity: an axis must be `:periodic` on both
+sides or non-periodic on both sides. Periodic B-splines wrap a whole
+univariate axis, so mixing `:periodic` with anything else on the same axis
+is ill-defined.
+"""
+function normalize_bc(bc)::NTuple{4,Symbol}
     if bc isa Symbol
         if bc === :periodic
-            return (:periodic, :periodic)
+            return (:periodic, :periodic, :periodic, :periodic)
         elseif bc === :wall
-            return (:wall, :wall)
+            return (:wall, :wall, :wall, :wall)
         elseif bc === :neumann
             @warn "boundary_condition :neumann is a legacy stub; treating as :periodic."
-            return (:periodic, :periodic)
+            return (:periodic, :periodic, :periodic, :periodic)
         else
             throw(ArgumentError(
                 "boundary_condition Symbol must be :periodic or :wall, got $bc"
@@ -242,72 +292,258 @@ function normalize_bc(bc)::NTuple{2,Symbol}
         end
     elseif bc isa NTuple{2,Symbol}
         for s in bc
-            s === :periodic || s === :wall || throw(ArgumentError(
-                "per-axis boundary_condition entries must be :periodic or :wall, got $s"
+            s in VALID_BC_SIDES || throw(ArgumentError(
+                "per-axis boundary_condition entries must be in $(VALID_BC_SIDES), got $s"
             ))
         end
+        return (bc[1], bc[1], bc[2], bc[2])
+    elseif bc isa NTuple{4,Symbol}
+        for s in bc
+            s in VALID_BC_SIDES || throw(ArgumentError(
+                "per-side boundary_condition entries must be in $(VALID_BC_SIDES), got $s"
+            ))
+        end
+        (bc[1] === :periodic) == (bc[2] === :periodic) || throw(ArgumentError(
+            "x-axis (sides 1,2) must be both :periodic or both non-periodic, got $((bc[1], bc[2]))"
+        ))
+        (bc[3] === :periodic) == (bc[4] === :periodic) || throw(ArgumentError(
+            "y-axis (sides 3,4) must be both :periodic or both non-periodic, got $((bc[3], bc[4]))"
+        ))
         return bc
     else
         throw(ArgumentError(
-            "boundary_condition must be Symbol or NTuple{2,Symbol}, got $(typeof(bc))"
+            "boundary_condition must be Symbol, NTuple{2,Symbol}, or NTuple{4,Symbol}, got $(typeof(bc))"
         ))
     end
 end
 
-"""True if BC has any walled axis (pure-periodic returns false)."""
-has_walls(bc::NTuple{2,Symbol}) = any(s -> s === :wall, bc)
+"""Per-axis summary `(axis_x, axis_y)` collapsing a per-side BC. An axis is
+`:periodic` iff both of its sides are `:periodic`, else `:wall` (the catch-all
+non-periodic tag the FE-space construction needs)."""
+@inline function bc_axes(bc_sides::NTuple{4,Symbol})::NTuple{2,Symbol}
+    ax = bc_sides[1] === :periodic && bc_sides[2] === :periodic ? :periodic : :wall
+    ay = bc_sides[3] === :periodic && bc_sides[4] === :periodic ? :periodic : :wall
+    return (ax, ay)
+end
 
-"""Per-axis position policy modes derived from BC."""
-@inline bc_to_position_modes(bc::NTuple{2,Symbol}) =
-    (bc[1] === :wall ? :clamp : :periodic, bc[2] === :wall ? :clamp : :periodic)
+"""True if BC has any non-periodic side."""
+has_walls(bc_sides::NTuple{4,Symbol}) = any(s -> s !== :periodic, bc_sides)
+
+"""Per-axis position policy `(mode_x, mode_y)` derived from per-side BC.
+An axis is `:clamp` when its sides are non-periodic and `:periodic` otherwise.
+This summary is sufficient for the position-arithmetic wrap/clamp choice;
+per-side asymmetry (e.g. inlet vs outlet) is handled where it matters."""
+@inline function bc_to_position_modes(bc_sides::NTuple{4,Symbol})
+    axes = bc_axes(bc_sides)
+    return (axes[1] === :periodic ? :periodic : :clamp,
+            axes[2] === :periodic ? :periodic : :clamp)
+end
 
 """
-Compute global R1 DOF indices that must vanish for free-slip (u·n=0) walls.
+Classify R1 wall-normal-trace DOFs into a homogeneous set (`u·n = 0`) and a
+prescribed-Dirichlet set (used for non-zero inlet conditions). DOFs on
+`:outlet` sides are intentionally left out of both sets — those DOFs remain
+**free** so the Hodge-Laplace projection produces a natural zero-gradient /
+do-nothing outflow there.
 
-The R1 1-form has two TensorProductSpace components in a DirectSumSpace:
-- component 1 (dx-form, basis combination [1]): D_x ⊗ P_y. Its rotated proxy is
-  the physical y-velocity, so it must vanish on y-walls (top/bottom).
-- component 2 (dy-form, basis combination [2]): P_x ⊗ D_y. Its rotated proxy
-  is the (negated) physical x-velocity, so it must vanish on x-walls.
+R1 has two TensorProductSpace components (rotated R1 storage; ★u_h = phys vel):
+- comp1 = D_x ⊗ P_y → physical v, wall-normal trace on y-sides (bottom=3, top=4).
+- comp2 = P_x ⊗ D_y → physical -u, wall-normal trace on x-sides (left=1, right=2).
 
-For an open-knot non-periodic B-spline, only the first and last univariate
-basis functions are nonzero at the endpoints, so we pick those by univariate
-index. For periodic axes we skip the corresponding wall.
+Per-side classification:
+- `:inlet`    → DOF joins the Dirichlet set; coefficient set from `lift_g_R1`.
+- `:wall`     → DOF joins the homogeneous set; coefficient pinned to 0.
+- `:outlet`   → DOF is skipped (free). Operator factorisations don't pin it,
+                LSQR fits it from particles, and the projection produces the
+                natural `∂p/∂n = 0` outflow on those DOFs automatically.
+- `:periodic` → DOF is skipped (no boundary trace on a wrapped axis).
+
+Returns `(homogeneous_dofs_R1, dirichlet_dofs_R1)` as two disjoint sorted
+`Vector{Int}` indices.
 """
-function compute_wall_dofs_R1(R1_space, bc::NTuple{2,Symbol})::Vector{Int}
-    has_walls(bc) || return Int[]
+function classify_R1_boundary_dofs(R1_space, bc_sides::NTuple{4,Symbol})
+    homog = Set{Int}()
+    dir   = Set{Int}()
+    has_walls(bc_sides) || return (Int[], Int[])
 
-    components   = FunctionSpaces.get_component_spaces(R1_space.fem_space)
-    dof_offsets  = FunctionSpaces.get_dof_offsets(R1_space.fem_space)
-    wall_set     = Set{Int}()
+    components  = FunctionSpaces.get_component_spaces(R1_space.fem_space)
+    dof_offsets = FunctionSpaces.get_dof_offsets(R1_space.fem_space)
 
-    # Component 1 = D_x ⊗ P_y, kills v on y-walls (axis 2)
-    if bc[2] === :wall
+    # Assign one trace DOF to its right bucket based on the side type. Returns
+    # nothing for :outlet / :periodic so those DOFs stay unconstrained.
+    @inline function dispatch!(kind::Symbol, gdof::Int)
+        if kind === :inlet
+            push!(dir, gdof)
+        elseif kind === :wall
+            push!(homog, gdof)
+        end
+        # :outlet, :periodic → free
+        return nothing
+    end
+
+    # Component 1 — y-side traces (sides 3=bottom, 4=top)
+    bot, top = bc_sides[3], bc_sides[4]
+    if bot !== :periodic || top !== :periodic
         comp1   = components[1]
         nbasis1 = FunctionSpaces.get_constituent_num_basis(comp1)  # (n_dx, n_py)
         n_py    = nbasis1[2]
         for bid in 1:FunctionSpaces.get_num_basis(comp1)
-            cb = FunctionSpaces.get_constituent_basis_id(comp1, bid)
-            if cb[2] == 1 || cb[2] == n_py
-                push!(wall_set, dof_offsets[1] + bid)
+            cb   = FunctionSpaces.get_constituent_basis_id(comp1, bid)
+            gdof = dof_offsets[1] + bid
+            if cb[2] == 1
+                dispatch!(bot, gdof)
+            elseif cb[2] == n_py
+                dispatch!(top, gdof)
             end
         end
     end
 
-    # Component 2 = P_x ⊗ D_y, kills u on x-walls (axis 1)
-    if bc[1] === :wall
+    # Component 2 — x-side traces (sides 1=left, 2=right)
+    lf, rt = bc_sides[1], bc_sides[2]
+    if lf !== :periodic || rt !== :periodic
         comp2   = components[2]
         nbasis2 = FunctionSpaces.get_constituent_num_basis(comp2)  # (n_px, n_dy)
         n_px    = nbasis2[1]
         for bid in 1:FunctionSpaces.get_num_basis(comp2)
-            cb = FunctionSpaces.get_constituent_basis_id(comp2, bid)
-            if cb[1] == 1 || cb[1] == n_px
-                push!(wall_set, dof_offsets[2] + bid)
+            cb   = FunctionSpaces.get_constituent_basis_id(comp2, bid)
+            gdof = dof_offsets[2] + bid
+            if cb[1] == 1
+                dispatch!(lf, gdof)
+            elseif cb[1] == n_px
+                dispatch!(rt, gdof)
             end
         end
     end
 
-    return sort!(collect(wall_set))
+    return (sort!(collect(homog)), sort!(collect(dir)))
+end
+
+"""Backwards-compatible alias returning the union of homogeneous and
+Dirichlet wall-trace DOFs (stage-1 behaviour). Kept for any external
+callers; internal code should use `classify_R1_boundary_dofs`."""
+function compute_wall_dofs_R1(R1_space, bc_sides::NTuple{4,Symbol})::Vector{Int}
+    h, d = classify_R1_boundary_dofs(R1_space, bc_sides)
+    return sort!(vcat(h, d))
+end
+
+"""
+Snapshot the inlet lift `lift_g_R1` from a freshly-fitted unconstrained R1
+coefficient vector. No-op when the Dirichlet set is empty or the lift has
+already been populated. The "already populated" check looks at any nonzero
+entry on the Dirichlet indices — the lift starts as all zeros, so the first
+P2G with a non-trivial inlet velocity flips at least one entry, after which
+this call becomes a no-op for the rest of the run.
+
+This approach guarantees `lift_g_R1[i]` matches whatever value the LSQR
+particle-to-grid fit produces for the inlet velocity in the same FEM
+normalisation the rest of the solver uses — without an extra L2 projection,
+Greville interpolation, or mass-matrix solve at construction time.
+"""
+function maybe_initialise_inlet_lift!(d::Domain, u_grid_unconstrained::AbstractVector{Float64})
+    isempty(d.dirichlet_dofs_R1) && return d
+    already_set = false
+    @inbounds for i in d.dirichlet_dofs_R1
+        if d.lift_g_R1[i] != 0.0
+            already_set = true
+            break
+        end
+    end
+    already_set && return d
+    @inbounds for i in d.dirichlet_dofs_R1
+        d.lift_g_R1[i] = u_grid_unconstrained[i]
+    end
+    return d
+end
+
+"""Stamp boundary-trace coefficients onto an R1 coefficient vector:
+homogeneous DOFs go to 0, Dirichlet DOFs go to `lift_g_R1[i]`."""
+@inline function enforce_boundary_dofs!(coeffs::AbstractVector{Float64}, d::Domain)
+    @inbounds for i in d.homogeneous_dofs_R1
+        coeffs[i] = 0.0
+    end
+    @inbounds for i in d.dirichlet_dofs_R1
+        coeffs[i] = d.lift_g_R1[i]
+    end
+    return coeffs
+end
+
+"""True iff point `(x, y)` lies strictly inside the obstacle. `obs === nothing`
+always returns false. Currently supports `obs.kind === :cylinder`."""
+@inline function point_inside_obstacle(x::Float64, y::Float64, obs)::Bool
+    obs === nothing && return false
+    if obs.kind === :cylinder
+        cx, cy = obs.center
+        dx = x - cx;  dy = y - cy
+        return dx * dx + dy * dy < obs.radius * obs.radius
+    end
+    return false
+end
+
+"""True iff every corner of the rectangular element `eid` lies strictly
+inside the obstacle. For a convex obstacle (e.g. cylinder) this is equivalent
+to the whole element being inside; for non-convex obstacles a finer sample
+would be needed but `:cylinder` is the only supported kind in stage 5."""
+@inline function element_inside_obstacle_box(
+        eid::Int, nel::NTuple{2,Int}, box_size::NTuple{2,Float64}, obs,
+    )::Bool
+    obs === nothing && return false
+    nx, ny = nel
+    Lx, Ly = box_size
+    dx = Lx / nx;  dy = Ly / ny
+    ej = (eid - 1) ÷ nx + 1
+    ei = eid - (ej - 1) * nx
+    x0 = (ei - 1) * dx
+    y0 = (ej - 1) * dy
+    return point_inside_obstacle(x0,      y0,      obs) &&
+           point_inside_obstacle(x0 + dx, y0,      obs) &&
+           point_inside_obstacle(x0,      y0 + dy, obs) &&
+           point_inside_obstacle(x0 + dx, y0 + dy, obs)
+end
+
+"""
+Compute the R1 DOFs whose entire basis support lies in elements that are
+fully inside the obstacle. Pinning these to zero exactly zeros the velocity
+in the interior of the obstacle without polluting the surrounding fluid:
+any DOF that is also supported on a partially-fluid element is excluded.
+
+Returns a sorted `Vector{Int}` of global R1 DOF indices. Empty when
+`obs === nothing`.
+
+**Not currently called by `GenerateDomain`.** Strong-Dirichlet pinning of
+*interior* R1 DOFs in the Hodge-Laplace saddle-point operator produces
+stranded R2 rows (all-zero rows from pinned R1 columns + zero A_22 block),
+which makes `ldiv!` return `O(10^54)` entries and the solver explode.
+Kept here as a building block for a future enforcement stage that also
+pins the stranded R2 DOFs. Today the no-slip surface is established
+purely via `apply_obstacle_brinkman!`.
+"""
+function compute_solid_dofs_R1(
+        R1_basis_indices::Vector{Vector{Int}},
+        nel::NTuple{2,Int}, box_size::NTuple{2,Float64},
+        obs, n_R1::Int,
+    )::Vector{Int}
+    obs === nothing && return Int[]
+    num_elements = prod(nel)
+
+    # Tag each DOF as "touched by an outside element" and "touched by an
+    # inside element". Solid DOFs are those touched only by inside elements.
+    touched_outside = falses(n_R1)
+    touched_inside  = falses(n_R1)
+    @inbounds for eid in 1:num_elements
+        inside = element_inside_obstacle_box(eid, nel, box_size, obs)
+        flags  = inside ? touched_inside : touched_outside
+        for dof in R1_basis_indices[eid]
+            flags[dof] = true
+        end
+    end
+
+    solid = Int[]
+    @inbounds for dof in 1:n_R1
+        if touched_inside[dof] && !touched_outside[dof]
+            push!(solid, dof)
+        end
+    end
+    return solid
 end
 
 """
@@ -378,30 +614,62 @@ function GenerateDomain(
         box_size::NTuple{2,Float64}=(1.0, 1.0),
         starting_point::NTuple{2,Float64}=(0.0, 0.0),
         boundary_condition=:periodic,
+        obstacle=nothing,
     )
-    bc = normalize_bc(boundary_condition)
+    bc_sides = normalize_bc(boundary_condition)
 
     nq_assembly    = p .+ 1
     nq_error       = nq_assembly .* 2
     ∫ₐ, ∫ₑ = Quadrature.get_canonical_quadrature_rules(Quadrature.gauss_legendre, nq_assembly, nq_error)
     dΩ = Quadrature.StandardQuadrature(∫ₐ, prod(nel))
 
-    periodic_flags = (bc[1] === :periodic, bc[2] === :periodic)
+    bc_ax = bc_axes(bc_sides)
+    periodic_flags = (bc_ax[1] === :periodic, bc_ax[2] === :periodic)
     R = Forms.create_tensor_product_bspline_de_rham_complex(
         starting_point, box_size, nel, p, k; periodic=periodic_flags,
     )
 
-    wall_dofs_R1 = compute_wall_dofs_R1(R[2], bc)
+    # Build the element→DOF map early so the obstacle solid-DOF classification
+    # can run before the matrix-level Dirichlet pinning. The result is also
+    # stored on Domain at the end.
+    num_elements = prod(nel)
+    R1_basis_indices = Vector{Vector{Int}}(undef, num_elements)
+    for eid in 1:num_elements
+        R1_basis_indices[eid] = collect(FunctionSpaces.get_basis_indices(R[2].fem_space, eid))
+    end
+    eval_cache_size = maximum(length(bi) for bi in R1_basis_indices)
+    n_R1 = FunctionSpaces.get_num_basis(R[2].fem_space)
+
+    homogeneous_dofs_R1, dirichlet_dofs_R1 =
+        classify_R1_boundary_dofs(R[2], bc_sides)
+
+    # Immersed-boundary obstacle: we do *not* fold interior-cylinder R1 DOFs
+    # into the matrix pinning. Strong-Dirichlet-pinning an *interior* R1 DOF
+    # (one that's not on a domain boundary) decouples it from the discrete
+    # exterior derivative `d:R1→R2` — but every R2 DOF whose support lies in
+    # cells coupled exclusively to pinned R1 columns then has an all-zero
+    # row in the Hodge-Laplace saddle-point operator. LU produces a tiny
+    # pivot, `ldiv!` returns O(10^54) entries, the next advection blows up.
+    # The cylinder no-slip is enforced via particle Brinkman penalisation
+    # instead (see `apply_obstacle_brinkman!`), which is sufficient for the
+    # qualitative-demonstration target. A future stage that wants strict
+    # operator-level enforcement must also pin the corresponding stranded
+    # R2 DOFs to keep the saddle-point system well-posed.
+    pinned_dofs_R1 = sort!(vcat(homogeneous_dofs_R1, dirichlet_dofs_R1))
 
     A, N = assemble_hodge_laplacian_matrices(R[2], R[3], dΩ)
     M    = assemble_1form_mass_matrix(R[2], dΩ)
     M_R0 = assemble_R0_mass_matrix(R[1], dΩ)
 
-    if !isempty(wall_dofs_R1)
-        # Pin wall normal-trace 1-form DOFs to zero in the Hodge-Laplace and
-        # mass solves so the projected/lifted velocity satisfies u·n = 0 strongly.
-        apply_dirichlet_zero!(A, wall_dofs_R1)
-        apply_dirichlet_zero!(M, wall_dofs_R1)
+    if !isempty(pinned_dofs_R1)
+        # Both homogeneous and Dirichlet wall-trace DOFs are symmetrically
+        # pinned in the operator factorisations (rows/cols zeroed, diag=1).
+        # The RHS at homogeneous DOFs is enforced to 0 and at Dirichlet DOFs
+        # to lift_g_R1[i] at the call sites where the solver is invoked, so
+        # the resulting field satisfies u·n = 0 on walls/outlet/obstacle and
+        # u·n = g on the inlet exactly.
+        apply_dirichlet_zero!(A, pinned_dofs_R1)
+        apply_dirichlet_zero!(M, pinned_dofs_R1)
     end
 
     A_fact = lu(A)
@@ -410,14 +678,15 @@ function GenerateDomain(
     K_R0    = assemble_R0_stiffness_matrix(R[1], dΩ)
     G_R0_R1 = assemble_R0_R1_weak_grad_matrix(R[1], R[2], dΩ)
 
-    if !isempty(wall_dofs_R1)
-        # Wall DOFs hold u·n = 0; the weak-gradient operator's R1 column
-        # space should not couple to them. Zeroing G_R0_R1 columns at
-        # wall_dofs_R1 means (a) the discrete divergence G·u ignores wall
-        # normal components, and (b) Gᵀ·p (used to map pressure back to
-        # R1 in the projection / curl-consistent kick) has zero rows at
-        # wall_dofs_R1, so the resulting R1 update keeps u·n=0.
-        zero_cols!(G_R0_R1, wall_dofs_R1)
+    if !isempty(pinned_dofs_R1)
+        # Pinned DOFs hold prescribed values; the weak-gradient operator's R1
+        # column space should not couple to them. Zeroing G_R0_R1 columns
+        # means (a) the discrete divergence G·u ignores wall normal
+        # components, and (b) Gᵀ·p (used to map pressure back to R1 in the
+        # projection / curl-consistent kick) has zero rows at the pinned
+        # DOFs, so the projection-induced update preserves the prescribed
+        # boundary trace.
+        zero_cols!(G_R0_R1, pinned_dofs_R1)
     end
 
     n0 = size(K_R0, 1)
@@ -425,25 +694,29 @@ function GenerateDomain(
     K_R0_reg = K_R0 + ridge_R0 * sparse(I, n0, n0)
     K_R0_fact = lu(K_R0_reg)
 
-    num_elements = prod(nel)
-    R1_basis_indices = Vector{Vector{Int}}(undef, num_elements)
-    for eid in 1:num_elements
-        R1_basis_indices[eid] = collect(FunctionSpaces.get_basis_indices(R[2].fem_space, eid))
+    lift_g_R1 = zeros(Float64, n_R1)
+
+    if !isnothing(obstacle)
+        println("  Obstacle: $(obstacle.kind) at center=$(obstacle.center), radius=$(obstacle.radius). " *
+                "No-slip enforced via particle Brinkman penalisation (no operator-level DOF pinning).")
     end
-    eval_cache_size = maximum(length(bi) for bi in R1_basis_indices)
 
     return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k,
                   A, A_fact, N, M, M_R0, K_R0, K_R0_fact, G_R0_R1, M_fact,
                   eval_cache_size, box_size, R1_basis_indices,
-                  bc, wall_dofs_R1)
+                  bc_sides, homogeneous_dofs_R1, dirichlet_dofs_R1, lift_g_R1,
+                  obstacle)
 end
 
-"""Evaluate analytic velocity field at specified point. `bc` selects per-axis
+"""Evaluate analytic velocity field at specified point. `bc` selects per-side
 boundary type so flows that depend on it (e.g. leapfrog with wall images) can
-produce a BC-consistent velocity."""
+produce a BC-consistent velocity. `obstacle`/`U_inf` are needed only by the
+`:cylinder` flow (uniform far-field with zero velocity inside the obstacle)."""
 function initial_velocity(
         flow_type::Symbol, px::Float64, py::Float64, Lx::Float64, Ly::Float64;
-        bc::NTuple{2,Symbol}=(:periodic, :periodic),
+        bc::NTuple{4,Symbol}=(:periodic, :periodic, :periodic, :periodic),
+        obstacle=nothing,
+        U_inf::Float64=0.0,
     )
     if flow_type == :tg;             return flow_taylor_green(px, py, Lx, Ly)
     elseif flow_type == :decaying_tg; return flow_decaying_tg(px, py, Lx, Ly)
@@ -459,11 +732,16 @@ function initial_velocity(
     elseif flow_type == :leapfrog;    return flow_leapfrog(px, py, Lx, Ly; bc=bc)
     elseif flow_type == :four_vortex; return flow_four_vortex(px, py, Lx, Ly)
     elseif flow_type == :stuart;      return flow_stuart(px, py, Lx, Ly)
+    elseif flow_type == :cylinder;   return flow_cylinder(px, py, Lx, Ly, obstacle, U_inf)
     else; error("Unknown flow type: $flow_type")
     end
 end
 
-"""Generate initial particle distribution with stratified or random seeding."""
+"""Generate initial particle distribution with stratified or random seeding.
+
+`U_inf` is forwarded to `initial_velocity` and is consumed by `:cylinder` /
+similar flow types that need the far-field uniform speed. The obstacle (if
+any) is read from `domain.obstacle`."""
 function generate_particles(
         num_particles::Int,
         domain::Domain,
@@ -472,6 +750,7 @@ function generate_particles(
         rng_seed::Union{Int,Nothing}=nothing,
         volume_convention::Symbol=:physical,
         boundary_condition=:periodic,
+        U_inf::Float64=0.0,
     )
     if rng_seed !== nothing
         Random.seed!(rng_seed)
@@ -483,8 +762,9 @@ function generate_particles(
         ))
     end
 
-    bc    = normalize_bc(boundary_condition)
-    modes = bc_to_position_modes(bc)
+    bc       = normalize_bc(boundary_condition)
+    modes    = bc_to_position_modes(bc)
+    obstacle = domain.obstacle
     Lx, Ly = domain.box_size
     nx, ny = domain.nel
     dx     = Lx / nx
@@ -523,7 +803,7 @@ function generate_particles(
                 py = wrap_axis(y0 + ((jj + rand()) / used_N) * dy, Ly, modes[2], 1e-12)
                 x[pid]  = px
                 y[pid]  = py
-                u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
+                u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc, obstacle=obstacle, U_inf=U_inf)
                 mx[pid] = u
                 my[pid] = v
                 pid += 1
@@ -534,7 +814,7 @@ function generate_particles(
                 py = wrap_axis(y0 + rand() * dy, Ly, modes[2], 1e-12)
                 x[pid]  = px
                 y[pid]  = py
-                u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
+                u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc, obstacle=obstacle, U_inf=U_inf)
                 mx[pid] = u
                 my[pid] = v
                 pid += 1
@@ -545,7 +825,7 @@ function generate_particles(
             py = rand() * Ly
             x[pid]  = px
             y[pid]  = py
-            u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
+            u, v    = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc, obstacle=obstacle, U_inf=U_inf)
             mx[pid] = u
             my[pid] = v
             pid += 1
@@ -556,7 +836,7 @@ function generate_particles(
             py = rand() * Ly
             x[i]  = px
             y[i]  = py
-            u, v  = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc)
+            u, v  = initial_velocity(flow_type, px, py, Lx, Ly; bc=bc, obstacle=obstacle, U_inf=U_inf)
             mx[i] = u
             my[i] = v
         end
@@ -574,31 +854,67 @@ function generate_particles(
 end
 
 """Build per-element linked lists and canonical reference coordinates for particles."""
-function particle_sorter!(p::Particles, d::Domain)
+function particle_sorter!(p::Particles, d::Domain; cull_outlets::Bool=true)
     fill!(p.head, 0)
 
     nx, ny = d.nel
     Lx, Ly = d.box_size
     dx = Lx / nx;  dy = Ly / ny
     inv_dx = 1.0 / dx;  inv_dy = 1.0 / dy
-    modes  = bc_to_position_modes(d.bc)
+    modes  = bc_to_position_modes(d.bc_sides)
+    sides  = d.bc_sides
     tol    = 1e-12
     # Slab thickness in which wall-normal momentum is zeroed. Anything in
     # the outermost ~5% of a cell is treated as a wall straggler, otherwise
     # round-off-clamped particles never get cleaned up.
     near_wall_tol_x = max(2 * tol, 0.05 * dx)
     near_wall_tol_y = max(2 * tol, 0.05 * dy)
-    wall_x = modes[1] === :clamp
-    wall_y = modes[2] === :clamp
 
-    @inbounds for i in 1:length(p.x)
+    # Per-side flags. Only `:wall` sides zero the wall-normal momentum slab —
+    # `:inlet` must preserve its prescribed inflow velocity, and `:outlet`
+    # particles are culled in this same pass so their velocity is immaterial.
+    wall_left  = sides[1] === :wall
+    wall_right = sides[2] === :wall
+    wall_bot   = sides[3] === :wall
+    wall_top   = sides[4] === :wall
+
+    # `cull_outlets=false` is used inside the step_co_flip! fixed-point loop
+    # so the particle array doesn't shrink mid-iter (the advection buffers
+    # x_n, P11..P22, etc. are sized to the initial num_p; shrinking p.x
+    # under them would corrupt long-term pullback bookkeeping). The outer
+    # post-iter sort and the per-step rebalance both cull as normal.
+    out_left   = cull_outlets && sides[1] === :outlet
+    out_right  = cull_outlets && sides[2] === :outlet
+    out_bot    = cull_outlets && sides[3] === :outlet
+    out_top    = cull_outlets && sides[4] === :outlet
+    any_outlet = out_left | out_right | out_bot | out_top
+
+    n_particles = length(p.x)
+    # `trues` allocates a BitVector (~n/8 bytes); only paid when outlets exist
+    # in the BC. For non-outlet configs the sorter is bit-identical to before.
+    keep_mask = any_outlet ? trues(n_particles) : Bool[]
+
+    @inbounds for i in 1:n_particles
+        # Outlet culling — done on the raw post-advection position, before
+        # wrap/clamp, so a particle that drifted past an outlet edge is
+        # recognised as exited rather than clamped back inside the domain.
+        if any_outlet
+            if (out_left  && p.x[i] <= 0.0) || (out_right && p.x[i] >= Lx) ||
+               (out_bot   && p.y[i] <= 0.0) || (out_top   && p.y[i] >= Ly)
+                keep_mask[i] = false
+                continue
+            end
+        end
+
         p.x[i] = wrap_axis(p.x[i], Lx, modes[1], tol)
         p.y[i] = wrap_axis(p.y[i], Ly, modes[2], tol)
 
-        if wall_x && (p.x[i] <= near_wall_tol_x || p.x[i] >= Lx - near_wall_tol_x)
+        if (wall_left && p.x[i] <= near_wall_tol_x) ||
+           (wall_right && p.x[i] >= Lx - near_wall_tol_x)
             p.mx[i] = 0.0
         end
-        if wall_y && (p.y[i] <= near_wall_tol_y || p.y[i] >= Ly - near_wall_tol_y)
+        if (wall_bot && p.y[i] <= near_wall_tol_y) ||
+           (wall_top && p.y[i] >= Ly - near_wall_tol_y)
             p.my[i] = 0.0
         end
 
@@ -613,6 +929,29 @@ function particle_sorter!(p::Particles, d::Domain)
         p.next[i]   = p.head[eid]
         p.head[eid] = i
     end
+
+    if any_outlet
+        any_dead = false
+        @inbounds for i in 1:n_particles
+            if !keep_mask[i]
+                any_dead = true
+                break
+            end
+        end
+        if any_dead
+            compact_particles_inplace!(p, keep_mask, n_particles)
+            # head/next are stale after compaction (some indices removed);
+            # rebuild from the surviving particles' preserved elem_ids.
+            fill!(p.head, 0)
+            @inbounds for i in 1:length(p.x)
+                eid = p.elem_ids[i]
+                p.next[i] = p.head[eid]
+                p.head[eid] = i
+            end
+        end
+    end
+
+    return nothing
 end
 
 """Set particle position and velocity by sampling grid 1-form."""
@@ -831,7 +1170,7 @@ function enforce_min_particles_per_element!(
                 qdx = 0.5 * dx
                 qdy = 0.5 * dy
 
-                modes = bc_to_position_modes(d.bc)
+                modes = bc_to_position_modes(d.bc_sides)
                 for _ in 1:n_add_q
                     px = qx0 + rand(rng) * qdx
                     py = qy0 + rand(rng) * qdy
@@ -987,6 +1326,263 @@ function ensure_particle_capacity!(buf::SimulationBuffers, n::Int)
     return nothing
 end
 
+"""
+Per-side analytical inlet velocity, pointing into the domain along the
+inward normal of side `s` with magnitude `U`. Returns `(0.0, 0.0)` when
+the side is not an inlet.
+"""
+@inline function inlet_inward_velocity(sides::NTuple{4,Symbol}, s::Int, U::Float64)
+    sides[s] === :inlet || return (0.0, 0.0)
+    return s == 1 ? ( U, 0.0) :       # left  → +x
+           s == 2 ? (-U, 0.0) :       # right → -x
+           s == 3 ? ( 0.0,  U) :      # bot   → +y
+                    ( 0.0, -U)        # top   → -y
+end
+
+"""Stamp one freshly-injected inlet particle into slot `pid` at random
+sub-position within element `eid` (which spans `[x0, x0+dx] × [y0, y0+dy]`).
+Identity pullback, zero accumulated `delta_t`, volume = cell area (rebound
+to per-particle later by the rebalance pass)."""
+@inline function _seed_inlet_particle!(
+        p::Particles, pid::Int, eid::Int,
+        x0::Float64, y0::Float64, dx::Float64, dy::Float64,
+        u_in::Float64, v_in::Float64, cell_area::Float64, rng,
+    )
+    px = x0 + rand(rng) * dx
+    py = y0 + rand(rng) * dy
+    @inbounds begin
+        p.x[pid]        = px
+        p.y[pid]        = py
+        p.mx[pid]       = u_in
+        p.my[pid]       = v_in
+        p.volume[pid]   = cell_area
+        p.can_x[pid]    = (px - x0) / dx
+        p.can_y[pid]    = (py - y0) / dy
+        p.elem_ids[pid] = eid
+        p.P11[pid]      = 1.0
+        p.P12[pid]      = 0.0
+        p.P21[pid]      = 0.0
+        p.P22[pid]      = 1.0
+        p.delta_t[pid]  = 0.0
+    end
+    return nothing
+end
+
+"""
+Replenish and re-stamp particles in elements adjacent to any `:inlet` side
+so the prescribed inflow is maintained throughout the run:
+
+1. Patch the velocity of every particle currently in an inlet-row element
+   to the analytical inlet value (independent of any L2-projection smearing
+   in the grid representation that would otherwise feed velocity through
+   `set_g2p_velocity`).
+2. Where an inlet element holds fewer than `cfg.particles_per_cell`
+   particles, seed new ones at uniform random sub-positions, give them the
+   analytical inlet velocity, and start them with identity pullback.
+
+No-op for configs with no inlet sides or `cfg.inlet_U_inf == 0`. Call once
+per outer step *before* the fixed-point loop so the inflow is established
+before P2G.
+"""
+function enforce_inlet_particles!(
+        p::Particles, d::Domain, buf::SimulationBuffers, cfg::SimulationConfig,
+    )
+    sides = d.bc_sides
+    has_inlet = sides[1] === :inlet || sides[2] === :inlet ||
+                sides[3] === :inlet || sides[4] === :inlet
+    has_inlet || return 0
+    cfg.inlet_U_inf > 0.0 || return 0
+
+    target = max(cfg.particles_per_cell, cfg.min_particles_per_element)
+    target > 0 || return 0
+
+    nx, ny = d.nel
+    Lx, Ly = d.box_size
+    dx = Lx / nx;  dy = Ly / ny
+    cell_area = dx * dy
+    U = cfg.inlet_U_inf
+
+    in_left  = sides[1] === :inlet
+    in_right = sides[2] === :inlet
+    in_bot   = sides[3] === :inlet
+    in_top   = sides[4] === :inlet
+
+    particle_sorter!(p, d)
+
+    # Pass 1: tally per-element counts and patch velocities of existing
+    # particles in inlet-row elements (analytical inlet velocity).
+    counts_elem = buf.counts_elem
+    fill!(counts_elem, 0)
+    @inbounds for pid in 1:length(p.x)
+        eid = p.elem_ids[pid]
+        counts_elem[eid] += 1
+        ej = (eid - 1) ÷ nx + 1
+        ei = eid - (ej - 1) * nx
+        if in_left && ei == 1
+            p.mx[pid] = U;    p.my[pid] = 0.0
+        elseif in_right && ei == nx
+            p.mx[pid] = -U;   p.my[pid] = 0.0
+        elseif in_bot && ej == 1
+            p.mx[pid] = 0.0;  p.my[pid] = U
+        elseif in_top && ej == ny
+            p.mx[pid] = 0.0;  p.my[pid] = -U
+        end
+    end
+
+    # Pass 2: count how many fresh particles to inject across all inlet rows.
+    deficit_total = 0
+    if in_left
+        @inbounds for ej in 1:ny
+            deficit_total += max(0, target - counts_elem[(ej - 1) * nx + 1])
+        end
+    end
+    if in_right
+        @inbounds for ej in 1:ny
+            deficit_total += max(0, target - counts_elem[(ej - 1) * nx + nx])
+        end
+    end
+    if in_bot
+        @inbounds for ei in 1:nx
+            deficit_total += max(0, target - counts_elem[ei])
+        end
+    end
+    if in_top
+        @inbounds for ei in 1:nx
+            deficit_total += max(0, target - counts_elem[(ny - 1) * nx + ei])
+        end
+    end
+    deficit_total > 0 || return 0
+
+    # Pass 3: allocate slots and inject.
+    old_count = length(p.x)
+    new_count = old_count + deficit_total
+
+    resize!(p.x,        new_count)
+    resize!(p.y,        new_count)
+    resize!(p.mx,       new_count)
+    resize!(p.my,       new_count)
+    resize!(p.volume,   new_count)
+    resize!(p.can_x,    new_count)
+    resize!(p.can_y,    new_count)
+    resize!(p.next,     new_count)
+    resize!(p.elem_ids, new_count)
+    resize!(p.P11,      new_count)
+    resize!(p.P12,      new_count)
+    resize!(p.P21,      new_count)
+    resize!(p.P22,      new_count)
+    resize!(p.delta_t,  new_count)
+    ensure_particle_capacity!(buf, new_count)
+
+    rng = Random.default_rng()
+    pid = old_count + 1
+
+    if in_left
+        u_in, v_in = inlet_inward_velocity(sides, 1, U)
+        @inbounds for ej in 1:ny
+            eid = (ej - 1) * nx + 1
+            deficit = target - counts_elem[eid]
+            deficit > 0 || continue
+            x0 = 0.0
+            y0 = (ej - 1) * dy
+            for _ in 1:deficit
+                _seed_inlet_particle!(p, pid, eid, x0, y0, dx, dy,
+                                      u_in, v_in, cell_area, rng)
+                pid += 1
+            end
+        end
+    end
+    if in_right
+        u_in, v_in = inlet_inward_velocity(sides, 2, U)
+        @inbounds for ej in 1:ny
+            eid = (ej - 1) * nx + nx
+            deficit = target - counts_elem[eid]
+            deficit > 0 || continue
+            x0 = (nx - 1) * dx
+            y0 = (ej - 1) * dy
+            for _ in 1:deficit
+                _seed_inlet_particle!(p, pid, eid, x0, y0, dx, dy,
+                                      u_in, v_in, cell_area, rng)
+                pid += 1
+            end
+        end
+    end
+    if in_bot
+        u_in, v_in = inlet_inward_velocity(sides, 3, U)
+        @inbounds for ei in 1:nx
+            eid = ei
+            deficit = target - counts_elem[eid]
+            deficit > 0 || continue
+            x0 = (ei - 1) * dx
+            y0 = 0.0
+            for _ in 1:deficit
+                _seed_inlet_particle!(p, pid, eid, x0, y0, dx, dy,
+                                      u_in, v_in, cell_area, rng)
+                pid += 1
+            end
+        end
+    end
+    if in_top
+        u_in, v_in = inlet_inward_velocity(sides, 4, U)
+        @inbounds for ei in 1:nx
+            eid = (ny - 1) * nx + ei
+            deficit = target - counts_elem[eid]
+            deficit > 0 || continue
+            x0 = (ei - 1) * dx
+            y0 = (ny - 1) * dy
+            for _ in 1:deficit
+                _seed_inlet_particle!(p, pid, eid, x0, y0, dx, dy,
+                                      u_in, v_in, cell_area, rng)
+                pid += 1
+            end
+        end
+    end
+
+    particle_sorter!(p, d)
+    return deficit_total
+end
+
+"""
+Immersed-boundary penalisation (Brinkman, τ→0 limit) for any obstacle. For
+each particle currently inside the obstacle, zero its velocity **in place**
+(position is left unchanged). LSQR then sees a smooth distribution of
+v=0 samples filling the cylinder interior, and fits a clean U∞-to-0
+transition over ~1-2 cells at the boundary.
+
+We *don't* project the position onto a thin offset annulus outside the
+surface. That formulation concentrates every interior particle into a
+band of width ~1e-4·rc; after a handful of steps tens of thousands of
+zero-velocity particles share that band, the per-step rebalance churns
+whole-population fractions just from the resulting density spike, and the
+LSQR B-spline fit develops singular gradients near the surface that
+amplify under advection (10^19 grid-vel errors observed in step 1 even
+with no operator-level cylinder pinning). In-place zeroing keeps the
+distribution diffuse and the gradients bounded.
+
+Returns the number of particles modified. No-op when `d.obstacle === nothing`.
+"""
+function apply_obstacle_brinkman!(p::Particles, d::Domain)
+    obs = d.obstacle
+    obs === nothing && return 0
+    obs.kind === :cylinder || return 0
+
+    cx, cy = obs.center
+    rc     = obs.radius
+    rc2    = rc * rc
+
+    damped = 0
+    @inbounds for pid in 1:length(p.x)
+        dx = p.x[pid] - cx
+        dy = p.y[pid] - cy
+        r2 = dx * dx + dy * dy
+        if r2 < rc2
+            p.mx[pid] = 0.0
+            p.my[pid] = 0.0
+            damped   += 1
+        end
+    end
+    return damped
+end
+
 """Taylor-Green vortex on periodic domain."""
 function flow_taylor_green(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     U0 = 1.0
@@ -1108,6 +1704,19 @@ function flow_uniform(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     return 1.0, 0.0
 end
 
+"""Initial condition for flow past an obstacle: uniform far-field
+`(U_inf, 0)` outside the obstacle, zero velocity inside. Used together with
+the immersed-boundary penalisation (Step 5) to bootstrap a flow-past-cylinder
+simulation. `obstacle === nothing` falls back to a pure uniform field."""
+function flow_cylinder(
+        x::Float64, y::Float64, Lx::Float64, Ly::Float64,
+        obstacle, U_inf::Float64,
+    )
+    _ = (Lx, Ly)
+    point_inside_obstacle(x, y, obstacle) && return 0.0, 0.0
+    return U_inf, 0.0
+end
+
 """Bell-Colella-Glaz double shear layer — vortex roll-up benchmark on periodic box."""
 function flow_shear(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     ρ = 30.0
@@ -1180,7 +1789,7 @@ streamfunction-Dirichlet-on-wall construction, just expressed analytically
 via the method of images. `n_images` controls how many image rings are
 summed (1 ≈ exact for vortices far from walls)."""
 function flow_leapfrog(x::Float64, y::Float64, Lx::Float64, Ly::Float64;
-        bc::NTuple{2,Symbol}=(:periodic, :periodic),
+        bc::NTuple{4,Symbol}=(:periodic, :periodic, :periodic, :periodic),
         n_images::Int=2,
     )
     # Real vortex centers + circulations. C++: dist_a=1.5, dist_b=3.0 on L=2π.
@@ -1194,8 +1803,12 @@ function flow_leapfrog(x::Float64, y::Float64, Lx::Float64, Ly::Float64;
                      (cx - 0.5*dist_b, cy, +Γ),
                      (cx + 0.5*dist_b, cy, -Γ))
 
-    wall_x = bc[1] === :wall
-    wall_y = bc[2] === :wall
+    # Image lattice keys on per-axis wall presence; the method-of-images
+    # construction reflects across both sides of any non-periodic axis, so
+    # per-axis collapse is the right summary here.
+    axes_summary = bc_axes(bc)
+    wall_x = axes_summary[1] === :wall
+    wall_y = axes_summary[2] === :wall
 
     # Image lattice for free-slip on a rectangle: for each real vortex at
     # (xc, yc, Γ), the image positions are (sx·xc + 2k·Lx, sy·yc + 2m·Ly) with
@@ -1426,7 +2039,7 @@ function probe_field_at_point(
     Tout   = probe_output_eltype(T)
     Lx, Ly = d.box_size
     nx, ny = d.nel
-    modes  = bc_to_position_modes(d.bc)
+    modes  = bc_to_position_modes(d.bc_sides)
 
     x_wrapped = wrap_axis(Float64(x), Lx, modes[1], 1e-12)
     y_wrapped = wrap_axis(Float64(y), Ly, modes[2], 1e-12)
@@ -1479,7 +2092,7 @@ Otherwise, fall back to standard element lookup.
     Tout   = probe_output_eltype(T)
     Lx, Ly = d.box_size
     nx, ny = d.nel
-    modes  = bc_to_position_modes(d.bc)
+    modes  = bc_to_position_modes(d.bc_sides)
 
     x_wrapped = wrap_axis(Float64(x), Lx, modes[1], 1e-12)
     y_wrapped = wrap_axis(Float64(y), Ly, modes[2], 1e-12)
@@ -1855,18 +2468,29 @@ function apply_viscous_diffusion_feec!(
 
     rhs = vcat(M_R1 * f_in, zeros(n_R0))
 
-    if !isempty(domain.wall_dofs_R1)
-        apply_dirichlet_zero!(A_sys, domain.wall_dofs_R1)
-        @inbounds for i in domain.wall_dofs_R1
+    homog = domain.homogeneous_dofs_R1
+    dir   = domain.dirichlet_dofs_R1
+    pinned = isempty(homog) ? dir : (isempty(dir) ? homog : sort!(vcat(homog, dir)))
+    lift   = domain.lift_g_R1
+
+    if !isempty(pinned)
+        apply_dirichlet_zero!(A_sys, pinned)
+        @inbounds for i in homog
             rhs[i] = 0.0
+        end
+        @inbounds for i in dir
+            rhs[i] = lift[i]
         end
     end
 
     sol = lu(A_sys) \ rhs
     copyto!(f_out, view(sol, 1:n_R1))
 
-    @inbounds for i in domain.wall_dofs_R1
+    @inbounds for i in homog
         f_out[i] = 0.0
+    end
+    @inbounds for i in dir
+        f_out[i] = lift[i]
     end
 
     return f_out
@@ -2515,11 +3139,16 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
                                         atol=lsqr_atol, btol=lsqr_btol,
                                         maxiter=lsqr_maxiter,
                                         error_on_nonconvergence=lsqr_error_on_nonconvergence)
-    # Pin wall normal-trace DOFs to zero (free-slip). LSQR fits particle data
-    # without any BC awareness, so the constraint must be enforced afterwards.
-    @inbounds for i in d.wall_dofs_R1
-        u_grid_n[i] = 0.0
-    end
+    # Lazy lift initialisation: on the first P2G that sees a non-empty
+    # Dirichlet set, snapshot the inlet-DOF values from the unconstrained
+    # LSQR fit and freeze them as the lift `lift_g_R1`. This anchors the
+    # lift in the same FEM normalisation the rest of the solver uses
+    # (no separate L2-projection / Greville interpolation needed).
+    maybe_initialise_inlet_lift!(d, u_grid_n)
+    # LSQR is BC-unaware; enforce homogeneous walls/outlet to zero and
+    # Dirichlet (inlet) entries to the lift value. After this the field is
+    # consistent with the strong-Dirichlet operator factorisations.
+    enforce_boundary_dofs!(u_grid_n, d)
     copy!(buf.lsqr_warm, u_grid_n)
     t_solve_raw_ms = time() - t0
 
@@ -2527,6 +3156,9 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
     u_grid_n_h             = Forms.build_form_field(d.R1, u_grid_n)
     u_div_free_coeffs_n = project_and_get_pressure(d, u_grid_n_h, buf;
                                                       subtract_mean=projection_mean_subtract)
+    # Defensive: the projection preserves the prescribed trace mathematically
+    # but a single re-stamp keeps round-off from drifting the inlet value.
+    enforce_boundary_dofs!(u_div_free_coeffs_n, d)
     t_project_ms = time() - t0
 
     t_total_ms = time() - step_t0
@@ -2576,6 +3208,19 @@ function step_co_flip!(
     end
     println("  Initial seeding time: $(round(t_seed_start, digits=2)) s")
 
+    # Inlet replenishment: top up inlet-adjacent elements to
+    # `cfg.particles_per_cell` and stamp the analytical inlet velocity onto
+    # every particle currently in an inlet row. Runs after the generic
+    # rebalance above so the inlet pass sees a freshly-sorted population and
+    # its injection is preserved in the captured num_p below. No-op when no
+    # `:inlet` side is configured or `cfg.inlet_U_inf == 0`.
+    t0 = time()
+    n_inlet = enforce_inlet_particles!(p, d, buf, cfg)
+    t_inlet = time() - t0
+    if n_inlet > 0
+        println("  Inlet injection: +$n_inlet particles  (t=$(round(t_inlet, digits=2)) s)")
+    end
+
     num_p = length(p.x)
     ensure_particle_capacity!(buf, num_p)
 
@@ -2619,7 +3264,7 @@ function step_co_flip!(
                 @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
                 @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
                 thread_caches, buf.max_err_per_thread;
-                position_modes=bc_to_position_modes(d.bc),
+                position_modes=bc_to_position_modes(d.bc_sides),
             )
         elseif cfg.advection_time_integrator === :rk4
             advect_particles_pullback_rk4!(
@@ -2632,7 +3277,7 @@ function step_co_flip!(
                 @view(buf.short_P11[1:num_p]), @view(buf.short_P12[1:num_p]),
                 @view(buf.short_P21[1:num_p]), @view(buf.short_P22[1:num_p]),
                 thread_caches, buf.max_err_per_thread;
-                position_modes=bc_to_position_modes(d.bc),
+                position_modes=bc_to_position_modes(d.bc_sides),
             )
         else
             throw(ArgumentError("Unknown advection_time_integrator=$(cfg.advection_time_integrator). Use :rk2 or :rk4"))
@@ -2644,7 +3289,18 @@ function step_co_flip!(
             p.x[i]  = x_np1[i];   p.y[i]  = y_np1[i]
             p.mx[i] = mx_np1[i];  p.my[i] = my_np1[i]
         end
-        particle_sorter!(p, d)
+        # Immersed-boundary penalisation: any particle whose advected
+        # position landed inside the obstacle gets projected to the surface
+        # with zero velocity. Done *before* the sort so elem_ids/can_x/can_y
+        # are computed from the corrected positions and LSQR sees clean,
+        # no-slip-like data in the cells near the surface.
+        apply_obstacle_brinkman!(p, d)
+        # Skip outlet culling here: the fixed-point loop re-advects every
+        # iter from the captured `x_n` anchor, and the advection / pullback
+        # buffers are sized to the original num_p. Shrinking p.x mid-iter
+        # would desync those. Outlet escapees are culled in the final post-
+        # iter sort below.
+        particle_sorter!(p, d; cull_outlets=false)
         t_sort = time() - t0
 
         t0    = time()
@@ -2659,9 +3315,10 @@ function step_co_flip!(
                                            atol=cfg.lsqr_atol, btol=cfg.lsqr_btol,
                                            maxiter=cfg.lsqr_maxiter,
                                            error_on_nonconvergence=cfg.lsqr_error_on_nonconvergence)
-        @inbounds for i in d.wall_dofs_R1
-            raw_sol[i] = 0.0
-        end
+        # First-time lift initialisation (no-op in subsequent iterations) and
+        # then stamp the BC trace: homogeneous=0, Dirichlet=lift_g_R1.
+        maybe_initialise_inlet_lift!(d, raw_sol)
+        enforce_boundary_dofs!(raw_sol, d)
         copy!(f_np1_raw, raw_sol)
         copy!(buf.lsqr_warm, raw_sol)
         t_solve = time() - t0
@@ -2675,6 +3332,10 @@ function step_co_flip!(
                 tol=1e-14,
                 project_non_orthogonal=true,
             )
+            # Energy correction blends three R1 vectors; the BC trace can drift
+            # to a slightly different value if the boundary slice of those
+            # vectors disagrees. Re-stamp before projection.
+            enforce_boundary_dofs!(f_np1, d)
         else
             copy!(f_np1, f_np1_raw)
         end
@@ -2685,6 +3346,10 @@ function step_co_flip!(
         proj_result = project_and_get_pressure(d, f_np1_h, buf;
                                subtract_mean=cfg.projection_mean_subtract)
         copy!(f_np1_proj, proj_result)
+        # Re-stamp the BC trace after projection; the pinned operator should
+        # preserve it exactly, but defensive enforcement keeps round-off out
+        # of the long-running fixed-point iteration.
+        enforce_boundary_dofs!(f_np1_proj, d)
         t_project = time() - t0
 
         err = norm(@view(f_np1_proj[1:end]) .- @view(f_np1_proj_prev[1:end]))
@@ -2771,6 +3436,12 @@ function step_co_flip!(
     end
 
     apply_pic_blend!(p, f_np1_proj, d, thread_caches, cfg.pic_blend_alpha)
+
+    # End-of-step immersed-boundary clean-up: the pressure kick and PIC blend
+    # above may have given particles inside the obstacle a small non-zero
+    # velocity; re-stamp them to surface positions with zero velocity so the
+    # next step starts from a clean no-slip state.
+    apply_obstacle_brinkman!(p, d)
 
     t0 = time()
     particle_sorter!(p, d)
@@ -2878,7 +3549,7 @@ function apply_ftle_reset!(
                 p, pid, p.x[pid], p.y[pid], eid,
                 (ei - 1) * dx, (ej - 1) * dy, dx, dy,
                 u_phys_form, Lx, Ly;
-                modes=bc_to_position_modes(d.bc),
+                modes=bc_to_position_modes(d.bc_sides),
             )
             p.P11[pid] = 1.0;  p.P12[pid] = 0.0
             p.P21[pid] = 0.0;  p.P22[pid] = 1.0
@@ -2924,7 +3595,7 @@ function global_reseed_from_grid!(
         Random.seed!(rng_seed)
     end
 
-    modes = bc_to_position_modes(dom.bc)
+    modes = bc_to_position_modes(dom.bc_sides)
     pid = 1
     if cfg.particles_per_cell > 0
         used_N = max(1, floor(Int, sqrt(base_ppc) + 1e-12))
@@ -3121,12 +3792,17 @@ function run_diagnostic_simulation(cfg::SimulationConfig;
     domain    = GenerateDomain(cfg.nel, cfg.p, cfg.k;
                                box_size=cfg.box_size,
                                starting_point=cfg.starting_point,
-                               boundary_condition=cfg.boundary_condition)
+                               boundary_condition=cfg.boundary_condition,
+                               obstacle=cfg.obstacle)
     particles = generate_particles(num_particles, domain, cfg.flow_type;
                                    stratified_seeding=cfg.stratified_seeding,
                                    rng_seed=cfg.rng_seed,
                                    volume_convention=cfg.volume_convention,
-                                   boundary_condition=cfg.boundary_condition)
+                                   boundary_condition=cfg.boundary_condition,
+                                   U_inf=cfg.inlet_U_inf)
+    # Clean up any particles seeded inside the obstacle: push them to the
+    # surface with zero velocity before the first sort/P2G.
+    apply_obstacle_brinkman!(particles, domain)
     particle_sorter!(particles, domain)
 
     dt_cfl = compute_cfl_dt_from_particles(particles, domain, cfg.target_cfl)
@@ -3163,6 +3839,10 @@ function run_diagnostic_simulation(cfg::SimulationConfig;
                          eid, (ei - 1) * dx, (ej - 1) * dy, dx, dy,
                          u_phys_form, Lx, Ly)
     end
+    # Re-stamp obstacle-surface particles after the grid resample; the
+    # projected grid velocity may have tiny non-zero values at the surface
+    # that we don't want to push back into particles.
+    apply_obstacle_brinkman!(particles, domain)
 
     if save_vtk
         d_u_phys_0 = Forms.d(u_phys_form)
@@ -3562,12 +4242,17 @@ function main(cfg::SimulationConfig=SimulationConfig())
     domain    = GenerateDomain(cfg.nel, cfg.p, cfg.k;
                                box_size=cfg.box_size,
                                starting_point=cfg.starting_point,
-                               boundary_condition=cfg.boundary_condition)
+                               boundary_condition=cfg.boundary_condition,
+                               obstacle=cfg.obstacle)
     particles = generate_particles(num_particles, domain, cfg.flow_type;
                                    stratified_seeding=cfg.stratified_seeding,
                                    rng_seed=cfg.rng_seed,
                                    volume_convention=cfg.volume_convention,
-                                   boundary_condition=cfg.boundary_condition)
+                                   boundary_condition=cfg.boundary_condition,
+                                   U_inf=cfg.inlet_U_inf)
+    # Clean up any particles seeded inside the obstacle: push them to the
+    # surface with zero velocity before the first sort/P2G.
+    apply_obstacle_brinkman!(particles, domain)
     particle_sorter!(particles, domain)
 
     run_startup_smoke_tests(domain)
@@ -3615,6 +4300,7 @@ function main(cfg::SimulationConfig=SimulationConfig())
             u_phys_form, Lx, Ly,
         )
     end
+    apply_obstacle_brinkman!(particles, domain)
 
     d_u_phys = Forms.d(u_phys_form)
     ω_h      = ★(d_u_phys)
@@ -3625,7 +4311,8 @@ function main(cfg::SimulationConfig=SimulationConfig())
 
     warmup_evaluation_memo!(domain)
 
-    for step in 1:n_steps
+    step = 1
+    while step <= n_steps
         println("Step $step / $n_steps (t = $(round(step * dt, digits=3)))...")
 
         if mod(step, 5) == 0
@@ -3652,6 +4339,7 @@ function main(cfg::SimulationConfig=SimulationConfig())
         new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
         if new_dt != dt
             remaining_steps = max(1, ceil(Int, (cfg.T_final - step * dt) / new_dt))
+            n_steps = step + remaining_steps  # Adjust total steps to keep T_final fixed
             println("  Adaptive CFL: dt=$(new_dt) (was $(dt)); remaining_steps≈$(remaining_steps)")
             dt = new_dt
         end
@@ -3673,13 +4361,15 @@ function main(cfg::SimulationConfig=SimulationConfig())
         end
 
         maybe_clear_memo_tables!(step, cfg.clear_memo_every, domain)
+        step += 1
     end
 
     println("\nSimulation complete! Step files written to '$(output_dir)'.")
 end
 
+
 #main()
 
 #run_test_suite()
 
-result = test_decaying_taylor_green()
+#result = test_decaying_taylor_green()
