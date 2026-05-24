@@ -178,7 +178,7 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (96, 96)
+    nel::NTuple{2,Int}                = (256, 256)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (1.0, 1.0)
@@ -186,7 +186,7 @@ Base.@kwdef struct SimulationConfig
     # :periodic (back-compat shorthand for both axes), or per-axis NTuple
     # like (:periodic, :wall) or (:wall, :wall). :wall means free-slip
     # (u·n = 0 on both sides of that axis).
-    boundary_condition::Union{Symbol, NTuple{2,Symbol}} = :periodic
+    boundary_condition::Union{Symbol, NTuple{2,Symbol}} = :wall
     particles_per_cell::Int           = 20
     stratified_seeding::Bool          = true
     volume_convention::Symbol         = :physical
@@ -199,12 +199,12 @@ Base.@kwdef struct SimulationConfig
     fp_tol::Float64                   = 5e-9
     enable_energy_correction::Bool    = true
     enable_pressure_kick::Bool        = true
-    pressure_kick_method::Symbol      = :curl_consistent
+    pressure_kick_method::Symbol      = :div_consistent
     pic_blend_alpha::Float64          = 0.0
     min_particles_per_element::Int    = 10
     max_particles_per_element::Int    = 25
     min_particles_per_quarter::Int    = 3
-    ftle_threshold::Float64           = 0.2
+    ftle_threshold::Float64           = 1.0
     max_longterm_delta_t::Float64     = 1.0
     ftle_use_rate::Bool               = true
     global_ftle_gate::Float64         = -Inf
@@ -219,7 +219,7 @@ Base.@kwdef struct SimulationConfig
     cfl_recheck_tolerance::Float64    = 0.5
     cfl_adaptive::Bool                = false
     projection_mean_subtract::Bool    = true
-    advection_time_integrator::Symbol = :rk2
+    advection_time_integrator::Symbol = :rk4
 end
 
 """Promote coefficient type for field probe output."""

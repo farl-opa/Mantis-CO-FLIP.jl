@@ -2,9 +2,9 @@
 #SBATCH --job-name=coflip_leapfrog
 #SBATCH --partition=compute-p1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=3900M
-#SBATCH --time=15:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=coflip_leapfrog_%j.out 
 #SBATCH --error=coflip_leapfrog_%j.err
 
