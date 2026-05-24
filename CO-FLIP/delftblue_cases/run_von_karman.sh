@@ -2,9 +2,9 @@
 #SBATCH --job-name=coflip_von_karman
 #SBATCH --partition=compute-p1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=3900M
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=coflip_von_karman_%j.out
 #SBATCH --error=coflip_von_karman_%j.err
 
