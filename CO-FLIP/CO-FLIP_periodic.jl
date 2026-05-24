@@ -36,30 +36,10 @@ struct Domain{F0, F1, F2, G, Q, MH, NH, MM, HF, KR0, KR0F, GG, M1F, M0M, OBS}
     eval_cache_size::Int
     box_size::NTuple{2,Float64}
     R1_basis_indices::Vector{Vector{Int}}
-    # Per-side boundary condition in the order (left, right, bottom, top),
-    # i.e. (x-min, x-max, y-min, y-max). Each side is one of :periodic, :wall,
-    # :inlet, :outlet. Periodicity must agree on both sides of an axis.
     bc_sides::NTuple{4,Symbol}
-    # Wall-normal-trace R1 DOFs partitioned by side type. Both sets are
-    # symmetrically pinned to definite values in the operator factorisations
-    # (rows/cols zeroed, diagonal 1.0); what differs is the RHS handling:
-    #   - homogeneous_dofs_R1 carry u·n = 0 (walls + outlet in stage 2).
-    #   - dirichlet_dofs_R1 are set to lift_g_R1 (inlet, non-zero u·n).
-    # Together they form the same set the old `wall_dofs_R1` represented.
     homogeneous_dofs_R1::Vector{Int}
     dirichlet_dofs_R1::Vector{Int}
-    # Inlet lift coefficient vector for R1, length = num R1 basis. Zero
-    # everywhere except `dirichlet_dofs_R1`. Populated lazily on the first
-    # P2G fit so the FEM normalisation is automatically consistent with how
-    # particles get mapped to R1 coefficients elsewhere in the solver.
     lift_g_R1::Vector{Float64}
-    # Obstacle metadata for immersed-boundary penalisation. `nothing` for
-    # plain box domains; otherwise a NamedTuple describing the obstacle
-    # geometry, e.g. `(kind=:cylinder, center=(cx,cy), radius=rc)`. R1 DOFs
-    # whose support lies entirely inside the obstacle are merged into
-    # `homogeneous_dofs_R1` at construction; particles that wander inside
-    # are projected to the surface with zero velocity each step (Brinkman /
-    # immersed-boundary penalisation, τ→0 limit).
     obstacle::OBS
 end
 
@@ -83,10 +63,6 @@ end
 
 struct EvaluationCache
     results::Vector{Vector{Vector{Matrix{Float64}}}}
-    # Scratch buffers for the allocation-free 2D fast-path (per dimension):
-    # bern_buf[d]  is (p+1, nder+1)  — Bernstein values
-    # bsp_vals[d]  is (nder+1, n_bsp) — after BSpline extraction
-    # gtb_vals[d]  is (nder+1, n_gtb) — after GTBSpline extraction
     bern_buf::NTuple{2, Matrix{Float64}}
     bsp_vals::NTuple{2, Matrix{Float64}}
     gtb_vals::NTuple{2, Matrix{Float64}}
@@ -195,25 +171,13 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
 end
 
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (96, 48)
+    nel::NTuple{2,Int}                = (96, 64)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
     box_size::NTuple{2,Float64}       = (40, 20)
     starting_point::NTuple{2,Float64} = (0.0, 0.0)
-    # Boundary condition. Accepted forms:
-    #   - Symbol: :periodic or :wall applied to all four sides.
-    #   - NTuple{2,Symbol}: legacy per-axis (axis_x, axis_y).
-    #   - NTuple{4,Symbol}: explicit per-side (left, right, bottom, top).
-    # Per-side tags: :periodic, :wall, :inlet, :outlet.
     boundary_condition::Union{Symbol, NTuple{2,Symbol}, NTuple{4,Symbol}} = (:inlet, :outlet, :periodic, :periodic)
-    # Uniform inlet x-speed (signed: positive points into the domain through
-    # the inlet's inward normal). Zero disables the inlet replenishment
-    # machinery; configs with no `:inlet` side use 0 and incur zero overhead.
-    inlet_U_inf::Float64              = 0.0
-    # Immersed-boundary obstacle. `nothing` = plain box; otherwise a
-    # NamedTuple describing the obstacle, e.g.
-    # `(kind=:cylinder, center=(cx,cy), radius=rc)`. Only `:cylinder` is
-    # supported in stage 5.
+    inlet_U_inf::Float64              = 1.0
     obstacle::Union{Nothing,NamedTuple} = (kind=:cylinder, center=(10.0, 10.0), radius=1.0)
     particles_per_cell::Int           = 10
     stratified_seeding::Bool          = true
@@ -2164,6 +2128,216 @@ function export_particles_to_vtk(particles::Particles, output_path::String)
     outfiles = vtk_save(vtkfile)
     return outfiles
 end
+"""
+Read particle state from a `.vtu` file written by `export_particles_to_vtk`.
+Returns `(x, y, mx, my, volume)` as `Vector{Float64}`.
+"""
+function read_particles_from_vtu(path::String)
+    vtk = ReadVTK.VTKFile(path)
+
+    points = ReadVTK.get_data(ReadVTK.get_data_section(vtk, "Points")["Points"])
+    coords = reshape(points, 3, :)
+
+    pd = ReadVTK.get_point_data(vtk)
+    mx = ReadVTK.get_data(pd["mx"])
+    my = ReadVTK.get_data(pd["my"])
+    vol = ReadVTK.get_data(pd["volume"])
+
+    n = size(coords, 2)
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, n)
+    @inbounds for i in 1:n
+        x[i] = coords[1, i]
+        y[i] = coords[2, i]
+    end
+
+    return x, y, Vector{Float64}(mx), Vector{Float64}(my), Vector{Float64}(vol)
+end
+
+"""
+Build a fresh `Particles` from raw vectors. P-tensor and `delta_t` are
+initialised to identity / zero — the .vtu export does not store them, so
+the FTLE accumulator restarts cold.
+"""
+function particles_from_vtu_state(
+        x::Vector{Float64}, y::Vector{Float64},
+        mx::Vector{Float64}, my::Vector{Float64},
+        vol::Vector{Float64},
+        num_elements::Int,
+    )
+    n = length(x)
+    @assert length(y)  == n
+    @assert length(mx) == n
+    @assert length(my) == n
+    @assert length(vol) == n
+
+    can_x    = zeros(Float64, n)
+    can_y    = zeros(Float64, n)
+    head     = zeros(Int, num_elements)
+    next     = zeros(Int, n)
+    elem_ids = zeros(Int, n)
+
+    P11 = ones(Float64, n);  P12 = zeros(Float64, n)
+    P21 = zeros(Float64, n); P22 = ones(Float64, n)
+    delta_t = zeros(Float64, n)
+
+    return Particles(x, y, mx, my, vol,
+                     can_x, can_y, head, next, elem_ids,
+                     P11, P12, P21, P22, delta_t)
+end
+
+"""
+Continue a CO-FLIP run from a saved particle snapshot.
+
+Arguments:
+- `cfg`              — `SimulationConfig` matching the original run (same nel, p, k,
+                       box_size, BCs, obstacle, flow_type, viscosity, …). The
+                       `T_final` field is ignored on restart; `additional_steps`
+                       controls the run length instead.
+- `particles_vtu`    — path to the `particles_NNNN.vtu` to resume from.
+
+Keyword arguments:
+- `restart_step`     — step index of the snapshot (used only for output naming;
+                       next file written is `*_{restart_step+output_every}`).
+- `additional_steps` — number of CO-FLIP steps to run after the restart.
+- `output_dir`       — where VTK snapshots and particles are written. Defaults
+                       to the parent directory of `particles_vtu`.
+- `dt`               — optional override; if `nothing`, recomputed from CFL on
+                       the reconstructed velocity field.
+"""
+function restart_main(
+        cfg::SimulationConfig,
+        particles_vtu::String;
+        restart_step::Int,
+        additional_steps::Int,
+        dt::Float64,
+        output_dir::Union{String,Nothing} = nothing,
+    )
+    println("Restart adapter: loading $(particles_vtu)")
+    LinearAlgebra.BLAS.set_num_threads(1)
+
+    out_dir = output_dir === nothing ? dirname(abspath(particles_vtu)) : output_dir
+    mkpath(out_dir)
+
+    domain = GenerateDomain(cfg.nel, cfg.p, cfg.k;
+                            box_size           = cfg.box_size,
+                            starting_point     = cfg.starting_point,
+                            boundary_condition = cfg.boundary_condition,
+                            obstacle           = cfg.obstacle)
+
+    num_elements = prod(domain.nel)
+
+    x, y, mx, my, vol = read_particles_from_vtu(particles_vtu)
+    particles = particles_from_vtu_state(x, y, mx, my, vol, num_elements)
+    println("  Loaded $(length(particles.x)) particles")
+
+    apply_obstacle_brinkman!(particles, domain)
+    particle_sorter!(particles, domain)
+
+    ndofs   = FunctionSpaces.get_num_basis(domain.R1.fem_space)
+    sim_buf = SimulationBuffers(length(particles.x), ndofs, num_elements, domain)
+
+    println("Reconstructing u_coeffs from particle impulses (coadjoint P2G + projection)...")
+    u_coeffs = coadjoint_step!(particles, domain, sim_buf;
+        lsqr_atol                    = cfg.lsqr_atol,
+        lsqr_btol                    = cfg.lsqr_btol,
+        lsqr_maxiter                 = cfg.lsqr_maxiter,
+        lsqr_error_on_nonconvergence = cfg.lsqr_error_on_nonconvergence,
+        projection_mean_subtract     = cfg.projection_mean_subtract,
+    )
+
+    u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+    u_phys_expr = ★(u_form)
+    u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+
+    nx, ny = domain.nel
+    Lx, Ly = domain.box_size
+    dx = Lx / nx;  dy = Ly / ny
+    @inbounds for pid in eachindex(particles.x)
+        eid = particles.elem_ids[pid]
+        ej  = ((eid - 1) ÷ nx) + 1
+        ei  = eid - (ej - 1) * nx
+        set_g2p_velocity(
+            particles, pid,
+            particles.x[pid], particles.y[pid],
+            eid, (ei - 1) * dx, (ej - 1) * dy, dx, dy,
+            u_phys_form, Lx, Ly,
+        )
+    end
+    apply_obstacle_brinkman!(particles, domain)
+
+    isfinite(dt) && dt > 0 ||
+        error("restart_main: dt must be a finite positive Float64, got dt=$(dt)")
+
+    # Informational CFL gauge against the loaded particle + reconstructed grid
+    # state — just printed, not enforced. The user's `dt` is used as-is; the
+    # in-loop `recheck_cfl_dt` / `enforce_cfl_recheck!` will still adapt it if
+    # `cfg.cfl_adaptive=true`.
+    dt_particles = compute_cfl_dt_from_particles(particles, domain, cfg.target_cfl)
+    dt_grid      = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, Inf)
+    println(@sprintf("CFL gauge at restart: dt_particles=%.6g, dt_grid=%.6g (user dt=%.6g)",
+                     dt_particles, dt_grid, dt))
+    println("Restarting from step $(restart_step) for $(additional_steps) more steps (dt = $(dt))")
+
+    warmup_evaluation_memo!(domain)
+
+    step = restart_step + 1
+    final_step = restart_step + additional_steps
+    while step <= final_step
+        println("Step $step / $final_step (t ≈ $(round(step * dt, digits=3)))...")
+
+        if mod(step, 5) == 0
+            physical_spatial_sort!(particles, domain)
+        end
+
+        u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
+
+        u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+        u_phys_expr = ★(u_form)
+        u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+
+        if cfg.delayed_reinit_frequency > 0 &&
+           step % cfg.delayed_reinit_frequency == 0
+            new_count = global_reseed_from_grid!(particles, domain, cfg, u_phys_form;
+                                                 rng_seed = cfg.rng_seed)
+            println("  Delayed re-seed at step $step: $(new_count) particles re-generated.")
+        end
+
+        reset_count = apply_ftle_reset!(particles, domain, u_phys_form, cfg)
+        reset_count > 0 && println("  FTLE reset: $reset_count particles reseeded.")
+
+        dt_check = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, dt)
+        new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
+        if new_dt != dt
+            println("  Adaptive CFL: dt=$(new_dt) (was $(dt))")
+            dt = new_dt
+        end
+
+        if cfg.output_every > 0 && step % cfg.output_every == 0
+            d_u_phys = Forms.d(u_phys_form)
+            ω_h      = ★(d_u_phys)
+            Plot.export_form_fields_to_vtk((u_form,), @sprintf("u_h_%04d", step);
+                                           output_directory_tree=[out_dir])
+            Plot.export_form_fields_to_vtk((ω_h,),    @sprintf("w_h_%04d", step);
+                                           output_directory_tree=[out_dir])
+
+            diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
+            print_conservation_diagnostics(step, step * dt, diagnostics)
+
+            export_particles_to_vtk(
+                particles,
+                joinpath(out_dir, @sprintf("particles_%04d", step)),
+            )
+            println("  Saved step $step visualization and particle data.")
+        end
+
+        maybe_clear_memo_tables!(step, cfg.clear_memo_every, domain)
+        step += 1
+    end
+
+    println("\nRestart complete. Files written to '$(out_dir)'.")
+    return nothing
+end
 
 """Ensure triplet buffers can hold at least `needed_nnz` B-matrix nonzeros."""
 function ensure_B_triplet_capacity!(buf::SimulationBuffers, needed_nnz::Int)
@@ -3757,242 +3931,6 @@ function run_startup_smoke_tests(d::Domain)
     return nothing
 end
 
-"""L2 norm of a 1-form coefficient vector via the assembled mass matrix."""
-function l2_velocity_norm(u_coeffs::AbstractVector{<:Real}, dom::Domain)
-    return sqrt(max(0.0, dot(u_coeffs, dom.Mass_matrix * u_coeffs)))
-end
-
-"""Write per-step conservation diagnostics to a CSV file."""
-function save_diagnostics_csv(history, path::String)
-    open(path, "w") do io
-        println(io, "t,energy,enstrophy,circulation")
-        for h in history
-            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
-                    h.t, h.energy, h.enstrophy, h.circulation)
-        end
-    end
-    return path
-end
-
-"""
-Run one CO-FLIP simulation and record (t, energy, enstrophy, circulation) every `record_every` steps.
-Slimmed-down counterpart to `main()` — skips VTK/particle dumps unless `save_vtk=true`.
-Returns initial and final velocity coefficients so callers can compute custom error norms.
-"""
-function run_diagnostic_simulation(cfg::SimulationConfig;
-        save_vtk::Bool=true,
-        output_dir::String="diag_output",
-        record_every::Int=1,
-        case_name::String="",
-    )
-    LinearAlgebra.BLAS.set_num_threads(1)
-    save_vtk && mkpath(output_dir)
-
-    num_particles = cfg.nel[1] * cfg.nel[2] * cfg.particles_per_cell
-    domain    = GenerateDomain(cfg.nel, cfg.p, cfg.k;
-                               box_size=cfg.box_size,
-                               starting_point=cfg.starting_point,
-                               boundary_condition=cfg.boundary_condition,
-                               obstacle=cfg.obstacle)
-    particles = generate_particles(num_particles, domain, cfg.flow_type;
-                                   stratified_seeding=cfg.stratified_seeding,
-                                   rng_seed=cfg.rng_seed,
-                                   volume_convention=cfg.volume_convention,
-                                   boundary_condition=cfg.boundary_condition,
-                                   U_inf=cfg.inlet_U_inf)
-    # Clean up any particles seeded inside the obstacle: push them to the
-    # surface with zero velocity before the first sort/P2G.
-    apply_obstacle_brinkman!(particles, domain)
-    particle_sorter!(particles, domain)
-
-    dt_cfl = compute_cfl_dt_from_particles(particles, domain, cfg.target_cfl)
-    if !isfinite(dt_cfl)
-        n_steps = 1;  dt = cfg.T_final
-    else
-        n_steps = max(1, ceil(Int, cfg.T_final / dt_cfl))
-        dt      = cfg.T_final / n_steps
-    end
-
-    ndofs        = FunctionSpaces.get_num_basis(domain.R1.fem_space)
-    num_elements = prod(domain.nel)
-    sim_buf      = SimulationBuffers(num_particles, ndofs, num_elements, domain)
-
-    u_coeffs = coadjoint_step!(particles, domain, sim_buf;
-        lsqr_atol=cfg.lsqr_atol, lsqr_btol=cfg.lsqr_btol, lsqr_maxiter=cfg.lsqr_maxiter,
-        lsqr_error_on_nonconvergence=cfg.lsqr_error_on_nonconvergence,
-        projection_mean_subtract=cfg.projection_mean_subtract)
-    u_initial = copy(u_coeffs)
-
-    u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
-    u_phys_expr = ★(u_form)
-    u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
-    particle_sorter!(particles, domain)
-
-    nx, ny = domain.nel
-    Lx, Ly = domain.box_size
-    dx = Lx / nx;  dy = Ly / ny
-    @inbounds for pid in eachindex(particles.x)
-        eid = particles.elem_ids[pid]
-        ej  = ((eid - 1) ÷ nx) + 1
-        ei  = eid - (ej - 1) * nx
-        set_g2p_velocity(particles, pid, particles.x[pid], particles.y[pid],
-                         eid, (ei - 1) * dx, (ej - 1) * dy, dx, dy,
-                         u_phys_form, Lx, Ly)
-    end
-    # Re-stamp obstacle-surface particles after the grid resample; the
-    # projected grid velocity may have tiny non-zero values at the surface
-    # that we don't want to push back into particles.
-    apply_obstacle_brinkman!(particles, domain)
-
-    if save_vtk
-        d_u_phys_0 = Forms.d(u_phys_form)
-        ω_h_0      = ★(d_u_phys_0)
-        Plot.export_form_fields_to_vtk((u_form,), "u_h_0000"; output_directory_tree=[output_dir])
-        Plot.export_form_fields_to_vtk((ω_h_0,),  "w_h_0000"; output_directory_tree=[output_dir])
-    end
-
-    warmup_evaluation_memo!(domain)
-
-    d0 = compute_conservation_diagnostics(u_coeffs, domain)
-    history = [(t=0.0, energy=d0.energy, enstrophy=d0.enstrophy, circulation=d0.circulation)]
-
-    for step in 1:n_steps
-        println(@sprintf("Step %d/%d, case: %s", step, n_steps, case_name))
-        u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
-
-        u_form_loc      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
-        u_phys_expr_loc = ★(u_form_loc)
-        u_phys_form_loc = Assemblers.solve_L2_projection(domain.R1, u_phys_expr_loc, domain.dΩ)
-
-        if cfg.delayed_reinit_frequency > 0 && step % cfg.delayed_reinit_frequency == 0
-            global_reseed_from_grid!(particles, domain, cfg, u_phys_form_loc; rng_seed=cfg.rng_seed)
-        end
-        apply_ftle_reset!(particles, domain, u_phys_form_loc, cfg)
-
-        dt_check = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, dt)
-        new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
-        new_dt != dt && (dt = new_dt)
-
-        if step % record_every == 0
-            d = compute_conservation_diagnostics(u_coeffs, domain)
-            push!(history, (t=step*dt, energy=d.energy, enstrophy=d.enstrophy, circulation=d.circulation))
-
-            if save_vtk
-                d_u_phys = Forms.d(u_phys_form_loc)
-                ω_h      = ★(d_u_phys)
-                Plot.export_form_fields_to_vtk((u_form_loc,),
-                    @sprintf("u_h_%04d", step); output_directory_tree=[output_dir])
-                Plot.export_form_fields_to_vtk((ω_h,),
-                    @sprintf("w_h_%04d", step); output_directory_tree=[output_dir])
-            end
-        end
-
-        maybe_clear_memo_tables!(step, cfg.clear_memo_every, domain)
-    end
-
-    return (history=history, u_initial=u_initial, u_final=u_coeffs,
-            domain=domain, dt=dt, n_steps=n_steps)
-end
-
-"""
-Run the canonical 2D periodic inviscid Euler test suite for CO-FLIP.
-
-Each case records (energy, enstrophy, circulation) over time → CSV, and prints conservation
-drifts. The Taylor-Green case additionally reports ‖u(T)-u(0)‖₂/‖u(0)‖₂ — that ratio should
-be tiny because the IC is an exact stationary solution of 2D Euler.
-
-Set `save_vtk=true` to dump VTK snapshots per case (useful for visually inspecting the
-double-shear roll-up, leapfrog dynamics, four-vortex symmetry, etc.). Use `T_factor` to
-shorten/lengthen all runs uniformly.
-"""
-function run_test_suite(;
-        output_dir::String="test_results",
-        save_vtk::Bool=false,
-        T_factor::Float64=1.0,
-        nel::NTuple{2,Int}=(64, 64),
-        particles_per_cell::Int=20,
-    )
-    mkpath(output_dir)
-
-    cases = (
-        (name="taylor_green", flow=:tg,          T=2.0, note="Exact stationary 2D Euler"),
-        (name="lamb_oseen",   flow=:vortex,      T=1.0, note="Single vortex — vorticity diffusion"),
-        (name="convecting",   flow=:convecting,  T=1.0, note="Vortex translation in uniform flow"),
-        (name="dipole",       flow=:dipole,      T=1.0, note="Self-propagating Lamb-Oseen pair"),
-        (name="merging",      flow=:merging,     T=2.0, note="Co-rotating vortex merger"),
-        (name="four_vortex",  flow=:four_vortex, T=1.0, note="Symmetry preservation (net Γ=0)"),
-        (name="shear",        flow=:shear,       T=1.5, note="Bell-Colella-Glaz double shear roll-up"),
-        (name="stuart",       flow=:stuart,      T=1.0, note="Exact 2D Euler traveling wave"),
-        (name="leapfrog",     flow=:leapfrog,    T=2.0, note="Two coaxial dipoles"),
-        (name="decaying_tg",  flow=:decaying_tg, T=5.0, note="Viscous TG: energy decays at rate 2ν(kx²+ky²)",
-                              bc=:periodic, viscosity=0.01),
-    )
-
-    println("\n========== CO-FLIP TEST SUITE (nel=$(nel)) ==========")
-    summary_rows = String[]
-
-    for case in cases
-        println("\n--- $(case.name): $(case.note) ---")
-        cfg_kwargs = (
-            flow_type=case.flow,
-            T_final=case.T * T_factor,
-            nel=nel,
-            particles_per_cell=particles_per_cell,
-            output_every=0,
-        )
-        if hasproperty(case, :bc)
-            cfg_kwargs = merge(cfg_kwargs, (boundary_condition=case.bc,))
-        end
-        if hasproperty(case, :viscosity)
-            cfg_kwargs = merge(cfg_kwargs, (viscosity=case.viscosity,))
-        end
-        cfg = SimulationConfig(; cfg_kwargs...)
-
-        result = nothing
-        try
-            result = run_diagnostic_simulation(cfg;
-                save_vtk=save_vtk,
-                output_dir=joinpath(output_dir, case.name),
-                record_every=1,
-                case_name=case.name)
-        catch err
-            @warn "$(case.name) FAILED" exception=err
-            push!(summary_rows, @sprintf("%-13s | FAILED: %s", case.name, err))
-            continue
-        end
-
-        save_diagnostics_csv(result.history, joinpath(output_dir, case.name * ".csv"))
-
-        h0, hT = result.history[1], result.history[end]
-        ΔE = abs(hT.energy    - h0.energy)    / max(abs(h0.energy),    1e-30)
-        ΔZ = abs(hT.enstrophy - h0.enstrophy) / max(abs(h0.enstrophy), 1e-30)
-        ΔΓ = abs(hT.circulation - h0.circulation)
-
-        extra = ""
-        if case.flow === :tg
-            diff_norm = l2_velocity_norm(result.u_final .- result.u_initial, result.domain)
-            init_norm = l2_velocity_norm(result.u_initial, result.domain)
-            tg_relerr = diff_norm / max(init_norm, 1e-30)
-            extra = @sprintf(" | stationary L2 relerr=%.3e", tg_relerr)
-        end
-
-        @printf("  ΔE/E0 = %.3e | ΔZ/Z0 = %.3e | |ΔΓ| = %.3e%s\n", ΔE, ΔZ, ΔΓ, extra)
-        push!(summary_rows,
-              @sprintf("%-13s | ΔE/E0=%.2e | ΔZ/Z0=%.2e | |ΔΓ|=%.2e%s",
-                       case.name, ΔE, ΔZ, ΔΓ, extra))
-    end
-
-    println("\n========== SUMMARY ==========")
-    foreach(println, summary_rows)
-
-    open(joinpath(output_dir, "summary.txt"), "w") do io
-        println(io, "CO-FLIP test suite — $(length(cases)) cases, nel=$(nel)")
-        for row in summary_rows; println(io, row); end
-    end
-
-    return summary_rows
-end
-
 """
 Comprehensive validation of the FEEC viscous diffusion implementation against
 the decaying Taylor–Green vortex.
@@ -4373,3 +4311,11 @@ end
 #run_test_suite()
 
 #result = test_decaying_taylor_green()
+
+# cfg for continue sim
+cfg = SimulationConfig()
+
+restart_main(cfg, "coflip_output/particles_0627.vtu";
+             restart_step = 0627,
+             additional_steps = 1000,
+             dt = 0.048)
