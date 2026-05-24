@@ -690,6 +690,7 @@ function initial_velocity(
     elseif flow_type == :convecting; return flow_convecting_vortex(px, py, Lx, Ly)
     elseif flow_type == :merging;    return flow_merging_vortices(px, py, Lx, Ly)
     elseif flow_type == :uniform;     return flow_uniform(px, py, Lx, Ly)
+    elseif flow_type == :zero;        return flow_zero(px, py, Lx, Ly)
     elseif flow_type == :shear;       return flow_shear(px, py, Lx, Ly)
     elseif flow_type == :kh;          return flow_kelvin_helmholtz(px, py, Lx, Ly)
     elseif flow_type == :dipole;      return flow_dipole(px, py, Lx, Ly)
@@ -1547,6 +1548,52 @@ function apply_obstacle_brinkman!(p::Particles, d::Domain)
     return damped
 end
 
+"""
+Brinkman-style tangential-velocity enforcement for a lid-driven cavity.
+
+Pins the particle velocity to `(U_lid, 0)` in a band of thickness
+`band_cells*dy` immediately below the top wall, and to `(0, 0)` in
+equivalent bands along the bottom, left, and right walls. The :wall BC
+already pins the wall-normal trace `u·n = 0` strongly via DOF zeroing,
+so this hook only adds the tangential component the operator doesn't
+constrain — yielding a Brinkman-approximation of full no-slip + moving
+lid. Apply once per step (after `step_co_flip!`) so the next step's P2G
+sees the prescribed boundary tangential velocity.
+
+The band is several cells thick on purpose: `particle_sorter!` zeroes
+wall-normal momentum only within a 5%-of-cell slab, and a thin Brinkman
+band can be diluted by the LSQR fit before it has time to imprint on
+the grid. `band_cells ≈ 1.5` is a robust default; thinner bands give
+sharper boundary-layer profiles but require more particles per cell.
+"""
+function apply_lid_cavity_brinkman!(p::Particles, d::Domain, U_lid::Float64;
+        band_cells::Float64=1.5,
+    )
+    nx, ny = d.nel
+    Lx, Ly = d.box_size
+    dx = Lx / nx;  dy = Ly / ny
+    δx = band_cells * dx
+    δy = band_cells * dy
+    pinned = 0
+    @inbounds for pid in 1:length(p.x)
+        x = p.x[pid];  y = p.y[pid]
+        if y >= Ly - δy
+            p.mx[pid] = U_lid
+            p.my[pid] = 0.0
+            pinned += 1
+        elseif y <= δy
+            p.mx[pid] = 0.0
+            p.my[pid] = 0.0
+            pinned += 1
+        elseif x <= δx || x >= Lx - δx
+            p.mx[pid] = 0.0
+            p.my[pid] = 0.0
+            pinned += 1
+        end
+    end
+    return pinned
+end
+
 """Taylor-Green vortex on periodic domain."""
 function flow_taylor_green(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     U0 = 1.0
@@ -1666,6 +1713,13 @@ end
 function flow_uniform(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
     _ = (x, y, Lx, Ly)
     return 1.0, 0.0
+end
+
+"""Zero velocity field. Used as the initial condition for cases where the
+flow is driven entirely by boundary conditions (lid-driven cavity)."""
+function flow_zero(x::Float64, y::Float64, Lx::Float64, Ly::Float64)
+    _ = (x, y, Lx, Ly)
+    return 0.0, 0.0
 end
 
 """Initial condition for flow past an obstacle: uniform far-field
@@ -3932,6 +3986,346 @@ function run_startup_smoke_tests(d::Domain)
 end
 
 """
+Lightweight simulation runner used by the diagnostic / convergence /
+shedding / cavity tests. Returns the conservation history and the final
+grid coefficients, plus exposes the running `domain` and `particles` to
+the caller via the named tuple.
+
+Compared to `main`, this version:
+  * supports a user-supplied `fixed_dt` (required for convergence sweeps —
+    CFL adaptation must be disabled there so dt is constant across runs);
+  * fires three optional callbacks per step:
+      - `step_hook(particles, domain, cfg, step, t)` — runs *after* the
+        CO-FLIP advance and any FTLE reset, before the CFL recheck. Used
+        by the lid-cavity case to re-stamp the tangential lid velocity.
+      - `probe_callback(t, u_coeffs, domain, step)` — runs every step.
+        Used by the Von Kármán case to sample velocity at downstream
+        probe points each step (FFT later → Strouhal).
+      - `sample_callback(t, u_coeffs, domain, particles, step)` — runs
+        the first time `t` crosses each requested `sample_times[k]`.
+        Used by the TG convergence study to log L2 error at t=2, t=5.
+  * VTK frequency controlled by `save_vtk_every` independently of the
+    history `record_every`.
+
+The runner mirrors `main`'s structure exactly (initial coadjoint P2G,
+particle resampling from grid, identical step pipeline) so behaviour
+matches the production simulation.
+"""
+function run_diagnostic_simulation(
+        cfg::SimulationConfig;
+        save_vtk::Bool=true,
+        save_vtk_every::Int=1,
+        output_dir::String=joinpath(get(ENV, "OUTPUT_DIR", pwd()), "diag_output"),
+        record_every::Int=1,
+        case_name::String="",
+        fixed_dt::Union{Float64,Nothing}=nothing,
+        step_hook::Union{Nothing,Function}=nothing,
+        probe_callback::Union{Nothing,Function}=nothing,
+        sample_times::Vector{Float64}=Float64[],
+        sample_callback::Union{Nothing,Function}=nothing,
+        save_particles::Bool=false,
+        verbose::Bool=true,
+    )
+    LinearAlgebra.BLAS.set_num_threads(1)
+    save_vtk && mkpath(output_dir)
+
+    num_particles = cfg.nel[1] * cfg.nel[2] * cfg.particles_per_cell
+    domain    = GenerateDomain(cfg.nel, cfg.p, cfg.k;
+                               box_size=cfg.box_size,
+                               starting_point=cfg.starting_point,
+                               boundary_condition=cfg.boundary_condition,
+                               obstacle=cfg.obstacle)
+    particles = generate_particles(num_particles, domain, cfg.flow_type;
+                                   stratified_seeding=cfg.stratified_seeding,
+                                   rng_seed=cfg.rng_seed,
+                                   volume_convention=cfg.volume_convention,
+                                   boundary_condition=cfg.boundary_condition,
+                                   U_inf=cfg.inlet_U_inf)
+    apply_obstacle_brinkman!(particles, domain)
+    if step_hook !== nothing
+        step_hook(particles, domain, cfg, 0, 0.0)
+    end
+    particle_sorter!(particles, domain)
+
+    dt = NaN
+    n_steps = 0
+    if fixed_dt !== nothing
+        isfinite(fixed_dt) && fixed_dt > 0 ||
+            error("run_diagnostic_simulation: fixed_dt must be a finite positive Float64")
+        dt = fixed_dt
+        n_steps = max(1, ceil(Int, cfg.T_final / dt))
+    else
+        dt_cfl = compute_cfl_dt_from_particles(particles, domain, cfg.target_cfl)
+        if !isfinite(dt_cfl)
+            n_steps = 1;  dt = cfg.T_final
+        else
+            n_steps = max(1, ceil(Int, cfg.T_final / dt_cfl))
+            dt      = cfg.T_final / n_steps
+        end
+    end
+
+    verbose && println(@sprintf("  [%s] T_final=%.4f  dt=%.6f  n_steps=%d  ν=%.4g",
+                                case_name, cfg.T_final, dt, n_steps, cfg.viscosity))
+
+    ndofs        = FunctionSpaces.get_num_basis(domain.R1.fem_space)
+    num_elements = prod(domain.nel)
+    sim_buf      = SimulationBuffers(num_particles, ndofs, num_elements, domain)
+
+    u_coeffs = coadjoint_step!(particles, domain, sim_buf;
+        lsqr_atol                    = cfg.lsqr_atol,
+        lsqr_btol                    = cfg.lsqr_btol,
+        lsqr_maxiter                 = cfg.lsqr_maxiter,
+        lsqr_error_on_nonconvergence = cfg.lsqr_error_on_nonconvergence,
+        projection_mean_subtract     = cfg.projection_mean_subtract)
+    u_initial = copy(u_coeffs)
+
+    u_form_init      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+    u_phys_expr_init = ★(u_form_init)
+    u_phys_form_init = Assemblers.solve_L2_projection(domain.R1, u_phys_expr_init, domain.dΩ)
+
+    particle_sorter!(particles, domain)
+    nx, ny = domain.nel
+    Lx, Ly = domain.box_size
+    dx_dom = Lx / nx;  dy_dom = Ly / ny
+    @inbounds for pid in eachindex(particles.x)
+        eid = particles.elem_ids[pid]
+        ej  = ((eid - 1) ÷ nx) + 1
+        ei  = eid - (ej - 1) * nx
+        set_g2p_velocity(particles, pid, particles.x[pid], particles.y[pid],
+                         eid, (ei - 1) * dx_dom, (ej - 1) * dy_dom, dx_dom, dy_dom,
+                         u_phys_form_init, Lx, Ly)
+    end
+    apply_obstacle_brinkman!(particles, domain)
+    if step_hook !== nothing
+        step_hook(particles, domain, cfg, 0, 0.0)
+    end
+
+    if save_vtk
+        d_u_phys_0 = Forms.d(u_phys_form_init)
+        ω_h_0      = ★(d_u_phys_0)
+        Plot.export_form_fields_to_vtk((u_form_init,), "u_h_0000"; output_directory_tree=[output_dir])
+        Plot.export_form_fields_to_vtk((ω_h_0,),       "w_h_0000"; output_directory_tree=[output_dir])
+        save_particles && export_particles_to_vtk(particles, joinpath(output_dir, "particles_0000"))
+    end
+
+    warmup_evaluation_memo!(domain)
+
+    d0 = compute_conservation_diagnostics(u_coeffs, domain)
+    history = [(t=0.0, energy=d0.energy, enstrophy=d0.enstrophy, circulation=d0.circulation)]
+
+    if probe_callback !== nothing
+        probe_callback(0.0, u_coeffs, domain, 0)
+    end
+
+    sample_done = falses(length(sample_times))
+
+    t_now = 0.0
+    for step in 1:n_steps
+        verbose && println(@sprintf("Step %d/%d  t≈%.4f  case=%s",
+                                    step, n_steps, step*dt, case_name))
+
+        if mod(step, 5) == 0
+            physical_spatial_sort!(particles, domain)
+        end
+
+        u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
+        t_now    = step * dt
+
+        u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+        u_phys_expr = ★(u_form)
+        u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+
+        if cfg.delayed_reinit_frequency > 0 && step % cfg.delayed_reinit_frequency == 0
+            global_reseed_from_grid!(particles, domain, cfg, u_phys_form; rng_seed=cfg.rng_seed)
+        end
+        apply_ftle_reset!(particles, domain, u_phys_form, cfg)
+
+        if step_hook !== nothing
+            step_hook(particles, domain, cfg, step, t_now)
+        end
+
+        # CFL recheck is suppressed when dt is user-fixed (convergence sweeps).
+        if fixed_dt === nothing
+            dt_check = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, dt)
+            new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
+            if new_dt != dt
+                dt = new_dt
+            end
+        end
+
+        if probe_callback !== nothing
+            probe_callback(t_now, u_coeffs, domain, step)
+        end
+
+        if sample_callback !== nothing && !isempty(sample_times)
+            @inbounds for s in eachindex(sample_times)
+                if !sample_done[s] && t_now >= sample_times[s]
+                    sample_callback(t_now, u_coeffs, domain, particles, step)
+                    sample_done[s] = true
+                end
+            end
+        end
+
+        if step % record_every == 0
+            d = compute_conservation_diagnostics(u_coeffs, domain)
+            push!(history, (t=t_now, energy=d.energy,
+                            enstrophy=d.enstrophy, circulation=d.circulation))
+
+            if save_vtk && save_vtk_every > 0 && step % save_vtk_every == 0
+                d_u_phys = Forms.d(u_phys_form)
+                ω_h      = ★(d_u_phys)
+                Plot.export_form_fields_to_vtk((u_form,),
+                    @sprintf("u_h_%04d", step); output_directory_tree=[output_dir])
+                Plot.export_form_fields_to_vtk((ω_h,),
+                    @sprintf("w_h_%04d", step); output_directory_tree=[output_dir])
+                save_particles && export_particles_to_vtk(particles,
+                    joinpath(output_dir, @sprintf("particles_%04d", step)))
+            end
+        end
+
+        maybe_clear_memo_tables!(step, cfg.clear_memo_every, domain)
+    end
+
+    return (history=history, u_initial=u_initial, u_final=u_coeffs,
+            domain=domain, particles=particles, dt=dt, n_steps=n_steps,
+            sample_times=sample_times, sample_done=sample_done)
+end
+
+"""
+L2 error of a CO-FLIP grid velocity field against the analytical decaying
+Taylor–Green solution.
+
+The exact Navier–Stokes solution on the 2π×2π box with U₀=1 and unit
+wavenumbers is
+
+    u_e(x,y,t) =  sin(x)·cos(y)·exp(-ν·(kx²+ky²)·t)
+    v_e(x,y,t) = -cos(x)·sin(y)·exp(-ν·(kx²+ky²)·t)
+
+with kx=ky=2π/L. We L2-project the discrete R1 form onto the physical
+velocity space via `★`, then sample the pushed-forward physical velocity
+at `n_per_elem × n_per_elem` midpoint quadrature nodes inside every
+element. The error norm is taken in physical velocity (not in the
+rotated R1 storage, where `probe_field_at_point` lives), so the result
+is directly comparable to analytical Navier–Stokes velocities.
+
+Returns `(l2_err, rel_l2_err, max_err)`. `rel_l2_err` divides by the
+analytical L2 norm at the same time, useful when the field has decayed
+substantially.
+"""
+function compute_decaying_tg_l2_error(
+        domain::Domain, u_coeffs::AbstractVector{Float64},
+        t::Float64, viscosity::Float64;
+        n_per_elem::Int=4,
+    )
+    Lx, Ly = domain.box_size
+    nx, ny = domain.nel
+    kx = 2π / Lx
+    ky = 2π / Ly
+    decay = exp(-viscosity * (kx^2 + ky^2) * t)
+
+    u_form      = Forms.build_form_field(domain.R1, u_coeffs)
+    u_phys_expr = ★(u_form)
+    u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
+
+    dx = Lx / nx;  dy = Ly / ny
+    sub = [(k - 0.5) / n_per_elem for k in 1:n_per_elem]
+    n_per_cell = n_per_elem * n_per_elem
+    xis  = Vector{Float64}(undef, n_per_cell)
+    etas = Vector{Float64}(undef, n_per_cell)
+    idx = 1
+    for j in 1:n_per_elem, i in 1:n_per_elem
+        xis[idx]  = sub[i]
+        etas[idx] = sub[j]
+        idx += 1
+    end
+    sample_points = Mantis.Points.CartesianPoints((xis, etas))
+    dA_sub = dx * dy / n_per_cell
+
+    err_sq_sum  = 0.0
+    norm_sq_sum = 0.0
+    err_max     = 0.0
+    @inbounds for ej in 1:ny, ei in 1:nx
+        eid = (ej - 1) * nx + ei
+        x0  = (ei - 1) * dx
+        y0  = (ej - 1) * dy
+        pushfwd_eval, _ = Forms.evaluate_sharp_pushforward(u_phys_form, eid, sample_points)
+        u_h_vec = vec(sum(pushfwd_eval[1], dims=2))
+        v_h_vec = vec(sum(pushfwd_eval[2], dims=2))
+        for k in 1:n_per_cell
+            x = x0 + xis[k]  * dx
+            y = y0 + etas[k] * dy
+            u_e_raw, v_e_raw = flow_taylor_green(x, y, Lx, Ly)
+            u_e = u_e_raw * decay
+            v_e = v_e_raw * decay
+            eu  = u_h_vec[k] - u_e
+            ev  = v_h_vec[k] - v_e
+            e2  = eu*eu + ev*ev
+            n2  = u_e*u_e + v_e*v_e
+            err_sq_sum  += e2 * dA_sub
+            norm_sq_sum += n2 * dA_sub
+            err_max      = max(err_max, sqrt(e2))
+        end
+    end
+    return (l2_err     = sqrt(err_sq_sum),
+            rel_l2_err = sqrt(err_sq_sum / max(norm_sq_sum, eps())),
+            max_err    = err_max)
+end
+
+"""
+Estimate the dominant frequency of a probe v(t) signal via a brute-force
+periodogram over candidate frequencies. Returns `(f, St, power)` where
+`St = f·D/U_inf` is the Strouhal number. Uses the second half of the
+record by default to skip the start-up transient.
+
+This is intentionally simple (no FFTW dependency). For a thesis-quality
+spectrum the user should re-process the saved probe CSV in
+Python/MATLAB; this estimate is meant as an in-run sanity check.
+"""
+function estimate_strouhal_from_v_signal(
+        ts::Vector{Float64}, vs::Vector{Float64};
+        U_inf::Float64=1.0, D::Float64=2.0,
+        skip_fraction::Float64=0.5, n_freq::Int=4096,
+    )
+    n  = length(ts)
+    n  >= 16 || return (f=NaN, St=NaN, power=0.0)
+    n1 = max(1, floor(Int, skip_fraction * n))
+    t_seg = ts[n1:end]
+    v_seg = vs[n1:end]
+    Nu = length(t_seg)
+    t0, tf = first(t_seg), last(t_seg)
+    window = tf - t0
+    window > 0 || return (f=NaN, St=NaN, power=0.0)
+    dt_avg = window / max(Nu - 1, 1)
+
+    v_mean = sum(v_seg) / Nu
+    v_c    = v_seg .- v_mean
+
+    f_min = 1.0 / window
+    f_max = 0.5 / dt_avg
+    f_max <= f_min && return (f=NaN, St=NaN, power=0.0)
+
+    df    = (f_max - f_min) / (n_freq - 1)
+    best_power = 0.0
+    best_f     = f_min
+    for k in 0:(n_freq - 1)
+        f = f_min + k * df
+        ω = 2π * f
+        a = 0.0;  b = 0.0
+        @inbounds for j in 1:Nu
+            tj = t_seg[j]
+            a += v_c[j] * cos(ω * tj)
+            b += v_c[j] * sin(ω * tj)
+        end
+        power = a*a + b*b
+        if power > best_power
+            best_power = power
+            best_f     = f
+        end
+    end
+    return (f=best_f, St=best_f * D / U_inf, power=best_power)
+end
+
+"""
 Comprehensive validation of the FEEC viscous diffusion implementation against
 the decaying Taylor–Green vortex.
 
@@ -3992,6 +4386,7 @@ function test_decaying_taylor_green(;
     cfg_v = SimulationConfig(;
         flow_type           = :decaying_tg,
         boundary_condition  = :periodic,
+        obstacle            = nothing,
         viscosity           = viscosity,
         T_final             = T_final,
         nel                 = nel,
@@ -4013,6 +4408,7 @@ function test_decaying_taylor_green(;
         cfg_inv = SimulationConfig(;
             flow_type           = :decaying_tg,
             boundary_condition  = :periodic,
+            obstacle            = nothing,
             viscosity           = 0.0,
             T_final             = T_final,
             nel                 = nel,
@@ -4170,6 +4566,714 @@ function test_decaying_taylor_green(;
     )
 end
 
+# ============================================================================
+# THESIS RESULT CASES
+# ============================================================================
+# Three thesis-oriented test functions plus an env-driven dispatcher at the
+# bottom of the file. Each function runs **one** independent simulation
+# point and writes its CSV/VTK output under `output_dir`; the user submits
+# multiple cluster jobs (typically a SLURM job array) to fill out a sweep.
+
+const TG_NEL_SPACE_SWEEP    = (32, 48, 64, 96, 128)
+const TG_DT_TIME_SWEEP      = (0.04, 0.02, 0.01, 0.005, 0.0025)
+const TG_FIXED_NEL_FOR_TIME = 128
+const TG_FIXED_DT_FOR_SPACE = 0.005
+
+"""
+Run ONE point of the decaying Taylor-Green convergence study.
+
+`mode` selects whether this run is part of the spatial sweep (fixed dt,
+varying nel) or the temporal sweep (fixed nel, varying dt). `sweep_idx`
+picks the point within the corresponding sweep array
+(`TG_NEL_SPACE_SWEEP` / `TG_DT_TIME_SWEEP`).
+
+Each run samples the L2 velocity error against the analytical viscous
+Navier-Stokes solution at `t=2` and `t=5`, and writes a CSV with one
+row per sample plus a per-step history CSV. Cluster post-processing
+should gather every `*_errors.csv` from one sweep and plot the resulting
+convergence curve.
+
+Defaults: ν=0.05 on the 2π×2π periodic box, T_final=5.0, p=(3,3) splines,
+CFL adaptation off (so dt is constant across all spatial-sweep points).
+"""
+function test_decaying_tg_convergence(;
+        mode::Symbol = :space,
+        sweep_idx::Int = 1,
+        output_dir::String = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "tg_convergence"),
+        viscosity::Float64 = 0.05,
+        T_final::Float64 = 5.0,
+        sample_times::Vector{Float64} = [2.0, 5.0],
+        nel_space_sweep = TG_NEL_SPACE_SWEEP,
+        dt_time_sweep   = TG_DT_TIME_SWEEP,
+        fixed_nel_for_time::Int   = TG_FIXED_NEL_FOR_TIME,
+        fixed_dt_for_space::Float64 = TG_FIXED_DT_FOR_SPACE,
+        particles_per_cell::Int = 16,
+        save_vtk::Bool = false,
+        save_vtk_at_samples::Bool = true,
+        n_per_elem_quad::Int = 4,
+    )
+    mkpath(output_dir)
+    box_size = (2π, 2π)
+
+    if mode === :space
+        1 <= sweep_idx <= length(nel_space_sweep) ||
+            error("sweep_idx=$sweep_idx out of range for space sweep (1:$(length(nel_space_sweep)))")
+        nel_val = nel_space_sweep[sweep_idx]
+        dt_val  = fixed_dt_for_space
+        run_label = @sprintf("space_nel%03d_dt%.5f", nel_val, dt_val)
+    elseif mode === :time
+        1 <= sweep_idx <= length(dt_time_sweep) ||
+            error("sweep_idx=$sweep_idx out of range for time sweep (1:$(length(dt_time_sweep)))")
+        nel_val = fixed_nel_for_time
+        dt_val  = dt_time_sweep[sweep_idx]
+        run_label = @sprintf("time_nel%03d_dt%.5f", nel_val, dt_val)
+    else
+        error("mode must be :space or :time, got $mode")
+    end
+
+    println("\n========== DECAYING-TG CONVERGENCE ==========")
+    println(@sprintf("  mode=%s  sweep_idx=%d  →  nel=(%d,%d)  dt=%.5f  ν=%.4f  T=%.2f",
+                     mode, sweep_idx, nel_val, nel_val, dt_val, viscosity, T_final))
+    println("  Output dir: $output_dir")
+
+    cfg = SimulationConfig(;
+        flow_type           = :decaying_tg,
+        boundary_condition  = :periodic,
+        obstacle            = nothing,
+        viscosity           = viscosity,
+        T_final             = T_final,
+        nel                 = (nel_val, nel_val),
+        particles_per_cell  = particles_per_cell,
+        box_size            = box_size,
+        target_cfl          = 0.5,
+        cfl_adaptive        = false,
+        projection_mean_subtract = true,
+        output_every        = 0,
+    )
+
+    sample_records = NamedTuple[]
+    sample_cb = function (t, u_coeffs, domain, particles, step)
+        err  = compute_decaying_tg_l2_error(domain, u_coeffs, t, viscosity;
+                                            n_per_elem=n_per_elem_quad)
+        diag = compute_conservation_diagnostics(u_coeffs, domain)
+        rec  = (t=t, step=step, nel=nel_val, dt=dt_val,
+                l2_err=err.l2_err, rel_l2_err=err.rel_l2_err, max_err=err.max_err,
+                energy=diag.energy, enstrophy=diag.enstrophy,
+                circulation=diag.circulation)
+        push!(sample_records, rec)
+        @printf("  [SAMPLE] t=%.3f  L2_err=%.6e  rel_L2_err=%.6e  max_err=%.6e  E=%.6e  Z=%.6e\n",
+                t, err.l2_err, err.rel_l2_err, err.max_err, diag.energy, diag.enstrophy)
+
+        if save_vtk_at_samples
+            u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
+            u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
+            ω_h         = ★(Forms.d(u_phys_form))
+            t_tag = @sprintf("t%05.2f", t)
+            Plot.export_form_fields_to_vtk((u_form,),
+                run_label * "_u_" * t_tag; output_directory_tree=[output_dir])
+            Plot.export_form_fields_to_vtk((ω_h,),
+                run_label * "_w_" * t_tag; output_directory_tree=[output_dir])
+        end
+    end
+
+    result = run_diagnostic_simulation(cfg;
+        save_vtk        = save_vtk,
+        save_vtk_every  = 0,
+        output_dir      = joinpath(output_dir, run_label * "_history"),
+        record_every    = 5,
+        case_name       = run_label,
+        fixed_dt        = dt_val,
+        sample_times    = sample_times,
+        sample_callback = sample_cb,
+    )
+
+    csv_path = joinpath(output_dir, run_label * "_errors.csv")
+    open(csv_path, "w") do io
+        println(io, "mode,sweep_idx,nel,dt,viscosity,t,step,l2_err,rel_l2_err,max_err,energy,enstrophy,circulation")
+        for r in sample_records
+            @printf(io, "%s,%d,%d,%.10e,%.10e,%.6f,%d,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e\n",
+                    String(mode), sweep_idx, r.nel, r.dt, viscosity,
+                    r.t, r.step, r.l2_err, r.rel_l2_err, r.max_err,
+                    r.energy, r.enstrophy, r.circulation)
+        end
+    end
+    println("Saved per-sample errors: $csv_path")
+
+    history_csv = joinpath(output_dir, run_label * "_history.csv")
+    open(history_csv, "w") do io
+        println(io, "t,energy,enstrophy,circulation")
+        for hi in result.history
+            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
+                    hi.t, hi.energy, hi.enstrophy, hi.circulation)
+        end
+    end
+    println("Saved per-step history: $history_csv")
+
+    return (result=result, records=sample_records, run_label=run_label,
+            csv_path=csv_path, history_csv=history_csv)
+end
+
+"""
+Run a Von Kármán vortex-shedding case past a cylinder and write probe
+velocity data for offline Strouhal estimation.
+
+Defaults set up Re=100 (D=2, U_inf=1, ν=0.02) on a 50×30 box with
+nel=(200,120) → dx=dy=0.25. Top and bottom are :wall (free-slip) to
+avoid the periodic feedthrough of the older default cfg. Three probe
+points are sampled every step and dumped to CSV. A coarse periodogram
+estimate of the dominant frequency is printed at the end as a sanity
+check; for thesis-grade spectra, post-process the CSV with FFTW in
+Python/MATLAB.
+"""
+function test_von_karman_strouhal(;
+        output_dir::String       = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "von_karman"),
+        box_size::NTuple{2,Float64}        = (50.0, 30.0),
+        nel::NTuple{2,Int}                 = (200, 120),
+        cylinder_center::NTuple{2,Float64} = (10.0, 15.0),
+        cylinder_radius::Float64           = 1.0,
+        U_inf::Float64           = 1.5,     # For Re=300, U_inf=1.5 and ν=0.01
+        viscosity::Float64       = 0.01,
+        T_final::Float64         = 200.0,
+        bc_top_bottom::Symbol    = :wall,
+        probe_points::Vector{NTuple{2,Float64}} =
+            [(20.0, 15.0), (25.0, 15.0), (30.0, 15.0)],
+        save_vtk_every::Int      = 50,
+        particles_per_cell::Int  = 10,
+        target_cfl::Float64      = 0.5,
+        case_label::String       = "vk_re100",
+    )
+    bc_top_bottom in (:wall, :periodic) ||
+        error("bc_top_bottom must be :wall or :periodic, got $bc_top_bottom")
+    mkpath(output_dir)
+    bc = (:inlet, :outlet, bc_top_bottom, bc_top_bottom)
+    Re = U_inf * (2 * cylinder_radius) / viscosity
+
+    println("\n========== VON KARMAN VORTEX SHEDDING ==========")
+    println(@sprintf("  box=%s  nel=%s  cyl=%s  r=%.3f  U=%.3f  ν=%.4f  Re=%.1f  T=%.1f  bc_y=%s",
+                     box_size, nel, cylinder_center, cylinder_radius,
+                     U_inf, viscosity, Re, T_final, bc_top_bottom))
+
+    cfg = SimulationConfig(;
+        nel                 = nel,
+        box_size            = box_size,
+        boundary_condition  = bc,
+        inlet_U_inf         = U_inf,
+        obstacle            = (kind=:cylinder, center=cylinder_center, radius=cylinder_radius),
+        flow_type           = :cylinder,
+        viscosity           = viscosity,
+        T_final             = T_final,
+        target_cfl          = target_cfl,
+        cfl_adaptive        = true,
+        particles_per_cell  = particles_per_cell,
+        output_every        = save_vtk_every,
+    )
+
+    n_probes = length(probe_points)
+    probe_records = NamedTuple[]
+
+    probe_cb = function (t, u_coeffs, domain, step)
+        cache = EvaluationCache(evaluation_cache_size(domain))
+        us = Vector{Float64}(undef, n_probes)
+        vs = Vector{Float64}(undef, n_probes)
+        @inbounds for k in 1:n_probes
+            xp, yp = probe_points[k]
+            (u, v), _ = probe_field_at_point(xp, yp, u_coeffs, domain, cache)
+            us[k] = Float64(u);  vs[k] = Float64(v)
+        end
+        push!(probe_records, (t=t, step=step, us=us, vs=vs))
+    end
+
+    result = run_diagnostic_simulation(cfg;
+        save_vtk        = true,
+        save_vtk_every  = save_vtk_every,
+        output_dir      = joinpath(output_dir, case_label * "_vtk"),
+        record_every    = max(1, save_vtk_every),
+        case_name       = case_label,
+        probe_callback  = probe_cb,
+        save_particles  = false,
+    )
+
+    probe_csv = joinpath(output_dir, case_label * "_probes.csv")
+    open(probe_csv, "w") do io
+        header = "t,step"
+        for k in 1:n_probes
+            header *= @sprintf(",u_p%d,v_p%d", k, k)
+        end
+        println(io, header)
+        for r in probe_records
+            line = @sprintf("%.10e,%d", r.t, r.step)
+            for k in 1:n_probes
+                line *= @sprintf(",%.16e,%.16e", r.us[k], r.vs[k])
+            end
+            println(io, line)
+        end
+    end
+    println("Saved probe CSV: $probe_csv")
+
+    history_csv = joinpath(output_dir, case_label * "_history.csv")
+    open(history_csv, "w") do io
+        println(io, "t,energy,enstrophy,circulation")
+        for hi in result.history
+            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
+                    hi.t, hi.energy, hi.enstrophy, hi.circulation)
+        end
+    end
+    println("Saved history CSV: $history_csv")
+
+    if length(probe_records) > 16
+        ts  = [r.t for r in probe_records]
+        vs1 = [r.vs[1] for r in probe_records]
+        st  = estimate_strouhal_from_v_signal(ts, vs1;
+                                              U_inf=U_inf, D=2*cylinder_radius)
+        println("\n--- In-run Strouhal estimate (probe 1, second half of record) ---")
+        @printf("  Re=%.1f  U=%.3f  D=%.3f\n", Re, U_inf, 2*cylinder_radius)
+        @printf("  f_dominant=%.6f  T_period=%.4f  St=f·D/U=%.4f\n",
+                st.f, 1.0/max(st.f, eps()), st.St)
+
+        open(joinpath(output_dir, case_label * "_strouhal.txt"), "w") do io
+            println(io, @sprintf("Re=%.2f  U=%.4f  D=%.4f  ν=%.4f", Re, U_inf,
+                                 2*cylinder_radius, viscosity))
+            println(io, @sprintf("Probe 1 location = (%.3f, %.3f)",
+                                 probe_points[1][1], probe_points[1][2]))
+            println(io, @sprintf("Dominant freq f = %.6f", st.f))
+            println(io, @sprintf("Period         T = %.4f", 1.0/max(st.f, eps())))
+            println(io, @sprintf("Strouhal       St = %.6f", st.St))
+        end
+    end
+
+    return (result=result, probes=probe_records,
+            probe_csv=probe_csv, history_csv=history_csv)
+end
+
+"""
+Run a lid-driven cavity case using a Brinkman-style tangential
+enforcement to mimic no-slip side walls and a moving top lid.
+
+The solver's `:wall` BC pins the wall-normal velocity trace to zero
+strongly at the operator level. The tangential component is not
+strongly constrained, so we re-stamp it onto the particles each step
+via `apply_lid_cavity_brinkman!`. The result is a recognisable lid-
+driven cavity flow but **not** strict no-slip — the boundary layer is
+resolved over the Brinkman band rather than at the wall exactly. Note
+this in the thesis when reporting results.
+
+Default Re = U_lid·L/ν = 1·1/0.01 = 100.
+"""
+
+# ----------------------------------------------------------------------------
+# Ghia, Ghia & Shin (1982) benchmark — lid-driven cavity centerline velocities
+# ----------------------------------------------------------------------------
+# Tables I & II, normalised by U_lid. Top-wall lid is +1, all other walls 0.
+# Sampled along the vertical centerline (x = L/2, u(y)) and the horizontal
+# centerline (y = L/2, v(x)). Only Re=100, 400, 1000 included here — the
+# higher-Re columns are available in the paper and can be added later.
+const GHIA_Y_OVER_L = (
+    0.0000, 0.0547, 0.0625, 0.0703, 0.1016, 0.1719, 0.2813, 0.4531,
+    0.5000, 0.6172, 0.7344, 0.8516, 0.9531, 0.9609, 0.9688, 0.9766, 1.0000)
+const GHIA_U_RE100 = (
+     0.00000, -0.03717, -0.04192, -0.04775, -0.06434, -0.10150, -0.15662, -0.21090,
+    -0.20581, -0.13641,  0.00332,  0.23151,  0.68717,  0.73722,  0.78871,  0.84123,  1.00000)
+const GHIA_U_RE400 = (
+     0.00000, -0.08186, -0.09266, -0.10338, -0.14612, -0.24299, -0.32726, -0.17119,
+    -0.11477,  0.02135,  0.16256,  0.29093,  0.55892,  0.61756,  0.68439,  0.75837,  1.00000)
+const GHIA_U_RE1000 = (
+     0.00000, -0.18109, -0.20196, -0.22220, -0.29730, -0.38289, -0.27805, -0.10648,
+    -0.06080,  0.05702,  0.18719,  0.33304,  0.46604,  0.51117,  0.57492,  0.65928,  1.00000)
+const GHIA_X_OVER_L = (
+    0.0000, 0.0625, 0.0703, 0.0781, 0.0938, 0.1563, 0.2266, 0.2344,
+    0.5000, 0.8047, 0.8594, 0.9063, 0.9453, 0.9531, 0.9609, 0.9688, 1.0000)
+const GHIA_V_RE100 = (
+    0.00000,  0.09233,  0.10091,  0.10890,  0.12317,  0.16077,  0.17507,  0.17527,
+    0.05454, -0.24533, -0.22445, -0.16914, -0.10313, -0.08864, -0.07391, -0.05906,  0.00000)
+const GHIA_V_RE400 = (
+    0.00000,  0.18360,  0.19713,  0.20920,  0.22965,  0.28124,  0.30203,  0.30174,
+    0.05186, -0.38598, -0.44993, -0.23827, -0.22847, -0.19254, -0.15663, -0.12146,  0.00000)
+const GHIA_V_RE1000 = (
+    0.00000,  0.27485,  0.29012,  0.30353,  0.32627,  0.37095,  0.33075,  0.32235,
+    0.02526, -0.31966, -0.42665, -0.51550, -0.39188, -0.33714, -0.27669, -0.21388,  0.00000)
+
+"""Return `(ys, us, xs, vs)` Ghia (1982) benchmark vectors for the given
+Reynolds number, or `nothing` when no benchmark is tabulated. `ys`/`xs`
+are in units of `L` (cavity side length); `us`/`vs` are in units of
+`U_lid`."""
+function ghia_reference_data(Re::Real)
+    Re_int = Int(round(Re))
+    if Re_int == 100
+        return (collect(GHIA_Y_OVER_L), collect(GHIA_U_RE100),
+                collect(GHIA_X_OVER_L), collect(GHIA_V_RE100))
+    elseif Re_int == 400
+        return (collect(GHIA_Y_OVER_L), collect(GHIA_U_RE400),
+                collect(GHIA_X_OVER_L), collect(GHIA_V_RE400))
+    elseif Re_int == 1000
+        return (collect(GHIA_Y_OVER_L), collect(GHIA_U_RE1000),
+                collect(GHIA_X_OVER_L), collect(GHIA_V_RE1000))
+    end
+    return nothing
+end
+
+"""Sample the *physical* velocity `(u, v)` at point `(x, y)` from an
+already-projected `u_phys_form`. Cheaper than `probe_field_at_point`
+when the caller has the L2-projected form already (and unlike the raw
+R1 probe, this returns the physical-velocity components rather than the
+rotated R1-form components)."""
+function sample_phys_velocity_at_point(
+        u_phys_form, domain::Domain, x::Float64, y::Float64,
+    )
+    Lx, Ly = domain.box_size
+    nx, ny = domain.nel
+    dx = Lx / nx;  dy = Ly / ny
+    modes = bc_to_position_modes(domain.bc_sides)
+    x_w = wrap_axis(Float64(x), Lx, modes[1], 1e-12)
+    y_w = wrap_axis(Float64(y), Ly, modes[2], 1e-12)
+    ei  = clamp(floor(Int, x_w / dx) + 1, 1, nx)
+    ej  = clamp(floor(Int, y_w / dy) + 1, 1, ny)
+    eid = (ej - 1) * nx + ei
+    xi  = (x_w - (ei - 1) * dx) / dx
+    eta = (y_w - (ej - 1) * dy) / dy
+    sample_points = Mantis.Points.CartesianPoints(([xi], [eta]))
+    pushfwd_eval, _ = Forms.evaluate_sharp_pushforward(u_phys_form, eid, sample_points)
+    u = reduce(+, pushfwd_eval[1], dims=2)[1]
+    v = reduce(+, pushfwd_eval[2], dims=2)[1]
+    return u, v
+end
+
+"""Extract `u(y)` along the vertical centerline `x = L/2` and `v(x)` along
+the horizontal centerline `y = L/2`, sampled uniformly with `n_samples`
+points. Used both for full-resolution centerline CSVs and for Ghia-point
+sampling. Returns `(ys, us, xs, vs)`."""
+function extract_centerline_profiles(
+        u_coeffs::AbstractVector{Float64}, domain::Domain;
+        n_samples::Int = 401,
+    )
+    Lx, Ly = domain.box_size
+    x_mid = 0.5 * Lx
+    y_mid = 0.5 * Ly
+
+    u_form      = Forms.build_form_field(domain.R1, u_coeffs)
+    u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
+
+    ys = collect(range(0.0, Ly, length=n_samples))
+    xs = collect(range(0.0, Lx, length=n_samples))
+    us = Vector{Float64}(undef, n_samples)
+    vs = Vector{Float64}(undef, n_samples)
+
+    @inbounds for k in 1:n_samples
+        u, _ = sample_phys_velocity_at_point(u_phys_form, domain, x_mid, ys[k])
+        us[k] = u
+    end
+    @inbounds for k in 1:n_samples
+        _, v = sample_phys_velocity_at_point(u_phys_form, domain, xs[k], y_mid)
+        vs[k] = v
+    end
+    return ys, us, xs, vs
+end
+
+"""
+Validate a cavity simulation against the Ghia, Ghia, Shin (1982)
+benchmark for a matching Reynolds number.
+
+Steps:
+  1. Build the L2-projected physical-velocity form from `u_coeffs`.
+  2. Sample `u/U_lid` at the 17 Ghia vertical-centerline `y/L` points
+     and `v/U_lid` at the 17 horizontal-centerline `x/L` points.
+  3. Compute pointwise abs/rel differences and trapezoidal L2 / max
+     errors against the tabulated reference.
+  4. Also extract dense centerline profiles (`n_dense` samples per axis)
+     for full-curve plots alongside the 17 reference points.
+  5. Write three CSVs (`*_ghia_u_centerline.csv`, `*_ghia_v_centerline.csv`,
+     `*_centerline_{u,v}_dense.csv`) and a `*_ghia_summary.txt` file
+     with the summary errors.
+
+Returns `nothing` when no Ghia data exists for the rounded `Re`.
+"""
+function validate_lid_cavity_against_ghia(
+        u_coeffs::AbstractVector{Float64}, domain::Domain;
+        Re::Real, U_lid::Float64,
+        output_dir::String, case_label::String,
+        n_dense::Int = 401,
+    )
+    ref = ghia_reference_data(Re)
+    if ref === nothing
+        @printf("  [Ghia] no benchmark tabulated for Re=%.0f; skipping centerline validation.\n", Re)
+        return nothing
+    end
+    ys_g, us_g, xs_g, vs_g = ref
+    Lx, Ly = domain.box_size
+
+    u_form      = Forms.build_form_field(domain.R1, u_coeffs)
+    u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
+
+    us_num = Vector{Float64}(undef, length(ys_g))
+    @inbounds for k in eachindex(ys_g)
+        u, _ = sample_phys_velocity_at_point(u_phys_form, domain, 0.5*Lx, ys_g[k] * Ly)
+        us_num[k] = u / U_lid
+    end
+    vs_num = Vector{Float64}(undef, length(xs_g))
+    @inbounds for k in eachindex(xs_g)
+        _, v = sample_phys_velocity_at_point(u_phys_form, domain, xs_g[k] * Lx, 0.5*Ly)
+        vs_num[k] = v / U_lid
+    end
+
+    # Trapezoidal L2 norm over the (irregular) reference grid.
+    trapz_norm = (gs, vals) -> begin
+        s = 0.0
+        @inbounds for i in 1:length(gs)-1
+            s += 0.5 * (gs[i+1] - gs[i]) * (vals[i]^2 + vals[i+1]^2)
+        end
+        sqrt(s)
+    end
+
+    eu       = us_num .- us_g
+    ev       = vs_num .- vs_g
+    l2_u     = trapz_norm(ys_g, eu)
+    l2_v     = trapz_norm(xs_g, ev)
+    den_u    = trapz_norm(ys_g, us_g)
+    den_v    = trapz_norm(xs_g, vs_g)
+    rel_l2_u = l2_u / max(den_u, eps())
+    rel_l2_v = l2_v / max(den_v, eps())
+    max_u    = maximum(abs.(eu))
+    max_v    = maximum(abs.(ev))
+
+    ghia_csv_u = joinpath(output_dir, case_label * "_ghia_u_centerline.csv")
+    open(ghia_csv_u, "w") do io
+        println(io, "y_over_L,u_ghia,u_num,abs_err,rel_err")
+        for k in eachindex(ys_g)
+            rel = abs(us_num[k] - us_g[k]) / max(abs(us_g[k]), 1e-12)
+            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e\n",
+                    ys_g[k], us_g[k], us_num[k], abs(us_num[k] - us_g[k]), rel)
+        end
+    end
+    ghia_csv_v = joinpath(output_dir, case_label * "_ghia_v_centerline.csv")
+    open(ghia_csv_v, "w") do io
+        println(io, "x_over_L,v_ghia,v_num,abs_err,rel_err")
+        for k in eachindex(xs_g)
+            rel = abs(vs_num[k] - vs_g[k]) / max(abs(vs_g[k]), 1e-12)
+            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e\n",
+                    xs_g[k], vs_g[k], vs_num[k], abs(vs_num[k] - vs_g[k]), rel)
+        end
+    end
+
+    ys_d, us_d, xs_d, vs_d = extract_centerline_profiles(u_coeffs, domain; n_samples=n_dense)
+    dense_u = joinpath(output_dir, case_label * "_centerline_u_dense.csv")
+    open(dense_u, "w") do io
+        println(io, "y,u_phys,u_over_U_lid")
+        for k in eachindex(ys_d)
+            @printf(io, "%.10e,%.10e,%.10e\n", ys_d[k], us_d[k], us_d[k] / U_lid)
+        end
+    end
+    dense_v = joinpath(output_dir, case_label * "_centerline_v_dense.csv")
+    open(dense_v, "w") do io
+        println(io, "x,v_phys,v_over_U_lid")
+        for k in eachindex(xs_d)
+            @printf(io, "%.10e,%.10e,%.10e\n", xs_d[k], vs_d[k], vs_d[k] / U_lid)
+        end
+    end
+
+    summary_path = joinpath(output_dir, case_label * "_ghia_summary.txt")
+    open(summary_path, "w") do io
+        println(io, @sprintf("Ghia (1982) benchmark validation for cavity Re=%.0f", Re))
+        println(io, "=" ^ 60)
+        println(io, "")
+        println(io, "u along vertical centerline (x = L/2):")
+        println(io, @sprintf("  L2 error (relative) : %.4e", rel_l2_u))
+        println(io, @sprintf("  L2 error (absolute) : %.4e", l2_u))
+        println(io, @sprintf("  max pointwise error : %.4e", max_u))
+        println(io, "")
+        println(io, "v along horizontal centerline (y = L/2):")
+        println(io, @sprintf("  L2 error (relative) : %.4e", rel_l2_v))
+        println(io, @sprintf("  L2 error (absolute) : %.4e", l2_v))
+        println(io, @sprintf("  max pointwise error : %.4e", max_v))
+    end
+
+    println("")
+    @printf("  [Ghia Re=%.0f]  u centerline: rel_L2=%.3e  max=%.3e\n", Re, rel_l2_u, max_u)
+    @printf("  [Ghia Re=%.0f]  v centerline: rel_L2=%.3e  max=%.3e\n", Re, rel_l2_v, max_v)
+    println("  Saved: $ghia_csv_u")
+    println("  Saved: $ghia_csv_v")
+    println("  Saved: $dense_u")
+    println("  Saved: $dense_v")
+    println("  Saved: $summary_path")
+
+    return (rel_l2_u=rel_l2_u, rel_l2_v=rel_l2_v, max_u=max_u, max_v=max_v,
+            ys_g=ys_g, us_g=us_g, us_num=us_num,
+            xs_g=xs_g, vs_g=vs_g, vs_num=vs_num,
+            ghia_csv_u=ghia_csv_u, ghia_csv_v=ghia_csv_v,
+            dense_u=dense_u, dense_v=dense_v, summary_path=summary_path)
+end
+
+function test_lid_driven_cavity(;
+        output_dir::String       = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "lid_cavity"),
+        nel::NTuple{2,Int}                 = (96, 96),
+        box_size::NTuple{2,Float64}        = (1.0, 1.0),
+        U_lid::Float64           = 1.0,
+        viscosity::Float64       = 0.01,
+        T_final::Float64         = 30.0,
+        band_cells::Float64      = 1.5,
+        particles_per_cell::Int  = 16,
+        save_vtk_every::Int      = 25,
+        target_cfl::Float64      = 0.5,
+        ss_record_every::Int     = 5,
+        validate_ghia::Bool      = true,
+        case_label::String       = "lid_re100",
+    )
+    mkpath(output_dir)
+    Re = U_lid * box_size[1] / viscosity
+    println("\n========== LID DRIVEN CAVITY ==========")
+    println(@sprintf("  nel=%s  L=%.3f  U_lid=%.3f  ν=%.4f  Re=%.1f  T=%.1f  band=%.2f cells",
+                     nel, box_size[1], U_lid, viscosity, Re, T_final, band_cells))
+
+    cfg = SimulationConfig(;
+        nel                 = nel,
+        box_size            = box_size,
+        boundary_condition  = (:wall, :wall, :wall, :wall),
+        obstacle            = nothing,
+        flow_type           = :zero,
+        viscosity           = viscosity,
+        T_final             = T_final,
+        target_cfl          = target_cfl,
+        cfl_adaptive        = true,
+        particles_per_cell  = particles_per_cell,
+        min_particles_per_element = 6,
+        max_particles_per_element = 24,
+        min_particles_per_quarter = 1,
+        output_every        = save_vtk_every,
+    )
+
+    step_hook = function (particles, domain, _cfg, step, t)
+        apply_lid_cavity_brinkman!(particles, domain, U_lid; band_cells=band_cells)
+    end
+
+    # Steady-state convergence tracking. probe_callback receives u_coeffs every
+    # step; we sample every `ss_record_every` steps and record the
+    # mass-weighted L2 norm of (u_h - u_h_prev). When this plateaus near
+    # round-off the cavity has reached steady state.
+    ss_records  = NamedTuple[]
+    u_prev_ref  = Ref{Vector{Float64}}(Float64[])
+    ss_probe_cb = function (t, u_coeffs, domain, step)
+        step == 0 && return  # first call is the initial state — no diff yet
+        step % max(1, ss_record_every) == 0 || return
+        u_prev = u_prev_ref[]
+        if length(u_prev) == length(u_coeffs)
+            diff       = u_coeffs .- u_prev
+            Mdiff      = domain.Mass_matrix * diff
+            Mu         = domain.Mass_matrix * u_coeffs
+            norm_diff  = sqrt(max(dot(diff,    Mdiff), 0.0))
+            norm_u     = sqrt(max(dot(u_coeffs, Mu),    0.0))
+            rel_diff   = norm_diff / max(norm_u, eps())
+            push!(ss_records, (t=t, step=step, abs_diff=norm_diff,
+                               norm_u=norm_u, rel_diff=rel_diff))
+            @printf("  [SS] t=%.3f  ||Δu||_M=%.3e  ||u||_M=%.3e  rel=%.3e\n",
+                    t, norm_diff, norm_u, rel_diff)
+        end
+        u_prev_ref[] = copy(u_coeffs)
+    end
+
+    result = run_diagnostic_simulation(cfg;
+        save_vtk        = true,
+        save_vtk_every  = save_vtk_every,
+        output_dir      = joinpath(output_dir, case_label * "_vtk"),
+        record_every    = max(1, save_vtk_every),
+        case_name       = case_label,
+        step_hook       = step_hook,
+        probe_callback  = ss_probe_cb,
+        save_particles  = false,
+    )
+
+    history_csv = joinpath(output_dir, case_label * "_history.csv")
+    open(history_csv, "w") do io
+        println(io, "t,energy,enstrophy,circulation")
+        for hi in result.history
+            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
+                    hi.t, hi.energy, hi.enstrophy, hi.circulation)
+        end
+    end
+    println("Saved history CSV: $history_csv")
+
+    ss_csv = joinpath(output_dir, case_label * "_steady_state.csv")
+    open(ss_csv, "w") do io
+        println(io, "t,step,abs_diff_L2,norm_u_L2,rel_diff")
+        for r in ss_records
+            @printf(io, "%.10e,%d,%.16e,%.16e,%.16e\n",
+                    r.t, r.step, r.abs_diff, r.norm_u, r.rel_diff)
+        end
+    end
+    println("Saved steady-state CSV: $ss_csv")
+
+    ghia = nothing
+    if validate_ghia
+        ghia = validate_lid_cavity_against_ghia(
+            result.u_final, result.domain;
+            Re=Re, U_lid=U_lid,
+            output_dir=output_dir, case_label=case_label,
+        )
+    end
+
+    return (result=result, history_csv=history_csv, ss_csv=ss_csv,
+            ss_records=ss_records, ghia=ghia)
+end
+
+"""
+Dispatcher used by the bottom of this file when run as a script.
+
+Reads `COFLIP_CASE` from the environment and runs the matching test
+function. SLURM scripts set `COFLIP_CASE` plus the case-specific extra
+vars listed below. Returns `nothing`.
+
+Supported cases:
+  - `tg_convergence`   — uses `COFLIP_SWEEP_MODE` ∈ {`space`, `time`}
+                         and `COFLIP_SWEEP_IDX` (1-based).
+  - `von_karman`       — Strouhal probe run, no extra vars (override
+                         defaults by editing the function call below).
+  - `lid_cavity`       — lid-driven cavity, no extra vars.
+  - `tg_validation`    — single-point viscous-decay validation (the
+                         legacy `test_decaying_taylor_green`).
+  - `main`             — the full-blown `main()` from this file.
+  - `restart`          — `restart_main` from a saved particle .vtu;
+                         requires `COFLIP_RESTART_VTU`,
+                         `COFLIP_RESTART_STEP`, `COFLIP_ADDITIONAL_STEPS`,
+                         `COFLIP_DT`.
+
+If `COFLIP_CASE` is unset or empty, the dispatcher does nothing (so
+`include(...)` from external scripts is safe). Use that for
+interactive sessions; call a specific test function manually.
+"""
+function coflip_dispatch_from_env()
+    case = get(ENV, "COFLIP_CASE", "")
+    if case == ""
+        println("(CO-FLIP_periodic.jl loaded; set ENV[\"COFLIP_CASE\"] to run a case.)")
+        return nothing
+    end
+
+    if case == "tg_convergence"
+        mode_str = get(ENV, "COFLIP_SWEEP_MODE", "space")
+        idx_str  = get(ENV, "COFLIP_SWEEP_IDX",  "1")
+        mode = Symbol(mode_str)
+        idx  = parse(Int, idx_str)
+        test_decaying_tg_convergence(; mode=mode, sweep_idx=idx)
+    elseif case == "von_karman"
+        test_von_karman_strouhal()
+    elseif case == "lid_cavity"
+        test_lid_driven_cavity()
+    elseif case == "tg_validation"
+        test_decaying_taylor_green()
+    elseif case == "main"
+        main()
+    elseif case == "restart"
+        vtu  = get(ENV, "COFLIP_RESTART_VTU", "")
+        step = parse(Int, get(ENV, "COFLIP_RESTART_STEP",  "0"))
+        more = parse(Int, get(ENV, "COFLIP_ADDITIONAL_STEPS", "1000"))
+        dt   = parse(Float64, get(ENV, "COFLIP_DT", "0.05"))
+        vtu == "" && error("COFLIP_CASE=restart requires COFLIP_RESTART_VTU env var")
+        restart_main(SimulationConfig(), vtu;
+                     restart_step=step, additional_steps=more, dt=dt)
+    else
+        error("Unknown COFLIP_CASE=$case. " *
+              "Expected one of: tg_convergence, von_karman, lid_cavity, " *
+              "tg_validation, main, restart")
+    end
+    return nothing
+end
+
 """Run complete CO-FLIP simulation."""
 function main(cfg::SimulationConfig=SimulationConfig())
     println("Initializing Domain and Particles...")
@@ -4312,10 +5416,24 @@ end
 
 #result = test_decaying_taylor_green()
 
-# cfg for continue sim
-cfg = SimulationConfig()
+# ----------------------------------------------------------------------------
+# Env-driven dispatcher
+# ----------------------------------------------------------------------------
+# When this file is invoked directly (`julia ... CO-FLIP_periodic.jl`) the
+# block below picks a test case based on the `COFLIP_CASE` env var (see
+# `coflip_dispatch_from_env` above for supported cases). SLURM submit scripts
+# set the right env vars before launching Julia, so the same file serves
+# every thesis case without per-case copies.
+#
+# `include`ing this file from another Julia script is a no-op as long as
+# `COFLIP_CASE` is unset, so wrapper scripts can pull in the solver and
+# then call the test functions explicitly.
 
-restart_main(cfg, "coflip_output/particles_0627.vtu";
-             restart_step = 0627,
-             additional_steps = 1000,
-             dt = 0.048)
+if abspath(PROGRAM_FILE) == @__FILE__
+    coflip_dispatch_from_env()
+end
+
+# Legacy restart entry point (kept for reference; opt in via COFLIP_CASE=restart):
+# cfg = SimulationConfig()
+# restart_main(cfg, "coflip_output/particles_0627.vtu";
+#              restart_step = 0627, additional_steps = 1000, dt = 0.048)
