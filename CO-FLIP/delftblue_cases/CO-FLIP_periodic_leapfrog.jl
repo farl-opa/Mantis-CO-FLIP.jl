@@ -187,13 +187,13 @@ Base.@kwdef struct SimulationConfig
     # like (:periodic, :wall) or (:wall, :wall). :wall means free-slip
     # (u·n = 0 on both sides of that axis).
     boundary_condition::Union{Symbol, NTuple{2,Symbol}} = :wall
-    particles_per_cell::Int           = 20
+    particles_per_cell::Int           = 16
     stratified_seeding::Bool          = true
     volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
     flow_type::Symbol                 = :leapfrog
     target_cfl::Float64               = 0.5
-    T_final::Float64                  = 1.0
+    T_final::Float64                  = 5.0
     viscosity::Float64                = 0.0
     max_fp_iter::Int                  = 6
     fp_tol::Float64                   = 5e-9
@@ -202,7 +202,7 @@ Base.@kwdef struct SimulationConfig
     pressure_kick_method::Symbol      = :div_consistent
     pic_blend_alpha::Float64          = 0.0
     min_particles_per_element::Int    = 10
-    max_particles_per_element::Int    = 25
+    max_particles_per_element::Int    = 20
     min_particles_per_quarter::Int    = 3
     ftle_threshold::Float64           = 1.0
     max_longterm_delta_t::Float64     = 1.0
@@ -3537,6 +3537,6 @@ function main(cfg::SimulationConfig=SimulationConfig())
     println("\nSimulation complete! Step files written to '$(output_dir)'.")
 end
 
-#main()
+main()
 
-run_test_suite()
+#run_test_suite()
