@@ -13,7 +13,10 @@
       "Bash(mkdir smoke_out)",
       "Bash(julia --project=. -e ' *)",
       "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_decaying_tg_convergence\\)\\); println\\(methods\\(test_von_karman_strouhal\\)\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(coflip_dispatch_from_env\\)\\);')",
-      "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(validate_lid_cavity_against_ghia\\)\\); println\\(methods\\(extract_centerline_profiles\\)\\); println\\(methods\\(ghia_reference_data\\)\\);')"
+      "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(validate_lid_cavity_against_ghia\\)\\); println\\(methods\\(extract_centerline_profiles\\)\\); println\\(methods\\(ghia_reference_data\\)\\);')",
+      "Bash(python plot_convergence.py)",
+      "Bash(python -m pip install --user --quiet pandas matplotlib numpy)",
+      "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(apply_lid_cavity_brinkman!\\)\\)')"
     ]
   }
 }

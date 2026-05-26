@@ -1552,40 +1552,52 @@ end
 Brinkman-style tangential-velocity enforcement for a lid-driven cavity.
 
 Pins the particle velocity to `(U_lid, 0)` in a band of thickness
-`band_cells*dy` immediately below the top wall, and to `(0, 0)` in
-equivalent bands along the bottom, left, and right walls. The :wall BC
-already pins the wall-normal trace `u·n = 0` strongly via DOF zeroing,
-so this hook only adds the tangential component the operator doesn't
-constrain — yielding a Brinkman-approximation of full no-slip + moving
-lid. Apply once per step (after `step_co_flip!`) so the next step's P2G
-sees the prescribed boundary tangential velocity.
+`lid_band_cells*dy` immediately below the top wall, and to `(0, 0)` in
+bands of thickness `wall_band_cells * dx (or dy)` along the bottom, left,
+and right walls. The `:wall` BC already pins the wall-normal trace
+`u·n = 0` strongly via DOF zeroing, so this hook only adds the
+*tangential* component the operator doesn't constrain — a Brinkman-style
+approximation of full no-slip + moving lid. Apply once per step (after
+`step_co_flip!`) so the next step's P2G sees the prescribed boundary
+tangential velocity.
 
-The band is several cells thick on purpose: `particle_sorter!` zeroes
-wall-normal momentum only within a 5%-of-cell slab, and a thin Brinkman
-band can be diluted by the LSQR fit before it has time to imprint on
-the grid. `band_cells ≈ 1.5` is a robust default; thinner bands give
-sharper boundary-layer profiles but require more particles per cell.
+Why the lid band is wider than the wall bands: the LSQR particle→grid
+fit gives the top R1 coefficient roughly the *fraction* of in-support
+particles that are stamped. For p=3 splines the boundary DOF has support
+over ~p+1=4 cells; a 1-cell band leaves ~75% of those particles unmarked
+and the LSQR fit therefore reports a top u of only ≈ 0.25·U_lid. Setting
+`lid_band_cells ≈ p+1` lets the fit converge to U_lid. The wall bands
+are kept thin to avoid artificially thickening the boundary layer.
 """
 function apply_lid_cavity_brinkman!(p::Particles, d::Domain, U_lid::Float64;
-        band_cells::Float64=1.5,
+        lid_band_cells::Float64=4.0,
+        wall_band_cells::Float64=1.0,
+        # Back-compat: callers passing the old `band_cells` kwarg get the
+        # same value applied to both the lid and the walls.
+        band_cells::Union{Nothing,Float64}=nothing,
     )
+    if band_cells !== nothing
+        lid_band_cells  = band_cells
+        wall_band_cells = band_cells
+    end
     nx, ny = d.nel
     Lx, Ly = d.box_size
     dx = Lx / nx;  dy = Ly / ny
-    δx = band_cells * dx
-    δy = band_cells * dy
+    δy_lid  = lid_band_cells  * dy
+    δy_wall = wall_band_cells * dy
+    δx_wall = wall_band_cells * dx
     pinned = 0
     @inbounds for pid in 1:length(p.x)
         x = p.x[pid];  y = p.y[pid]
-        if y >= Ly - δy
+        if y >= Ly - δy_lid
             p.mx[pid] = U_lid
             p.my[pid] = 0.0
             pinned += 1
-        elseif y <= δy
+        elseif y <= δy_wall
             p.mx[pid] = 0.0
             p.my[pid] = 0.0
             pinned += 1
-        elseif x <= δx || x >= Lx - δx
+        elseif x <= δx_wall || x >= Lx - δx_wall
             p.mx[pid] = 0.0
             p.my[pid] = 0.0
             pinned += 1
@@ -4731,19 +4743,17 @@ function test_von_karman_strouhal(;
         nel::NTuple{2,Int}                 = (200, 120),
         cylinder_center::NTuple{2,Float64} = (10.0, 15.0),
         cylinder_radius::Float64           = 1.0,
-        U_inf::Float64           = 1.5,     # For Re=300, U_inf=1.5 and ν=0.01
+        U_inf::Float64           = 1.5,
         viscosity::Float64       = 0.01,
-        T_final::Float64         = 200.0,
+        T_final::Float64         = 50.0,
         bc_top_bottom::Symbol    = :wall,
         probe_points::Vector{NTuple{2,Float64}} =
             [(20.0, 15.0), (25.0, 15.0), (30.0, 15.0)],
-        save_vtk_every::Int      = 50,
+        save_vtk_every::Int      = 1,
         particles_per_cell::Int  = 10,
         target_cfl::Float64      = 0.5,
-        case_label::String       = "vk_re100",
+        case_label::String       = "vk_re300",
     )
-    bc_top_bottom in (:wall, :periodic) ||
-        error("bc_top_bottom must be :wall or :periodic, got $bc_top_bottom")
     mkpath(output_dir)
     bc = (:inlet, :outlet, bc_top_bottom, bc_top_bottom)
     Re = U_inf * (2 * cylinder_radius) / viscosity
@@ -5108,19 +5118,50 @@ function test_lid_driven_cavity(;
         U_lid::Float64           = 1.0,
         viscosity::Float64       = 0.01,
         T_final::Float64         = 30.0,
-        band_cells::Float64      = 1.5,
-        particles_per_cell::Int  = 16,
+        lid_band_cells::Float64  = 4.0,
+        wall_band_cells::Float64 = 1.0,
+        particles_per_cell::Int  = 20,
         save_vtk_every::Int      = 25,
         target_cfl::Float64      = 0.5,
         ss_record_every::Int     = 5,
         validate_ghia::Bool      = true,
+        # Cavity-specific physics overrides (see notes below for the why):
+        enable_energy_correction::Bool = false,
+        ftle_threshold::Float64        = Inf,
+        max_longterm_delta_t::Float64  = 1.0e9,
+        pic_blend_alpha::Float64       = 0.05,
         case_label::String       = "lid_re100",
     )
     mkpath(output_dir)
     Re = U_lid * box_size[1] / viscosity
     println("\n========== LID DRIVEN CAVITY ==========")
-    println(@sprintf("  nel=%s  L=%.3f  U_lid=%.3f  ν=%.4f  Re=%.1f  T=%.1f  band=%.2f cells",
-                     nel, box_size[1], U_lid, viscosity, Re, T_final, band_cells))
+    println(@sprintf("  nel=%s  L=%.3f  U_lid=%.3f  ν=%.4f  Re=%.1f  T=%.1f",
+                     nel, box_size[1], U_lid, viscosity, Re, T_final))
+    println(@sprintf("  Brinkman bands:  lid=%.2f cells  walls=%.2f cells",
+                     lid_band_cells, wall_band_cells))
+    println(@sprintf("  energy_correction=%s  ftle_threshold=%s  pic_blend=%.3f",
+                     enable_energy_correction, ftle_threshold, pic_blend_alpha))
+
+    # Notes on the cavity-specific overrides:
+    # • enable_energy_correction = false
+    #     The energy correction projects velocity updates orthogonal to the
+    #     midpoint velocity to *preserve* kinetic energy. In a lid-driven
+    #     cavity the lid does work on the fluid — KE is NOT conserved — so
+    #     the correction systematically cancels the lid's energy injection
+    #     and the vortex never forms.
+    # • ftle_threshold = Inf, max_longterm_delta_t = 1e9
+    #     The lid band sustains a steep shear `U_lid / band_thickness` that
+    #     drives the particle pullback Jacobian to large stretch fast. With
+    #     the default thresholds, lid-band particles get reset every step
+    #     by resampling from the LSQR-averaged grid, which clamps the lid
+    #     velocity well below U_lid. Disabling FTLE-based reset lets the
+    #     Brinkman stamp dominate.
+    # • lid_band_cells = 4.0 (≈ p+1 cells)
+    #     The boundary B-spline DOF has support over p+1 cells; a band
+    #     thinner than this leaves the LSQR fit averaging only a fraction
+    #     of the lid-marked particles, so the top DOF converges to a
+    #     fraction of U_lid. wall_band_cells stays at 1 to keep the no-slip
+    #     boundary-layer profile sharp.
 
     cfg = SimulationConfig(;
         nel                 = nel,
@@ -5133,14 +5174,20 @@ function test_lid_driven_cavity(;
         target_cfl          = target_cfl,
         cfl_adaptive        = true,
         particles_per_cell  = particles_per_cell,
-        min_particles_per_element = 6,
-        max_particles_per_element = 24,
+        min_particles_per_element = max(8, particles_per_cell ÷ 2),
+        max_particles_per_element = max(32, particles_per_cell * 2),
         min_particles_per_quarter = 1,
         output_every        = save_vtk_every,
+        enable_energy_correction = enable_energy_correction,
+        ftle_threshold      = ftle_threshold,
+        max_longterm_delta_t = max_longterm_delta_t,
+        pic_blend_alpha     = pic_blend_alpha,
     )
 
     step_hook = function (particles, domain, _cfg, step, t)
-        apply_lid_cavity_brinkman!(particles, domain, U_lid; band_cells=band_cells)
+        apply_lid_cavity_brinkman!(particles, domain, U_lid;
+                                   lid_band_cells=lid_band_cells,
+                                   wall_band_cells=wall_band_cells)
     end
 
     # Steady-state convergence tracking. probe_callback receives u_coeffs every
