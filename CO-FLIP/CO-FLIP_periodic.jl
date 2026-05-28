@@ -702,21 +702,67 @@ function initial_velocity(
     end
 end
 
+"""Tensor-product Gauss-Legendre nodes and weights on `[0, 1]` for `n = 1..6`.
+Returned weights sum to 1. Use ``x_i·dx + x0`` to map to a cell and
+``w_i·dx`` to get the physical 1D weight."""
+function gauss_legendre_01(n::Int)
+    n == 1 && return ([0.5], [1.0])
+    n == 2 && return ([0.21132486540518713, 0.7886751345948129],
+                      [0.5, 0.5])
+    n == 3 && return ([0.1127016653792583,  0.5, 0.8872983346207417],
+                      [0.2777777777777778, 0.4444444444444444, 0.2777777777777778])
+    n == 4 && return ([0.06943184420297371, 0.33000947820757187,
+                       0.6699905217924281,  0.9305681557970263],
+                      [0.17392742256872692, 0.32607257743127305,
+                       0.32607257743127305, 0.17392742256872692])
+    n == 5 && return ([0.04691007703066802, 0.23076534494715845, 0.5,
+                       0.7692346550528415,  0.9530899229693319],
+                      [0.11846344251309455, 0.23931433524968326,
+                       0.28444444444444444, 0.23931433524968326,
+                       0.11846344251309455])
+    n == 6 && return ([0.03376524289842398, 0.16939530676686775,
+                       0.38069040695840156, 0.6193095930415985,
+                       0.8306046932331323,  0.9662347571015761],
+                      [0.0856622461895852,  0.18038078652406930,
+                       0.23395696728634552, 0.23395696728634552,
+                       0.18038078652406930, 0.0856622461895852])
+    error("gauss_legendre_01: only n=1..6 supported, got n=$n")
+end
+
 """Generate initial particle distribution with stratified or random seeding.
 
 `U_inf` is forwarded to `initial_velocity` and is consumed by `:cylinder` /
 similar flow types that need the far-field uniform speed. The obstacle (if
-any) is read from `domain.obstacle`."""
+any) is read from `domain.obstacle`.
+
+`seeding_mode`:
+- `:auto` (default): legacy behaviour driven by `stratified_seeding` —
+  jittered stratified sub-cell placement or pure uniform random.
+- `:gauss_legendre`: deterministic tensor-product Gauss-Legendre nodes
+  inside each element, with `vol_p` set to the GL weight (×dx·dy). The
+  LSQR P2G fit then becomes an *exact* polynomial quadrature up to
+  total degree `2n−1` per direction (with `n = floor(sqrt(ppc))`),
+  exposing the true spline-space approximation order in convergence
+  studies. `volume_convention` is ignored in this mode. Excess
+  particles requested by `num_particles ≠ n²·num_elements` are
+  dropped (return count is `n²·num_elements`)."""
 function generate_particles(
         num_particles::Int,
         domain::Domain,
         flow_type::Symbol=:vortex;
         stratified_seeding::Bool=true,
+        seeding_mode::Symbol=:auto,
         rng_seed::Union{Int,Nothing}=nothing,
         volume_convention::Symbol=:physical,
         boundary_condition=:periodic,
         U_inf::Float64=0.0,
     )
+    if seeding_mode === :gauss_legendre
+        return _generate_particles_gauss_legendre(num_particles, domain, flow_type;
+            boundary_condition=boundary_condition, U_inf=U_inf)
+    end
+    seeding_mode === :auto ||
+        throw(ArgumentError("seeding_mode must be :auto or :gauss_legendre, got $seeding_mode"))
     if rng_seed !== nothing
         Random.seed!(rng_seed)
     end
@@ -812,6 +858,84 @@ function generate_particles(
     else
         ppc_for_volume = base_ppc > 0 ? base_ppc : num_particles
         fill!(vol, 1.0 / ppc_for_volume)
+    end
+
+    return Particles(x, y, mx, my, vol, can_x, can_y, head, next, elem_ids,
+                     P11, P12, P21, P22, delta_t)
+end
+
+"""Deterministic tensor-product Gauss-Legendre particle seeding (helper
+for `generate_particles(...; seeding_mode=:gauss_legendre)`).
+
+Places `n² = floor(√(num_particles ÷ num_elements))² ` particles per
+element at GL nodes. Particle volume is the GL weight ×dx·dy (sums to
+cell area). With this volume convention the LSQR P2G discrete inner
+product `Σ vol_p · f(x_p) g(x_p)` equals the continuous L2 inner
+product exactly when `f·g` is a polynomial of degree ≤ `2n−1` per
+direction inside each cell, which is what allows clean
+spline-order convergence in `test_p2g_taylor_green_convergence`."""
+function _generate_particles_gauss_legendre(
+        num_particles::Int,
+        domain::Domain,
+        flow_type::Symbol;
+        boundary_condition=:periodic,
+        U_inf::Float64=0.0,
+    )
+    bc       = normalize_bc(boundary_condition)
+    modes    = bc_to_position_modes(bc)
+    obstacle = domain.obstacle
+    Lx, Ly = domain.box_size
+    nx, ny = domain.nel
+    dx     = Lx / nx
+    dy     = Ly / ny
+
+    num_elements = nx * ny
+    base_ppc     = max(1, num_particles ÷ num_elements)
+    n_gl         = max(1, floor(Int, sqrt(base_ppc) + 1e-12))
+    nodes_01, weights_01 = gauss_legendre_01(n_gl)
+
+    actual_ppc = n_gl * n_gl
+    total      = actual_ppc * num_elements
+
+    if actual_ppc != base_ppc
+        @info "GL seeding: requested $(base_ppc) ppc rounded down to $(actual_ppc) (n_gl=$n_gl per direction)"
+    end
+
+    x   = Vector{Float64}(undef, total)
+    y   = Vector{Float64}(undef, total)
+    mx  = Vector{Float64}(undef, total)
+    my  = Vector{Float64}(undef, total)
+    vol = Vector{Float64}(undef, total)
+
+    can_x    = zeros(Float64, total)
+    can_y    = zeros(Float64, total)
+    head     = zeros(Int, num_elements)
+    next     = zeros(Int, total)
+    elem_ids = zeros(Int, total)
+
+    P11 = ones(Float64,  total)
+    P12 = zeros(Float64, total)
+    P21 = zeros(Float64, total)
+    P22 = ones(Float64,  total)
+    delta_t = zeros(Float64, total)
+
+    pid = 1
+    @inbounds for ej in 1:ny, ei in 1:nx
+        x0 = (ei - 1) * dx
+        y0 = (ej - 1) * dy
+        for jj in 1:n_gl, ii in 1:n_gl
+            px = wrap_axis(x0 + nodes_01[ii] * dx, Lx, modes[1], 1e-12)
+            py = wrap_axis(y0 + nodes_01[jj] * dy, Ly, modes[2], 1e-12)
+            w  = weights_01[ii] * weights_01[jj] * dx * dy
+            x[pid]  = px
+            y[pid]  = py
+            u, v    = initial_velocity(flow_type, px, py, Lx, Ly;
+                                       bc=bc, obstacle=obstacle, U_inf=U_inf)
+            mx[pid]  = u
+            my[pid]  = v
+            vol[pid] = w
+            pid += 1
+        end
     end
 
     return Particles(x, y, mx, my, vol, can_x, can_y, head, next, elem_ids,
@@ -3899,11 +4023,18 @@ function global_reseed_from_grid!(
     return new_count
 end
 
-"""Clear and rewarm memoization cache periodically."""
+"""Clear and rewarm memoization cache periodically. Also runs an explicit
+`GC.gc()` after the cache reset so the freed memo tables — plus any
+throwaway sparse matrices the L2-projection / LSQR paths allocated in
+the preceding steps — actually get released back to the OS. Without
+this, Julia's heuristic GC sometimes lets sparse-matrix churn build up
+to multi-GB before triggering, which is what causes the OOM at step
+~256 on the lid-driven cavity."""
 function maybe_clear_memo_tables!(step::Int, clear_every::Int, d::Domain)
     if clear_every > 0 && (step % clear_every == 0)
         Memoization.empty_all_caches!()
         warmup_evaluation_memo!(d)
+        GC.gc()
     end
 end
 
@@ -4213,74 +4344,52 @@ wavenumbers is
     u_e(x,y,t) =  sin(x)·cos(y)·exp(-ν·(kx²+ky²)·t)
     v_e(x,y,t) = -cos(x)·sin(y)·exp(-ν·(kx²+ky²)·t)
 
-with kx=ky=2π/L. We L2-project the discrete R1 form onto the physical
-velocity space via `★`, then sample the pushed-forward physical velocity
-at `n_per_elem × n_per_elem` midpoint quadrature nodes inside every
-element. The error norm is taken in physical velocity (not in the
-rotated R1 storage, where `probe_field_at_point` lives), so the result
-is directly comparable to analytical Navier–Stokes velocities.
+with kx=ky=2π/L. The discrete R1 form is first L2-projected onto the
+physical-velocity R1 space via `★`, matching the visualisation pipeline
+used everywhere else in CO-FLIP. The error is then computed by
+`Analysis.L2_norm(u_phys_form - u_exact, dΩ_err)` against an
+`AnalyticalFormField` representing the physical Taylor–Green velocity,
+using a finer Gauss–Legendre quadrature than the assembly `dΩ`
+(`(p + nq_extra)` points per direction).
 
-Returns `(l2_err, rel_l2_err, max_err)`. `rel_l2_err` divides by the
-analytical L2 norm at the same time, useful when the field has decayed
-substantially.
+Returns `(l2_err, rel_l2_err, l2_norm_exact)`.
 """
 function compute_decaying_tg_l2_error(
         domain::Domain, u_coeffs::AbstractVector{Float64},
         t::Float64, viscosity::Float64;
-        n_per_elem::Int=4,
+        nq_extra::Int=2,
     )
     Lx, Ly = domain.box_size
-    nx, ny = domain.nel
     kx = 2π / Lx
     ky = 2π / Ly
     decay = exp(-viscosity * (kx^2 + ky^2) * t)
+    U0    = 1.0
 
     u_form      = Forms.build_form_field(domain.R1, u_coeffs)
     u_phys_expr = ★(u_form)
     u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
 
-    dx = Lx / nx;  dy = Ly / ny
-    sub = [(k - 0.5) / n_per_elem for k in 1:n_per_elem]
-    n_per_cell = n_per_elem * n_per_elem
-    xis  = Vector{Float64}(undef, n_per_cell)
-    etas = Vector{Float64}(undef, n_per_cell)
-    idx = 1
-    for j in 1:n_per_elem, i in 1:n_per_elem
-        xis[idx]  = sub[i]
-        etas[idx] = sub[j]
-        idx += 1
+    expr = function (X::Matrix{Float64})
+        xs = @view X[:, 1]
+        ys = @view X[:, 2]
+        c1 = @.  decay * U0 * sin(kx * xs) * cos(ky * ys)   # physical u
+        c2 = @. -decay * U0 * cos(kx * xs) * sin(ky * ys)   # physical v
+        return [c1, c2]
     end
-    sample_points = Mantis.Points.CartesianPoints((xis, etas))
-    dA_sub = dx * dy / n_per_cell
+    u_exact = Forms.AnalyticalFormField(1, expr, domain.geo, "u_TG")
 
-    err_sq_sum  = 0.0
-    norm_sq_sum = 0.0
-    err_max     = 0.0
-    @inbounds for ej in 1:ny, ei in 1:nx
-        eid = (ej - 1) * nx + ei
-        x0  = (ei - 1) * dx
-        y0  = (ej - 1) * dy
-        pushfwd_eval, _ = Forms.evaluate_sharp_pushforward(u_phys_form, eid, sample_points)
-        u_h_vec = vec(sum(pushfwd_eval[1], dims=2))
-        v_h_vec = vec(sum(pushfwd_eval[2], dims=2))
-        for k in 1:n_per_cell
-            x = x0 + xis[k]  * dx
-            y = y0 + etas[k] * dy
-            u_e_raw, v_e_raw = flow_taylor_green(x, y, Lx, Ly)
-            u_e = u_e_raw * decay
-            v_e = v_e_raw * decay
-            eu  = u_h_vec[k] - u_e
-            ev  = v_h_vec[k] - v_e
-            e2  = eu*eu + ev*ev
-            n2  = u_e*u_e + v_e*v_e
-            err_sq_sum  += e2 * dA_sub
-            norm_sq_sum += n2 * dA_sub
-            err_max      = max(err_max, sqrt(e2))
-        end
-    end
-    return (l2_err     = sqrt(err_sq_sum),
-            rel_l2_err = sqrt(err_sq_sum / max(norm_sq_sum, eps())),
-            max_err    = err_max)
+    p1, p2 = domain.p
+    nq_err = (p1 + nq_extra, p2 + nq_extra)
+    dΩ_err = Quadrature.StandardQuadrature(
+        Quadrature.tensor_product_rule(nq_err, Quadrature.gauss_legendre),
+        prod(domain.nel),
+    )
+
+    l2_err     = Analysis.L2_norm(u_phys_form - u_exact, dΩ_err)
+    l2_norm_ex = Analysis.L2_norm(u_exact, dΩ_err)
+    rel_l2_err = l2_err / max(l2_norm_ex, eps())
+
+    return (l2_err=l2_err, rel_l2_err=rel_l2_err, l2_norm_exact=l2_norm_ex)
 end
 
 """
@@ -4622,7 +4731,7 @@ function test_decaying_tg_convergence(;
         particles_per_cell::Int = 16,
         save_vtk::Bool = false,
         save_vtk_at_samples::Bool = true,
-        n_per_elem_quad::Int = 4,
+        nq_extra::Int = 2,
     )
     mkpath(output_dir)
     box_size = (2π, 2π)
@@ -4666,15 +4775,17 @@ function test_decaying_tg_convergence(;
     sample_records = NamedTuple[]
     sample_cb = function (t, u_coeffs, domain, particles, step)
         err  = compute_decaying_tg_l2_error(domain, u_coeffs, t, viscosity;
-                                            n_per_elem=n_per_elem_quad)
+                                            nq_extra=nq_extra)
         diag = compute_conservation_diagnostics(u_coeffs, domain)
         rec  = (t=t, step=step, nel=nel_val, dt=dt_val,
-                l2_err=err.l2_err, rel_l2_err=err.rel_l2_err, max_err=err.max_err,
+                l2_err=err.l2_err, rel_l2_err=err.rel_l2_err,
+                l2_norm_exact=err.l2_norm_exact,
                 energy=diag.energy, enstrophy=diag.enstrophy,
                 circulation=diag.circulation)
         push!(sample_records, rec)
-        @printf("  [SAMPLE] t=%.3f  L2_err=%.6e  rel_L2_err=%.6e  max_err=%.6e  E=%.6e  Z=%.6e\n",
-                t, err.l2_err, err.rel_l2_err, err.max_err, diag.energy, diag.enstrophy)
+        @printf("  [SAMPLE] t=%.3f  L2_err=%.6e  rel_L2_err=%.6e  ||u_exact||=%.6e  E=%.6e  Z=%.6e\n",
+                t, err.l2_err, err.rel_l2_err, err.l2_norm_exact,
+                diag.energy, diag.enstrophy)
 
         if save_vtk_at_samples
             u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
@@ -4701,11 +4812,11 @@ function test_decaying_tg_convergence(;
 
     csv_path = joinpath(output_dir, run_label * "_errors.csv")
     open(csv_path, "w") do io
-        println(io, "mode,sweep_idx,nel,dt,viscosity,t,step,l2_err,rel_l2_err,max_err,energy,enstrophy,circulation")
+        println(io, "mode,sweep_idx,nel,dt,viscosity,t,step,l2_err,rel_l2_err,l2_norm_exact,energy,enstrophy,circulation")
         for r in sample_records
             @printf(io, "%s,%d,%d,%.10e,%.10e,%.6f,%d,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e\n",
                     String(mode), sweep_idx, r.nel, r.dt, viscosity,
-                    r.t, r.step, r.l2_err, r.rel_l2_err, r.max_err,
+                    r.t, r.step, r.l2_err, r.rel_l2_err, r.l2_norm_exact,
                     r.energy, r.enstrophy, r.circulation)
         end
     end
@@ -4723,6 +4834,195 @@ function test_decaying_tg_convergence(;
 
     return (result=result, records=sample_records, run_label=run_label,
             csv_path=csv_path, history_csv=history_csv)
+end
+
+"""
+Spatial convergence study of the P2G (particle-to-grid) least-squares
+reconstruction at the **initial step**, on the periodic Taylor-Green
+vortex.
+
+For each `(p_order, nel)` pair this routine:
+  1. Builds a periodic 2π×2π domain with `nel × nel` elements and B-spline
+     order `p_order` (continuity k=1).
+  2. Seeds particles via `seeding_mode`. Default is `:gauss_legendre`
+     (tensor-product GL nodes per element with weights set as particle
+     volumes), which turns the LSQR fit into an exact polynomial
+     quadrature so the discretisation error is dominated by the spline
+     approximation rather than particle-quadrature noise.
+  3. Assembles the P2G matrix `B` (rows = 2·num_particles) and solves the
+     least-squares system `min ‖B·u_grid − m_p‖₂` via LSQR.
+  4. Measures the L2 error via `compute_decaying_tg_l2_error` (at t=0,
+     ν=0), which uses Mantis's `Analysis.L2_norm` on the difference
+     `u_phys_form − u_TG_analytical` over a high-order Gauss–Legendre
+     quadrature.
+
+The least-squares fit alone is tested — no Hodge projection / pressure
+solve — so the resulting curve isolates the P2G reconstruction error.
+
+For the rotated R1 storage on tensor-product B-splines of order `p`, the
+mixed-degree components `(p-1, p)` and `(p, p-1)` make the L2-best-
+approximation rate of a smooth physical-velocity field `O(h^p)`. The
+reference slope drawn in the plot is `h^p`.
+
+Returns the list of per-run `(p, nel, h, l2_err, rel_l2_err, lsqr_resid_rel)`
+NamedTuples.
+"""
+function test_p2g_taylor_green_convergence(;
+        nel_sweep::NTuple{N,Int}=(32, 48, 64, 96, 128),
+        p_orders::NTuple{M,Int}=(2, 3),
+        particles_per_cell::Int=16,
+        seeding_mode::Symbol=:gauss_legendre,
+        rng_seed::Union{Int,Nothing}=42,
+        nq_extra::Int=2,
+        lsqr_atol::Float64=1e-12,
+        lsqr_btol::Float64=1e-12,
+        lsqr_maxiter::Int=5000,
+        output_dir::String=joinpath(get(ENV, "OUTPUT_DIR", pwd()), "p2g_tg_convergence"),
+        save_plot::Bool=true,
+    ) where {N,M}
+    mkpath(output_dir)
+
+    box_size = (2π, 2π)
+    results  = NamedTuple[]
+
+    println("\n========== P2G TAYLOR-GREEN CONVERGENCE ==========")
+    @printf("  box=%s  ppc=%d  seeding_mode=%s  rng_seed=%s  nq_extra=%d\n",
+            string(box_size), particles_per_cell, seeding_mode,
+            string(rng_seed), nq_extra)
+
+    for p_order in p_orders, n in nel_sweep
+        nel = (n, n)
+        p   = (p_order, p_order)
+        k   = (1, 1)
+
+        println(@sprintf("\n--- p=%d  nel=%d ---", p_order, n))
+
+        domain = GenerateDomain(nel, p, k;
+                                box_size=box_size,
+                                starting_point=(0.0, 0.0),
+                                boundary_condition=:periodic,
+                                obstacle=nothing)
+
+        num_particles = nel[1] * nel[2] * particles_per_cell
+        particles = generate_particles(num_particles, domain, :tg;
+                                       stratified_seeding=true,
+                                       seeding_mode=seeding_mode,
+                                       rng_seed=rng_seed,
+                                       volume_convention=:physical,
+                                       boundary_condition=:periodic,
+                                       U_inf=0.0)
+        # GL seeding may round the actual count down; use the resulting array.
+        num_particles = length(particles.x)
+        particle_sorter!(particles, domain)
+
+        ndofs        = FunctionSpaces.get_num_basis(domain.R1.fem_space)
+        num_elements = prod(domain.nel)
+        buf          = SimulationBuffers(num_particles, ndofs, num_elements, domain)
+
+        t0 = time()
+        B  = build_B_matrix(particles, domain, buf)
+        t_build_B = time() - t0
+
+        if length(buf.lsqr_warm) != size(B, 2)
+            buf.lsqr_warm = zeros(size(B, 2))
+        end
+
+        t0 = time()
+        u_grid = solve_grid_velocity_lsqr(B, particles, buf.V_p, buf.lsqr_warm;
+                                          atol=lsqr_atol, btol=lsqr_btol,
+                                          maxiter=lsqr_maxiter,
+                                          error_on_nonconvergence=true)
+        t_solve = time() - t0
+
+        # LSQR residual on the actual fit problem — quantifies whether the
+        # least-squares optimum was reached. Build RHS afresh because the
+        # LSQR call above scaled B in place via column-Jacobi preconditioner,
+        # which leaves B with unit-norm columns rather than the original B.
+        m_rhs = similar(buf.V_p, 2 * length(particles.x))
+        build_lsqr_rhs!(m_rhs, particles)
+        B_fresh = build_B_matrix(particles, domain, buf)
+        residual = B_fresh * u_grid .- m_rhs
+        lsqr_resid_rel = norm(residual) / max(norm(m_rhs), eps())
+
+        err = compute_decaying_tg_l2_error(domain, u_grid, 0.0, 0.0;
+                                           nq_extra=nq_extra)
+
+        h   = box_size[1] / n
+        rec = (p=p_order, nel=n, h=h,
+               l2_err=err.l2_err,
+               rel_l2_err=err.rel_l2_err,
+               l2_norm_exact=err.l2_norm_exact,
+               lsqr_resid_rel=lsqr_resid_rel,
+               num_particles=num_particles,
+               t_build_B=t_build_B, t_solve=t_solve)
+        push!(results, rec)
+        @printf("  nel=%d h=%.5f  L2=%.4e  rel_L2=%.4e  LSQR_resid_rel=%.2e  (build_B=%.2fs solve=%.2fs)\n",
+                n, h, err.l2_err, err.rel_l2_err,
+                lsqr_resid_rel, t_build_B, t_solve)
+    end
+
+    println("\n========== OBSERVED CONVERGENCE ORDERS ==========")
+    for p_order in p_orders
+        subset = filter(r -> r.p == p_order, results)
+        length(subset) >= 2 || continue
+        println(@sprintf("\n  p=%d  (expected order %d)", p_order, p_order))
+        @printf("  %-6s %-10s  %-12s %-8s %-8s  %-10s\n",
+                "nel", "h", "L2_err", "ratio", "order", "lsqr_res")
+        prev = nothing
+        for r in subset
+            if prev === nothing
+                @printf("  %-6d %-10.5e  %-12.4e %-8s %-8s  %-10.2e\n",
+                        r.nel, r.h, r.l2_err, "—", "—", r.lsqr_resid_rel)
+            else
+                h_ratio = prev.h / r.h
+                ratio   = prev.l2_err / max(r.l2_err, eps())
+                order   = log(ratio) / log(h_ratio)
+                @printf("  %-6d %-10.5e  %-12.4e %-8.3f %-8.3f  %-10.2e\n",
+                        r.nel, r.h, r.l2_err, ratio, order, r.lsqr_resid_rel)
+            end
+            prev = r
+        end
+    end
+
+    csv_path = joinpath(output_dir, "p2g_tg_convergence.csv")
+    open(csv_path, "w") do io
+        println(io, "p,nel,h,num_particles,l2_err,rel_l2_err,l2_norm_exact,lsqr_resid_rel,t_build_B,t_solve")
+        for r in results
+            @printf(io, "%d,%d,%.10e,%d,%.16e,%.16e,%.16e,%.16e,%.6f,%.6f\n",
+                    r.p, r.nel, r.h, r.num_particles,
+                    r.l2_err, r.rel_l2_err, r.l2_norm_exact,
+                    r.lsqr_resid_rel,
+                    r.t_build_B, r.t_solve)
+        end
+    end
+    println("\nSaved per-run CSV: $csv_path")
+
+    if save_plot
+        try
+            plt = plot(xscale=:log10, yscale=:log10,
+                       xlabel="h", ylabel="L2 error",
+                       title="P2G LSQR reconstruction error vs h\n(Taylor-Green, t=0)",
+                       legend=:bottomright, minorgrid=true)
+            for p_order in p_orders
+                subset = filter(r -> r.p == p_order, results)
+                isempty(subset) && continue
+                hs   = [r.h for r in subset]
+                errs = [r.l2_err for r in subset]
+                plot!(plt, hs, errs, marker=:circle, lw=2,
+                      label="p=$(p_order)  measured")
+                refs = errs[end] .* (hs ./ hs[end]) .^ p_order
+                plot!(plt, hs, refs, ls=:dash, lw=1,
+                      label="∝ h^$(p_order)")
+            end
+            plot_path = joinpath(output_dir, "p2g_tg_convergence.png")
+            savefig(plt, plot_path)
+            println("Saved log-log plot: $plot_path")
+        catch err
+            @warn "Plot save failed (continuing)" exception=err
+        end
+    end
+
+    return results
 end
 
 """
@@ -5013,53 +5313,80 @@ function validate_lid_cavity_against_ghia(
     u_form      = Forms.build_form_field(domain.R1, u_coeffs)
     u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
 
+    # FEEC artefact: the dy-form derivative space `D_y` has reduced boundary
+    # multiplicity, so physical `u` (which lives in `comp2 = P_x ⊗ D_y`)
+    # vanishes structurally at `y = 0` and `y = L_y`. Same for physical `v`
+    # at `x = 0` and `x = L_x`. Sampling exactly on the wall therefore
+    # returns 0 by construction, which has nothing to do with the lid
+    # enforcement. We probe one cell inward so the comparison reflects the
+    # solver's behaviour rather than the discretisation's boundary trace.
+    nx, ny = domain.nel
+    dx_dom = Lx / nx;  dy_dom = Ly / ny
+    nudge_into_domain_y(y) = clamp(y, 0.5 * dy_dom, Ly - 0.5 * dy_dom)
+    nudge_into_domain_x(x) = clamp(x, 0.5 * dx_dom, Lx - 0.5 * dx_dom)
+
     us_num = Vector{Float64}(undef, length(ys_g))
     @inbounds for k in eachindex(ys_g)
-        u, _ = sample_phys_velocity_at_point(u_phys_form, domain, 0.5*Lx, ys_g[k] * Ly)
+        y_sample = nudge_into_domain_y(ys_g[k] * Ly)
+        u, _ = sample_phys_velocity_at_point(u_phys_form, domain, 0.5*Lx, y_sample)
         us_num[k] = u / U_lid
     end
     vs_num = Vector{Float64}(undef, length(xs_g))
     @inbounds for k in eachindex(xs_g)
-        _, v = sample_phys_velocity_at_point(u_phys_form, domain, xs_g[k] * Lx, 0.5*Ly)
+        x_sample = nudge_into_domain_x(xs_g[k] * Lx)
+        _, v = sample_phys_velocity_at_point(u_phys_form, domain, x_sample, 0.5*Ly)
         vs_num[k] = v / U_lid
     end
 
-    # Trapezoidal L2 norm over the (irregular) reference grid.
-    trapz_norm = (gs, vals) -> begin
+    # Build masks that exclude the wall endpoints (y/L=0 and y/L=1 etc.)
+    # when computing L2 / max errors — those samples report a structural
+    # zero from the FEEC space, not a real solver disagreement.
+    interior_y = (ys_g .> 1e-6) .& (ys_g .< 1.0 - 1e-6)
+    interior_x = (xs_g .> 1e-6) .& (xs_g .< 1.0 - 1e-6)
+
+    # Trapezoidal L2 norm over the (irregular) reference grid, restricted
+    # to the interior indices.
+    function trapz_norm_interior(gs, vals, mask)
         s = 0.0
-        @inbounds for i in 1:length(gs)-1
-            s += 0.5 * (gs[i+1] - gs[i]) * (vals[i]^2 + vals[i+1]^2)
+        idxs = findall(mask)
+        @inbounds for k in 1:length(idxs)-1
+            i, j = idxs[k], idxs[k+1]
+            s += 0.5 * (gs[j] - gs[i]) * (vals[i]^2 + vals[j]^2)
         end
         sqrt(s)
     end
 
     eu       = us_num .- us_g
     ev       = vs_num .- vs_g
-    l2_u     = trapz_norm(ys_g, eu)
-    l2_v     = trapz_norm(xs_g, ev)
-    den_u    = trapz_norm(ys_g, us_g)
-    den_v    = trapz_norm(xs_g, vs_g)
+    l2_u     = trapz_norm_interior(ys_g, eu, interior_y)
+    l2_v     = trapz_norm_interior(xs_g, ev, interior_x)
+    den_u    = trapz_norm_interior(ys_g, us_g, interior_y)
+    den_v    = trapz_norm_interior(xs_g, vs_g, interior_x)
     rel_l2_u = l2_u / max(den_u, eps())
     rel_l2_v = l2_v / max(den_v, eps())
-    max_u    = maximum(abs.(eu))
-    max_v    = maximum(abs.(ev))
+    max_u    = maximum(abs.(eu[interior_y]))
+    max_v    = maximum(abs.(ev[interior_x]))
 
     ghia_csv_u = joinpath(output_dir, case_label * "_ghia_u_centerline.csv")
     open(ghia_csv_u, "w") do io
-        println(io, "y_over_L,u_ghia,u_num,abs_err,rel_err")
+        println(io, "y_over_L,u_ghia,u_num,abs_err,rel_err,is_wall_endpoint")
         for k in eachindex(ys_g)
             rel = abs(us_num[k] - us_g[k]) / max(abs(us_g[k]), 1e-12)
-            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e\n",
-                    ys_g[k], us_g[k], us_num[k], abs(us_num[k] - us_g[k]), rel)
+            is_wall = !interior_y[k]
+            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e,%d\n",
+                    ys_g[k], us_g[k], us_num[k],
+                    abs(us_num[k] - us_g[k]), rel, is_wall ? 1 : 0)
         end
     end
     ghia_csv_v = joinpath(output_dir, case_label * "_ghia_v_centerline.csv")
     open(ghia_csv_v, "w") do io
-        println(io, "x_over_L,v_ghia,v_num,abs_err,rel_err")
+        println(io, "x_over_L,v_ghia,v_num,abs_err,rel_err,is_wall_endpoint")
         for k in eachindex(xs_g)
             rel = abs(vs_num[k] - vs_g[k]) / max(abs(vs_g[k]), 1e-12)
-            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e\n",
-                    xs_g[k], vs_g[k], vs_num[k], abs(vs_num[k] - vs_g[k]), rel)
+            is_wall = !interior_x[k]
+            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e,%d\n",
+                    xs_g[k], vs_g[k], vs_num[k],
+                    abs(vs_num[k] - vs_g[k]), rel, is_wall ? 1 : 0)
         end
     end
 
@@ -5083,6 +5410,13 @@ function validate_lid_cavity_against_ghia(
     open(summary_path, "w") do io
         println(io, @sprintf("Ghia (1982) benchmark validation for cavity Re=%.0f", Re))
         println(io, "=" ^ 60)
+        println(io, "Errors are reported over INTERIOR Ghia points only.")
+        println(io, "The wall endpoints (y/L=0, y/L=1, x/L=0, x/L=1) are excluded")
+        println(io, "because the FEEC dy-form derivative space `D_y` has reduced")
+        println(io, "boundary multiplicity → physical u/v vanishes at y/x walls")
+        println(io, "by construction, regardless of the lid Brinkman stamping.")
+        println(io, "Endpoints are still listed in the per-point CSV with the")
+        println(io, "`is_wall_endpoint=1` flag for completeness.")
         println(io, "")
         println(io, "u along vertical centerline (x = L/2):")
         println(io, @sprintf("  L2 error (relative) : %.4e", rel_l2_u))
@@ -5117,11 +5451,11 @@ function test_lid_driven_cavity(;
         box_size::NTuple{2,Float64}        = (1.0, 1.0),
         U_lid::Float64           = 1.0,
         viscosity::Float64       = 0.01,
-        T_final::Float64         = 30.0,
-        lid_band_cells::Float64  = 4.0,
+        T_final::Float64         = 10.0,
+        lid_band_cells::Float64  = 2.0,
         wall_band_cells::Float64 = 1.0,
-        particles_per_cell::Int  = 20,
-        save_vtk_every::Int      = 25,
+        particles_per_cell::Int  = 10,
+        save_vtk_every::Int      = 1,
         target_cfl::Float64      = 0.5,
         ss_record_every::Int     = 5,
         validate_ghia::Bool      = true,
@@ -5130,6 +5464,7 @@ function test_lid_driven_cavity(;
         ftle_threshold::Float64        = Inf,
         max_longterm_delta_t::Float64  = 1.0e9,
         pic_blend_alpha::Float64       = 0.05,
+        clear_memo_every::Int          = 5,
         case_label::String       = "lid_re100",
     )
     mkpath(output_dir)
@@ -5141,27 +5476,6 @@ function test_lid_driven_cavity(;
                      lid_band_cells, wall_band_cells))
     println(@sprintf("  energy_correction=%s  ftle_threshold=%s  pic_blend=%.3f",
                      enable_energy_correction, ftle_threshold, pic_blend_alpha))
-
-    # Notes on the cavity-specific overrides:
-    # • enable_energy_correction = false
-    #     The energy correction projects velocity updates orthogonal to the
-    #     midpoint velocity to *preserve* kinetic energy. In a lid-driven
-    #     cavity the lid does work on the fluid — KE is NOT conserved — so
-    #     the correction systematically cancels the lid's energy injection
-    #     and the vortex never forms.
-    # • ftle_threshold = Inf, max_longterm_delta_t = 1e9
-    #     The lid band sustains a steep shear `U_lid / band_thickness` that
-    #     drives the particle pullback Jacobian to large stretch fast. With
-    #     the default thresholds, lid-band particles get reset every step
-    #     by resampling from the LSQR-averaged grid, which clamps the lid
-    #     velocity well below U_lid. Disabling FTLE-based reset lets the
-    #     Brinkman stamp dominate.
-    # • lid_band_cells = 4.0 (≈ p+1 cells)
-    #     The boundary B-spline DOF has support over p+1 cells; a band
-    #     thinner than this leaves the LSQR fit averaging only a fraction
-    #     of the lid-marked particles, so the top DOF converges to a
-    #     fraction of U_lid. wall_band_cells stays at 1 to keep the no-slip
-    #     boundary-layer profile sharp.
 
     cfg = SimulationConfig(;
         nel                 = nel,
@@ -5182,6 +5496,7 @@ function test_lid_driven_cavity(;
         ftle_threshold      = ftle_threshold,
         max_longterm_delta_t = max_longterm_delta_t,
         pic_blend_alpha     = pic_blend_alpha,
+        clear_memo_every    = clear_memo_every,
     )
 
     step_hook = function (particles, domain, _cfg, step, t)
@@ -5463,21 +5778,10 @@ end
 
 #result = test_decaying_taylor_green()
 
-# ----------------------------------------------------------------------------
-# Env-driven dispatcher
-# ----------------------------------------------------------------------------
-# When this file is invoked directly (`julia ... CO-FLIP_periodic.jl`) the
-# block below picks a test case based on the `COFLIP_CASE` env var (see
-# `coflip_dispatch_from_env` above for supported cases). SLURM submit scripts
-# set the right env vars before launching Julia, so the same file serves
-# every thesis case without per-case copies.
-#
-# `include`ing this file from another Julia script is a no-op as long as
-# `COFLIP_CASE` is unset, so wrapper scripts can pull in the solver and
-# then call the test functions explicitly.
-
 if abspath(PROGRAM_FILE) == @__FILE__
     coflip_dispatch_from_env()
+    #test_lid_driven_cavity()
+    #test_p2g_taylor_green_convergence()
 end
 
 # Legacy restart entry point (kept for reference; opt in via COFLIP_CASE=restart):

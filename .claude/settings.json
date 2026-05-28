@@ -16,7 +16,15 @@
       "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(validate_lid_cavity_against_ghia\\)\\); println\\(methods\\(extract_centerline_profiles\\)\\); println\\(methods\\(ghia_reference_data\\)\\);')",
       "Bash(python plot_convergence.py)",
       "Bash(python -m pip install --user --quiet pandas matplotlib numpy)",
-      "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(apply_lid_cavity_brinkman!\\)\\)')"
+      "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\); println\\(methods\\(test_lid_driven_cavity\\)\\); println\\(methods\\(apply_lid_cavity_brinkman!\\)\\)')",
+      "Bash(julia --project=. -e 'include\\(\"CO-FLIP/CO-FLIP_periodic.jl\"\\); println\\(\"OK\"\\)')",
+      "Bash(python plot_cavity.py)",
+      "Bash(julia --project=. CO-FLIP/run_p2g_gl.jl)",
+      "Bash(tee p2g_gl_run.log)",
+      "Bash(taskkill //F //PID 2026 //T)",
+      "PowerShell(Stop-Process -Id 2026 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Id 2024 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process julia -ErrorAction SilentlyContinue)"
     ]
   }
 }
