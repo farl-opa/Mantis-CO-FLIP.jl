@@ -5543,7 +5543,7 @@ function test_lid_driven_cavity(;
         case_name       = case_label,
         step_hook       = step_hook,
         probe_callback  = ss_probe_cb,
-        save_particles  = false,
+        save_particles  = true,
     )
 
     history_csv = joinpath(output_dir, case_label * "_history.csv")
@@ -5779,13 +5779,12 @@ end
 
 #main()
 
-#run_test_suite()
-
-#result = test_decaying_taylor_green()
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    coflip_dispatch_from_env()
-    #test_lid_driven_cavity()
+    #coflip_dispatch_from_env()
+    #test_decaying_tg_convergence()
+    #test_von_karman_strouhal()
+    test_lid_driven_cavity()
     #test_p2g_taylor_green_convergence()
 end
 
