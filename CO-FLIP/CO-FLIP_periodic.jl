@@ -4263,7 +4263,8 @@ function run_diagnostic_simulation(
     sample_done = falses(length(sample_times))
 
     t_now = 0.0
-    for step in 1:n_steps
+    step = 1
+    while step <= n_steps
         verbose && println(@sprintf("Step %d/%d  t≈%.4f  case=%s",
                                     step, n_steps, step*dt, case_name))
 
@@ -4292,6 +4293,9 @@ function run_diagnostic_simulation(
             dt_check = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, dt)
             new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
             if new_dt != dt
+                remaining_steps = max(1, ceil(Int, (cfg.T_final - step * dt) / new_dt))
+                n_steps = step + remaining_steps
+                verbose && println("  Adaptive CFL: dt=$(new_dt) (was $(dt)); remaining_steps≈$(remaining_steps)")
                 dt = new_dt
             end
         end
@@ -4327,6 +4331,7 @@ function run_diagnostic_simulation(
         end
 
         maybe_clear_memo_tables!(step, cfg.clear_memo_every, domain)
+        step += 1
     end
 
     return (history=history, u_initial=u_initial, u_final=u_coeffs,
