@@ -5436,6 +5436,7 @@ function test_von_karman_strouhal(;
         cfl_adaptive        = true,
         particles_per_cell  = particles_per_cell,
         output_every        = save_vtk_every,
+        clear_memo_every    = 5,
     )
 
     n_probes = length(probe_points)
