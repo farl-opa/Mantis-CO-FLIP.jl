@@ -129,6 +129,12 @@ mutable struct SimulationBuffers
     v_coeffs_buf::Vector{Float64}
     b_buf::Vector{Float64}
     sol_buf::Vector{Float64}
+
+    # Per-step momentum impulse delivered to the obstacle, [F_x·dt, F_y·dt].
+    # Populated by step_co_flip! via apply_obstacle_brinkman!. Reset at the
+    # start of each step. The runner divides by dt to get instantaneous force
+    # and reports (Cd, Cl). Always length 2; carries zeros when no obstacle.
+    obstacle_impulse::Vector{Float64}
 end
 
 """Allocates scratch buffers for particle-to-grid transfer and time stepping."""
@@ -167,6 +173,7 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
         zeros(Float64, size(d.N_Hodge, 1)),
         zeros(Float64, size(d.N_Hodge, 1)),
         zeros(Float64, size(d.N_Hodge, 1)),
+        zeros(Float64, 2),
     )
 end
 
@@ -178,6 +185,17 @@ Base.@kwdef struct SimulationConfig
     starting_point::NTuple{2,Float64} = (0.0, 0.0)
     boundary_condition::Union{Symbol, NTuple{2,Symbol}, NTuple{4,Symbol}} = (:inlet, :outlet, :periodic, :periodic)
     inlet_U_inf::Float64              = 1.0
+    # --- Far-field open-boundary parameters ---
+    # Active only on sides tagged `:farfield`. `farfield_velocity` is the
+    # uniform-stream velocity used to top up depleted top/bottom-row cells
+    # (see `enforce_farfield_particles!`) — existing particles are *not*
+    # touched, so no fake boundary layer is introduced. Set to (0.0, 0.0)
+    # to skip particle replenishment.
+    farfield_velocity::NTuple{2,Float64} = (0.0, 0.0)
+    # Number of cells along the farfield edge to pin v=0 at the inlet-touching
+    # corners. Stabilises the projection where the inlet's strong Dirichlet
+    # u-trace meets the open v-trace. Set to 0 to disable.
+    farfield_corner_pin_cells::Int       = 4
     obstacle::Union{Nothing,NamedTuple} = (kind=:cylinder, center=(10.0, 10.0), radius=1.0)
     particles_per_cell::Int           = 10
     stratified_seeding::Bool          = true
@@ -222,8 +240,20 @@ evaluation_cache_size(d::Domain) = d.eval_cache_size
 """Per-side BC tags currently understood by the parser. Inlet/outlet are
 accepted here so future stages can ship without changing the parser, but
 this stage classifies them as homogeneous walls (zero u·n) — the inlet
-lift and outlet free-DOF handling live in later stages."""
-const VALID_BC_SIDES = (:periodic, :wall, :inlet, :outlet)
+lift and outlet free-DOF handling live in later stages.
+
+`:farfield` is an open / "particles escape" boundary. At the operator
+level it behaves like `:outlet` (R1 normal-trace DOFs are *not* pinned;
+the projection produces the natural `∂p/∂n = 0` condition there). At the
+particle level, anything that drifts past a `:farfield` side is culled by
+the same outlet-escapee logic in `particle_sorter!`, so the LSQR fit
+never sees particles outside the box. Use this on the top/bottom of an
+external-flow domain so vortices that reach the boundary leave instead
+of accumulating against a reflective lid. (Conceptually identical to
+`:outlet`; the tag exists for self-documenting BC specifications where
+the boundary represents "the rest of the universe at infinity" rather
+than a downstream outflow.)"""
+const VALID_BC_SIDES = (:periodic, :wall, :inlet, :outlet, :farfield)
 
 """
 Normalize a user-supplied boundary_condition to a per-side `NTuple{4,Symbol}`
@@ -246,12 +276,14 @@ function normalize_bc(bc)::NTuple{4,Symbol}
             return (:periodic, :periodic, :periodic, :periodic)
         elseif bc === :wall
             return (:wall, :wall, :wall, :wall)
+        elseif bc === :farfield
+            return (:farfield, :farfield, :farfield, :farfield)
         elseif bc === :neumann
             @warn "boundary_condition :neumann is a legacy stub; treating as :periodic."
             return (:periodic, :periodic, :periodic, :periodic)
         else
             throw(ArgumentError(
-                "boundary_condition Symbol must be :periodic or :wall, got $bc"
+                "boundary_condition Symbol must be :periodic, :wall, or :farfield, got $bc"
             ))
         end
     elseif bc isa NTuple{2,Symbol}
@@ -320,6 +352,10 @@ Per-side classification:
 - `:outlet`   → DOF is skipped (free). Operator factorisations don't pin it,
                 LSQR fits it from particles, and the projection produces the
                 natural `∂p/∂n = 0` outflow on those DOFs automatically.
+- `:farfield` → DOF is skipped (free). Operator-level behaviour is identical
+                to `:outlet`; the distinct tag exists to signal "open
+                far-field" rather than "downstream outflow" to readers and
+                to the particle-sorter outlet-cull logic.
 - `:periodic` → DOF is skipped (no boundary trace on a wrapped axis).
 
 Returns `(homogeneous_dofs_R1, dirichlet_dofs_R1)` as two disjoint sorted
@@ -341,7 +377,7 @@ function classify_R1_boundary_dofs(R1_space, bc_sides::NTuple{4,Symbol})
         elseif kind === :wall
             push!(homog, gdof)
         end
-        # :outlet, :periodic → free
+        # :outlet, :farfield, :periodic → free
         return nothing
     end
 
@@ -388,6 +424,70 @@ callers; internal code should use `classify_R1_boundary_dofs`."""
 function compute_wall_dofs_R1(R1_space, bc_sides::NTuple{4,Symbol})::Vector{Int}
     h, d = classify_R1_boundary_dofs(R1_space, bc_sides)
     return sort!(vcat(h, d))
+end
+
+"""
+Identify R1 comp1 DOFs (`v`-trace) on `:farfield` top/bottom edges that lie
+near an inlet-touching corner, so they can be pinned to 0 in the operator.
+
+Why these specifically: at a corner where `:inlet` meets `:farfield`, the
+inlet's strong Dirichlet pin on `comp2` (u-trace at x=0 or x=Lx, all y) sets
+`u = U_inf` exactly, but `comp1` (v-trace at y=0 or y=Ly) is unconstrained.
+The discrete divergence equation at the corner R0 DOF couples the two; with
+no anchor on `comp1`, the projection can develop a corner v-jet that drives
+spurious flow through the open top/bottom right at the inlet. Pinning the
+first `pin_cells` comp1 DOFs on the farfield edge near each inlet corner
+breaks the gauge cleanly without imposing v=0 across the full lid.
+
+Returns a sorted `Vector{Int}` of global R1 DOF indices. Empty when
+`pin_cells ≤ 0` or no inlet-farfield corner exists.
+"""
+function compute_corner_pin_dofs_R1(
+        R1_space, bc_sides::NTuple{4,Symbol}, pin_cells::Int,
+    )::Vector{Int}
+    pin_cells > 0 || return Int[]
+
+    inlet_left  = bc_sides[1] === :inlet
+    inlet_right = bc_sides[2] === :inlet
+    ff_bot      = bc_sides[3] === :farfield
+    ff_top      = bc_sides[4] === :farfield
+    (inlet_left || inlet_right) || return Int[]
+    (ff_bot || ff_top)          || return Int[]
+
+    components  = FunctionSpaces.get_component_spaces(R1_space.fem_space)
+    dof_offsets = FunctionSpaces.get_dof_offsets(R1_space.fem_space)
+    comp1       = components[1]
+    nbasis1     = FunctionSpaces.get_constituent_num_basis(comp1)  # (n_dx, n_py)
+    n_dx, n_py  = nbasis1
+    # `pin_cells` counts D_x basis functions inward from the corner. Clip to
+    # at most half the row to avoid pinning the full edge for tiny meshes.
+    left_thresh  = min(pin_cells, n_dx ÷ 2)
+    right_thresh = n_dx - left_thresh + 1
+
+    out = Int[]
+    for bid in 1:FunctionSpaces.get_num_basis(comp1)
+        cb         = FunctionSpaces.get_constituent_basis_id(comp1, bid)
+        on_bot_edge = (cb[2] == 1)
+        on_top_edge = (cb[2] == n_py)
+        (on_bot_edge || on_top_edge) || continue
+
+        in_left_corner  = (cb[1] <= left_thresh)
+        in_right_corner = (cb[1] >= right_thresh)
+
+        pin = false
+        if ff_bot && on_bot_edge
+            pin |= inlet_left  && in_left_corner
+            pin |= inlet_right && in_right_corner
+        end
+        if ff_top && on_top_edge
+            pin |= inlet_left  && in_left_corner
+            pin |= inlet_right && in_right_corner
+        end
+        if pin
+            push!(out, dof_offsets[1] + bid)
+        end
+    end
+    return sort!(out)
 end
 
 """
@@ -579,6 +679,7 @@ function GenerateDomain(
         starting_point::NTuple{2,Float64}=(0.0, 0.0),
         boundary_condition=:periodic,
         obstacle=nothing,
+        farfield_corner_pin_cells::Int=0,
     )
     bc_sides = normalize_bc(boundary_condition)
 
@@ -606,6 +707,21 @@ function GenerateDomain(
 
     homogeneous_dofs_R1, dirichlet_dofs_R1 =
         classify_R1_boundary_dofs(R[2], bc_sides)
+
+    # Far-field corner stabilisation: pin v=0 on a few comp1 DOFs at the
+    # `:farfield` edges where they touch an `:inlet`. Merged into the
+    # homogeneous set so the operator factorisations include them via the
+    # standard symmetric-Dirichlet zeroing below.
+    corner_pin_dofs = compute_corner_pin_dofs_R1(
+        R[2], bc_sides, farfield_corner_pin_cells,
+    )
+    if !isempty(corner_pin_dofs)
+        homog_set = Set(homogeneous_dofs_R1)
+        for g in corner_pin_dofs
+            push!(homog_set, g)
+        end
+        homogeneous_dofs_R1 = sort!(collect(homog_set))
+    end
 
     # Immersed-boundary obstacle: we do *not* fold interior-cylinder R1 DOFs
     # into the matrix pinning. Strong-Dirichlet-pinning an *interior* R1 DOF
@@ -663,6 +779,23 @@ function GenerateDomain(
     if !isnothing(obstacle)
         println("  Obstacle: $(obstacle.kind) at center=$(obstacle.center), radius=$(obstacle.radius). " *
                 "No-slip enforced via particle Brinkman penalisation (no operator-level DOF pinning).")
+    end
+
+    let side_names = ("left", "right", "bottom", "top"),
+        active = String[]
+        @inbounds for s in 1:4
+            bc_sides[s] === :farfield && push!(active, side_names[s])
+        end
+        if !isempty(active)
+            println("  Far-field sides: $(join(active, ", ")) — open boundary: " *
+                    "R1 normal trace is free (natural ∂p/∂n = 0), particles drifting " *
+                    "past are culled in particle_sorter!.")
+            if !isempty(corner_pin_dofs)
+                println("  Far-field corner pin: $(length(corner_pin_dofs)) comp1 " *
+                        "DOF(s) pinned to v=0 at inlet-touching corners " *
+                        "(farfield_corner_pin_cells=$farfield_corner_pin_cells).")
+            end
+        end
     end
 
     return Domain(R[1], R[2], R[3], Forms.get_geometry(R[2]), dΩ, nel, p, k,
@@ -960,22 +1093,29 @@ function particle_sorter!(p::Particles, d::Domain; cull_outlets::Bool=true)
     near_wall_tol_y = max(2 * tol, 0.05 * dy)
 
     # Per-side flags. Only `:wall` sides zero the wall-normal momentum slab —
-    # `:inlet` must preserve its prescribed inflow velocity, and `:outlet`
-    # particles are culled in this same pass so their velocity is immaterial.
+    # `:inlet` must preserve its prescribed inflow velocity, and `:outlet` /
+    # `:farfield` particles are culled in this same pass so their velocity
+    # is immaterial. `:farfield` is intentionally not in this slab: pinning
+    # particle wall-normal velocity there would create exactly the artificial
+    # thin boundary layer the open-boundary tag is meant to avoid.
     wall_left  = sides[1] === :wall
     wall_right = sides[2] === :wall
     wall_bot   = sides[3] === :wall
     wall_top   = sides[4] === :wall
 
-    # `cull_outlets=false` is used inside the step_co_flip! fixed-point loop
-    # so the particle array doesn't shrink mid-iter (the advection buffers
-    # x_n, P11..P22, etc. are sized to the initial num_p; shrinking p.x
-    # under them would corrupt long-term pullback bookkeeping). The outer
-    # post-iter sort and the per-step rebalance both cull as normal.
-    out_left   = cull_outlets && sides[1] === :outlet
-    out_right  = cull_outlets && sides[2] === :outlet
-    out_bot    = cull_outlets && sides[3] === :outlet
-    out_top    = cull_outlets && sides[4] === :outlet
+    # Open-boundary culling: any particle that drifts past an `:outlet` or
+    # `:farfield` side is removed so the LSQR fit never sees out-of-domain
+    # samples. `cull_outlets=false` is used inside the step_co_flip! fixed-
+    # point loop so the particle array doesn't shrink mid-iter (the
+    # advection buffers x_n, P11..P22, etc. are sized to the initial num_p;
+    # shrinking p.x under them would corrupt long-term pullback
+    # bookkeeping). The outer post-iter sort and the per-step rebalance
+    # both cull as normal.
+    @inline _is_open(s) = s === :outlet || s === :farfield
+    out_left   = cull_outlets && _is_open(sides[1])
+    out_right  = cull_outlets && _is_open(sides[2])
+    out_bot    = cull_outlets && _is_open(sides[3])
+    out_top    = cull_outlets && _is_open(sides[4])
     any_outlet = out_left | out_right | out_bot | out_top
 
     n_particles = length(p.x)
@@ -1631,6 +1771,148 @@ function enforce_inlet_particles!(
 end
 
 """
+Replenish particles in `:farfield`-edge cells whose count has dropped below
+`cfg.particles_per_cell`. New particles are stamped with
+`cfg.farfield_velocity = (U_far, V_far)`, identity pullback, zero
+accumulated `delta_t`.
+
+Crucially **only fills deficits** — existing particles are not touched.
+This is what makes the boundary an "open far-field" rather than a sponge:
+particles that drift out of the box leave (culled by `particle_sorter!`),
+and any depletion in the edge row is replaced by uniform-stream samples
+so the LSQR fit at the boundary R1 DOFs always sees a stable density.
+
+No-op when no side is `:farfield` or `cfg.farfield_velocity == (0.0, 0.0)`.
+Call once per outer step, immediately after `enforce_inlet_particles!` so
+the LSQR sees a freshly-sorted, fully-stocked population. Returns the
+number of injected particles.
+"""
+function enforce_farfield_particles!(
+        p::Particles, d::Domain, buf::SimulationBuffers, cfg::SimulationConfig,
+    )
+    sides = d.bc_sides
+    ff_left  = sides[1] === :farfield
+    ff_right = sides[2] === :farfield
+    ff_bot   = sides[3] === :farfield
+    ff_top   = sides[4] === :farfield
+    any_ff = ff_left || ff_right || ff_bot || ff_top
+    any_ff || return 0
+
+    U_far, V_far = cfg.farfield_velocity
+    (U_far != 0.0 || V_far != 0.0) || return 0
+
+    target = max(cfg.particles_per_cell, cfg.min_particles_per_element)
+    target > 0 || return 0
+
+    nx, ny = d.nel
+    Lx, Ly = d.box_size
+    dx = Lx / nx;  dy = Ly / ny
+    cell_area = dx * dy
+
+    particle_sorter!(p, d)
+
+    # Tally per-element counts (existing particles).
+    counts_elem = buf.counts_elem
+    fill!(counts_elem, 0)
+    @inbounds for pid in 1:length(p.x)
+        counts_elem[p.elem_ids[pid]] += 1
+    end
+
+    # Pass 1: total deficit across all farfield-edge cells.
+    deficit_total = 0
+    if ff_left
+        @inbounds for ej in 1:ny
+            deficit_total += max(0, target - counts_elem[(ej - 1) * nx + 1])
+        end
+    end
+    if ff_right
+        @inbounds for ej in 1:ny
+            deficit_total += max(0, target - counts_elem[(ej - 1) * nx + nx])
+        end
+    end
+    if ff_bot
+        @inbounds for ei in 1:nx
+            deficit_total += max(0, target - counts_elem[ei])
+        end
+    end
+    if ff_top
+        @inbounds for ei in 1:nx
+            deficit_total += max(0, target - counts_elem[(ny - 1) * nx + ei])
+        end
+    end
+    deficit_total > 0 || return 0
+
+    # Pass 2: grow particle arrays and inject. `_seed_inlet_particle!` is
+    # reused — the per-particle stamping (random sub-position, identity
+    # pullback, far-field velocity, cell-area volume) is identical to the
+    # inlet seeder; only the *which-cells-and-with-what-velocity* policy
+    # differs, and that's encoded in this wrapper.
+    old_count = length(p.x)
+    new_count = old_count + deficit_total
+
+    resize!(p.x,        new_count)
+    resize!(p.y,        new_count)
+    resize!(p.mx,       new_count)
+    resize!(p.my,       new_count)
+    resize!(p.volume,   new_count)
+    resize!(p.can_x,    new_count)
+    resize!(p.can_y,    new_count)
+    resize!(p.next,     new_count)
+    resize!(p.elem_ids, new_count)
+    resize!(p.P11,      new_count)
+    resize!(p.P12,      new_count)
+    resize!(p.P21,      new_count)
+    resize!(p.P22,      new_count)
+    resize!(p.delta_t,  new_count)
+    ensure_particle_capacity!(buf, new_count)
+
+    rng = Random.default_rng()
+    pid = old_count + 1
+
+    @inline function _inject_row!(eids, x0s, y0s)
+        @inbounds for k in eachindex(eids)
+            eid = eids[k]
+            deficit = target - counts_elem[eid]
+            deficit > 0 || continue
+            x0 = x0s[k];  y0 = y0s[k]
+            for _ in 1:deficit
+                _seed_inlet_particle!(p, pid, eid, x0, y0, dx, dy,
+                                      U_far, V_far, cell_area, rng)
+                pid += 1
+            end
+        end
+    end
+
+    if ff_left
+        eids = [(ej - 1) * nx + 1 for ej in 1:ny]
+        x0s  = fill(0.0, ny)
+        y0s  = [(ej - 1) * dy for ej in 1:ny]
+        _inject_row!(eids, x0s, y0s)
+    end
+    if ff_right
+        eids = [(ej - 1) * nx + nx for ej in 1:ny]
+        x0s  = fill((nx - 1) * dx, ny)
+        y0s  = [(ej - 1) * dy for ej in 1:ny]
+        _inject_row!(eids, x0s, y0s)
+    end
+    if ff_bot
+        eids = collect(1:nx)
+        x0s  = [(ei - 1) * dx for ei in 1:nx]
+        y0s  = fill(0.0, nx)
+        _inject_row!(eids, x0s, y0s)
+    end
+    if ff_top
+        eids = [(ny - 1) * nx + ei for ei in 1:nx]
+        x0s  = [(ei - 1) * dx for ei in 1:nx]
+        y0s  = fill((ny - 1) * dy, nx)
+        _inject_row!(eids, x0s, y0s)
+    end
+
+    particle_sorter!(p, d)
+    return deficit_total
+end
+
+"""
 Immersed-boundary penalisation (Brinkman, τ→0 limit) for any obstacle. For
 each particle currently inside the obstacle, zero its velocity **in place**
 (position is left unchanged). LSQR then sees a smooth distribution of
@@ -1647,29 +1929,53 @@ amplify under advection (10^19 grid-vel errors observed in step 1 even
 with no operator-level cylinder pinning). In-place zeroing keeps the
 distribution diffuse and the gradients bounded.
 
-Returns the number of particles modified. No-op when `d.obstacle === nothing`.
+Returns a `NamedTuple (n_damped, fx, fy)`:
+- `n_damped` is the number of particles whose velocity was zeroed.
+- `fx = Σ volume·mx_before_zero`, `fy = Σ volume·my_before_zero` — the linear
+  momentum the fluid handed over to the cylinder during this call. This is
+  the impulse on the cylinder over the time interval that produced these
+  particle velocities; divide by `dt` to get force, normalise by
+  `½ρU²D` to get drag/lift coefficients.
+
+The result is also accumulated into `impulse_out` (a 2-element Vector{Float64})
+when provided, so callers in tight loops can sum impulses without allocating
+NamedTuples per call.
+
+No-op when `d.obstacle === nothing`; returns `(n_damped=0, fx=0.0, fy=0.0)`.
 """
-function apply_obstacle_brinkman!(p::Particles, d::Domain)
+function apply_obstacle_brinkman!(
+        p::Particles, d::Domain;
+        impulse_out::Union{Nothing,AbstractVector{Float64}}=nothing,
+    )
     obs = d.obstacle
-    obs === nothing && return 0
-    obs.kind === :cylinder || return 0
+    obs === nothing && return (n_damped=0, fx=0.0, fy=0.0)
+    obs.kind === :cylinder || return (n_damped=0, fx=0.0, fy=0.0)
 
     cx, cy = obs.center
     rc     = obs.radius
     rc2    = rc * rc
 
     damped = 0
+    fx_sum = 0.0
+    fy_sum = 0.0
     @inbounds for pid in 1:length(p.x)
         dx = p.x[pid] - cx
         dy = p.y[pid] - cy
         r2 = dx * dx + dy * dy
         if r2 < rc2
+            vol     = p.volume[pid]
+            fx_sum += vol * p.mx[pid]
+            fy_sum += vol * p.my[pid]
             p.mx[pid] = 0.0
             p.my[pid] = 0.0
             damped   += 1
         end
     end
-    return damped
+    if impulse_out !== nothing
+        @inbounds impulse_out[1] += fx_sum
+        @inbounds impulse_out[2] += fy_sum
+    end
+    return (n_damped=damped, fx=fx_sum, fy=fy_sum)
 end
 
 """
@@ -2410,10 +2716,11 @@ function restart_main(
     mkpath(out_dir)
 
     domain = GenerateDomain(cfg.nel, cfg.p, cfg.k;
-                            box_size           = cfg.box_size,
-                            starting_point     = cfg.starting_point,
-                            boundary_condition = cfg.boundary_condition,
-                            obstacle           = cfg.obstacle)
+                            box_size                 = cfg.box_size,
+                            starting_point           = cfg.starting_point,
+                            boundary_condition       = cfg.boundary_condition,
+                            obstacle                 = cfg.obstacle,
+                            farfield_corner_pin_cells = cfg.farfield_corner_pin_cells)
 
     num_elements = prod(domain.nel)
 
@@ -3585,6 +3892,17 @@ function step_co_flip!(
         println("  Inlet injection: +$n_inlet particles  (t=$(round(t_inlet, digits=2)) s)")
     end
 
+    # Far-field row top-up: refill depleted top/bottom (or left/right)
+    # `:farfield` row cells with uniform-stream particles. Existing
+    # particles are left untouched — only the deficit is filled — so the
+    # LSQR fit at the open boundary has a stable density without a sponge.
+    t0 = time()
+    n_ff = enforce_farfield_particles!(p, d, buf, cfg)
+    t_ff = time() - t0
+    if n_ff > 0
+        println("  Far-field replenishment: +$n_ff particles  (t=$(round(t_ff, digits=2)) s)")
+    end
+
     num_p = length(p.x)
     ensure_particle_capacity!(buf, num_p)
 
@@ -3658,7 +3976,17 @@ function step_co_flip!(
         # with zero velocity. Done *before* the sort so elem_ids/can_x/can_y
         # are computed from the corrected positions and LSQR sees clean,
         # no-slip-like data in the cells near the surface.
-        apply_obstacle_brinkman!(p, d)
+        #
+        # Force-on-cylinder bookkeeping: clear `buf.obstacle_impulse` and
+        # then pass it into the Brinkman call. Each FP iter is a *trial*
+        # advection from the captured x_n anchor — only the final iter's
+        # impulse corresponds to the physical trajectory, so we clear
+        # before each iter; after the loop exits the accumulator holds the
+        # last iter's value. The end-of-step Brinkman call further down
+        # adds the (small) PIC-residual impulse without clearing.
+        buf.obstacle_impulse[1] = 0.0
+        buf.obstacle_impulse[2] = 0.0
+        apply_obstacle_brinkman!(p, d; impulse_out=buf.obstacle_impulse)
         # Skip outlet culling here: the fixed-point loop re-advects every
         # iter from the captured `x_n` anchor, and the advection / pullback
         # buffers are sized to the original num_p. Shrinking p.x mid-iter
@@ -3804,8 +4132,10 @@ function step_co_flip!(
     # End-of-step immersed-boundary clean-up: the pressure kick and PIC blend
     # above may have given particles inside the obstacle a small non-zero
     # velocity; re-stamp them to surface positions with zero velocity so the
-    # next step starts from a clean no-slip state.
-    apply_obstacle_brinkman!(p, d)
+    # next step starts from a clean no-slip state. Accumulate into the
+    # impulse buffer *without* clearing — we want the sum of (last FP iter
+    # impulse, already there) + (PIC-residual impulse, added here).
+    apply_obstacle_brinkman!(p, d; impulse_out=buf.obstacle_impulse)
 
     t0 = time()
     particle_sorter!(p, d)
@@ -4137,13 +4467,17 @@ the caller via the named tuple.
 Compared to `main`, this version:
   * supports a user-supplied `fixed_dt` (required for convergence sweeps —
     CFL adaptation must be disabled there so dt is constant across runs);
-  * fires three optional callbacks per step:
+  * fires four optional callbacks per step:
       - `step_hook(particles, domain, cfg, step, t)` — runs *after* the
         CO-FLIP advance and any FTLE reset, before the CFL recheck. Used
         by the lid-cavity case to re-stamp the tangential lid velocity.
       - `probe_callback(t, u_coeffs, domain, step)` — runs every step.
         Used by the Von Kármán case to sample velocity at downstream
         probe points each step (FFT later → Strouhal).
+      - `force_callback(t, fx, fy, dt, step)` — runs every step when
+        `domain.obstacle !== nothing`. `fx`, `fy` are the instantaneous
+        forces on the obstacle (impulse / dt). Used by the Von Kármán
+        case to record drag / lift history for Cd_mean and Cl_rms.
       - `sample_callback(t, u_coeffs, domain, particles, step)` — runs
         the first time `t` crosses each requested `sample_times[k]`.
         Used by the TG convergence study to log L2 error at t=2, t=5.
@@ -4164,6 +4498,7 @@ function run_diagnostic_simulation(
         fixed_dt::Union{Float64,Nothing}=nothing,
         step_hook::Union{Nothing,Function}=nothing,
         probe_callback::Union{Nothing,Function}=nothing,
+        force_callback::Union{Nothing,Function}=nothing,
         sample_times::Vector{Float64}=Float64[],
         sample_callback::Union{Nothing,Function}=nothing,
         save_particles::Bool=false,
@@ -4177,7 +4512,8 @@ function run_diagnostic_simulation(
                                box_size=cfg.box_size,
                                starting_point=cfg.starting_point,
                                boundary_condition=cfg.boundary_condition,
-                               obstacle=cfg.obstacle)
+                               obstacle=cfg.obstacle,
+                               farfield_corner_pin_cells=cfg.farfield_corner_pin_cells)
     particles = generate_particles(num_particles, domain, cfg.flow_type;
                                    stratified_seeding=cfg.stratified_seeding,
                                    rng_seed=cfg.rng_seed,
@@ -4302,6 +4638,19 @@ function run_diagnostic_simulation(
 
         if probe_callback !== nothing
             probe_callback(t_now, u_coeffs, domain, step)
+        end
+
+        if force_callback !== nothing
+            # step_co_flip! populated sim_buf.obstacle_impulse during this
+            # step. Convert (impulse_x, impulse_y) → (F_x, F_y) by dividing
+            # by the just-taken `dt`. The callback may compute Cd/Cl from
+            # these values using whatever cylinder geometry / U_inf it
+            # already knows about. No-op when no obstacle is configured;
+            # the impulse buffer simply stays at zero.
+            inv_dt = dt > 0.0 ? 1.0 / dt : 0.0
+            fx = sim_buf.obstacle_impulse[1] * inv_dt
+            fy = sim_buf.obstacle_impulse[2] * inv_dt
+            force_callback(t_now, fx, fy, dt, step)
         end
 
         if sample_callback !== nothing && !isempty(sample_times)
@@ -5044,20 +5393,20 @@ Python/MATLAB.
 """
 function test_von_karman_strouhal(;
         output_dir::String       = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "von_karman"),
-        box_size::NTuple{2,Float64}        = (50.0, 30.0),
-        nel::NTuple{2,Int}                 = (200, 120),
+        box_size::NTuple{2,Float64}        = (40.0, 30.0),
+        nel::NTuple{2,Int}                 = (160, 120),
         cylinder_center::NTuple{2,Float64} = (10.0, 15.0),
         cylinder_radius::Float64           = 1.0,
-        U_inf::Float64           = 1.5,
-        viscosity::Float64       = 0.01,
-        T_final::Float64         = 50.0,
-        bc_top_bottom::Symbol    = :wall,
+        U_inf::Float64           = 1.0,
+        viscosity::Float64       = 0.02,
+        T_final::Float64         = 100.0,
+        bc_top_bottom::Symbol    = :periodic,
         probe_points::Vector{NTuple{2,Float64}} =
             [(20.0, 15.0), (25.0, 15.0), (30.0, 15.0)],
         save_vtk_every::Int      = 1,
         particles_per_cell::Int  = 10,
         target_cfl::Float64      = 0.5,
-        case_label::String       = "vk_re300",
+        case_label::String       = "vk_re100",
     )
     mkpath(output_dir)
     bc = (:inlet, :outlet, bc_top_bottom, bc_top_bottom)
@@ -5073,6 +5422,12 @@ function test_von_karman_strouhal(;
         box_size            = box_size,
         boundary_condition  = bc,
         inlet_U_inf         = U_inf,
+        # Far-field policy (only active when `bc_top_bottom = :farfield`):
+        # replenish depleted top/bottom-row cells with `(U_inf, 0)` and pin
+        # v=0 on the first few cells at each inlet-touching corner to
+        # stabilise the projection there.
+        farfield_velocity         = (U_inf, 0.0),
+        farfield_corner_pin_cells = 4,
         obstacle            = (kind=:cylinder, center=cylinder_center, radius=cylinder_radius),
         flow_type           = :cylinder,
         viscosity           = viscosity,
@@ -5098,6 +5453,19 @@ function test_von_karman_strouhal(;
         push!(probe_records, (t=t, step=step, us=us, vs=vs))
     end
 
+    # Per-step force history for drag/lift coefficient post-processing.
+    # `force_callback` fires after every step_co_flip!. `fx`, `fy` are
+    # already converted from impulse to force (divided by dt) by the
+    # runner; here we normalise to (Cd, Cl) using ρ=1, D=2r, U=U_inf.
+    D_cyl = 2 * cylinder_radius
+    cd_norm = 2.0 / (U_inf^2 * D_cyl)  # ρ = 1
+    force_records = NamedTuple[]
+    force_cb = function (t, fx, fy, dt, step)
+        push!(force_records,
+              (t=t, step=step, dt=dt, fx=fx, fy=fy,
+               Cd=cd_norm * fx, Cl=cd_norm * fy))
+    end
+
     result = run_diagnostic_simulation(cfg;
         save_vtk        = true,
         save_vtk_every  = save_vtk_every,
@@ -5105,6 +5473,7 @@ function test_von_karman_strouhal(;
         record_every    = max(1, save_vtk_every),
         case_name       = case_label,
         probe_callback  = probe_cb,
+        force_callback  = force_cb,
         save_particles  = false,
     )
 
@@ -5135,29 +5504,86 @@ function test_von_karman_strouhal(;
     end
     println("Saved history CSV: $history_csv")
 
+    # ----- Force history CSV -----
+    force_csv = joinpath(output_dir, case_label * "_forces.csv")
+    open(force_csv, "w") do io
+        println(io, "t,step,dt,fx,fy,Cd,Cl")
+        for r in force_records
+            @printf(io, "%.10e,%d,%.10e,%.16e,%.16e,%.16e,%.16e\n",
+                    r.t, r.step, r.dt, r.fx, r.fy, r.Cd, r.Cl)
+        end
+    end
+    println("Saved force CSV:   $force_csv")
+
+    # Drag/lift coefficient statistics over the second half of the record
+    # (the developed-shedding regime; the first half captures the start-up
+    # transient where Cd is artificially high and Cl is still ramping up).
+    cd_mean  = NaN
+    cl_rms   = NaN
+    cl_mean  = NaN
+    n_window = 0
+    if length(force_records) >= 16
+        start_idx = div(length(force_records), 2) + 1
+        n_window  = length(force_records) - start_idx + 1
+        cds = [r.Cd for r in @view force_records[start_idx:end]]
+        cls = [r.Cl for r in @view force_records[start_idx:end]]
+        cd_mean = sum(cds) / n_window
+        cl_mean = sum(cls) / n_window
+        # RMS-about-the-mean (i.e. standard deviation). For Kármán shedding
+        # the mean Cl ≈ 0 by symmetry; using std rather than √<Cl²> keeps
+        # the value invariant to a small mean drift from start-up bias.
+        cl_var = 0.0
+        @inbounds for cl in cls
+            d = cl - cl_mean
+            cl_var += d * d
+        end
+        cl_rms = sqrt(cl_var / n_window)
+    end
+
+    # ----- Strouhal + Cd/Cl summary -----
+    st_f = NaN; st_T = NaN; st_St = NaN
     if length(probe_records) > 16
         ts  = [r.t for r in probe_records]
         vs1 = [r.vs[1] for r in probe_records]
         st  = estimate_strouhal_from_v_signal(ts, vs1;
                                               U_inf=U_inf, D=2*cylinder_radius)
+        st_f  = st.f
+        st_T  = 1.0 / max(st.f, eps())
+        st_St = st.St
         println("\n--- In-run Strouhal estimate (probe 1, second half of record) ---")
         @printf("  Re=%.1f  U=%.3f  D=%.3f\n", Re, U_inf, 2*cylinder_radius)
         @printf("  f_dominant=%.6f  T_period=%.4f  St=f·D/U=%.4f\n",
-                st.f, 1.0/max(st.f, eps()), st.St)
+                st_f, st_T, st_St)
+    end
 
-        open(joinpath(output_dir, case_label * "_strouhal.txt"), "w") do io
-            println(io, @sprintf("Re=%.2f  U=%.4f  D=%.4f  ν=%.4f", Re, U_inf,
-                                 2*cylinder_radius, viscosity))
+    if length(force_records) >= 16
+        println("\n--- Drag / lift coefficient (second half of record, $n_window samples) ---")
+        @printf("  Cd_mean  = %.4f   (Re=%.1f reference ≈ 1.32-1.37)\n", cd_mean, Re)
+        @printf("  Cl_mean  = %.4f   (expected ≈ 0 by top/bottom symmetry)\n", cl_mean)
+        @printf("  Cl_rms   = %.4f   (Re=%.1f reference ≈ 0.22-0.26)\n", cl_rms, Re)
+    end
+
+    open(joinpath(output_dir, case_label * "_summary.txt"), "w") do io
+        println(io, @sprintf("Re=%.2f  U=%.4f  D=%.4f  ν=%.4f", Re, U_inf,
+                             2*cylinder_radius, viscosity))
+        if length(probe_records) > 16
             println(io, @sprintf("Probe 1 location = (%.3f, %.3f)",
                                  probe_points[1][1], probe_points[1][2]))
-            println(io, @sprintf("Dominant freq f = %.6f", st.f))
-            println(io, @sprintf("Period         T = %.4f", 1.0/max(st.f, eps())))
-            println(io, @sprintf("Strouhal       St = %.6f", st.St))
+            println(io, @sprintf("Strouhal       St = %.6f", st_St))
+            println(io, @sprintf("Dominant freq f = %.6f", st_f))
+            println(io, @sprintf("Period         T = %.4f", st_T))
+        end
+        if length(force_records) >= 16
+            println(io, @sprintf("Cd_mean = %.6f  (window: last %d samples)", cd_mean, n_window))
+            println(io, @sprintf("Cl_mean = %.6f", cl_mean))
+            println(io, @sprintf("Cl_rms  = %.6f", cl_rms))
         end
     end
 
-    return (result=result, probes=probe_records,
-            probe_csv=probe_csv, history_csv=history_csv)
+    return (result=result, probes=probe_records, forces=force_records,
+            probe_csv=probe_csv, history_csv=history_csv, force_csv=force_csv,
+            Cd_mean=cd_mean, Cl_rms=cl_rms, Cl_mean=cl_mean,
+            St=st_St, f_shed=st_f, T_shed=st_T)
 end
 
 """
@@ -5652,7 +6078,8 @@ function main(cfg::SimulationConfig=SimulationConfig())
                                box_size=cfg.box_size,
                                starting_point=cfg.starting_point,
                                boundary_condition=cfg.boundary_condition,
-                               obstacle=cfg.obstacle)
+                               obstacle=cfg.obstacle,
+                               farfield_corner_pin_cells=cfg.farfield_corner_pin_cells)
     particles = generate_particles(num_particles, domain, cfg.flow_type;
                                    stratified_seeding=cfg.stratified_seeding,
                                    rng_seed=cfg.rng_seed,
@@ -5783,8 +6210,8 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     #coflip_dispatch_from_env()
     #test_decaying_tg_convergence()
-    #test_von_karman_strouhal()
-    test_lid_driven_cavity()
+    test_von_karman_strouhal()
+    #test_lid_driven_cavity()
     #test_p2g_taylor_green_convergence()
 end
 

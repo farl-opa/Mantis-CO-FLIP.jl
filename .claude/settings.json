@@ -24,7 +24,8 @@
       "Bash(taskkill //F //PID 2026 //T)",
       "PowerShell(Stop-Process -Id 2026 -Force -ErrorAction SilentlyContinue)",
       "PowerShell(Stop-Process -Id 2024 -Force -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Process julia -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Process julia -ErrorAction SilentlyContinue)",
+      "Bash(julia --color=no -e 'Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); println\\(\"OK\"\\)')"
     ]
   }
 }
