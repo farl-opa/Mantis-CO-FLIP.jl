@@ -2,7 +2,7 @@
 #SBATCH --job-name=coflip_lid_cavity
 #SBATCH --partition=compute-p1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=3900M
 #SBATCH --time=24:00:00
 #SBATCH --output=coflip_lid_cavity_%j.out

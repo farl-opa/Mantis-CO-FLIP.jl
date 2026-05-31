@@ -4501,7 +4501,7 @@ function run_diagnostic_simulation(
         force_callback::Union{Nothing,Function}=nothing,
         sample_times::Vector{Float64}=Float64[],
         sample_callback::Union{Nothing,Function}=nothing,
-        save_particles::Bool=false,
+        save_particles::Bool=true,
         verbose::Bool=true,
     )
     LinearAlgebra.BLAS.set_num_threads(1)
@@ -5436,7 +5436,7 @@ function test_von_karman_strouhal(;
         cfl_adaptive        = true,
         particles_per_cell  = particles_per_cell,
         output_every        = save_vtk_every,
-        clear_memo_every    = 5,
+        clear_memo_every    = 1,
     )
 
     n_probes = length(probe_points)
@@ -5883,11 +5883,11 @@ function test_lid_driven_cavity(;
         box_size::NTuple{2,Float64}        = (1.0, 1.0),
         U_lid::Float64           = 1.0,
         viscosity::Float64       = 0.01,
-        T_final::Float64         = 10.0,
+        T_final::Float64         = 30.0,
         lid_band_cells::Float64  = 2.0,
         wall_band_cells::Float64 = 1.0,
         particles_per_cell::Int  = 10,
-        save_vtk_every::Int      = 1,
+        save_vtk_every::Int      = 50,
         target_cfl::Float64      = 0.5,
         ss_record_every::Int     = 5,
         validate_ghia::Bool      = true,
@@ -5896,7 +5896,7 @@ function test_lid_driven_cavity(;
         ftle_threshold::Float64        = Inf,
         max_longterm_delta_t::Float64  = 1.0e9,
         pic_blend_alpha::Float64       = 0.05,
-        clear_memo_every::Int          = 5,
+        clear_memo_every::Int          = 1,
         case_label::String       = "lid_re100",
     )
     mkpath(output_dir)
