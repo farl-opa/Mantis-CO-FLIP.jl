@@ -135,6 +135,10 @@ mutable struct SimulationBuffers
     # start of each step. The runner divides by dt to get instantaneous force
     # and reports (Cd, Cl). Always length 2; carries zeros when no obstacle.
     obstacle_impulse::Vector{Float64}
+
+    # LSQR solver scratch buffers (persistent to avoid per-call allocation)
+    ne_rhs_buf::Vector{Float64}    # B'b for mass-matrix warm start
+    col_norms_buf::Vector{Float64} # Jacobi column norms
 end
 
 """Allocates scratch buffers for particle-to-grid transfer and time stepping."""
@@ -174,6 +178,8 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
         zeros(Float64, size(d.N_Hodge, 1)),
         zeros(Float64, size(d.N_Hodge, 1)),
         zeros(Float64, 2),
+        zeros(Float64, ndofs),  # ne_rhs_buf
+        zeros(Float64, ndofs),  # col_norms_buf
     )
 end
 
@@ -3010,16 +3016,18 @@ Returns the LSQR convergence info (`ConvergenceHistory`).
 function solve_lsqr_jacobi!(
         x::AbstractVector{Float64},
         B::SparseMatrixCSC{Float64,Int},
-        b::AbstractVector{Float64};
+        b::AbstractVector{Float64},
+        col_norms::AbstractVector{Float64};  # persistent buffer, length ≥ size(B,2)
         atol::Float64=1e-9,
         btol::Float64=1e-9,
         maxiter::Int=2000,
     )
     ncols = size(B, 2)
     length(x) == ncols || throw(DimensionMismatch("x length $(length(x)) ≠ ncols $ncols"))
+    length(col_norms) >= ncols || throw(DimensionMismatch(
+        "col_norms length $(length(col_norms)) < ncols $ncols"))
 
     # Column 2-norms (and clamp empty columns to 1.0 to avoid divide-by-zero)
-    col_norms = Vector{Float64}(undef, ncols)
     colptr = B.colptr
     nzval  = B.nzval
     @inbounds for j in 1:ncols
@@ -3056,12 +3064,23 @@ function solve_lsqr_jacobi!(
     return ch
 end
 
-"""Solve P2G least-squares system with warm-start for grid velocity."""
+"""Solve P2G least-squares system with mass-matrix warm-start for grid velocity.
+
+Computes the L2-projection initial guess x₀ = M_R1⁻¹·B'b before running LSQR.
+Since B'B ≈ M_R1 for well-distributed particles, x₀ is already close to the
+LSQR solution, reducing iteration count from O(100–2000) to O(1–5).
+
+`warm` is overwritten with the solution on exit (in-place, no allocation).
+Returns `warm`.
+"""
 function solve_grid_velocity_lsqr(
         B::SparseMatrixCSC{Float64,Int},
         p::Particles,
         V_p_buf::AbstractVector{Float64},
-        warm::AbstractVector{Float64};
+        warm::AbstractVector{Float64},
+        ne_rhs_buf::AbstractVector{Float64},
+        col_norms_buf::AbstractVector{Float64},
+        Mass1_fact;
         atol::Float64=1e-8,
         btol::Float64=1e-8,
         maxiter::Int=2000,
@@ -3071,15 +3090,24 @@ function solve_grid_velocity_lsqr(
     V_p = @view V_p_buf[1:n]
     build_lsqr_rhs!(V_p, p)
 
-    x0 = copy(warm)
-    if length(x0) != size(B, 2)
-        x0 = zeros(size(B, 2))
+    ndofs = size(B, 2)
+    if length(warm) != ndofs
+        resize!(warm, ndofs)
+        fill!(warm, 0.0)
     end
-    ch = solve_lsqr_jacobi!(x0, B, V_p; atol=atol, btol=btol, maxiter=maxiter)
+
+    # Compute mass-matrix warm start: x₀ = M_R1⁻¹ · B'b.
+    # One sparse matvec + one triangular solve replaces hundreds of LSQR
+    # iterations; the result is an excellent initial guess because B'B ≈ M_R1.
+    mul!(ne_rhs_buf, B', V_p)
+    copyto!(warm, ne_rhs_buf)
+    ldiv!(Mass1_fact, warm)
+
+    ch = solve_lsqr_jacobi!(warm, B, V_p, col_norms_buf; atol=atol, btol=btol, maxiter=maxiter)
     if !ch.isconverged && error_on_nonconvergence
         @error "P2G LSQR did not converge" iters=ch.iters atol=atol btol=btol maxiter=maxiter
     end
-    return x0
+    return warm
 end
 
 """Project to divergence-free space via Hodge-Laplace and return pressure."""
@@ -3801,12 +3829,9 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
     B = build_B_matrix(p, d, buf)
     t_build_B_ms = time() - t0
 
-    if length(buf.lsqr_warm) != size(B, 2)
-        buf.lsqr_warm = zeros(size(B, 2))
-    end
-
     t0 = time()
-    u_grid_n = solve_grid_velocity_lsqr(B, p, buf.V_p, buf.lsqr_warm;
+    u_grid_n = solve_grid_velocity_lsqr(B, p, buf.V_p, buf.lsqr_warm,
+                                        buf.ne_rhs_buf, buf.col_norms_buf, d.Mass1_fact;
                                         atol=lsqr_atol, btol=lsqr_btol,
                                         maxiter=lsqr_maxiter,
                                         error_on_nonconvergence=lsqr_error_on_nonconvergence)
@@ -3820,6 +3845,8 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
     # Dirichlet (inlet) entries to the lift value. After this the field is
     # consistent with the strong-Dirichlet operator factorisations.
     enforce_boundary_dofs!(u_grid_n, d)
+    # u_grid_n is buf.lsqr_warm (returned in-place); copy! is a no-op but kept
+    # for clarity in case the alias assumption ever changes.
     copy!(buf.lsqr_warm, u_grid_n)
     t_solve_raw_ms = time() - t0
 
@@ -3997,13 +4024,11 @@ function step_co_flip!(
 
         t0    = time()
         B_np1 = build_B_matrix(p, d, buf)
-        if length(buf.lsqr_warm) != size(B_np1, 2)
-            buf.lsqr_warm = zeros(size(B_np1, 2))
-        end
         t_build_B = time() - t0
 
         t0      = time()
-        raw_sol = solve_grid_velocity_lsqr(B_np1, p, buf.V_p, buf.lsqr_warm;
+        raw_sol = solve_grid_velocity_lsqr(B_np1, p, buf.V_p, buf.lsqr_warm,
+                                           buf.ne_rhs_buf, buf.col_norms_buf, d.Mass1_fact;
                                            atol=cfg.lsqr_atol, btol=cfg.lsqr_btol,
                                            maxiter=cfg.lsqr_maxiter,
                                            error_on_nonconvergence=cfg.lsqr_error_on_nonconvergence)
@@ -5277,12 +5302,10 @@ function test_p2g_taylor_green_convergence(;
         B  = build_B_matrix(particles, domain, buf)
         t_build_B = time() - t0
 
-        if length(buf.lsqr_warm) != size(B, 2)
-            buf.lsqr_warm = zeros(size(B, 2))
-        end
-
         t0 = time()
-        u_grid = solve_grid_velocity_lsqr(B, particles, buf.V_p, buf.lsqr_warm;
+        u_grid = solve_grid_velocity_lsqr(B, particles, buf.V_p, buf.lsqr_warm,
+                                          buf.ne_rhs_buf, buf.col_norms_buf,
+                                          domain.Mass1_fact;
                                           atol=lsqr_atol, btol=lsqr_btol,
                                           maxiter=lsqr_maxiter,
                                           error_on_nonconvergence=true)
