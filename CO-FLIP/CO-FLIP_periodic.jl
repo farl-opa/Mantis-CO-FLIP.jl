@@ -12,6 +12,8 @@ using Printf
 using Memoization
 using WriteVTK
 import ReadVTK
+using Dates
+using Logging
 
 gr()
 
@@ -211,8 +213,8 @@ Base.@kwdef struct SimulationConfig
     target_cfl::Float64               = 0.5
     T_final::Float64                  = 40.0
     viscosity::Float64                = 0.02
-    max_fp_iter::Int                  = 6
-    fp_tol::Float64                   = 5e-9
+    max_fp_iter::Int                  = 4
+    fp_tol::Float64                   = 1e-7
     enable_energy_correction::Bool    = true
     enable_pressure_kick::Bool        = true
     pic_blend_alpha::Float64          = 0.02
@@ -227,14 +229,14 @@ Base.@kwdef struct SimulationConfig
     output_every::Int                 = 1
     clear_memo_every::Int             = 0
     clear_memo_every_fp_iter::Int     = 1
-    lsqr_atol::Float64                = 1e-9
-    lsqr_btol::Float64                = 1e-9
+    lsqr_atol::Float64                = 1e-6
+    lsqr_btol::Float64                = 1e-6
     lsqr_maxiter::Int                 = 2000
-    lsqr_error_on_nonconvergence::Bool = true
-    cfl_recheck_tolerance::Float64    = 0.5
+    lsqr_error_on_nonconvergence::Bool = false
+    cfl_recheck_tolerance::Float64    = 0.3
     cfl_adaptive::Bool                = true
     projection_mean_subtract::Bool    = true
-    advection_time_integrator::Symbol = :rk4
+    advection_time_integrator::Symbol = :rk2
 end
 
 """Promote coefficient type for field probe output."""
@@ -2786,14 +2788,19 @@ function restart_main(
 
     step = restart_step + 1
     final_step = restart_step + additional_steps
+    # Best available baseline for elapsed time at restart (the pre-restart dt
+    # history is unknown; assume the loaded dt held up to restart_step). From
+    # here, accumulate `+= dt` so adaptive-CFL dt changes don't corrupt t.
+    t_now = restart_step * dt
     while step <= final_step
-        println("Step $step / $final_step (t ≈ $(round(step * dt, digits=3)))...")
+        println("Step $step / $final_step (t ≈ $(round(t_now, digits=3)))...")
 
         if mod(step, 5) == 0
             physical_spatial_sort!(particles, domain)
         end
 
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
+        t_now += dt
 
         u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
         u_phys_expr = ★(u_form)
@@ -2825,7 +2832,7 @@ function restart_main(
                                            output_directory_tree=[out_dir])
 
             diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
-            print_conservation_diagnostics(step, step * dt, diagnostics)
+            print_conservation_diagnostics(step, t_now, diagnostics)
 
             export_particles_to_vtk(
                 particles,
@@ -3002,6 +3009,288 @@ function build_lsqr_rhs!(V_p::AbstractVector{Float64}, p::Particles)
 end
 
 """
+Threaded least-squares operator wrapping a sparse `A` (CSC) **and** its
+materialised transpose `Aᵀ` (also CSC). LSQR needs two products per iteration —
+`A·v` and `Aᵀ·u` — and stock `SparseMatrixCSC` matvec is single-threaded. Worse,
+the forward product `A·v` on a CSC matrix is a column-*scatter* (`y[rowval] +=
+…`), which has write conflicts and cannot be threaded without atomics.
+
+Keeping an explicit `Aᵀ` turns *both* directions into the conflict-free
+column-*gather* form `yⱼ = Σ_{k∈col j} nzval[k]·x[rowval[k]]`, which parallelises
+trivially (each output entry is an independent dot product):
+
+  * `A·v`  = `(Aᵀ)ᵀ·v` → gather over the columns of `Aᵀ` (parallel over A's rows)
+  * `Aᵀ·u` →             gather over the columns of `A`  (parallel over A's cols)
+
+Cost is one O(nnz) transpose per solve, negligible next to the LSQR iteration
+count. Used only inside `solve_lsqr_jacobi!`.
+"""
+struct ThreadedSparseLSQR{Tv,Ti<:Integer}
+    A::SparseMatrixCSC{Tv,Ti}
+    At::SparseMatrixCSC{Tv,Ti}
+end
+ThreadedSparseLSQR(A::SparseMatrixCSC) = ThreadedSparseLSQR(A, permutedims(A))
+
+"""Lazy adjoint view of a [`ThreadedSparseLSQR`](@ref); `mul!` gathers over `A`."""
+struct AdjThreadedSparseLSQR{Tv,Ti<:Integer}
+    parent::ThreadedSparseLSQR{Tv,Ti}
+end
+
+Base.size(M::ThreadedSparseLSQR) = size(M.A)
+Base.size(M::ThreadedSparseLSQR, d::Integer) = size(M.A, d)
+Base.eltype(::ThreadedSparseLSQR{Tv}) where {Tv} = Tv
+Base.adjoint(M::ThreadedSparseLSQR) = AdjThreadedSparseLSQR(M)
+
+Base.size(M::AdjThreadedSparseLSQR) = reverse(size(M.parent))
+Base.size(M::AdjThreadedSparseLSQR, d::Integer) = size(M.parent, d == 1 ? 2 : 1)
+Base.eltype(::AdjThreadedSparseLSQR{Tv}) where {Tv} = Tv
+Base.adjoint(M::AdjThreadedSparseLSQR) = M.parent
+
+"""Threaded `y .= Sᵀ·x` for `S` in CSC: `y[j] = Σ_{k∈col j} S.nzval[k]·x[S.rowval[k]]`.
+Each `y[j]` is an independent dot product over one column → no write races."""
+function _threaded_csc_tmul!(y::AbstractVector, S::SparseMatrixCSC, x::AbstractVector)
+    colptr = S.colptr; rowval = S.rowval; nzval = S.nzval
+    n = size(S, 2)
+    size(S, 1) == length(x) || throw(DimensionMismatch("x length $(length(x)) ≠ $(size(S,1))"))
+    length(y) == n || throw(DimensionMismatch("y length $(length(y)) ≠ $n"))
+    Threads.@threads :static for j in 1:n
+        acc = zero(eltype(y))
+        @inbounds for k in colptr[j]:(colptr[j + 1] - 1)
+            acc += nzval[k] * x[rowval[k]]
+        end
+        @inbounds y[j] = acc
+    end
+    return y
+end
+
+# A·x ≡ (Aᵀ)ᵀ·x — gather over the stored transpose's columns
+LinearAlgebra.mul!(y::AbstractVector, M::ThreadedSparseLSQR, x::AbstractVector) =
+    _threaded_csc_tmul!(y, M.At, x)
+# Aᵀ·u — gather over A's own columns
+LinearAlgebra.mul!(y::AbstractVector, M::AdjThreadedSparseLSQR, x::AbstractVector) =
+    _threaded_csc_tmul!(y, M.parent.A, x)
+
+Base.:*(M::ThreadedSparseLSQR, x::AbstractVector) =
+    mul!(similar(x, eltype(M), size(M, 1)), M, x)
+Base.:*(M::AdjThreadedSparseLSQR, x::AbstractVector) =
+    mul!(similar(x, eltype(M), size(M, 1)), M, x)
+
+# ---------------------------------------------------------------------------
+# Threaded LSQR vector kernels.
+#
+# Each splits 1:n into `nt` contiguous chunks (one per thread, via `@threads
+# :static`) with a thread-local accumulator, so reductions have no false
+# sharing and the elementwise updates are bit-identical regardless of thread
+# count. Norm reductions sum the per-thread partials at the end; this reorders
+# the floating-point summation versus a serial pass, so results match the
+# reference LSQR to round-off (~1e-15 relative), not bit-for-bit. The iterate
+# and the converged solution are identical to the same tolerance.
+# ---------------------------------------------------------------------------
+
+"""`y .= s·y .+ src` in place; returns the resulting `‖y‖₂` (fused, threaded)."""
+function _thr_scaleadd_normsq!(y::AbstractVector{T}, s::T, src::AbstractVector{T}) where {T}
+    n = length(y)
+    n == length(src) || throw(DimensionMismatch("length mismatch"))
+    nt = max(1, min(Threads.nthreads(), n))
+    partials = zeros(T, nt)
+    Threads.@threads :static for tid in 1:nt
+        lo = ((tid - 1) * n) ÷ nt + 1
+        hi = (tid * n) ÷ nt
+        acc = zero(T)
+        @inbounds for i in lo:hi
+            yi = s * y[i] + src[i]
+            y[i] = yi
+            acc += yi * yi
+        end
+        partials[tid] = acc
+    end
+    return sqrt(sum(partials))
+end
+
+"""`y .*= s` in place (threaded, bit-identical)."""
+function _thr_scale!(y::AbstractVector{T}, s::T) where {T}
+    n = length(y)
+    nt = max(1, min(Threads.nthreads(), n))
+    Threads.@threads :static for tid in 1:nt
+        lo = ((tid - 1) * n) ÷ nt + 1
+        hi = (tid * n) ÷ nt
+        @inbounds for i in lo:hi
+            y[i] *= s
+        end
+    end
+    return y
+end
+
+"""`y .+= a·x` in place (threaded, bit-identical)."""
+function _thr_axpy!(a::T, x::AbstractVector{T}, y::AbstractVector{T}) where {T}
+    n = length(y)
+    n == length(x) || throw(DimensionMismatch("length mismatch"))
+    nt = max(1, min(Threads.nthreads(), n))
+    Threads.@threads :static for tid in 1:nt
+        lo = ((tid - 1) * n) ÷ nt + 1
+        hi = (tid * n) ÷ nt
+        @inbounds for i in lo:hi
+            y[i] += a * x[i]
+        end
+    end
+    return y
+end
+
+"""Lightweight stand-in for `IterativeSolvers.ConvergenceHistory` exposing the
+two fields callers use (`iters`, `isconverged`)."""
+struct LSQRStats
+    iters::Int
+    isconverged::Bool
+    istop::Int
+end
+
+"""
+Threaded in-place LSQR: `min ‖A·x − b‖₂` (no damping).
+
+A faithful port of `IterativeSolvers.lsqr_method!` — the scalar bidiagonalisation
+recurrences and stopping tests are reproduced verbatim — with the per-iteration
+vector work (the two matvecs plus the `u`/`v`/`w` updates and their norms) routed
+through the threaded kernels above and the `ThreadedSparseLSQR` operator. The
+`wrho` temporary and its extra pass are folded into the fused `w`-update.
+
+`x` carries the initial guess in and the solution out. Returns `(x, ::LSQRStats)`.
+Numerically matches the reference solver to round-off (threaded norm reductions
+reorder summation); iterate trajectory and stopping behaviour are otherwise identical.
+
+NOTE on `isconverged`: unlike `IterativeSolvers`, hitting `maxiter` (`istop=7`) is
+reported as **not** converged, so callers see an honest non-convergence flag.
+"""
+function _lsqr_threaded!(x::AbstractVector{T}, A, b::AbstractVector{T};
+        atol::T = T(1e-6), btol::T = T(1e-6),
+        conlim::T = T(1e8), maxiter::Int = maximum(size(A)),
+    ) where {T<:AbstractFloat}
+    m = size(A, 1)
+    n = size(A, 2)
+    length(x) == n || error("x should be of length ", n)
+    length(b) == m || error("b should be of length ", m)
+    @inbounds for i in 1:n
+        isfinite(x[i]) || error("Initial guess for x must be finite")
+    end
+
+    Tr = real(T)
+    itn = istop = 0
+    ctol = conlim > 0 ? convert(Tr, 1 / conlim) : zero(Tr)
+    Anorm = Acond = ddnorm = res2 = xnorm = xxnorm = z = sn2 = zero(Tr)
+    cs2 = -one(Tr)
+    tmpm = similar(b, T, m)
+    tmpn = similar(x, T, n)
+
+    # Set up the first vectors u and v for the bidiagonalization.
+    #   beta*u = b - A*x,   alpha*v = A'u
+    mul!(tmpm, A, x)
+    u = similar(b, T, m)
+    @inbounds @. u = b - tmpm           # one-time init; cheap vs the iteration loop
+    v = copy(x)
+    beta = norm(u)
+    alpha = zero(Tr)
+    adjointA = adjoint(A)
+    if beta > 0
+        _thr_scale!(u, inv(beta))
+        mul!(v, adjointA, u)
+        alpha = norm(v)
+    end
+    if alpha > 0
+        _thr_scale!(v, inv(alpha))
+    end
+    w = copy(v)
+
+    Arnorm = alpha * beta
+    if Arnorm == 0
+        return x, LSQRStats(0, false, 0)
+    end
+
+    rhobar = alpha
+    phibar = beta
+    bnorm  = beta
+    rnorm  = beta
+
+    isconverged = false
+    while (itn < maxiter) & !isconverged
+        itn += 1
+
+        # beta*u = A*v - alpha*u ;  alpha*v = A'*u - beta*v
+        mul!(tmpm, A, v)
+        beta = _thr_scaleadd_normsq!(u, -alpha, tmpm)   # u .= -alpha.*u .+ tmpm ; ‖u‖
+        if beta > 0
+            _thr_scale!(u, inv(beta))
+            Anorm = sqrt(abs2(Anorm) + abs2(alpha) + abs2(beta))
+            mul!(tmpn, adjointA, u)
+            alpha = _thr_scaleadd_normsq!(v, -beta, tmpn)  # v .= -beta.*v .+ tmpn ; ‖v‖
+            if alpha > 0
+                _thr_scale!(v, inv(alpha))
+            end
+        end
+
+        # Plane rotations — verbatim from IterativeSolvers.lsqr_method! with
+        # damp=0 (⇒ dampsq=0, rhobar1=|rhobar|, sn1=0, psi=0). The cs1 sign
+        # flip is NOT optional: rhobar = -cs·alpha goes negative after iter 1,
+        # so |rhobar| and the sign carried into phibar must be reproduced
+        # exactly to match the reference iterate.
+        rhobar1 =   abs(rhobar)             # sqrt(abs2(rhobar) + dampsq), dampsq=0
+        cs1     =   rhobar / rhobar1        # = sign(rhobar)
+        phibar  =   cs1 * phibar            # psi = sn1*phibar = 0 (sn1=0)
+
+        rho     =   sqrt(abs2(rhobar1) + abs2(beta))
+        cs      =   rhobar1 / rho
+        sn      =   beta / rho
+        theta   =   sn * alpha
+        rhobar  = - cs * alpha
+        phi     =   cs * phibar
+        phibar  =   sn * phibar
+        tau     =   sn * phi
+
+        # Update x and w.
+        t1      =   phi / rho
+        t2      = - theta / rho
+
+        _thr_axpy!(t1, w, x)                            # x .+= t1.*w
+        wnorm = _thr_scaleadd_normsq!(w, t2, v)         # w .= t2.*w .+ v ; ‖w‖
+        ddnorm += wnorm * inv(rho)                      # == old: ddnorm += ‖w·inv(rho)‖
+
+        # Estimate norm(x).
+        delta   =   sn2 * rho
+        gambar  =  -cs2 * rho
+        rhs     =   phi - delta * z
+        zbar    =   rhs / gambar
+        xnorm   =   sqrt(xxnorm + abs2(zbar))
+        gamma   =   sqrt(abs2(gambar) + abs2(theta))
+        cs2     =   gambar / gamma
+        sn2     =   theta / gamma
+        z       =   rhs / gamma
+        xxnorm +=   abs2(z)
+
+        # Convergence tests. With damp=0: psi=0 ⇒ res2 stays 0, rnorm=|phibar|.
+        Acond   =   Anorm * sqrt(ddnorm)
+        res1    =   abs2(phibar)
+        rnorm   =   sqrt(res1 + res2)
+        Arnorm  =   alpha * abs(tau)
+
+        test1   =   rnorm / bnorm
+        test2   =   Arnorm / (Anorm * rnorm)
+        test3   =   inv(Acond)
+        t1t     =   test1 / (1 + Anorm * xnorm / bnorm)
+        rtol    =   btol + atol * Anorm * xnorm / bnorm
+
+        if itn >= maxiter  istop = 7 end
+        if 1 + test3 <= 1  istop = 6 end
+        if 1 + test2 <= 1  istop = 5 end
+        if 1 + t1t   <= 1  istop = 4 end
+        if test3 <= ctol   istop = 3 end
+        if test2 <= atol   istop = 2 end
+        if test1 <= rtol   istop = 1 end
+
+        isconverged = istop > 0
+    end
+
+    return x, LSQRStats(itn, istop > 0 && istop != 7, istop)
+end
+
+"""
 Solve `min ‖B·x − b‖₂` via LSQR with Jacobi (column-norm) right preconditioning.
 
 Equivalent to scaling B's columns to unit ℓ²-norm before the iteration: we solve
@@ -3011,7 +3300,7 @@ where column norms vary by 10×–100× depending on how many particles touch ea
 
 `B` is modified **in place** (columns are scaled). `x` carries the warm-start in
 original x-space on entry and the converged solution in original x-space on exit.
-Returns the LSQR convergence info (`ConvergenceHistory`).
+Returns the convergence info (`LSQRStats`, with `.iters` / `.isconverged`).
 """
 function solve_lsqr_jacobi!(
         x::AbstractVector{Float64},
@@ -3053,8 +3342,13 @@ function solve_lsqr_jacobi!(
         x[j] *= col_norms[j]
     end
 
-    _, ch = IterativeSolvers.lsqr!(x, B, b; atol=atol, btol=btol,
-                                   maxiter=maxiter, log=true)
+    # Wrap the (column-scaled) B in the threaded operator and run the vendored
+    # threaded LSQR: every iteration's matvecs (A·v / Aᵀ·u) AND vector updates
+    # (u/v/w AXPYs and their norms) run multi-threaded. Matches the reference
+    # IterativeSolvers.lsqr! iterate to round-off (threaded norm reductions
+    # reorder summation), with identical stopping behaviour.
+    Bop = ThreadedSparseLSQR(B)
+    _, ch = _lsqr_threaded!(x, Bop, b; atol=atol, btol=btol, maxiter=maxiter)
 
     # Recover x = D·y = y ./ col_norms
     @inbounds for j in 1:ncols
@@ -3071,7 +3365,8 @@ Since B'B ≈ M_R1 for well-distributed particles, x₀ is already close to the
 LSQR solution, reducing iteration count from O(100–2000) to O(1–5).
 
 `warm` is overwritten with the solution on exit (in-place, no allocation).
-Returns `warm`.
+Returns `(warm, ch)` where `ch` is the LSQR `ConvergenceHistory` (use
+`ch.iters` for the iteration count and `ch.isconverged` for the stop flag).
 """
 function solve_grid_velocity_lsqr(
         B::SparseMatrixCSC{Float64,Int},
@@ -3107,7 +3402,7 @@ function solve_grid_velocity_lsqr(
     if !ch.isconverged && error_on_nonconvergence
         @error "P2G LSQR did not converge" iters=ch.iters atol=atol btol=btol maxiter=maxiter
     end
-    return warm
+    return warm, ch
 end
 
 """Project to divergence-free space via Hodge-Laplace and return pressure."""
@@ -3830,7 +4125,7 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
     t_build_B_ms = time() - t0
 
     t0 = time()
-    u_grid_n = solve_grid_velocity_lsqr(B, p, buf.V_p, buf.lsqr_warm,
+    u_grid_n, ch_n = solve_grid_velocity_lsqr(B, p, buf.V_p, buf.lsqr_warm,
                                         buf.ne_rhs_buf, buf.col_norms_buf, d.Mass1_fact;
                                         atol=lsqr_atol, btol=lsqr_btol,
                                         maxiter=lsqr_maxiter,
@@ -3864,7 +4159,7 @@ function coadjoint_step!(p::Particles, d::Domain, buf::SimulationBuffers;
     println(
         "  Coadjoint Timings [s]: " *
         "build_B=$(round(t_build_B_ms, digits=2)), " *
-        "solve_raw=$(round(t_solve_raw_ms, digits=2)), " *
+        "solve_raw=$(round(t_solve_raw_ms, digits=2)) (lsqr_iters=$(ch_n.iters)), " *
         "project=$(round(t_project_ms, digits=2)), " *
         "total=$(round(t_total_ms, digits=2))",
     )
@@ -4027,7 +4322,7 @@ function step_co_flip!(
         t_build_B = time() - t0
 
         t0      = time()
-        raw_sol = solve_grid_velocity_lsqr(B_np1, p, buf.V_p, buf.lsqr_warm,
+        raw_sol, ch_fp = solve_grid_velocity_lsqr(B_np1, p, buf.V_p, buf.lsqr_warm,
                                            buf.ne_rhs_buf, buf.col_norms_buf, d.Mass1_fact;
                                            atol=cfg.lsqr_atol, btol=cfg.lsqr_btol,
                                            maxiter=cfg.lsqr_maxiter,
@@ -4078,7 +4373,7 @@ function step_co_flip!(
             "    Timings [s]: advect=$(round(t_advect, digits=2)), " *
             "sort=$(round(t_sort, digits=2)), " *
             "build_B=$(round(t_build_B, digits=2)), " *
-            "solve_raw=$(round(t_solve, digits=2)), " *
+            "solve_raw=$(round(t_solve, digits=2)) (lsqr_iters=$(ch_fp.iters)), " *
             "energy=$(round(t_energy, digits=2)), " *
             "project=$(round(t_project, digits=2)), " *
             "iter_total=$(round(t_iter, digits=2))",
@@ -4528,23 +4823,40 @@ function run_diagnostic_simulation(
         sample_callback::Union{Nothing,Function}=nothing,
         save_particles::Bool=true,
         verbose::Bool=true,
+        restart_vtu::Union{String,Nothing}=nothing,
+        restart_step::Int=0,
+        n_steps_override::Union{Int,Nothing}=nothing,
+        initial_dt::Union{Float64,Nothing}=nothing,
     )
     LinearAlgebra.BLAS.set_num_threads(1)
     save_vtk && mkpath(output_dir)
 
-    num_particles = cfg.nel[1] * cfg.nel[2] * cfg.particles_per_cell
+    is_restart = restart_vtu !== nothing
     domain    = GenerateDomain(cfg.nel, cfg.p, cfg.k;
                                box_size=cfg.box_size,
                                starting_point=cfg.starting_point,
                                boundary_condition=cfg.boundary_condition,
                                obstacle=cfg.obstacle,
                                farfield_corner_pin_cells=cfg.farfield_corner_pin_cells)
-    particles = generate_particles(num_particles, domain, cfg.flow_type;
-                                   stratified_seeding=cfg.stratified_seeding,
-                                   rng_seed=cfg.rng_seed,
-                                   volume_convention=cfg.volume_convention,
-                                   boundary_condition=cfg.boundary_condition,
-                                   U_inf=cfg.inlet_U_inf)
+    if is_restart
+        n_steps_override !== nothing ||
+            error("run_diagnostic_simulation: restart requires n_steps_override")
+        initial_dt !== nothing && isfinite(initial_dt) && initial_dt > 0 ||
+            error("run_diagnostic_simulation: restart requires a finite positive initial_dt")
+        verbose && println("  Restart: loading particles from $(restart_vtu)")
+        x, y, mx, my, vol = read_particles_from_vtu(restart_vtu)
+        particles = particles_from_vtu_state(x, y, mx, my, vol, prod(domain.nel))
+        num_particles = length(particles.x)
+        verbose && println("  Restart: loaded $(num_particles) particles, continuing from step $(restart_step)")
+    else
+        num_particles = cfg.nel[1] * cfg.nel[2] * cfg.particles_per_cell
+        particles = generate_particles(num_particles, domain, cfg.flow_type;
+                                       stratified_seeding=cfg.stratified_seeding,
+                                       rng_seed=cfg.rng_seed,
+                                       volume_convention=cfg.volume_convention,
+                                       boundary_condition=cfg.boundary_condition,
+                                       U_inf=cfg.inlet_U_inf)
+    end
     apply_obstacle_brinkman!(particles, domain)
     if step_hook !== nothing
         step_hook(particles, domain, cfg, 0, 0.0)
@@ -4552,8 +4864,16 @@ function run_diagnostic_simulation(
     particle_sorter!(particles, domain)
 
     dt = NaN
-    n_steps = 0
-    if fixed_dt !== nothing
+    n_steps = 0          # absolute index of the final step the loop will reach
+    step_start = 1       # absolute index of the first step the loop runs
+    if is_restart
+        # Fixed step count from the restart point; dt starts at initial_dt and
+        # may still shrink via the in-loop CFL recheck (adaptive CFL), but the
+        # step count is NOT retargeted so the run stops exactly at final step.
+        dt         = initial_dt
+        step_start = restart_step + 1
+        n_steps    = restart_step + n_steps_override
+    elseif fixed_dt !== nothing
         isfinite(fixed_dt) && fixed_dt > 0 ||
             error("run_diagnostic_simulation: fixed_dt must be a finite positive Float64")
         dt = fixed_dt
@@ -4568,8 +4888,8 @@ function run_diagnostic_simulation(
         end
     end
 
-    verbose && println(@sprintf("  [%s] T_final=%.4f  dt=%.6f  n_steps=%d  ν=%.4g",
-                                case_name, cfg.T_final, dt, n_steps, cfg.viscosity))
+    verbose && println(@sprintf("  [%s] T_final=%.4f  dt=%.6f  steps=%d..%d  ν=%.4g",
+                                case_name, cfg.T_final, dt, step_start, n_steps, cfg.viscosity))
 
     ndofs        = FunctionSpaces.get_num_basis(domain.R1.fem_space)
     num_elements = prod(domain.nel)
@@ -4604,7 +4924,13 @@ function run_diagnostic_simulation(
         step_hook(particles, domain, cfg, 0, 0.0)
     end
 
-    if save_vtk
+    # Elapsed-time baseline. On restart we assume the loaded dt held up to
+    # restart_step (best available estimate; pre-restart dt history is unknown).
+    t_base = is_restart ? restart_step * dt : 0.0
+
+    # Skip the initial snapshot on restart: it would just rewrite the loaded
+    # state (and clobber the original run's particles_0000 / step file).
+    if save_vtk && !is_restart
         d_u_phys_0 = Forms.d(u_phys_form_init)
         ω_h_0      = ★(d_u_phys_0)
         Plot.export_form_fields_to_vtk((u_form_init,), "u_h_0000"; output_directory_tree=[output_dir])
@@ -4615,26 +4941,31 @@ function run_diagnostic_simulation(
     warmup_evaluation_memo!(domain)
 
     d0 = compute_conservation_diagnostics(u_coeffs, domain)
-    history = [(t=0.0, energy=d0.energy, enstrophy=d0.enstrophy, circulation=d0.circulation)]
+    history = [(t=t_base, energy=d0.energy, enstrophy=d0.enstrophy, circulation=d0.circulation)]
 
     if probe_callback !== nothing
-        probe_callback(0.0, u_coeffs, domain, 0)
+        probe_callback(t_base, u_coeffs, domain, restart_step)
     end
 
     sample_done = falses(length(sample_times))
 
-    t_now = 0.0
-    step = 1
+    t_now = t_base
+    step = step_start
     while step <= n_steps
         verbose && println(@sprintf("Step %d/%d  t≈%.4f  case=%s",
-                                    step, n_steps, step*dt, case_name))
+                                    step, n_steps, t_now, case_name))
 
         if mod(step, 5) == 0
             physical_spatial_sort!(particles, domain)
         end
 
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
-        t_now    = step * dt
+        # Accumulate true elapsed time with the dt actually integrated this
+        # step. Must use `+= dt` (not `step * dt`): under adaptive CFL `dt`
+        # changes between steps, so `step * dt` would retroactively apply the
+        # current dt to all prior steps and corrupt the time axis the probe /
+        # Strouhal analysis relies on.
+        t_now += dt
 
         u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
         u_phys_expr = ★(u_form)
@@ -4654,9 +4985,16 @@ function run_diagnostic_simulation(
             dt_check = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, dt)
             new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
             if new_dt != dt
-                remaining_steps = max(1, ceil(Int, (cfg.T_final - step * dt) / new_dt))
-                n_steps = step + remaining_steps
-                verbose && println("  Adaptive CFL: dt=$(new_dt) (was $(dt)); remaining_steps≈$(remaining_steps)")
+                # Restart runs use a fixed step count (n_steps_override): shrink
+                # dt but do NOT retarget n_steps, so the run stops exactly at the
+                # requested final step. Fresh runs keep T_final fixed instead.
+                if n_steps_override === nothing
+                    remaining_steps = max(1, ceil(Int, (cfg.T_final - t_now) / new_dt))
+                    n_steps = step + remaining_steps
+                    verbose && println("  Adaptive CFL: dt=$(new_dt) (was $(dt)); remaining_steps≈$(remaining_steps)")
+                else
+                    verbose && println("  Adaptive CFL: dt=$(new_dt) (was $(dt)); fixed step count, $(n_steps - step) steps left")
+                end
                 dt = new_dt
             end
         end
@@ -5303,7 +5641,7 @@ function test_p2g_taylor_green_convergence(;
         t_build_B = time() - t0
 
         t0 = time()
-        u_grid = solve_grid_velocity_lsqr(B, particles, buf.V_p, buf.lsqr_warm,
+        u_grid, _ = solve_grid_velocity_lsqr(B, particles, buf.V_p, buf.lsqr_warm,
                                           buf.ne_rhs_buf, buf.col_norms_buf,
                                           domain.Mass1_fact;
                                           atol=lsqr_atol, btol=lsqr_btol,
@@ -5416,29 +5754,54 @@ Python/MATLAB.
 """
 function test_von_karman_strouhal(;
         output_dir::String       = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "von_karman"),
-        box_size::NTuple{2,Float64}        = (40.0, 30.0),
-        nel::NTuple{2,Int}                 = (160, 120),
-        cylinder_center::NTuple{2,Float64} = (10.0, 15.0),
+        box_size::NTuple{2,Float64}        = (40.0, 20.0),
+        nel::NTuple{2,Int}                 = (160, 80),
+        cylinder_center::NTuple{2,Float64} = (10.0, 10.0),
         cylinder_radius::Float64           = 1.0,
-        U_inf::Float64           = 1.0,
+        U_inf::Float64           = 1.5,
         viscosity::Float64       = 0.02,
         T_final::Float64         = 100.0,
         bc_top_bottom::Symbol    = :periodic,
         probe_points::Vector{NTuple{2,Float64}} =
             [(20.0, 15.0), (25.0, 15.0), (30.0, 15.0)],
-        save_vtk_every::Int      = 1,
+        save_vtk_every::Int      = 3,
         particles_per_cell::Int  = 10,
-        target_cfl::Float64      = 0.5,
-        case_label::String       = "vk_re100",
+        target_cfl::Float64      = 0.3,
+        case_label::String       = "vk_re150",
+        # Restart support. When `restart_vtu` is set, particles are loaded from
+        # that .vtu instead of generated fresh, the run continues from
+        # `restart_step`+1 up to `final_step` (a fixed step count, so adaptive
+        # CFL shrinks dt but never changes how many steps run), starting at
+        # `restart_dt`. All probe / force / Strouhal / Cd-Cl analysis runs the
+        # same as a fresh case.
+        restart_vtu::Union{String,Nothing} = nothing,
+        restart_step::Int                  = 0,
+        final_step::Union{Int,Nothing}     = nothing,
+        restart_dt::Float64                = 0.01,
     )
     mkpath(output_dir)
     bc = (:inlet, :outlet, bc_top_bottom, bc_top_bottom)
     Re = U_inf * (2 * cylinder_radius) / viscosity
 
+    is_restart = restart_vtu !== nothing
+    if is_restart
+        final_step !== nothing && final_step > restart_step ||
+            error("test_von_karman_strouhal: restart requires final_step > restart_step " *
+                  "(got restart_step=$(restart_step), final_step=$(final_step))")
+        isfinite(restart_dt) && restart_dt > 0 ||
+            error("test_von_karman_strouhal: restart_dt must be a finite positive Float64")
+    end
+    n_steps_override = is_restart ? (final_step - restart_step) : nothing
+
     println("\n========== VON KARMAN VORTEX SHEDDING ==========")
     println(@sprintf("  box=%s  nel=%s  cyl=%s  r=%.3f  U=%.3f  ν=%.4f  Re=%.1f  T=%.1f  bc_y=%s",
                      box_size, nel, cylinder_center, cylinder_radius,
                      U_inf, viscosity, Re, T_final, bc_top_bottom))
+    if is_restart
+        println(@sprintf("  RESTART from %s: step %d → %d (%d steps), dt0=%.4g",
+                         restart_vtu, restart_step, final_step,
+                         n_steps_override, restart_dt))
+    end
 
     cfg = SimulationConfig(;
         nel                 = nel,
@@ -5491,14 +5854,18 @@ function test_von_karman_strouhal(;
     end
 
     result = run_diagnostic_simulation(cfg;
-        save_vtk        = true,
-        save_vtk_every  = save_vtk_every,
-        output_dir      = joinpath(output_dir, case_label * "_vtk"),
-        record_every    = max(1, save_vtk_every),
-        case_name       = case_label,
-        probe_callback  = probe_cb,
-        force_callback  = force_cb,
-        save_particles  = false,
+        save_vtk         = true,
+        save_vtk_every   = save_vtk_every,
+        output_dir       = joinpath(output_dir, case_label * "_vtk"),
+        record_every     = max(1, save_vtk_every),
+        case_name        = case_label,
+        probe_callback   = probe_cb,
+        force_callback   = force_cb,
+        save_particles   = true,
+        restart_vtu      = restart_vtu,
+        restart_step     = restart_step,
+        n_steps_override = n_steps_override,
+        initial_dt       = is_restart ? restart_dt : nothing,
     )
 
     probe_csv = joinpath(output_dir, case_label * "_probes.csv")
@@ -6041,6 +6408,11 @@ Supported cases:
                          and `COFLIP_SWEEP_IDX` (1-based).
   - `von_karman`       — Strouhal probe run, no extra vars (override
                          defaults by editing the function call below).
+  - `von_karman_restart` — restart the Von Kármán case from a saved
+                         particle .vtu and run the full Strouhal / Cd-Cl
+                         analysis on completion. Requires
+                         `COFLIP_RESTART_VTU`, `COFLIP_RESTART_STEP`,
+                         `COFLIP_FINAL_STEP`; `COFLIP_DT` optional (0.01).
   - `lid_cavity`       — lid-driven cavity, no extra vars.
   - `tg_validation`    — single-point viscous-decay validation (the
                          legacy `test_decaying_taylor_green`).
@@ -6069,6 +6441,22 @@ function coflip_dispatch_from_env()
         test_decaying_tg_convergence(; mode=mode, sweep_idx=idx)
     elseif case == "von_karman"
         test_von_karman_strouhal()
+    elseif case == "von_karman_restart"
+        # Restart the Von Kármán case from a saved particle .vtu and run the
+        # full probe / force / Strouhal / Cd-Cl analysis when it finishes.
+        # Requires COFLIP_RESTART_VTU, COFLIP_RESTART_STEP, COFLIP_FINAL_STEP;
+        # COFLIP_DT optional (default 0.01).
+        vtu        = get(ENV, "COFLIP_RESTART_VTU", "")
+        rstep      = parse(Int, get(ENV, "COFLIP_RESTART_STEP", "0"))
+        fstep      = parse(Int, get(ENV, "COFLIP_FINAL_STEP", "0"))
+        rdt        = parse(Float64, get(ENV, "COFLIP_DT", "0.01"))
+        vtu == "" && error("COFLIP_CASE=von_karman_restart requires COFLIP_RESTART_VTU env var")
+        test_von_karman_strouhal(;
+            restart_vtu  = vtu,
+            restart_step = rstep,
+            final_step   = fstep,
+            restart_dt   = rdt,
+        )
     elseif case == "lid_cavity"
         test_lid_driven_cavity()
     elseif case == "tg_validation"
@@ -6171,15 +6559,19 @@ function main(cfg::SimulationConfig=SimulationConfig())
 
     warmup_evaluation_memo!(domain)
 
+    t_now = 0.0
     step = 1
     while step <= n_steps
-        println("Step $step / $n_steps (t = $(round(step * dt, digits=3)))...")
+        println("Step $step / $n_steps (t = $(round(t_now, digits=3)))...")
 
         if mod(step, 5) == 0
             physical_spatial_sort!(particles, domain)  # Every 5 steps
         end
 
         u_coeffs = step_co_flip!(particles, domain, dt, u_coeffs, sim_buf, cfg)
+        # Accumulate true elapsed time with the dt actually integrated this
+        # step; `step * dt` would be wrong once adaptive CFL changes dt.
+        t_now += dt
 
         u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
         u_phys_expr = ★(u_form)
@@ -6198,7 +6590,7 @@ function main(cfg::SimulationConfig=SimulationConfig())
         dt_check = recheck_cfl_dt(u_coeffs, domain, cfg.target_cfl, dt)
         new_dt   = enforce_cfl_recheck!(dt, dt_check, cfg)
         if new_dt != dt
-            remaining_steps = max(1, ceil(Int, (cfg.T_final - step * dt) / new_dt))
+            remaining_steps = max(1, ceil(Int, (cfg.T_final - t_now) / new_dt))
             n_steps = step + remaining_steps  # Adjust total steps to keep T_final fixed
             println("  Adaptive CFL: dt=$(new_dt) (was $(dt)); remaining_steps≈$(remaining_steps)")
             dt = new_dt
@@ -6211,7 +6603,7 @@ function main(cfg::SimulationConfig=SimulationConfig())
             Plot.export_form_fields_to_vtk((ω_h,),    @sprintf("w_h_%04d", step); output_directory_tree=["coflip_output"])
 
             diagnostics = compute_conservation_diagnostics(u_coeffs, domain)
-            print_conservation_diagnostics(step, step * dt, diagnostics)
+            print_conservation_diagnostics(step, t_now, diagnostics)
 
             export_particles_to_vtk(
                 particles,
@@ -6231,12 +6623,79 @@ end
 #main()
 
 
+"""
+    with_run_logging(f; logdir=".", prefix="coflip_run")
+
+Run `f()` while teeing **both** `stdout` and `stderr` to a timestamped log
+file, so everything printed during a run is preserved on disk — including
+the adaptive-CFL recheck messages, which are emitted via `@info`/`@error`
+(stderr) by `enforce_cfl_recheck!`, not `println`. Output still streams
+live to the terminal. Returns whatever `f()` returns.
+
+The log path is announced at the start and end of the run. Grep the file
+afterwards for the trigger, e.g.:
+
+    Select-String -Path coflip_run_*.log -Pattern "CFL recheck shrinking" | Select-Object -Last 1
+
+(Under SLURM the job stdout is already captured to a file, so this mainly
+helps local interactive runs where the terminal scrollback is finite.)
+"""
+function with_run_logging(f; logdir::AbstractString=".", prefix::AbstractString="coflip_run")
+    isdir(logdir) || mkpath(logdir)
+    stamp   = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
+    logpath = abspath(joinpath(logdir, "$(prefix)_$(stamp).log"))
+
+    real_out = stdout
+    real_err = stderr
+    open(logpath, "w") do logfile
+        rd_out, wr_out = redirect_stdout()
+        rd_err, wr_err = redirect_stderr()
+
+        # Copy each redirected stream to the real terminal *and* the log file.
+        tee = (src, dst) -> @async try
+            for line in eachline(src; keep=true)
+                print(dst, line);     flush(dst)
+                print(logfile, line); flush(logfile)
+            end
+        catch
+            # stream closed during teardown — nothing to do.
+        end
+        t_out = tee(rd_out, real_out)
+        t_err = tee(rd_err, real_err)
+
+        println("Run log: $logpath")
+        try
+            # Fresh ConsoleLogger so @info/@warn/@error follow the redirected
+            # stderr (the default logger captured the original stream at startup).
+            return with_logger(ConsoleLogger(stderr)) do
+                f()
+            end
+        finally
+            flush(stdout); flush(stderr)
+            redirect_stdout(real_out)
+            redirect_stderr(real_err)
+            close(wr_out); close(wr_err)
+            wait(t_out);   wait(t_err)
+            println(real_out, "Run log written to: $logpath")
+        end
+    end
+end
+
+
 if abspath(PROGRAM_FILE) == @__FILE__
-    #coflip_dispatch_from_env()
-    #test_decaying_tg_convergence()
-    test_von_karman_strouhal()
-    #test_lid_driven_cavity()
-    #test_p2g_taylor_green_convergence()
+    with_run_logging() do
+        if get(ENV, "COFLIP_CASE", "") != ""
+            # Env-driven dispatch (used by both the DelftBlue SLURM scripts and
+            # local runs that set COFLIP_CASE, e.g. von_karman_restart).
+            coflip_dispatch_from_env()
+        else
+            # Default when no case is selected: fresh Von Kármán shedding run.
+            test_von_karman_strouhal()
+            #test_decaying_tg_convergence()
+            #test_lid_driven_cavity()
+            #test_p2g_taylor_green_convergence()
+        end
+    end
 end
 
 # Legacy restart entry point (kept for reference; opt in via COFLIP_CASE=restart):

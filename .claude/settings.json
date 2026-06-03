@@ -25,7 +25,17 @@
       "PowerShell(Stop-Process -Id 2026 -Force -ErrorAction SilentlyContinue)",
       "PowerShell(Stop-Process -Id 2024 -Force -ErrorAction SilentlyContinue)",
       "PowerShell(Get-Process julia -ErrorAction SilentlyContinue)",
-      "Bash(julia --color=no -e 'Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); println\\(\"OK\"\\)')"
+      "Bash(julia --color=no -e 'Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); println\\(\"OK\"\\)')",
+      "Read(//c/Users/opele/.julia/packages/IterativeSolvers/**)",
+      "Bash(julia --startup-file=no -e 'using Base.Meta; try; Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); println\\(\"PARSE OK\"\\); catch e; println\\(\"PARSE ERROR: \", e\\); end')",
+      "Bash(julia --startup-file=no -t 8 CO-FLIP/_threaded_matvec_test.jl)",
+      "Bash(julia --startup-file=no -t 1 CO-FLIP/_lsqr_threaded_test.jl)",
+      "Bash(julia --startup-file=no -e ' *)",
+      "PowerShell($p = \"CO-FLIP/CO-FLIP_periodic.jl\"; $lines = Get-Content $p; \"before: $\\($lines.Count\\) lines\"; \"L3070=[$\\($lines[3069]\\)]\"; \"L3071=[$\\($lines[3070]\\)]\"; \"L3282=[$\\($lines[3281]\\)]\"; \"L3283=[$\\($lines[3282]\\)]\")",
+      "PowerShell($p = \"CO-FLIP/CO-FLIP_periodic.jl\"; $lines = Get-Content $p; $new = $lines[0..3069] + $lines[3282..\\($lines.Count-1\\)]; Set-Content -Path $p -Value $new -Encoding utf8; \"after: $\\($new.Count\\) lines \\(removed $\\($lines.Count - $new.Count\\)\\)\")",
+      "Bash(julia -e 'using Base.Meta; s=read\\(\"CO-FLIP/CO-FLIP_periodic.jl\",String\\); try; Meta.parseall\\(s\\); println\\(\"PARSE OK\"\\); catch e; println\\(\"PARSE ERR: \", e\\); end')",
+      "PowerShell($p = \"c:\\\\Users\\\\opele\\\\Mantis-CO-FLIP.jl\\\\CO-FLIP\\\\CO-FLIP_periodic.jl\"; $raw = [IO.File]::ReadAllText\\($p\\); if \\($raw -match \"`r`n\"\\) { \"CRLF\" } else { \"LF\" }; \"anchor-count: \" + \\([regex]::Matches\\($raw, [regex]::Escape\\(\"if abspath\\(PROGRAM_FILE\\) == @__FILE__\"\\)\\)\\).Count; \"wrap-already: \" + \\($raw.Contains\\(\"with_run_logging\"\\)\\))",
+      "PowerShell($j = \\(Get-Command julia -ErrorAction SilentlyContinue\\); if \\($j\\) { julia -e 'Meta.parseall\\(read\\(raw\"c:\\\\Users\\\\opele\\\\Mantis-CO-FLIP.jl\\\\CO-FLIP\\\\CO-FLIP_periodic.jl\", String\\)\\); println\\(\"PARSE OK\"\\)' } else { \"julia not on PATH — skipped parse check\" })"
     ]
   }
 }
