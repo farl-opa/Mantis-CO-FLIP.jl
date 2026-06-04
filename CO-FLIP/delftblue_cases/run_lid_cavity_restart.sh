@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=3900M
-#SBATCH --time=24:00:00
+#SBATCH --time=10:00:00
 #SBATCH --output=coflip_lid_restart_%j.out
 #SBATCH --error=coflip_lid_restart_%j.err
 
