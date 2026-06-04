@@ -4841,8 +4841,8 @@ function run_diagnostic_simulation(
     if is_restart
         n_steps_override !== nothing ||
             error("run_diagnostic_simulation: restart requires n_steps_override")
-        initial_dt !== nothing && isfinite(initial_dt) && initial_dt > 0 ||
-            error("run_diagnostic_simulation: restart requires a finite positive initial_dt")
+        (initial_dt === nothing) || (isfinite(initial_dt) && initial_dt > 0) ||
+            error("run_diagnostic_simulation: initial_dt must be a finite positive Float64 when provided")
         verbose && println("  Restart: loading particles from $(restart_vtu)")
         x, y, mx, my, vol = read_particles_from_vtu(restart_vtu)
         particles = particles_from_vtu_state(x, y, mx, my, vol, prod(domain.nel))
@@ -4867,10 +4867,21 @@ function run_diagnostic_simulation(
     n_steps = 0          # absolute index of the final step the loop will reach
     step_start = 1       # absolute index of the first step the loop runs
     if is_restart
-        # Fixed step count from the restart point; dt starts at initial_dt and
-        # may still shrink via the in-loop CFL recheck (adaptive CFL), but the
-        # step count is NOT retargeted so the run stops exactly at final step.
-        dt         = initial_dt
+        # Fixed step count from the restart point; dt starts at initial_dt (or,
+        # when initial_dt is not given, the CFL-limited dt recomputed from the
+        # loaded particle state — same as a fresh run's first dt) and may still
+        # shrink via the in-loop CFL recheck (adaptive CFL), but the step count
+        # is NOT retargeted, so the run stops exactly at the final step.
+        if initial_dt !== nothing
+            dt = initial_dt
+        else
+            dt_cfl = compute_cfl_dt_from_particles(particles, domain, cfg.target_cfl)
+            (isfinite(dt_cfl) && dt_cfl > 0) ||
+                error("run_diagnostic_simulation: could not infer a restart dt from CFL; " *
+                      "pass initial_dt explicitly")
+            dt = dt_cfl
+            verbose && println(@sprintf("  Restart: dt auto-set from CFL = %.6g", dt))
+        end
         step_start = restart_step + 1
         n_steps    = restart_step + n_steps_override
     elseif fixed_dt !== nothing
@@ -6288,12 +6299,39 @@ function test_lid_driven_cavity(;
         pic_blend_alpha::Float64       = 0.05,
         clear_memo_every::Int          = 1,
         case_label::String       = "lid_re100",
+        # Restart support. When `restart_vtu` is set, particles are loaded from
+        # that .vtu instead of generated fresh, the run continues from
+        # `restart_step`+1 up to `final_step` (a fixed step count, so adaptive
+        # CFL shrinks dt but never changes how many steps run). `restart_dt`
+        # is the starting dt; leave it `nothing` to auto-set it from the CFL
+        # condition of the loaded state. The Ghia validation runs the same as
+        # a fresh case.
+        restart_vtu::Union{String,Nothing} = nothing,
+        restart_step::Int                  = 0,
+        final_step::Union{Int,Nothing}     = nothing,
+        restart_dt::Union{Float64,Nothing} = nothing,
     )
     mkpath(output_dir)
     Re = U_lid * box_size[1] / viscosity
+
+    is_restart = restart_vtu !== nothing
+    if is_restart
+        final_step !== nothing && final_step > restart_step ||
+            error("test_lid_driven_cavity: restart requires final_step > restart_step " *
+                  "(got restart_step=$(restart_step), final_step=$(final_step))")
+        restart_dt === nothing || (isfinite(restart_dt) && restart_dt > 0) ||
+            error("test_lid_driven_cavity: restart_dt must be a finite positive Float64 when provided")
+    end
+    n_steps_override = is_restart ? (final_step - restart_step) : nothing
+
     println("\n========== LID DRIVEN CAVITY ==========")
     println(@sprintf("  nel=%s  L=%.3f  U_lid=%.3f  ν=%.4f  Re=%.1f  T=%.1f",
                      nel, box_size[1], U_lid, viscosity, Re, T_final))
+    if is_restart
+        println(@sprintf("  RESTART from %s: step %d → %d (%d steps), dt0=%s",
+                         restart_vtu, restart_step, final_step, n_steps_override,
+                         restart_dt === nothing ? "auto-CFL" : @sprintf("%.4g", restart_dt)))
+    end
     println(@sprintf("  Brinkman bands:  lid=%.2f cells  walls=%.2f cells",
                      lid_band_cells, wall_band_cells))
     println(@sprintf("  energy_correction=%s  ftle_threshold=%s  pic_blend=%.3f",
@@ -6353,14 +6391,18 @@ function test_lid_driven_cavity(;
     end
 
     result = run_diagnostic_simulation(cfg;
-        save_vtk        = true,
-        save_vtk_every  = save_vtk_every,
-        output_dir      = joinpath(output_dir, case_label * "_vtk"),
-        record_every    = max(1, save_vtk_every),
-        case_name       = case_label,
-        step_hook       = step_hook,
-        probe_callback  = ss_probe_cb,
-        save_particles  = true,
+        save_vtk         = true,
+        save_vtk_every   = save_vtk_every,
+        output_dir       = joinpath(output_dir, case_label * "_vtk"),
+        record_every     = max(1, save_vtk_every),
+        case_name        = case_label,
+        step_hook        = step_hook,
+        probe_callback   = ss_probe_cb,
+        save_particles   = true,
+        restart_vtu      = restart_vtu,
+        restart_step     = restart_step,
+        n_steps_override = n_steps_override,
+        initial_dt       = is_restart ? restart_dt : nothing,
     )
 
     history_csv = joinpath(output_dir, case_label * "_history.csv")
@@ -6414,6 +6456,11 @@ Supported cases:
                          `COFLIP_RESTART_VTU`, `COFLIP_RESTART_STEP`,
                          `COFLIP_FINAL_STEP`; `COFLIP_DT` optional (0.01).
   - `lid_cavity`       — lid-driven cavity, no extra vars.
+  - `lid_cavity_restart` — restart the lid-driven cavity from a saved
+                         particle .vtu and run the full Ghia comparison on
+                         completion. Requires `COFLIP_RESTART_VTU`,
+                         `COFLIP_RESTART_STEP`, `COFLIP_FINAL_STEP`;
+                         `COFLIP_DT` optional (auto-set from CFL if unset).
   - `tg_validation`    — single-point viscous-decay validation (the
                          legacy `test_decaying_taylor_green`).
   - `main`             — the full-blown `main()` from this file.
@@ -6459,6 +6506,22 @@ function coflip_dispatch_from_env()
         )
     elseif case == "lid_cavity"
         test_lid_driven_cavity()
+    elseif case == "lid_cavity_restart"
+        # Restart the lid-driven cavity from a saved particle .vtu and run the
+        # full steady-state + Ghia comparison when it finishes.
+        # Requires COFLIP_RESTART_VTU, COFLIP_RESTART_STEP, COFLIP_FINAL_STEP;
+        # COFLIP_DT optional (auto-set from CFL of the loaded state if unset).
+        vtu        = get(ENV, "COFLIP_RESTART_VTU", "")
+        vtu == "" && error("COFLIP_CASE=lid_cavity_restart requires COFLIP_RESTART_VTU env var")
+        rstep      = parse(Int, get(ENV, "COFLIP_RESTART_STEP", "0"))
+        fstep      = parse(Int, get(ENV, "COFLIP_FINAL_STEP", "0"))
+        rdt        = haskey(ENV, "COFLIP_DT") ? parse(Float64, ENV["COFLIP_DT"]) : nothing
+        test_lid_driven_cavity(;
+            restart_vtu  = vtu,
+            restart_step = rstep,
+            final_step   = fstep,
+            restart_dt   = rdt,
+        )
     elseif case == "tg_validation"
         test_decaying_taylor_green()
     elseif case == "main"
