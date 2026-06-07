@@ -5595,6 +5595,15 @@ const TG_DT_TIME_SWEEP      = (0.04, 0.02, 0.01, 0.005, 0.0025)
 const TG_FIXED_NEL_FOR_TIME = 128
 const TG_FIXED_DT_FOR_SPACE = 0.005
 
+# Double-shear-layer mesh/particle-density sweep. Each entry is one
+# independent simulation point `(nel, particles_per_cell)`; a SLURM job
+# array (1:6) fills out the whole grid in parallel. Three mesh sizes
+# (40², 96², 128²) crossed with two particle densities (10, 20 ppc).
+const SHEAR_LAYER_SWEEP = (
+    (40,  10), (96,  10), (128, 10),
+    (40,  20), (96,  20), (128, 20),
+)
+
 """
 Run ONE point of the decaying Taylor-Green convergence study.
 
@@ -5730,6 +5739,87 @@ function test_decaying_tg_convergence(;
 
     return (result=result, records=sample_records, run_label=run_label,
             csv_path=csv_path, history_csv=history_csv)
+end
+
+"""
+Run ONE point of the double-shear-layer benchmark (Bell-Colella-Glaz
+roll-up) on the periodic unit box, for a given mesh resolution and
+particle-per-cell density.
+
+`sweep_idx` indexes into `SHEAR_LAYER_SWEEP`, picking the
+`(nel, particles_per_cell)` pair for this run. A SLURM job array (1:6)
+covers the three mesh sizes (40², 96², 128²) × two densities (10, 20).
+
+The shear flow (`flow_shear`) is the classic two anti-parallel layers
+(thickness set by ρ=30) plus a single-mode `v`-perturbation (δ=0.05) that
+seeds the Kelvin-Helmholtz roll-up. Each run writes vorticity / velocity
+VTK frames every `save_vtk_every` steps so the roll-up can be visualised,
+plus a per-step energy/enstrophy/circulation history CSV. Comparing the
+frames across the sweep shows how mesh resolution and particle density
+affect the resolved vortex structure.
+
+Defaults: ν=1e-4 (Re≈10⁴) on the 1×1 periodic box, p=(3,3) splines, run
+to T_final=1.8 with adaptive CFL (target 0.5).
+"""
+function test_shear_layer(;
+        sweep_idx::Int = 1,
+        output_dir::String = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "shear_layer"),
+        viscosity::Float64 = 1e-4,
+        T_final::Float64 = 1.8,
+        target_cfl::Float64 = 0.5,
+        box_size::NTuple{2,Float64} = (1.0, 1.0),
+        save_vtk_every::Int = 10,
+        record_every::Int = 1,
+        shear_sweep = SHEAR_LAYER_SWEEP,
+    )
+    1 <= sweep_idx <= length(shear_sweep) ||
+        error("sweep_idx=$sweep_idx out of range for shear-layer sweep (1:$(length(shear_sweep)))")
+    nel_val, ppc_val = shear_sweep[sweep_idx]
+
+    run_label = @sprintf("shear_nel%03d_ppc%02d", nel_val, ppc_val)
+    run_dir   = joinpath(output_dir, run_label)
+    mkpath(run_dir)
+
+    println("\n========== DOUBLE SHEAR LAYER ==========")
+    println(@sprintf("  sweep_idx=%d  →  nel=(%d,%d)  ppc=%d  ν=%.1e  T=%.2f  box=%s",
+                     sweep_idx, nel_val, nel_val, ppc_val, viscosity, T_final, string(box_size)))
+    println("  Output dir: $run_dir")
+
+    cfg = SimulationConfig(;
+        flow_type           = :shear,
+        boundary_condition  = :periodic,
+        obstacle            = nothing,
+        viscosity           = viscosity,
+        T_final             = T_final,
+        nel                 = (nel_val, nel_val),
+        particles_per_cell  = ppc_val,
+        box_size            = box_size,
+        target_cfl          = target_cfl,
+        cfl_adaptive        = true,
+        projection_mean_subtract = true,
+        output_every        = save_vtk_every,
+    )
+
+    result = run_diagnostic_simulation(cfg;
+        save_vtk        = true,
+        save_vtk_every  = save_vtk_every,
+        output_dir      = run_dir,
+        record_every    = record_every,
+        case_name       = run_label,
+    )
+
+    history_csv = joinpath(output_dir, run_label * "_history.csv")
+    open(history_csv, "w") do io
+        println(io, "nel,ppc,t,energy,enstrophy,circulation")
+        for hi in result.history
+            @printf(io, "%d,%d,%.10e,%.16e,%.16e,%.16e\n",
+                    nel_val, ppc_val, hi.t, hi.energy, hi.enstrophy, hi.circulation)
+        end
+    end
+    println("Saved per-step history: $history_csv")
+
+    return (result=result, run_label=run_label,
+            nel=nel_val, ppc=ppc_val, history_csv=history_csv)
 end
 
 """
@@ -6616,6 +6706,9 @@ vars listed below. Returns `nothing`.
 Supported cases:
   - `tg_convergence`   — uses `COFLIP_SWEEP_MODE` ∈ {`space`, `time`}
                          and `COFLIP_SWEEP_IDX` (1-based).
+  - `shear_layer`      — double-shear-layer mesh/ppc sweep; uses
+                         `COFLIP_SWEEP_IDX` (1-based) into
+                         `SHEAR_LAYER_SWEEP` (1:6).
   - `von_karman`       — Strouhal probe run, no extra vars (override
                          defaults by editing the function call below).
   - `von_karman_restart` — restart the Von Kármán case from a saved
@@ -6654,6 +6747,9 @@ function coflip_dispatch_from_env()
         mode = Symbol(mode_str)
         idx  = parse(Int, idx_str)
         test_decaying_tg_convergence(; mode=mode, sweep_idx=idx)
+    elseif case == "shear_layer"
+        idx = parse(Int, get(ENV, "COFLIP_SWEEP_IDX", "1"))
+        test_shear_layer(; sweep_idx=idx)
     elseif case == "von_karman"
         test_von_karman_strouhal()
     elseif case == "von_karman_restart"
@@ -6704,8 +6800,8 @@ function coflip_dispatch_from_env()
                      restart_step=step, additional_steps=more, dt=dt)
     else
         error("Unknown COFLIP_CASE=$case. " *
-              "Expected one of: tg_convergence, von_karman, lid_cavity, " *
-              "tg_validation, main, restart")
+              "Expected one of: tg_convergence, shear_layer, von_karman, " *
+              "lid_cavity, tg_validation, main, restart")
     end
     return nothing
 end

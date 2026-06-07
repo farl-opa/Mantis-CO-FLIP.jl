@@ -39,4 +39,4 @@ export COFLIP_RESTART_STEP=5100
 export COFLIP_FINAL_STEP=5760
 # export COFLIP_DT=0.01   # optional: omit to auto-set dt from CFL
 
-julia --project=. CO-FLIP/CO-FLIP_periodic.jl
+julia --project=. CO-FLIP/CO-FLIP_solver.jl

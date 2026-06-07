@@ -37,4 +37,4 @@ export COFLIP_RESTART_STEP=1398
 export COFLIP_FINAL_STEP=4901
 export COFLIP_DT=0.01
 
-julia --project=. CO-FLIP/CO-FLIP_periodic.jl
+julia --project=. CO-FLIP/CO-FLIP_solver.jl

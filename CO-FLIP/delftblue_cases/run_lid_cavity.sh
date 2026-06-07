@@ -27,4 +27,4 @@ julia --project=. -e 'using Pkg; Pkg.develop(path="Mantis")'
 
 export COFLIP_CASE=lid_cavity
 
-julia --project=. CO-FLIP/CO-FLIP_periodic.jl
+julia --project=. CO-FLIP/CO-FLIP_solver.jl

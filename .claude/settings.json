@@ -42,7 +42,8 @@
       "Bash(julia --startup-file=no -e 'p = Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_solver.jl\", String\\)\\); for a in \\(p.head == :toplevel ? p.args : [p]\\); if a isa Expr && a.head == :error; println\\(\"PARSE ERROR: \", a\\); exit\\(1\\); end; end; println\\(\"parse OK\"\\)')",
       "Bash(julia --startup-file=no --project=.. test_weak_vorticity.jl)",
       "Bash(julia --startup-file=no --project=.. -e ' *)",
-      "Bash(julia --startup-file=no --project=../.. -e ' *)"
+      "Bash(julia --startup-file=no --project=../.. -e ' *)",
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_solver.jl\", String\\); filename=\"CO-FLIP_solver.jl\"\\); println\\(\"PARSE OK\"\\)')"
     ]
   }
 }

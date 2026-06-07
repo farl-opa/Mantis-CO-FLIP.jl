@@ -33,4 +33,4 @@ export COFLIP_CASE=tg_convergence
 export COFLIP_SWEEP_MODE=space
 export COFLIP_SWEEP_IDX=$SLURM_ARRAY_TASK_ID
 
-julia --project=. CO-FLIP/CO-FLIP_periodic.jl
+julia --project=. CO-FLIP/CO-FLIP_solver.jl
