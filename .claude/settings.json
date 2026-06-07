@@ -36,7 +36,13 @@
       "Bash(julia -e 'using Base.Meta; s=read\\(\"CO-FLIP/CO-FLIP_periodic.jl\",String\\); try; Meta.parseall\\(s\\); println\\(\"PARSE OK\"\\); catch e; println\\(\"PARSE ERR: \", e\\); end')",
       "PowerShell($p = \"c:\\\\Users\\\\opele\\\\Mantis-CO-FLIP.jl\\\\CO-FLIP\\\\CO-FLIP_periodic.jl\"; $raw = [IO.File]::ReadAllText\\($p\\); if \\($raw -match \"`r`n\"\\) { \"CRLF\" } else { \"LF\" }; \"anchor-count: \" + \\([regex]::Matches\\($raw, [regex]::Escape\\(\"if abspath\\(PROGRAM_FILE\\) == @__FILE__\"\\)\\)\\).Count; \"wrap-already: \" + \\($raw.Contains\\(\"with_run_logging\"\\)\\))",
       "PowerShell($j = \\(Get-Command julia -ErrorAction SilentlyContinue\\); if \\($j\\) { julia -e 'Meta.parseall\\(read\\(raw\"c:\\\\Users\\\\opele\\\\Mantis-CO-FLIP.jl\\\\CO-FLIP\\\\CO-FLIP_periodic.jl\", String\\)\\); println\\(\"PARSE OK\"\\)' } else { \"julia not on PATH — skipped parse check\" })",
-      "Bash(julia -e 'Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); println\\(\"PARSE OK\"\\)')"
+      "Bash(julia -e 'Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); println\\(\"PARSE OK\"\\)')",
+      "Bash(python plot_von_karman.py)",
+      "Bash(julia --startup-file=no -e 'p = Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_periodic.jl\", String\\)\\); for a in \\(p.head == :toplevel ? p.args : [p]\\); if a isa Expr && a.head == :error; println\\(\"PARSE ERROR: \", a\\); exit\\(1\\); end; end; println\\(\"parse OK\"\\)')",
+      "Bash(julia --startup-file=no -e 'p = Meta.parseall\\(read\\(\"CO-FLIP/CO-FLIP_solver.jl\", String\\)\\); for a in \\(p.head == :toplevel ? p.args : [p]\\); if a isa Expr && a.head == :error; println\\(\"PARSE ERROR: \", a\\); exit\\(1\\); end; end; println\\(\"parse OK\"\\)')",
+      "Bash(julia --startup-file=no --project=.. test_weak_vorticity.jl)",
+      "Bash(julia --startup-file=no --project=.. -e ' *)",
+      "Bash(julia --startup-file=no --project=../.. -e ' *)"
     ]
   }
 }
