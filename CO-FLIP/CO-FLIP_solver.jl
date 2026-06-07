@@ -214,6 +214,9 @@ Base.@kwdef struct SimulationConfig
     target_cfl::Float64               = 0.5
     T_final::Float64                  = 40.0
     viscosity::Float64                = 0.02
+    # :lie  → full advection then full diffusion (1st order in time).
+    # :strang → half-diffusion → full advection → half-diffusion (2nd order).
+    viscosity_splitting::Symbol       = :strang
     max_fp_iter::Int                  = 4
     fp_tol::Float64                   = 1e-7
     enable_energy_correction::Bool    = true
@@ -4314,6 +4317,11 @@ function step_co_flip!(
     ) where {Tf<:Real}
 
     @assert all(isfinite, f_n) "step_co_flip!: f_n contains non-finite values"
+    if cfg.viscosity_splitting !== :lie && cfg.viscosity_splitting !== :strang
+        throw(ArgumentError(
+            "viscosity_splitting must be :lie or :strang, got $(cfg.viscosity_splitting)"
+        ))
+    end
 
     step_t0       = time()
     thread_caches = buf.thread_caches
@@ -4381,6 +4389,22 @@ function step_co_flip!(
     f_np1_raw       = buf.f_np1_raw
     f_np1_proj      = buf.f_np1_proj
     f_np1_proj_prev = buf.f_np1_proj_prev
+
+    # --- Strang splitting: half-step viscous diffusion before the inviscid solve ---
+    # Diffuses f_n_saved by Δt/2 so the FP loop integrates the inviscid dynamics
+    # from the half-diffused state. The trailing half-step is applied after the
+    # FP loop below. Re-projects to clean up the small numerical divergence the
+    # saddle-point solve can introduce. No-op for :lie splitting.
+    if cfg.viscosity > 0.0 && cfg.viscosity_splitting === :strang
+        t0 = time()
+        apply_viscous_diffusion_feec!(f_n_saved, f_n_saved, d, cfg.viscosity, dt / 2)
+        f_n_saved_h = Forms.build_form_field(d.R1, f_n_saved)
+        proj_pre = project_and_get_pressure(d, f_n_saved_h, buf;
+                       subtract_mean=cfg.projection_mean_subtract)
+        copy!(f_n_saved, proj_pre)
+        println("  Strang half-diffusion (pre, ν=$(cfg.viscosity), Δt/2): " *
+                "t=$(round(time()-t0, digits=2))s")
+    end
 
     copy!(f_star, f_n_saved)
     copy!(f_np1_proj_prev, f_star)
@@ -4531,22 +4555,28 @@ function step_co_flip!(
     end
 
     # --- Viscous split-step diffusion (FEEC) ---
-    # f_np1_proj holds the inviscid divergence-free field f*. Apply one implicit
-    # (M + ν·Δt·L)·f = M·f* step, then re-project to restore divergence-free.
+    # f_np1_proj holds the inviscid divergence-free field f*. Apply the trailing
+    # implicit (M_R1 + ν·Δt_v·L_dδ)·f = M_R1·f* step (via the sparse saddle-point
+    # system in apply_viscous_diffusion_feec!), then re-project to restore the
+    # divergence-free constraint. For :lie this is the only diffusion call and
+    # uses the full Δt; for :strang it is the second half-step at Δt/2.
     if cfg.viscosity > 0.0
+        diff_dt = cfg.viscosity_splitting === :strang ? dt / 2 : dt
+        diff_label = cfg.viscosity_splitting === :strang ? "Strang half-diffusion (post)" :
+                                                           "Viscous diffusion step"
         t0 = time()
         apply_viscous_diffusion_feec!(
             f_np1_proj,
             f_np1_proj,
             d,
             cfg.viscosity,
-            dt,
+            diff_dt,
         )
         f_np1_proj_h = Forms.build_form_field(d.R1, f_np1_proj)
         proj_after_diff = project_and_get_pressure(d, f_np1_proj_h, buf;
                               subtract_mean=cfg.projection_mean_subtract)
         copy!(f_np1_proj, proj_after_diff)
-        println("  Viscous diffusion step (ν=$(cfg.viscosity)): t=$(round(time()-t0, digits=2))s")
+        println("  $(diff_label) (ν=$(cfg.viscosity)): t=$(round(time()-t0, digits=2))s")
     end
 
     # --- [STUB] Metriplectic viscosity (Approach 2) ---
