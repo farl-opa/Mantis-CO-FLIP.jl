@@ -5764,8 +5764,8 @@ to T_final=1.8 with adaptive CFL (target 0.5).
 function test_shear_layer(;
         sweep_idx::Int = 1,
         output_dir::String = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "shear_layer"),
-        viscosity::Float64 = 1e-4,
-        T_final::Float64 = 1.8,
+        viscosity::Float64 = 0.0,
+        T_final::Float64 = 3.0,
         target_cfl::Float64 = 0.5,
         box_size::NTuple{2,Float64} = (1.0, 1.0),
         save_vtk_every::Int = 10,
