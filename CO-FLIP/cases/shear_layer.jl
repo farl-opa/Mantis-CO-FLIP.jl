@@ -12,8 +12,8 @@ include(joinpath(@__DIR__, "..", "CO-FLIP_solver.jl"))
 
 # Double-shear-layer mesh/particle-density sweep. Each entry is one
 # independent simulation point `(nel, particles_per_cell)`; a SLURM job
-# array (1:6) fills out the whole grid in parallel. Three mesh sizes
-# (40², 96², 128²) crossed with two particle densities (10, 20 ppc).
+# array (1:3) fills out the whole grid in parallel. Three mesh sizes
+# (40², 96², 128²).
 const SHEAR_LAYER_SWEEP = (
     (40,  20), (96,  20), (128, 20),
 )

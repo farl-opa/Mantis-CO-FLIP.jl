@@ -4757,3 +4757,18 @@ Step 325/400  t≈1.6200  case=time_nel128_dt0.00500
   Particle rebalance after solve: +111 / -111
   Post Timings [s]: final_sort=0.0, final_rebalance=6.77, step_total=49.0
 Step 326/400  t≈1.6250  case=time_nel128_dt0.00500
+  Initial seeding time: 0.01 s
+  Strang half-diffusion (pre, ν=0.05, Δt/2): t=11.43s
+  Iter 1: Grid-vel error = 6.780117e-05
+    Timings [s]: advect=1.3, sort=0.0, build_B=0.75, solve_raw=1.44 (lsqr_iters=103), energy=0.01, project=0.29, iter_total=3.79
+  Iter 2: Grid-vel error = 2.319442e-06
+    Timings [s]: advect=1.19, sort=0.02, build_B=0.73, solve_raw=1.44 (lsqr_iters=103), energy=0.01, project=0.28, iter_total=3.66
+  Iter 3: Grid-vel error = 1.217305e-07
+    Timings [s]: advect=1.22, sort=0.01, build_B=0.73, solve_raw=1.38 (lsqr_iters=103), energy=0.01, project=0.26, iter_total=3.62
+  Iter 4: Grid-vel error = 6.319628e-09
+    Timings [s]: advect=1.22, sort=0.0, build_B=0.73, solve_raw=1.35 (lsqr_iters=103), energy=0.01, project=0.29, iter_total=3.6
+  Strang half-diffusion (post) (ν=0.05): t=13.02s
+  [pressure kick enabled — div-consistent (FLIP/hybrid)] t=0.6s
+  Particle rebalance after solve: +93 / -104
+  Post Timings [s]: final_sort=0.0, final_rebalance=6.6, step_total=46.95
+Step 327/400  t≈1.6300  case=time_nel128_dt0.00500
