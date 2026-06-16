@@ -18,7 +18,8 @@ Set-Location $root
 # Defaults to the project root, where the file currently lives.
 $env:OUTPUT_DIR = $root.Path
 
-$env:COFLIP_CASE          = "von_karman_restart"
+# Case is selected by running cases/von_karman.jl; the restart env vars below
+# trigger its restart path (COFLIP_RESTART_VTU set => restart instead of fresh).
 $env:COFLIP_RESTART_VTU   = Join-Path $root "von_karman\vk_re150_vtk\particles_1398.vtu"
 $env:COFLIP_RESTART_STEP  = "1398"
 $env:COFLIP_FINAL_STEP    = "4901"
@@ -28,4 +29,4 @@ if (-not (Test-Path $env:COFLIP_RESTART_VTU)) {
     throw "Restart file not found: $($env:COFLIP_RESTART_VTU)"
 }
 
-julia --project=. CO-FLIP/CO-FLIP_periodic.jl
+julia --project=. CO-FLIP/cases/von_karman.jl

@@ -26,8 +26,8 @@ cd /home/opelegriartola/CO-FLIP/Mantis-CO-FLIP.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
 julia --project=. -e 'using Pkg; Pkg.develop(path="Mantis")'
 
-export COFLIP_CASE=tg_convergence
+# (case selected by which cases/*.jl file is run)
 export COFLIP_SWEEP_MODE=time
 export COFLIP_SWEEP_IDX=$SLURM_ARRAY_TASK_ID
 
-julia --project=. CO-FLIP/CO-FLIP_solver.jl
+julia --project=. CO-FLIP/cases/taylor_green_convergence.jl

@@ -25,6 +25,6 @@ cd /home/opelegriartola/CO-FLIP/Mantis-CO-FLIP.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
 julia --project=. -e 'using Pkg; Pkg.develop(path="Mantis")'
 
-export COFLIP_CASE=lid_cavity
+# (case selected by which cases/*.jl file is run)
 
-julia --project=. CO-FLIP/CO-FLIP_solver.jl
+julia --project=. CO-FLIP/cases/lid_cavity.jl

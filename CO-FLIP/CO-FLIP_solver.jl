@@ -186,37 +186,80 @@ function SimulationBuffers(num_particles_initial::Int, ndofs::Int, num_elements:
     )
 end
 
+# Neutral, self-contained defaults: a periodic decaying Taylor-Green vortex on
+# the 2π×2π box with no obstacle. The bare engine (`julia CO-FLIP_solver.jl`)
+# therefore runs a trivial sanity case. The result cases under `cases/` each
+# build their own full SimulationConfig and do not rely on these defaults.
 Base.@kwdef struct SimulationConfig
-    nel::NTuple{2,Int}                = (96, 64)
+    nel::NTuple{2,Int}                = (64, 64)
     p::NTuple{2,Int}                  = (3, 3)
     k::NTuple{2,Int}                  = (1, 1)
-    box_size::NTuple{2,Float64}       = (40, 20)
+    box_size::NTuple{2,Float64}       = (2π, 2π)
     starting_point::NTuple{2,Float64} = (0.0, 0.0)
-    boundary_condition::Union{Symbol, NTuple{2,Symbol}, NTuple{4,Symbol}} = (:inlet, :outlet, :periodic, :periodic)
+    # Domain boundary conditions. Accepts a single Symbol (applied to all four
+    # sides), an NTuple{2,Symbol} (per-axis: x, y), or an NTuple{4,Symbol}
+    # (per-side: left, right, bottom, top = x-min, x-max, y-min, y-max). An axis
+    # must be :periodic on both its sides or on neither. See `normalize_bc`.
+    # Valid side tags (`VALID_BC_SIDES`):
+    #   :periodic → wrap-around (B-splines wrap the whole axis).
+    #   :wall     → no-penetration (u·n = 0) pinned strongly at the operator
+    #               level; tangential slip is free unless a case re-stamps it
+    #               (e.g. the lid-cavity Brinkman band).
+    #   :inlet    → prescribed normal-inflow trace (driven by `inlet_U_inf`).
+    #   :outlet   → free / do-nothing outflow (natural ∂p/∂n = 0); particles
+    #               that drift past it are culled.
+    #   :farfield → open boundary; operator-identical to :outlet, but also
+    #               replenishes depleted edge cells from `farfield_velocity`.
+    boundary_condition::Union{Symbol, NTuple{2,Symbol}, NTuple{4,Symbol}} = :periodic
     inlet_U_inf::Float64              = 1.0
-    # --- Far-field open-boundary parameters ---
-    # Active only on sides tagged `:farfield`. `farfield_velocity` is the
-    # uniform-stream velocity used to top up depleted top/bottom-row cells
-    # (see `enforce_farfield_particles!`) — existing particles are *not*
-    # touched, so no fake boundary layer is introduced. Set to (0.0, 0.0)
-    # to skip particle replenishment.
     farfield_velocity::NTuple{2,Float64} = (0.0, 0.0)
-    # Number of cells along the farfield edge to pin v=0 at the inlet-touching
-    # corners. Stabilises the projection where the inlet's strong Dirichlet
-    # u-trace meets the open v-trace. Set to 0 to disable.
     farfield_corner_pin_cells::Int       = 4
-    obstacle::Union{Nothing,NamedTuple} = (kind=:cylinder, center=(10.0, 10.0), radius=1.0)
+    obstacle::Union{Nothing,NamedTuple} = nothing
     particles_per_cell::Int           = 10
     stratified_seeding::Bool          = true
+    # How each particle's carried volume (its P2G least-squares quadrature
+    # weight) is set:
+    #   :physical  → equal share of the physical cell area, vol = Lx·Ly/Nₚ, so
+    #                Σ vol = domain area (default; matches the L2 inner product).
+    #   :reference → unit/parametric convention, vol = 1/particles_per_cell.
+    # (Ignored when seeding with `seeding_mode = :gauss_legendre`, which sets
+    #  the volume from the Gauss-Legendre quadrature weights instead.)
     volume_convention::Symbol         = :physical
     rng_seed::Union{Int,Nothing}      = nothing
-    flow_type::Symbol                 = :cylinder
+    # Initial velocity field used to seed the particles (see `initial_velocity`):
+    #   :tg          → Taylor-Green vortex (steady array of counter-rotating cells)
+    #   :decaying_tg → viscous decaying Taylor-Green (has an analytic NS solution;
+    #                  used by the TG validation / convergence cases)
+    #   :vortex      → single Lamb-Oseen vortex
+    #   :gyre        → double-gyre
+    #   :decay       → compactly-supported decaying (single Gaussian-core) vortex
+    #   :convecting  → vortex convected by a uniform stream
+    #   :merging     → two like-signed vortices that merge
+    #   :uniform     → uniform free stream (U_inf, 0)
+    #   :zero        → quiescent / zero velocity (lid-cavity start state)
+    #   :shear       → double shear layer + single-mode perturbation (KH roll-up)
+    #   :kh          → Kelvin-Helmholtz shear layer
+    #   :dipole      → counter-rotating Lamb-Oseen pair (self-propelling dipole)
+    #   :leapfrog    → four coaxial vortices (two stacked dipoles) that leapfrog
+    #   :four_vortex → four alternating-sign vortices (net Γ = 0 symmetry test)
+    #   :stuart      → Stuart vortex (exact 2D-Euler travelling wave)
+    #   :cylinder    → uniform inflow past the configured cylinder `obstacle`
+    flow_type::Symbol                 = :decaying_tg
     target_cfl::Float64               = 0.5
-    T_final::Float64                  = 40.0
-    viscosity::Float64                = 0.02
+    T_final::Float64                  = 10.0
+    viscosity::Float64                = 0.05
     # :lie  → full advection then full diffusion (1st order in time).
     # :strang → half-diffusion → full advection → half-diffusion (2nd order).
     viscosity_splitting::Symbol       = :strang
+    # Time integration of the viscous (diffusion) sub-step:
+    # :backward_euler → implicit Euler, (M + ν·Δt·L)·f = M·fⁿ. 1st order,
+    #                   L-stable / very robust (default — preserves the legacy
+    #                   behaviour of every existing case).
+    # :crank_nicolson → (M + ν·Δt/2·L)·fⁿ⁺¹ = (M − ν·Δt/2·L)·fⁿ. 2nd order;
+    #                   required for the Strang split to actually reach order 2.
+    #                   A-stable (not L-stable), so under-resolved stiff
+    #                   diffusion can ring — prefer for smooth/verified cases.
+    viscous_time_scheme::Symbol       = :backward_euler
     max_fp_iter::Int                  = 4
     fp_tol::Float64                   = 1e-7
     enable_energy_correction::Bool    = true
@@ -240,6 +283,10 @@ Base.@kwdef struct SimulationConfig
     cfl_recheck_tolerance::Float64    = 0.3
     cfl_adaptive::Bool                = true
     projection_mean_subtract::Bool    = true
+    # Time integrator for the particle pull-back advection sub-step:
+    #   :rk2 → 2nd-order Runge-Kutta pull-back (default; cheaper).
+    #   :rk4 → 4th-order Runge-Kutta pull-back (more accurate, ~2× the flow-map
+    #          evaluations per step).
     advection_time_integrator::Symbol = :rk2
     # How the output/diagnostic vorticity 0-form is computed from the velocity:
     #   :strong — pointwise exterior-calculus relation ω = ⋆d⋆u, evaluated
@@ -250,6 +297,20 @@ Base.@kwdef struct SimulationConfig
     #             zero for periodic BCs). The mass-matrix solve smooths the field.
     # See `compute_vorticity_form`.
     vorticity_method::Symbol          = :strong
+end
+
+"""
+    reconfigure(cfg::SimulationConfig; overrides...)
+
+Return a copy of `cfg` with the named fields replaced by `overrides`. Lets a
+case file keep one fully-specified base `SimulationConfig` and vary just the
+field(s) that change between runs — e.g. an inviscid control (`viscosity=0`)
+or a mesh/particle sweep (`nel`, `particles_per_cell`).
+"""
+function reconfigure(cfg::SimulationConfig; overrides...)
+    fns  = fieldnames(SimulationConfig)
+    base = NamedTuple{fns}(map(f -> getfield(cfg, f), fns))
+    return SimulationConfig(; merge(base, values(overrides))...)
 end
 
 """Promote coefficient type for field probe output."""
@@ -3452,10 +3513,16 @@ saddle-point system
     ⎣  G         -M_R0    ⎦ ⎣  q  ⎦ = ⎣     0     ⎦
 
 where q ≈ M_R0⁻¹·G·f_new is the discrete physical vorticity at the new step.
-Eliminating q yields (M_R1 + ν·Δt·Gᵀ·M_R0⁻¹·G)·f_new = M_R1·f_in.
+Eliminating q yields (M_R1 + a·Gᵀ·M_R0⁻¹·G)·f_new = rhs_top.
 
-The system is reassembled each call because ν·Δt changes under adaptive CFL,
-then factorised with `lu` and solved. Wall DOFs (R1 only) are pinned to zero to
+`scheme` selects the time discretisation of the diffusion operator (the L block):
+  - `:backward_euler`  → a = ν·Δt,   rhs_top = M_R1·f_in.            (1st order)
+  - `:crank_nicolson`  → a = ν·Δt/2, rhs_top = (M_R1 − a·L)·f_in.    (2nd order)
+    The L·f_in term reuses the cached `domain.R0_Mass_fact` (no extra
+    factorisation): solve M_R0·w = G·f_in, then L·f_in = Gᵀ·w.
+
+The system is reassembled each call because a changes under adaptive CFL, then
+factorised with `lu` and solved. Wall DOFs (R1 only) are pinned to zero to
 preserve free-slip BCs. Returns f_out, overwriting it.
 """
 function apply_viscous_diffusion_feec!(
@@ -3463,9 +3530,14 @@ function apply_viscous_diffusion_feec!(
         f_in::AbstractVector{Float64},
         domain::Domain,
         ν::Float64,
-        dt::Float64,
+        dt::Float64;
+        scheme::Symbol = :backward_euler,
     )
     ν <= 0.0 && (copyto!(f_out, f_in); return f_out)
+    if scheme !== :backward_euler && scheme !== :crank_nicolson
+        throw(ArgumentError(
+            "viscous_time_scheme must be :backward_euler or :crank_nicolson, got $scheme"))
+    end
 
     M_R1 = domain.Mass_matrix
     M_R0 = domain.R0_Mass_matrix
@@ -3473,12 +3545,19 @@ function apply_viscous_diffusion_feec!(
 
     n_R1 = size(M_R1, 1)
     n_R0 = size(M_R0, 1)
-    νdt  = ν * dt
+    a    = scheme === :crank_nicolson ? ν * dt / 2 : ν * dt
 
-    A_sys = [ M_R1                 νdt .* transpose(G);
-              G                    -M_R0               ]
+    A_sys = [ M_R1                 a .* transpose(G);
+              G                    -M_R0             ]
 
-    rhs = vcat(M_R1 * f_in, zeros(n_R0))
+    # rhs_top = (M_R1 − a·L)·f_in for Crank–Nicolson, M_R1·f_in for backward Euler.
+    rhs_top = M_R1 * f_in
+    if scheme === :crank_nicolson
+        w = domain.R0_Mass_fact \ (G * f_in)   # w = M_R0⁻¹·G·f_in
+        rhs_top .-= a .* (transpose(G) * w)    # − a·Gᵀ·w = − a·L·f_in
+    end
+
+    rhs = vcat(rhs_top, zeros(n_R0))
 
     homog = domain.homogeneous_dofs_R1
     dir   = domain.dirichlet_dofs_R1
@@ -3715,6 +3794,42 @@ function apply_pic_blend!(
 
             p.mx[i] = (1.0 - alpha) * p.mx[i] + alpha * u_g
             p.my[i] = (1.0 - alpha) * p.my[i] + alpha * v_g
+        end
+    end
+    return nothing
+end
+
+"""
+FLIP-transfer a full R1 velocity-field *increment* onto particle momenta.
+
+Unlike `apply_pic_blend!` (which blends particle momenta *toward* a grid field,
+discarding sub-grid FLIP fluctuations), this adds the entire increment carried by
+`delta_coeffs` to every particle, preserving the fluctuations. Used by the Strang
+pre-diffusion half-step so the inviscid advection that follows transports the
+*diffused* momenta: the same ★ rotation as `apply_pic_blend!` maps the raw R1
+probe `(du, dv)` to the physical-velocity increment `(-dv, du)`.
+"""
+function flip_transfer_field_delta!(
+        p::Particles,
+        delta_coeffs::AbstractVector{Float64},
+        d::Domain,
+        thread_caches::Vector{EvaluationCache},
+    )
+    if isempty(thread_caches)
+        throw(ArgumentError("thread_caches must not be empty"))
+    end
+    n_thread_slots = Threads.maxthreadid()
+    if length(thread_caches) < n_thread_slots
+        throw(ArgumentError("thread_caches length must be at least Threads.maxthreadid()"))
+    end
+
+    num_p = length(p.x)
+    Threads.@threads :static for i in 1:num_p
+        cache = thread_caches[Threads.threadid()]
+        @inbounds begin
+            draw, _ = probe_field_at_point(p.x[i], p.y[i], delta_coeffs, d, cache)
+            p.mx[i] += -draw[2]
+            p.my[i] +=  draw[1]
         end
     end
     return nothing
@@ -4374,6 +4489,31 @@ function step_co_flip!(
     num_p = length(p.x)
     ensure_particle_capacity!(buf, num_p)
 
+    # --- Strang splitting: half-step viscous diffusion BEFORE the inviscid solve ---
+    # Diffuse the grid field by Δt/2, then FLIP-transfer the resulting increment
+    # onto the particle momenta so the inviscid advection below transports the
+    # *diffused* state. This must happen before the mx_n/my_n capture: the field
+    # f_np1 is reconstructed (LSQR) from the advected particle momenta, so if the
+    # particles stayed undiffused while f_n_saved was diffused, the energy
+    # correction (baseline f_n_saved) and the midpoint f_star would be
+    # inconsistent with the carried momenta — that mismatch injects spurious
+    # energy every step and made the Strang sweep diverge. The trailing half-step
+    # is applied after the FP loop below. No-op for :lie splitting.
+    if cfg.viscosity > 0.0 && cfg.viscosity_splitting === :strang
+        t0 = time()
+        f_pre_diff = copy(f_n_saved)
+        apply_viscous_diffusion_feec!(f_n_saved, f_n_saved, d, cfg.viscosity, dt / 2;
+                                      scheme=cfg.viscous_time_scheme)
+        f_n_saved_h = Forms.build_form_field(d.R1, f_n_saved)
+        proj_pre = project_and_get_pressure(d, f_n_saved_h, buf;
+                       subtract_mean=cfg.projection_mean_subtract)
+        copy!(f_n_saved, proj_pre)
+        @inbounds @. f_pre_diff = f_n_saved - f_pre_diff
+        flip_transfer_field_delta!(p, f_pre_diff, d, buf.thread_caches)
+        println("  Strang half-diffusion (pre, ν=$(cfg.viscosity), Δt/2): " *
+                "t=$(round(time()-t0, digits=2))s")
+    end
+
     x_n  = buf.x_n;   y_n  = buf.y_n
     mx_n = buf.mx_n;  my_n = buf.my_n
     @inbounds for i in 1:num_p
@@ -4389,22 +4529,6 @@ function step_co_flip!(
     f_np1_raw       = buf.f_np1_raw
     f_np1_proj      = buf.f_np1_proj
     f_np1_proj_prev = buf.f_np1_proj_prev
-
-    # --- Strang splitting: half-step viscous diffusion before the inviscid solve ---
-    # Diffuses f_n_saved by Δt/2 so the FP loop integrates the inviscid dynamics
-    # from the half-diffused state. The trailing half-step is applied after the
-    # FP loop below. Re-projects to clean up the small numerical divergence the
-    # saddle-point solve can introduce. No-op for :lie splitting.
-    if cfg.viscosity > 0.0 && cfg.viscosity_splitting === :strang
-        t0 = time()
-        apply_viscous_diffusion_feec!(f_n_saved, f_n_saved, d, cfg.viscosity, dt / 2)
-        f_n_saved_h = Forms.build_form_field(d.R1, f_n_saved)
-        proj_pre = project_and_get_pressure(d, f_n_saved_h, buf;
-                       subtract_mean=cfg.projection_mean_subtract)
-        copy!(f_n_saved, proj_pre)
-        println("  Strang half-diffusion (pre, ν=$(cfg.viscosity), Δt/2): " *
-                "t=$(round(time()-t0, digits=2))s")
-    end
 
     copy!(f_star, f_n_saved)
     copy!(f_np1_proj_prev, f_star)
@@ -4570,7 +4694,8 @@ function step_co_flip!(
             f_np1_proj,
             d,
             cfg.viscosity,
-            diff_dt,
+            diff_dt;
+            scheme=cfg.viscous_time_scheme,
         )
         f_np1_proj_h = Forms.build_form_field(d.R1, f_np1_proj)
         proj_after_diff = project_and_get_pressure(d, f_np1_proj_h, buf;
@@ -5195,8 +5320,15 @@ function run_diagnostic_simulation(
         end
 
         if sample_callback !== nothing && !isempty(sample_times)
+            # Tolerance so a sample requested at exactly T_final still fires on
+            # the final step: t_now is accumulated via repeated `+= dt`, and for
+            # some dt the sum lands a few ULP *below* the target (e.g. 400×0.005
+            # → 1.99999999999998), which a bare `>=` would miss. The drift is
+            # ~N·eps (≲1e-12 here), far smaller than any dt, so this never fires
+            # a sample meaningfully early.
+            samp_tol = 1e-9
             @inbounds for s in eachindex(sample_times)
-                if !sample_done[s] && t_now >= sample_times[s]
+                if !sample_done[s] && t_now >= sample_times[s] - samp_tol
                     sample_callback(t_now, u_coeffs, domain, particles, step)
                     sample_done[s] = true
                 end
@@ -5229,1582 +5361,6 @@ function run_diagnostic_simulation(
             sample_times=sample_times, sample_done=sample_done)
 end
 
-"""
-L2 error of a CO-FLIP grid velocity field against the analytical decaying
-Taylor–Green solution.
-
-The exact Navier–Stokes solution on the 2π×2π box with U₀=1 and unit
-wavenumbers is
-
-    u_e(x,y,t) =  sin(x)·cos(y)·exp(-ν·(kx²+ky²)·t)
-    v_e(x,y,t) = -cos(x)·sin(y)·exp(-ν·(kx²+ky²)·t)
-
-with kx=ky=2π/L. The discrete R1 form is first L2-projected onto the
-physical-velocity R1 space via `★`, matching the visualisation pipeline
-used everywhere else in CO-FLIP. The error is then computed by
-`Analysis.L2_norm(u_phys_form - u_exact, dΩ_err)` against an
-`AnalyticalFormField` representing the physical Taylor–Green velocity,
-using a finer Gauss–Legendre quadrature than the assembly `dΩ`
-(`(p + nq_extra)` points per direction).
-
-Returns `(l2_err, rel_l2_err, l2_norm_exact)`.
-"""
-function compute_decaying_tg_l2_error(
-        domain::Domain, u_coeffs::AbstractVector{Float64},
-        t::Float64, viscosity::Float64;
-        nq_extra::Int=2,
-    )
-    Lx, Ly = domain.box_size
-    kx = 2π / Lx
-    ky = 2π / Ly
-    decay = exp(-viscosity * (kx^2 + ky^2) * t)
-    U0    = 1.0
-
-    u_form      = Forms.build_form_field(domain.R1, u_coeffs)
-    u_phys_expr = ★(u_form)
-    u_phys_form = Assemblers.solve_L2_projection(domain.R1, u_phys_expr, domain.dΩ)
-
-    expr = function (X::Matrix{Float64})
-        xs = @view X[:, 1]
-        ys = @view X[:, 2]
-        c1 = @.  decay * U0 * sin(kx * xs) * cos(ky * ys)   # physical u
-        c2 = @. -decay * U0 * cos(kx * xs) * sin(ky * ys)   # physical v
-        return [c1, c2]
-    end
-    u_exact = Forms.AnalyticalFormField(1, expr, domain.geo, "u_TG")
-
-    p1, p2 = domain.p
-    nq_err = (p1 + nq_extra, p2 + nq_extra)
-    dΩ_err = Quadrature.StandardQuadrature(
-        Quadrature.tensor_product_rule(nq_err, Quadrature.gauss_legendre),
-        prod(domain.nel),
-    )
-
-    l2_err     = Analysis.L2_norm(u_phys_form - u_exact, dΩ_err)
-    l2_norm_ex = Analysis.L2_norm(u_exact, dΩ_err)
-    rel_l2_err = l2_err / max(l2_norm_ex, eps())
-
-    return (l2_err=l2_err, rel_l2_err=rel_l2_err, l2_norm_exact=l2_norm_ex)
-end
-
-"""
-Estimate the dominant frequency of a probe v(t) signal via a brute-force
-periodogram over candidate frequencies. Returns `(f, St, power)` where
-`St = f·D/U_inf` is the Strouhal number. Uses the second half of the
-record by default to skip the start-up transient.
-
-This is intentionally simple (no FFTW dependency). For a thesis-quality
-spectrum the user should re-process the saved probe CSV in
-Python/MATLAB; this estimate is meant as an in-run sanity check.
-"""
-function estimate_strouhal_from_v_signal(
-        ts::Vector{Float64}, vs::Vector{Float64};
-        U_inf::Float64=1.0, D::Float64=2.0,
-        skip_fraction::Float64=0.5, n_freq::Int=4096,
-    )
-    n  = length(ts)
-    n  >= 16 || return (f=NaN, St=NaN, power=0.0)
-    n1 = max(1, floor(Int, skip_fraction * n))
-    t_seg = ts[n1:end]
-    v_seg = vs[n1:end]
-    Nu = length(t_seg)
-    t0, tf = first(t_seg), last(t_seg)
-    window = tf - t0
-    window > 0 || return (f=NaN, St=NaN, power=0.0)
-    dt_avg = window / max(Nu - 1, 1)
-
-    v_mean = sum(v_seg) / Nu
-    v_c    = v_seg .- v_mean
-
-    f_min = 1.0 / window
-    f_max = 0.5 / dt_avg
-    f_max <= f_min && return (f=NaN, St=NaN, power=0.0)
-
-    df    = (f_max - f_min) / (n_freq - 1)
-    best_power = 0.0
-    best_f     = f_min
-    for k in 0:(n_freq - 1)
-        f = f_min + k * df
-        ω = 2π * f
-        a = 0.0;  b = 0.0
-        @inbounds for j in 1:Nu
-            tj = t_seg[j]
-            a += v_c[j] * cos(ω * tj)
-            b += v_c[j] * sin(ω * tj)
-        end
-        power = a*a + b*b
-        if power > best_power
-            best_power = power
-            best_f     = f
-        end
-    end
-    return (f=best_f, St=best_f * D / U_inf, power=best_power)
-end
-
-"""
-Comprehensive validation of the FEEC viscous diffusion implementation against
-the decaying Taylor–Green vortex.
-
-For the 2π×2π periodic box with U₀=1, kx=ky=1 the exact Navier–Stokes solution is
-
-    u(x,y,t) =  sin(x)·cos(y)·exp(-2νt)
-    v(x,y,t) = -cos(x)·sin(y)·exp(-2νt)
-    ω(x,y,t) =  2·sin(x)·sin(y)·exp(-2νt)
-
-with conserved-but-decaying integrals
-
-    E(t) = E₀ · exp(-2ν·(kx²+ky²)·t)         (E₀ = π² for these constants)
-    Z(t) = Z₀ · exp(-2ν·(kx²+ky²)·t)         (Z₀ = 2π²)
-    Γ    ≡ 0                                  (periodic ⇒ zero circulation)
-
-Runs:
-  1. Viscous case (cfg.viscosity = `viscosity`, decaying_tg IC, periodic BCs)
-  2. Inviscid baseline (ν = 0) — should preserve energy within CO-FLIP's usual
-     conservation tolerance, isolating numerical drift from viscous dissipation.
-
-Reports:
-  • Initial E and Z vs analytical π² and 2π².
-  • Per-step relative error of E(t), Z(t) vs the analytical exponential.
-  • Best-fit decay rate from log-linear regression of E and Z, compared to
-    the analytical 2ν(kx²+ky²).
-  • Circulation drift (should remain ≈ 0).
-  • Inviscid control drift (sanity check that ν=0 → no extra decay).
-
-Saves a CSV of (t, E_num, E_exact, Z_num, Z_exact, Γ) and a 3-panel plot of
-E, Z, and log(E) vs time in `output_dir`.
-
-Returns a NamedTuple with all numerics for downstream automated checks.
-"""
-function test_decaying_taylor_green(;
-        nel::NTuple{2,Int}=(96, 96),
-        particles_per_cell::Int=16,
-        viscosity::Float64=0.2,
-        T_final::Float64=10.0,
-        target_cfl::Float64=0.5,
-        output_dir::String="decaying_tg_test",
-        save_vtk::Bool=true,
-        run_inviscid_baseline::Bool=true,
-    )
-    mkpath(output_dir)
-
-    println("\n========== DECAYING TAYLOR-GREEN VISCOUS VALIDATION ==========")
-    @printf("  nel = %s, particles/cell = %d\n", string(nel), particles_per_cell)
-    @printf("  ν   = %.6g, T_final = %.3f, target_cfl = %.3f\n",
-            viscosity, T_final, target_cfl)
-
-    box_size = (2π, 2π)
-    kx, ky   = 1.0, 1.0
-    decay_rate_exact = 2 * viscosity * (kx^2 + ky^2)      # exponent for E and Z
-    E_exact_init     = π^2                                # ½∫|u₀|² over 2π×2π
-    Z_exact_init     = 2 * π^2                            # ½∫ω₀² (ω₀ = 2 sin x sin y)
-
-    println("\n--- Running viscous case (ν=$(viscosity)) ---")
-    cfg_v = SimulationConfig(;
-        flow_type           = :decaying_tg,
-        boundary_condition  = :periodic,
-        obstacle            = nothing,
-        viscosity           = viscosity,
-        T_final             = T_final,
-        nel                 = nel,
-        particles_per_cell  = particles_per_cell,
-        target_cfl          = target_cfl,
-        box_size            = box_size,
-        output_every        = 0,
-    )
-    result_v = run_diagnostic_simulation(cfg_v;
-        save_vtk     = save_vtk,
-        output_dir   = joinpath(output_dir, "viscous"),
-        record_every = 1,
-        case_name    = "decaying_tg_viscous",
-    )
-
-    result_inv = nothing
-    if run_inviscid_baseline
-        println("\n--- Running inviscid baseline (ν=0.0) ---")
-        cfg_inv = SimulationConfig(;
-            flow_type           = :decaying_tg,
-            boundary_condition  = :periodic,
-            obstacle            = nothing,
-            viscosity           = 0.0,
-            T_final             = T_final,
-            nel                 = nel,
-            particles_per_cell  = particles_per_cell,
-            target_cfl          = target_cfl,
-            box_size            = box_size,
-            output_every        = 0,
-        )
-        result_inv = run_diagnostic_simulation(cfg_inv;
-            save_vtk     = true,
-            output_dir   = joinpath(output_dir, "inviscid"),
-            record_every = 1,
-            case_name    = "decaying_tg_inviscid",
-        )
-    end
-
-    ts      = [hi.t           for hi in result_v.history]
-    E_num   = [hi.energy      for hi in result_v.history]
-    Z_num   = [hi.enstrophy   for hi in result_v.history]
-    Γ_num   = [hi.circulation for hi in result_v.history]
-    E_exact = [E_num[1] * exp(-decay_rate_exact * t) for t in ts]
-    Z_exact = [Z_num[1] * exp(-decay_rate_exact * t) for t in ts]
-
-    E0_err       = abs(E_num[1] - E_exact_init) / E_exact_init
-    Z0_err       = abs(Z_num[1] - Z_exact_init) / Z_exact_init
-    E_final_err  = abs(E_num[end] - E_exact[end]) / E_exact[end]
-    Z_final_err  = abs(Z_num[end] - Z_exact[end]) / Z_exact[end]
-    rel_err_E    = [abs(E_num[i] - E_exact[i]) / E_exact[i] for i in eachindex(ts)]
-    rel_err_Z    = [abs(Z_num[i] - Z_exact[i]) / Z_exact[i] for i in eachindex(ts)]
-    mean_err_E   = sum(rel_err_E) / length(rel_err_E)
-    mean_err_Z   = sum(rel_err_Z) / length(rel_err_Z)
-    max_err_E    = maximum(rel_err_E)
-    max_err_Z    = maximum(rel_err_Z)
-    Γ_max_abs    = maximum(abs.(Γ_num))
-
-    # Best-fit decay rate from log-linear regression (slope of log(y) vs t).
-    fit_log_slope = function (t, y)
-        n     = length(t)
-        ly    = log.(max.(y, 1e-300))
-        tbar  = sum(t) / n
-        ybar  = sum(ly) / n
-        num   = sum((t .- tbar) .* (ly .- ybar))
-        den   = sum((t .- tbar).^2)
-        return num / den
-    end
-    slope_E_fit  = -fit_log_slope(ts, E_num)
-    slope_Z_fit  = -fit_log_slope(ts, Z_num)
-    slope_err_E  = abs(slope_E_fit - decay_rate_exact) / max(decay_rate_exact, eps())
-    slope_err_Z  = abs(slope_Z_fit - decay_rate_exact) / max(decay_rate_exact, eps())
-
-    inviscid_E_drift = nothing
-    inviscid_Z_drift = nothing
-    if !isnothing(result_inv)
-        E_inv = [hi.energy    for hi in result_inv.history]
-        Z_inv = [hi.enstrophy for hi in result_inv.history]
-        inviscid_E_drift = abs(E_inv[end] - E_inv[1]) / max(abs(E_inv[1]), eps())
-        inviscid_Z_drift = abs(Z_inv[end] - Z_inv[1]) / max(abs(Z_inv[1]), eps())
-    end
-
-    println("\n========== VALIDATION REPORT ==========")
-    @printf("Analytical decay rate (energy & enstrophy): %.6f  (half-life %.3f)\n",
-            decay_rate_exact, decay_rate_exact > 0 ? log(2)/decay_rate_exact : Inf)
-    println()
-    @printf("Initial energy:      num=%.6e | exact=%.6e | rel err=%.3e\n",
-            E_num[1], E_exact_init, E0_err)
-    @printf("Initial enstrophy:   num=%.6e | exact=%.6e | rel err=%.3e\n",
-            Z_num[1], Z_exact_init, Z0_err)
-    println()
-    @printf("Final energy:        num=%.6e | exact=%.6e | rel err=%.3e\n",
-            E_num[end], E_exact[end], E_final_err)
-    @printf("Final enstrophy:     num=%.6e | exact=%.6e | rel err=%.3e\n",
-            Z_num[end], Z_exact[end], Z_final_err)
-    println()
-    @printf("Fit decay rate E:    %.6f  (target %.6f, rel err %.3e)\n",
-            slope_E_fit, decay_rate_exact, slope_err_E)
-    @printf("Fit decay rate Z:    %.6f  (target %.6f, rel err %.3e)\n",
-            slope_Z_fit, decay_rate_exact, slope_err_Z)
-    println()
-    @printf("Mean rel err E(t):   %.3e   (max %.3e)\n", mean_err_E, max_err_E)
-    @printf("Mean rel err Z(t):   %.3e   (max %.3e)\n", mean_err_Z, max_err_Z)
-    println()
-    if !isnothing(inviscid_E_drift)
-        @printf("Inviscid ΔE/E₀:      %.3e   (should be ≪ %.3e from viscosity)\n",
-                inviscid_E_drift, 1 - exp(-decay_rate_exact * T_final))
-        @printf("Inviscid ΔZ/Z₀:      %.3e\n", inviscid_Z_drift)
-    end
-    @printf("max |Γ| over run:    %.3e   (should be ≈ 0)\n", Γ_max_abs)
-
-    csv_path = joinpath(output_dir, "decaying_tg_diagnostics.csv")
-    open(csv_path, "w") do io
-        println(io, "t,E_num,E_exact,Z_num,Z_exact,circulation")
-        for i in eachindex(ts)
-            @printf(io, "%.10e,%.16e,%.16e,%.16e,%.16e,%.16e\n",
-                    ts[i], E_num[i], E_exact[i], Z_num[i], Z_exact[i], Γ_num[i])
-        end
-    end
-    println("\nSaved per-step CSV: $csv_path")
-
-    try
-        p_E = plot(ts, E_num, label="numerical", lw=2,
-                   xlabel="t", ylabel="energy",
-                   title="Decaying TG (ν=$(viscosity)): energy")
-        plot!(p_E, ts, E_exact, label="analytical exp(-$(round(decay_rate_exact,digits=4))·t)",
-              ls=:dash, lw=2)
-        if !isnothing(result_inv)
-            ts_i = [hi.t for hi in result_inv.history]
-            E_i  = [hi.energy for hi in result_inv.history]
-            plot!(p_E, ts_i, E_i, label="inviscid (ν=0)", ls=:dot, lw=1.5)
-        end
-
-        p_Z = plot(ts, Z_num, label="numerical", lw=2,
-                   xlabel="t", ylabel="enstrophy",
-                   title="Decaying TG: enstrophy")
-        plot!(p_Z, ts, Z_exact, label="analytical", ls=:dash, lw=2)
-
-        p_logE = plot(ts, log.(max.(E_num, 1e-300)), label="log(E_num)", lw=2,
-                      xlabel="t", ylabel="log(E)",
-                      title="log-energy slope ≈ -$(round(slope_E_fit,digits=4)) (target -$(round(decay_rate_exact,digits=4)))")
-        plot!(p_logE, ts, log.(E_exact), label="log(E_exact)", ls=:dash, lw=2)
-
-        layout = plot(p_E, p_Z, p_logE, layout=(3, 1), size=(800, 1000))
-        plot_path = joinpath(output_dir, "decaying_tg_decay.png")
-        savefig(layout, plot_path)
-        println("Saved plot:         $plot_path")
-    catch err
-        @warn "Plot save failed (continuing)" exception=err
-    end
-
-    return (
-        history          = result_v.history,
-        ts               = ts,
-        E_num            = E_num,
-        E_exact          = E_exact,
-        Z_num            = Z_num,
-        Z_exact          = Z_exact,
-        circulation      = Γ_num,
-        decay_rate_exact = decay_rate_exact,
-        decay_rate_fit_E = slope_E_fit,
-        decay_rate_fit_Z = slope_Z_fit,
-        slope_err_E      = slope_err_E,
-        slope_err_Z      = slope_err_Z,
-        E0_err           = E0_err,
-        Z0_err           = Z0_err,
-        E_final_err      = E_final_err,
-        Z_final_err      = Z_final_err,
-        mean_err_E       = mean_err_E,
-        max_err_E        = max_err_E,
-        mean_err_Z       = mean_err_Z,
-        max_err_Z        = max_err_Z,
-        Γ_max_abs        = Γ_max_abs,
-        inviscid_E_drift = inviscid_E_drift,
-        inviscid_Z_drift = inviscid_Z_drift,
-        result_viscous   = result_v,
-        result_inviscid  = result_inv,
-    )
-end
-
-# ============================================================================
-# THESIS RESULT CASES
-# ============================================================================
-# Three thesis-oriented test functions plus an env-driven dispatcher at the
-# bottom of the file. Each function runs **one** independent simulation
-# point and writes its CSV/VTK output under `output_dir`; the user submits
-# multiple cluster jobs (typically a SLURM job array) to fill out a sweep.
-
-const TG_NEL_SPACE_SWEEP    = (32, 48, 64, 96, 128)
-const TG_DT_TIME_SWEEP      = (0.04, 0.02, 0.01, 0.005, 0.0025)
-const TG_FIXED_NEL_FOR_TIME = 128
-const TG_FIXED_DT_FOR_SPACE = 0.005
-
-# Double-shear-layer mesh/particle-density sweep. Each entry is one
-# independent simulation point `(nel, particles_per_cell)`; a SLURM job
-# array (1:6) fills out the whole grid in parallel. Three mesh sizes
-# (40², 96², 128²) crossed with two particle densities (10, 20 ppc).
-const SHEAR_LAYER_SWEEP = (
-    (40,  10), (96,  10), (128, 10),
-    (40,  20), (96,  20), (128, 20),
-)
-
-"""
-Run ONE point of the decaying Taylor-Green convergence study.
-
-`mode` selects whether this run is part of the spatial sweep (fixed dt,
-varying nel) or the temporal sweep (fixed nel, varying dt). `sweep_idx`
-picks the point within the corresponding sweep array
-(`TG_NEL_SPACE_SWEEP` / `TG_DT_TIME_SWEEP`).
-
-Each run samples the L2 velocity error against the analytical viscous
-Navier-Stokes solution at `t=2` and `t=5`, and writes a CSV with one
-row per sample plus a per-step history CSV. Cluster post-processing
-should gather every `*_errors.csv` from one sweep and plot the resulting
-convergence curve.
-
-Defaults: ν=0.05 on the 2π×2π periodic box, T_final=5.0, p=(3,3) splines,
-CFL adaptation off (so dt is constant across all spatial-sweep points).
-"""
-function test_decaying_tg_convergence(;
-        mode::Symbol = :space,
-        sweep_idx::Int = 1,
-        output_dir::String = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "tg_convergence"),
-        viscosity::Float64 = 0.05,
-        T_final::Float64 = 5.0,
-        sample_times::Vector{Float64} = [2.0, 5.0],
-        nel_space_sweep = TG_NEL_SPACE_SWEEP,
-        dt_time_sweep   = TG_DT_TIME_SWEEP,
-        fixed_nel_for_time::Int   = TG_FIXED_NEL_FOR_TIME,
-        fixed_dt_for_space::Float64 = TG_FIXED_DT_FOR_SPACE,
-        particles_per_cell::Int = 16,
-        save_vtk::Bool = false,
-        save_vtk_at_samples::Bool = true,
-        nq_extra::Int = 2,
-    )
-    mkpath(output_dir)
-    box_size = (2π, 2π)
-
-    if mode === :space
-        1 <= sweep_idx <= length(nel_space_sweep) ||
-            error("sweep_idx=$sweep_idx out of range for space sweep (1:$(length(nel_space_sweep)))")
-        nel_val = nel_space_sweep[sweep_idx]
-        dt_val  = fixed_dt_for_space
-        run_label = @sprintf("space_nel%03d_dt%.5f", nel_val, dt_val)
-    elseif mode === :time
-        1 <= sweep_idx <= length(dt_time_sweep) ||
-            error("sweep_idx=$sweep_idx out of range for time sweep (1:$(length(dt_time_sweep)))")
-        nel_val = fixed_nel_for_time
-        dt_val  = dt_time_sweep[sweep_idx]
-        run_label = @sprintf("time_nel%03d_dt%.5f", nel_val, dt_val)
-    else
-        error("mode must be :space or :time, got $mode")
-    end
-
-    println("\n========== DECAYING-TG CONVERGENCE ==========")
-    println(@sprintf("  mode=%s  sweep_idx=%d  →  nel=(%d,%d)  dt=%.5f  ν=%.4f  T=%.2f",
-                     mode, sweep_idx, nel_val, nel_val, dt_val, viscosity, T_final))
-    println("  Output dir: $output_dir")
-
-    cfg = SimulationConfig(;
-        flow_type           = :decaying_tg,
-        boundary_condition  = :periodic,
-        obstacle            = nothing,
-        viscosity           = viscosity,
-        T_final             = T_final,
-        nel                 = (nel_val, nel_val),
-        particles_per_cell  = particles_per_cell,
-        box_size            = box_size,
-        target_cfl          = 0.5,
-        cfl_adaptive        = false,
-        projection_mean_subtract = true,
-        output_every        = 0,
-    )
-
-    sample_records = NamedTuple[]
-    sample_cb = function (t, u_coeffs, domain, particles, step)
-        err  = compute_decaying_tg_l2_error(domain, u_coeffs, t, viscosity;
-                                            nq_extra=nq_extra)
-        diag = compute_conservation_diagnostics(u_coeffs, domain;
-                                                 vorticity_method=cfg.vorticity_method)
-        rec  = (t=t, step=step, nel=nel_val, dt=dt_val,
-                l2_err=err.l2_err, rel_l2_err=err.rel_l2_err,
-                l2_norm_exact=err.l2_norm_exact,
-                energy=diag.energy, enstrophy=diag.enstrophy,
-                circulation=diag.circulation)
-        push!(sample_records, rec)
-        @printf("  [SAMPLE] t=%.3f  L2_err=%.6e  rel_L2_err=%.6e  ||u_exact||=%.6e  E=%.6e  Z=%.6e\n",
-                t, err.l2_err, err.rel_l2_err, err.l2_norm_exact,
-                diag.energy, diag.enstrophy)
-
-        if save_vtk_at_samples
-            u_form      = Forms.build_form_field(domain.R1, u_coeffs; label="u_h")
-            u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
-            ω_h         = compute_vorticity_form(u_coeffs, u_phys_form, domain, cfg.vorticity_method)
-            t_tag = @sprintf("t%05.2f", t)
-            Plot.export_form_fields_to_vtk((u_form,),
-                run_label * "_u_" * t_tag; output_directory_tree=[output_dir])
-            Plot.export_form_fields_to_vtk((ω_h,),
-                run_label * "_w_" * t_tag; output_directory_tree=[output_dir])
-        end
-    end
-
-    result = run_diagnostic_simulation(cfg;
-        save_vtk        = save_vtk,
-        save_vtk_every  = 0,
-        output_dir      = joinpath(output_dir, run_label * "_history"),
-        record_every    = 5,
-        case_name       = run_label,
-        fixed_dt        = dt_val,
-        sample_times    = sample_times,
-        sample_callback = sample_cb,
-    )
-
-    csv_path = joinpath(output_dir, run_label * "_errors.csv")
-    open(csv_path, "w") do io
-        println(io, "mode,sweep_idx,nel,dt,viscosity,t,step,l2_err,rel_l2_err,l2_norm_exact,energy,enstrophy,circulation")
-        for r in sample_records
-            @printf(io, "%s,%d,%d,%.10e,%.10e,%.6f,%d,%.16e,%.16e,%.16e,%.16e,%.16e,%.16e\n",
-                    String(mode), sweep_idx, r.nel, r.dt, viscosity,
-                    r.t, r.step, r.l2_err, r.rel_l2_err, r.l2_norm_exact,
-                    r.energy, r.enstrophy, r.circulation)
-        end
-    end
-    println("Saved per-sample errors: $csv_path")
-
-    history_csv = joinpath(output_dir, run_label * "_history.csv")
-    open(history_csv, "w") do io
-        println(io, "t,energy,enstrophy,circulation")
-        for hi in result.history
-            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
-                    hi.t, hi.energy, hi.enstrophy, hi.circulation)
-        end
-    end
-    println("Saved per-step history: $history_csv")
-
-    return (result=result, records=sample_records, run_label=run_label,
-            csv_path=csv_path, history_csv=history_csv)
-end
-
-"""
-Run ONE point of the double-shear-layer benchmark (Bell-Colella-Glaz
-roll-up) on the periodic unit box, for a given mesh resolution and
-particle-per-cell density.
-
-`sweep_idx` indexes into `SHEAR_LAYER_SWEEP`, picking the
-`(nel, particles_per_cell)` pair for this run. A SLURM job array (1:6)
-covers the three mesh sizes (40², 96², 128²) × two densities (10, 20).
-
-The shear flow (`flow_shear`) is the classic two anti-parallel layers
-(thickness set by ρ=30) plus a single-mode `v`-perturbation (δ=0.05) that
-seeds the Kelvin-Helmholtz roll-up. Each run writes vorticity / velocity
-VTK frames every `save_vtk_every` steps so the roll-up can be visualised,
-plus a per-step energy/enstrophy/circulation history CSV. Comparing the
-frames across the sweep shows how mesh resolution and particle density
-affect the resolved vortex structure.
-
-Defaults: ν=1e-4 (Re≈10⁴) on the 1×1 periodic box, p=(3,3) splines, run
-to T_final=1.8 with adaptive CFL (target 0.5).
-"""
-function test_shear_layer(;
-        sweep_idx::Int = 1,
-        output_dir::String = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "shear_layer"),
-        viscosity::Float64 = 0.0,
-        T_final::Float64 = 3.0,
-        target_cfl::Float64 = 0.5,
-        box_size::NTuple{2,Float64} = (1.0, 1.0),
-        save_vtk_every::Int = 10,
-        record_every::Int = 1,
-        shear_sweep = SHEAR_LAYER_SWEEP,
-    )
-    1 <= sweep_idx <= length(shear_sweep) ||
-        error("sweep_idx=$sweep_idx out of range for shear-layer sweep (1:$(length(shear_sweep)))")
-    nel_val, ppc_val = shear_sweep[sweep_idx]
-
-    run_label = @sprintf("shear_nel%03d_ppc%02d", nel_val, ppc_val)
-    run_dir   = joinpath(output_dir, run_label)
-    mkpath(run_dir)
-
-    println("\n========== DOUBLE SHEAR LAYER ==========")
-    println(@sprintf("  sweep_idx=%d  →  nel=(%d,%d)  ppc=%d  ν=%.1e  T=%.2f  box=%s",
-                     sweep_idx, nel_val, nel_val, ppc_val, viscosity, T_final, string(box_size)))
-    println("  Output dir: $run_dir")
-
-    cfg = SimulationConfig(;
-        flow_type           = :shear,
-        boundary_condition  = :periodic,
-        obstacle            = nothing,
-        viscosity           = viscosity,
-        T_final             = T_final,
-        nel                 = (nel_val, nel_val),
-        particles_per_cell  = ppc_val,
-        box_size            = box_size,
-        target_cfl          = target_cfl,
-        cfl_adaptive        = true,
-        projection_mean_subtract = true,
-        output_every        = save_vtk_every,
-    )
-
-    result = run_diagnostic_simulation(cfg;
-        save_vtk        = true,
-        save_vtk_every  = save_vtk_every,
-        output_dir      = run_dir,
-        record_every    = record_every,
-        case_name       = run_label,
-    )
-
-    history_csv = joinpath(output_dir, run_label * "_history.csv")
-    open(history_csv, "w") do io
-        println(io, "nel,ppc,t,energy,enstrophy,circulation")
-        for hi in result.history
-            @printf(io, "%d,%d,%.10e,%.16e,%.16e,%.16e\n",
-                    nel_val, ppc_val, hi.t, hi.energy, hi.enstrophy, hi.circulation)
-        end
-    end
-    println("Saved per-step history: $history_csv")
-
-    return (result=result, run_label=run_label,
-            nel=nel_val, ppc=ppc_val, history_csv=history_csv)
-end
-
-"""
-Spatial convergence study of the P2G (particle-to-grid) least-squares
-reconstruction at the **initial step**, on the periodic Taylor-Green
-vortex.
-
-For each `(p_order, nel)` pair this routine:
-  1. Builds a periodic 2π×2π domain with `nel × nel` elements and B-spline
-     order `p_order` (continuity k=1).
-  2. Seeds particles via `seeding_mode`. Default is `:gauss_legendre`
-     (tensor-product GL nodes per element with weights set as particle
-     volumes), which turns the LSQR fit into an exact polynomial
-     quadrature so the discretisation error is dominated by the spline
-     approximation rather than particle-quadrature noise.
-  3. Assembles the P2G matrix `B` (rows = 2·num_particles) and solves the
-     least-squares system `min ‖B·u_grid − m_p‖₂` via LSQR.
-  4. Measures the L2 error via `compute_decaying_tg_l2_error` (at t=0,
-     ν=0), which uses Mantis's `Analysis.L2_norm` on the difference
-     `u_phys_form − u_TG_analytical` over a high-order Gauss–Legendre
-     quadrature.
-
-The least-squares fit alone is tested — no Hodge projection / pressure
-solve — so the resulting curve isolates the P2G reconstruction error.
-
-For the rotated R1 storage on tensor-product B-splines of order `p`, the
-mixed-degree components `(p-1, p)` and `(p, p-1)` make the L2-best-
-approximation rate of a smooth physical-velocity field `O(h^p)`. The
-reference slope drawn in the plot is `h^p`.
-
-Returns the list of per-run `(p, nel, h, l2_err, rel_l2_err, lsqr_resid_rel)`
-NamedTuples.
-"""
-function test_p2g_taylor_green_convergence(;
-        nel_sweep::NTuple{N,Int}=(32, 48, 64, 96, 128),
-        p_orders::NTuple{M,Int}=(2, 3),
-        particles_per_cell::Int=16,
-        seeding_mode::Symbol=:gauss_legendre,
-        rng_seed::Union{Int,Nothing}=42,
-        nq_extra::Int=2,
-        lsqr_atol::Float64=1e-12,
-        lsqr_btol::Float64=1e-12,
-        lsqr_maxiter::Int=5000,
-        output_dir::String=joinpath(get(ENV, "OUTPUT_DIR", pwd()), "p2g_tg_convergence"),
-        save_plot::Bool=true,
-    ) where {N,M}
-    mkpath(output_dir)
-
-    box_size = (2π, 2π)
-    results  = NamedTuple[]
-
-    println("\n========== P2G TAYLOR-GREEN CONVERGENCE ==========")
-    @printf("  box=%s  ppc=%d  seeding_mode=%s  rng_seed=%s  nq_extra=%d\n",
-            string(box_size), particles_per_cell, seeding_mode,
-            string(rng_seed), nq_extra)
-
-    for p_order in p_orders, n in nel_sweep
-        nel = (n, n)
-        p   = (p_order, p_order)
-        k   = (1, 1)
-
-        println(@sprintf("\n--- p=%d  nel=%d ---", p_order, n))
-
-        domain = GenerateDomain(nel, p, k;
-                                box_size=box_size,
-                                starting_point=(0.0, 0.0),
-                                boundary_condition=:periodic,
-                                obstacle=nothing)
-
-        num_particles = nel[1] * nel[2] * particles_per_cell
-        particles = generate_particles(num_particles, domain, :tg;
-                                       stratified_seeding=true,
-                                       seeding_mode=seeding_mode,
-                                       rng_seed=rng_seed,
-                                       volume_convention=:physical,
-                                       boundary_condition=:periodic,
-                                       U_inf=0.0)
-        # GL seeding may round the actual count down; use the resulting array.
-        num_particles = length(particles.x)
-        particle_sorter!(particles, domain)
-
-        ndofs        = FunctionSpaces.get_num_basis(domain.R1.fem_space)
-        num_elements = prod(domain.nel)
-        buf          = SimulationBuffers(num_particles, ndofs, num_elements, domain)
-
-        t0 = time()
-        B  = build_B_matrix(particles, domain, buf)
-        t_build_B = time() - t0
-
-        t0 = time()
-        u_grid, _ = solve_grid_velocity_lsqr(B, particles, buf.V_p, buf.lsqr_warm,
-                                          buf.ne_rhs_buf, buf.col_norms_buf,
-                                          domain.Mass1_fact;
-                                          atol=lsqr_atol, btol=lsqr_btol,
-                                          maxiter=lsqr_maxiter,
-                                          error_on_nonconvergence=true)
-        t_solve = time() - t0
-
-        # LSQR residual on the actual fit problem — quantifies whether the
-        # least-squares optimum was reached. Build RHS afresh because the
-        # LSQR call above scaled B in place via column-Jacobi preconditioner,
-        # which leaves B with unit-norm columns rather than the original B.
-        m_rhs = similar(buf.V_p, 2 * length(particles.x))
-        build_lsqr_rhs!(m_rhs, particles)
-        B_fresh = build_B_matrix(particles, domain, buf)
-        residual = B_fresh * u_grid .- m_rhs
-        lsqr_resid_rel = norm(residual) / max(norm(m_rhs), eps())
-
-        err = compute_decaying_tg_l2_error(domain, u_grid, 0.0, 0.0;
-                                           nq_extra=nq_extra)
-
-        h   = box_size[1] / n
-        rec = (p=p_order, nel=n, h=h,
-               l2_err=err.l2_err,
-               rel_l2_err=err.rel_l2_err,
-               l2_norm_exact=err.l2_norm_exact,
-               lsqr_resid_rel=lsqr_resid_rel,
-               num_particles=num_particles,
-               t_build_B=t_build_B, t_solve=t_solve)
-        push!(results, rec)
-        @printf("  nel=%d h=%.5f  L2=%.4e  rel_L2=%.4e  LSQR_resid_rel=%.2e  (build_B=%.2fs solve=%.2fs)\n",
-                n, h, err.l2_err, err.rel_l2_err,
-                lsqr_resid_rel, t_build_B, t_solve)
-    end
-
-    println("\n========== OBSERVED CONVERGENCE ORDERS ==========")
-    for p_order in p_orders
-        subset = filter(r -> r.p == p_order, results)
-        length(subset) >= 2 || continue
-        println(@sprintf("\n  p=%d  (expected order %d)", p_order, p_order))
-        @printf("  %-6s %-10s  %-12s %-8s %-8s  %-10s\n",
-                "nel", "h", "L2_err", "ratio", "order", "lsqr_res")
-        prev = nothing
-        for r in subset
-            if prev === nothing
-                @printf("  %-6d %-10.5e  %-12.4e %-8s %-8s  %-10.2e\n",
-                        r.nel, r.h, r.l2_err, "—", "—", r.lsqr_resid_rel)
-            else
-                h_ratio = prev.h / r.h
-                ratio   = prev.l2_err / max(r.l2_err, eps())
-                order   = log(ratio) / log(h_ratio)
-                @printf("  %-6d %-10.5e  %-12.4e %-8.3f %-8.3f  %-10.2e\n",
-                        r.nel, r.h, r.l2_err, ratio, order, r.lsqr_resid_rel)
-            end
-            prev = r
-        end
-    end
-
-    csv_path = joinpath(output_dir, "p2g_tg_convergence.csv")
-    open(csv_path, "w") do io
-        println(io, "p,nel,h,num_particles,l2_err,rel_l2_err,l2_norm_exact,lsqr_resid_rel,t_build_B,t_solve")
-        for r in results
-            @printf(io, "%d,%d,%.10e,%d,%.16e,%.16e,%.16e,%.16e,%.6f,%.6f\n",
-                    r.p, r.nel, r.h, r.num_particles,
-                    r.l2_err, r.rel_l2_err, r.l2_norm_exact,
-                    r.lsqr_resid_rel,
-                    r.t_build_B, r.t_solve)
-        end
-    end
-    println("\nSaved per-run CSV: $csv_path")
-
-    if save_plot
-        try
-            plt = plot(xscale=:log10, yscale=:log10,
-                       xlabel="h", ylabel="L2 error",
-                       title="P2G LSQR reconstruction error vs h\n(Taylor-Green, t=0)",
-                       legend=:bottomright, minorgrid=true)
-            for p_order in p_orders
-                subset = filter(r -> r.p == p_order, results)
-                isempty(subset) && continue
-                hs   = [r.h for r in subset]
-                errs = [r.l2_err for r in subset]
-                plot!(plt, hs, errs, marker=:circle, lw=2,
-                      label="p=$(p_order)  measured")
-                refs = errs[end] .* (hs ./ hs[end]) .^ p_order
-                plot!(plt, hs, refs, ls=:dash, lw=1,
-                      label="∝ h^$(p_order)")
-            end
-            plot_path = joinpath(output_dir, "p2g_tg_convergence.png")
-            savefig(plt, plot_path)
-            println("Saved log-log plot: $plot_path")
-        catch err
-            @warn "Plot save failed (continuing)" exception=err
-        end
-    end
-
-    return results
-end
-
-"""
-Run a Von Kármán vortex-shedding case past a cylinder and write probe
-velocity data for offline Strouhal estimation.
-
-Defaults set up Re=100 (D=2, U_inf=1, ν=0.02) on a 50×30 box with
-nel=(200,120) → dx=dy=0.25. Top and bottom are :wall (free-slip) to
-avoid the periodic feedthrough of the older default cfg. Three probe
-points are sampled every step and dumped to CSV. A coarse periodogram
-estimate of the dominant frequency is printed at the end as a sanity
-check; for thesis-grade spectra, post-process the CSV with FFTW in
-Python/MATLAB.
-"""
-function test_von_karman_strouhal(;
-        output_dir::String       = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "von_karman"),
-        box_size::NTuple{2,Float64}        = (40.0, 20.0),
-        nel::NTuple{2,Int}                 = (160, 80),
-        cylinder_center::NTuple{2,Float64} = (10.0, 10.0),
-        cylinder_radius::Float64           = 1.0,
-        U_inf::Float64           = 1.5,
-        viscosity::Float64       = 0.02,
-        T_final::Float64         = 100.0,
-        bc_top_bottom::Symbol    = :periodic,
-        probe_points::Vector{NTuple{2,Float64}} =
-            [(20.0, 15.0), (25.0, 15.0), (30.0, 15.0)],
-        save_vtk_every::Int      = 3,
-        particles_per_cell::Int  = 10,
-        target_cfl::Float64      = 0.3,
-        case_label::String       = "vk_re150",
-        # Restart support. When `restart_vtu` is set, particles are loaded from
-        # that .vtu instead of generated fresh, the run continues from
-        # `restart_step`+1 up to `final_step` (a fixed step count, so adaptive
-        # CFL shrinks dt but never changes how many steps run), starting at
-        # `restart_dt`. All probe / force / Strouhal / Cd-Cl analysis runs the
-        # same as a fresh case.
-        restart_vtu::Union{String,Nothing} = nothing,
-        restart_step::Int                  = 0,
-        final_step::Union{Int,Nothing}     = nothing,
-        restart_dt::Float64                = 0.01,
-    )
-    mkpath(output_dir)
-    bc = (:inlet, :outlet, bc_top_bottom, bc_top_bottom)
-    Re = U_inf * (2 * cylinder_radius) / viscosity
-
-    is_restart = restart_vtu !== nothing
-    if is_restart
-        final_step !== nothing && final_step > restart_step ||
-            error("test_von_karman_strouhal: restart requires final_step > restart_step " *
-                  "(got restart_step=$(restart_step), final_step=$(final_step))")
-        isfinite(restart_dt) && restart_dt > 0 ||
-            error("test_von_karman_strouhal: restart_dt must be a finite positive Float64")
-    end
-    n_steps_override = is_restart ? (final_step - restart_step) : nothing
-
-    println("\n========== VON KARMAN VORTEX SHEDDING ==========")
-    println(@sprintf("  box=%s  nel=%s  cyl=%s  r=%.3f  U=%.3f  ν=%.4f  Re=%.1f  T=%.1f  bc_y=%s",
-                     box_size, nel, cylinder_center, cylinder_radius,
-                     U_inf, viscosity, Re, T_final, bc_top_bottom))
-    if is_restart
-        println(@sprintf("  RESTART from %s: step %d → %d (%d steps), dt0=%.4g",
-                         restart_vtu, restart_step, final_step,
-                         n_steps_override, restart_dt))
-    end
-
-    cfg = SimulationConfig(;
-        nel                 = nel,
-        box_size            = box_size,
-        boundary_condition  = bc,
-        inlet_U_inf         = U_inf,
-        # Far-field policy (only active when `bc_top_bottom = :farfield`):
-        # replenish depleted top/bottom-row cells with `(U_inf, 0)` and pin
-        # v=0 on the first few cells at each inlet-touching corner to
-        # stabilise the projection there.
-        farfield_velocity         = (U_inf, 0.0),
-        farfield_corner_pin_cells = 4,
-        obstacle            = (kind=:cylinder, center=cylinder_center, radius=cylinder_radius),
-        flow_type           = :cylinder,
-        viscosity           = viscosity,
-        T_final             = T_final,
-        target_cfl          = target_cfl,
-        cfl_adaptive        = true,
-        particles_per_cell  = particles_per_cell,
-        output_every        = save_vtk_every,
-        clear_memo_every    = 1,
-    )
-
-    n_probes = length(probe_points)
-    probe_records = NamedTuple[]
-
-    probe_cb = function (t, u_coeffs, domain, step)
-        cache = EvaluationCache(evaluation_cache_size(domain))
-        us = Vector{Float64}(undef, n_probes)
-        vs = Vector{Float64}(undef, n_probes)
-        @inbounds for k in 1:n_probes
-            xp, yp = probe_points[k]
-            (u, v), _ = probe_field_at_point(xp, yp, u_coeffs, domain, cache)
-            us[k] = Float64(u);  vs[k] = Float64(v)
-        end
-        push!(probe_records, (t=t, step=step, us=us, vs=vs))
-    end
-
-    # Per-step force history for drag/lift coefficient post-processing.
-    # `force_callback` fires after every step_co_flip!. `fx`, `fy` are
-    # already converted from impulse to force (divided by dt) by the
-    # runner; here we normalise to (Cd, Cl) using ρ=1, D=2r, U=U_inf.
-    D_cyl = 2 * cylinder_radius
-    cd_norm = 2.0 / (U_inf^2 * D_cyl)  # ρ = 1
-    force_records = NamedTuple[]
-    force_cb = function (t, fx, fy, dt, step)
-        push!(force_records,
-              (t=t, step=step, dt=dt, fx=fx, fy=fy,
-               Cd=cd_norm * fx, Cl=cd_norm * fy))
-    end
-
-    result = run_diagnostic_simulation(cfg;
-        save_vtk         = true,
-        save_vtk_every   = save_vtk_every,
-        output_dir       = joinpath(output_dir, case_label * "_vtk"),
-        record_every     = max(1, save_vtk_every),
-        case_name        = case_label,
-        probe_callback   = probe_cb,
-        force_callback   = force_cb,
-        save_particles   = true,
-        restart_vtu      = restart_vtu,
-        restart_step     = restart_step,
-        n_steps_override = n_steps_override,
-        initial_dt       = is_restart ? restart_dt : nothing,
-    )
-
-    probe_csv = joinpath(output_dir, case_label * "_probes.csv")
-    open(probe_csv, "w") do io
-        header = "t,step"
-        for k in 1:n_probes
-            header *= @sprintf(",u_p%d,v_p%d", k, k)
-        end
-        println(io, header)
-        for r in probe_records
-            line = @sprintf("%.10e,%d", r.t, r.step)
-            for k in 1:n_probes
-                line *= @sprintf(",%.16e,%.16e", r.us[k], r.vs[k])
-            end
-            println(io, line)
-        end
-    end
-    println("Saved probe CSV: $probe_csv")
-
-    history_csv = joinpath(output_dir, case_label * "_history.csv")
-    open(history_csv, "w") do io
-        println(io, "t,energy,enstrophy,circulation")
-        for hi in result.history
-            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
-                    hi.t, hi.energy, hi.enstrophy, hi.circulation)
-        end
-    end
-    println("Saved history CSV: $history_csv")
-
-    # ----- Force history CSV -----
-    force_csv = joinpath(output_dir, case_label * "_forces.csv")
-    open(force_csv, "w") do io
-        println(io, "t,step,dt,fx,fy,Cd,Cl")
-        for r in force_records
-            @printf(io, "%.10e,%d,%.10e,%.16e,%.16e,%.16e,%.16e\n",
-                    r.t, r.step, r.dt, r.fx, r.fy, r.Cd, r.Cl)
-        end
-    end
-    println("Saved force CSV:   $force_csv")
-
-    # Drag/lift coefficient statistics over the second half of the record
-    # (the developed-shedding regime; the first half captures the start-up
-    # transient where Cd is artificially high and Cl is still ramping up).
-    cd_mean  = NaN
-    cl_rms   = NaN
-    cl_mean  = NaN
-    n_window = 0
-    if length(force_records) >= 16
-        start_idx = div(length(force_records), 2) + 1
-        n_window  = length(force_records) - start_idx + 1
-        cds = [r.Cd for r in @view force_records[start_idx:end]]
-        cls = [r.Cl for r in @view force_records[start_idx:end]]
-        cd_mean = sum(cds) / n_window
-        cl_mean = sum(cls) / n_window
-        # RMS-about-the-mean (i.e. standard deviation). For Kármán shedding
-        # the mean Cl ≈ 0 by symmetry; using std rather than √<Cl²> keeps
-        # the value invariant to a small mean drift from start-up bias.
-        cl_var = 0.0
-        @inbounds for cl in cls
-            d = cl - cl_mean
-            cl_var += d * d
-        end
-        cl_rms = sqrt(cl_var / n_window)
-    end
-
-    # ----- Strouhal + Cd/Cl summary -----
-    st_f = NaN; st_T = NaN; st_St = NaN
-    if length(probe_records) > 16
-        ts  = [r.t for r in probe_records]
-        vs1 = [r.vs[1] for r in probe_records]
-        st  = estimate_strouhal_from_v_signal(ts, vs1;
-                                              U_inf=U_inf, D=2*cylinder_radius)
-        st_f  = st.f
-        st_T  = 1.0 / max(st.f, eps())
-        st_St = st.St
-        println("\n--- In-run Strouhal estimate (probe 1, second half of record) ---")
-        @printf("  Re=%.1f  U=%.3f  D=%.3f\n", Re, U_inf, 2*cylinder_radius)
-        @printf("  f_dominant=%.6f  T_period=%.4f  St=f·D/U=%.4f\n",
-                st_f, st_T, st_St)
-    end
-
-    if length(force_records) >= 16
-        println("\n--- Drag / lift coefficient (second half of record, $n_window samples) ---")
-        @printf("  Cd_mean  = %.4f   (Re=%.1f reference ≈ 1.32-1.37)\n", cd_mean, Re)
-        @printf("  Cl_mean  = %.4f   (expected ≈ 0 by top/bottom symmetry)\n", cl_mean)
-        @printf("  Cl_rms   = %.4f   (Re=%.1f reference ≈ 0.22-0.26)\n", cl_rms, Re)
-    end
-
-    open(joinpath(output_dir, case_label * "_summary.txt"), "w") do io
-        println(io, @sprintf("Re=%.2f  U=%.4f  D=%.4f  ν=%.4f", Re, U_inf,
-                             2*cylinder_radius, viscosity))
-        if length(probe_records) > 16
-            println(io, @sprintf("Probe 1 location = (%.3f, %.3f)",
-                                 probe_points[1][1], probe_points[1][2]))
-            println(io, @sprintf("Strouhal       St = %.6f", st_St))
-            println(io, @sprintf("Dominant freq f = %.6f", st_f))
-            println(io, @sprintf("Period         T = %.4f", st_T))
-        end
-        if length(force_records) >= 16
-            println(io, @sprintf("Cd_mean = %.6f  (window: last %d samples)", cd_mean, n_window))
-            println(io, @sprintf("Cl_mean = %.6f", cl_mean))
-            println(io, @sprintf("Cl_rms  = %.6f", cl_rms))
-        end
-    end
-
-    return (result=result, probes=probe_records, forces=force_records,
-            probe_csv=probe_csv, history_csv=history_csv, force_csv=force_csv,
-            Cd_mean=cd_mean, Cl_rms=cl_rms, Cl_mean=cl_mean,
-            St=st_St, f_shed=st_f, T_shed=st_T)
-end
-
-"""
-Run a lid-driven cavity case using a Brinkman-style tangential
-enforcement to mimic no-slip side walls and a moving top lid.
-
-The solver's `:wall` BC pins the wall-normal velocity trace to zero
-strongly at the operator level. The tangential component is not
-strongly constrained, so we re-stamp it onto the particles each step
-via `apply_lid_cavity_brinkman!`. The result is a recognisable lid-
-driven cavity flow but **not** strict no-slip — the boundary layer is
-resolved over the Brinkman band rather than at the wall exactly. Note
-this in the thesis when reporting results.
-
-Default Re = U_lid·L/ν = 1·1/0.01 = 100.
-"""
-
-# ----------------------------------------------------------------------------
-# Ghia, Ghia & Shin (1982) benchmark — lid-driven cavity centerline velocities
-# ----------------------------------------------------------------------------
-# Tables I & II, normalised by U_lid. Top-wall lid is +1, all other walls 0.
-# Sampled along the vertical centerline (x = L/2, u(y)) and the horizontal
-# centerline (y = L/2, v(x)). Only Re=100, 400, 1000 included here — the
-# higher-Re columns are available in the paper and can be added later.
-const GHIA_Y_OVER_L = (
-    0.0000, 0.0547, 0.0625, 0.0703, 0.1016, 0.1719, 0.2813, 0.4531,
-    0.5000, 0.6172, 0.7344, 0.8516, 0.9531, 0.9609, 0.9688, 0.9766, 1.0000)
-const GHIA_U_RE100 = (
-     0.00000, -0.03717, -0.04192, -0.04775, -0.06434, -0.10150, -0.15662, -0.21090,
-    -0.20581, -0.13641,  0.00332,  0.23151,  0.68717,  0.73722,  0.78871,  0.84123,  1.00000)
-const GHIA_U_RE400 = (
-     0.00000, -0.08186, -0.09266, -0.10338, -0.14612, -0.24299, -0.32726, -0.17119,
-    -0.11477,  0.02135,  0.16256,  0.29093,  0.55892,  0.61756,  0.68439,  0.75837,  1.00000)
-const GHIA_U_RE1000 = (
-     0.00000, -0.18109, -0.20196, -0.22220, -0.29730, -0.38289, -0.27805, -0.10648,
-    -0.06080,  0.05702,  0.18719,  0.33304,  0.46604,  0.51117,  0.57492,  0.65928,  1.00000)
-const GHIA_X_OVER_L = (
-    0.0000, 0.0625, 0.0703, 0.0781, 0.0938, 0.1563, 0.2266, 0.2344,
-    0.5000, 0.8047, 0.8594, 0.9063, 0.9453, 0.9531, 0.9609, 0.9688, 1.0000)
-const GHIA_V_RE100 = (
-    0.00000,  0.09233,  0.10091,  0.10890,  0.12317,  0.16077,  0.17507,  0.17527,
-    0.05454, -0.24533, -0.22445, -0.16914, -0.10313, -0.08864, -0.07391, -0.05906,  0.00000)
-const GHIA_V_RE400 = (
-    0.00000,  0.18360,  0.19713,  0.20920,  0.22965,  0.28124,  0.30203,  0.30174,
-    0.05186, -0.38598, -0.44993, -0.23827, -0.22847, -0.19254, -0.15663, -0.12146,  0.00000)
-const GHIA_V_RE1000 = (
-    0.00000,  0.27485,  0.29012,  0.30353,  0.32627,  0.37095,  0.33075,  0.32235,
-    0.02526, -0.31966, -0.42665, -0.51550, -0.39188, -0.33714, -0.27669, -0.21388,  0.00000)
-
-"""Return `(ys, us, xs, vs)` Ghia (1982) benchmark vectors for the given
-Reynolds number, or `nothing` when no benchmark is tabulated. `ys`/`xs`
-are in units of `L` (cavity side length); `us`/`vs` are in units of
-`U_lid`."""
-function ghia_reference_data(Re::Real)
-    Re_int = Int(round(Re))
-    if Re_int == 100
-        return (collect(GHIA_Y_OVER_L), collect(GHIA_U_RE100),
-                collect(GHIA_X_OVER_L), collect(GHIA_V_RE100))
-    elseif Re_int == 400
-        return (collect(GHIA_Y_OVER_L), collect(GHIA_U_RE400),
-                collect(GHIA_X_OVER_L), collect(GHIA_V_RE400))
-    elseif Re_int == 1000
-        return (collect(GHIA_Y_OVER_L), collect(GHIA_U_RE1000),
-                collect(GHIA_X_OVER_L), collect(GHIA_V_RE1000))
-    end
-    return nothing
-end
-
-"""Sample the *physical* velocity `(u, v)` at point `(x, y)` from an
-already-projected `u_phys_form`. Cheaper than `probe_field_at_point`
-when the caller has the L2-projected form already (and unlike the raw
-R1 probe, this returns the physical-velocity components rather than the
-rotated R1-form components)."""
-function sample_phys_velocity_at_point(
-        u_phys_form, domain::Domain, x::Float64, y::Float64,
-    )
-    Lx, Ly = domain.box_size
-    nx, ny = domain.nel
-    dx = Lx / nx;  dy = Ly / ny
-    modes = bc_to_position_modes(domain.bc_sides)
-    x_w = wrap_axis(Float64(x), Lx, modes[1], 1e-12)
-    y_w = wrap_axis(Float64(y), Ly, modes[2], 1e-12)
-    ei  = clamp(floor(Int, x_w / dx) + 1, 1, nx)
-    ej  = clamp(floor(Int, y_w / dy) + 1, 1, ny)
-    eid = (ej - 1) * nx + ei
-    xi  = (x_w - (ei - 1) * dx) / dx
-    eta = (y_w - (ej - 1) * dy) / dy
-    sample_points = Mantis.Points.CartesianPoints(([xi], [eta]))
-    pushfwd_eval, _ = Forms.evaluate_sharp_pushforward(u_phys_form, eid, sample_points)
-    u = reduce(+, pushfwd_eval[1], dims=2)[1]
-    v = reduce(+, pushfwd_eval[2], dims=2)[1]
-    return u, v
-end
-
-"""Extract `u(y)` along the vertical centerline `x = L/2` and `v(x)` along
-the horizontal centerline `y = L/2`, sampled uniformly with `n_samples`
-points. Used both for full-resolution centerline CSVs and for Ghia-point
-sampling. Returns `(ys, us, xs, vs)`."""
-function extract_centerline_profiles(
-        u_coeffs::AbstractVector{Float64}, domain::Domain;
-        n_samples::Int = 401,
-    )
-    Lx, Ly = domain.box_size
-    x_mid = 0.5 * Lx
-    y_mid = 0.5 * Ly
-
-    u_form      = Forms.build_form_field(domain.R1, u_coeffs)
-    u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
-
-    ys = collect(range(0.0, Ly, length=n_samples))
-    xs = collect(range(0.0, Lx, length=n_samples))
-    us = Vector{Float64}(undef, n_samples)
-    vs = Vector{Float64}(undef, n_samples)
-
-    @inbounds for k in 1:n_samples
-        u, _ = sample_phys_velocity_at_point(u_phys_form, domain, x_mid, ys[k])
-        us[k] = u
-    end
-    @inbounds for k in 1:n_samples
-        _, v = sample_phys_velocity_at_point(u_phys_form, domain, xs[k], y_mid)
-        vs[k] = v
-    end
-    return ys, us, xs, vs
-end
-
-"""
-Validate a cavity simulation against the Ghia, Ghia, Shin (1982)
-benchmark for a matching Reynolds number.
-
-Steps:
-  1. Build the L2-projected physical-velocity form from `u_coeffs`.
-  2. Sample `u/U_lid` at the 17 Ghia vertical-centerline `y/L` points
-     and `v/U_lid` at the 17 horizontal-centerline `x/L` points.
-  3. Compute pointwise abs/rel differences and trapezoidal L2 / max
-     errors against the tabulated reference.
-  4. Also extract dense centerline profiles (`n_dense` samples per axis)
-     for full-curve plots alongside the 17 reference points.
-  5. Write three CSVs (`*_ghia_u_centerline.csv`, `*_ghia_v_centerline.csv`,
-     `*_centerline_{u,v}_dense.csv`) and a `*_ghia_summary.txt` file
-     with the summary errors.
-
-Returns `nothing` when no Ghia data exists for the rounded `Re`.
-"""
-function validate_lid_cavity_against_ghia(
-        u_coeffs::AbstractVector{Float64}, domain::Domain;
-        Re::Real, U_lid::Float64,
-        output_dir::String, case_label::String,
-        n_dense::Int = 401,
-    )
-    ref = ghia_reference_data(Re)
-    if ref === nothing
-        @printf("  [Ghia] no benchmark tabulated for Re=%.0f; skipping centerline validation.\n", Re)
-        return nothing
-    end
-    ys_g, us_g, xs_g, vs_g = ref
-    Lx, Ly = domain.box_size
-
-    u_form      = Forms.build_form_field(domain.R1, u_coeffs)
-    u_phys_form = Assemblers.solve_L2_projection(domain.R1, ★(u_form), domain.dΩ)
-
-    # FEEC artefact: the dy-form derivative space `D_y` has reduced boundary
-    # multiplicity, so physical `u` (which lives in `comp2 = P_x ⊗ D_y`)
-    # vanishes structurally at `y = 0` and `y = L_y`. Same for physical `v`
-    # at `x = 0` and `x = L_x`. Sampling exactly on the wall therefore
-    # returns 0 by construction, which has nothing to do with the lid
-    # enforcement. We probe one cell inward so the comparison reflects the
-    # solver's behaviour rather than the discretisation's boundary trace.
-    nx, ny = domain.nel
-    dx_dom = Lx / nx;  dy_dom = Ly / ny
-    nudge_into_domain_y(y) = clamp(y, 0.5 * dy_dom, Ly - 0.5 * dy_dom)
-    nudge_into_domain_x(x) = clamp(x, 0.5 * dx_dom, Lx - 0.5 * dx_dom)
-
-    us_num = Vector{Float64}(undef, length(ys_g))
-    @inbounds for k in eachindex(ys_g)
-        y_sample = nudge_into_domain_y(ys_g[k] * Ly)
-        u, _ = sample_phys_velocity_at_point(u_phys_form, domain, 0.5*Lx, y_sample)
-        us_num[k] = u / U_lid
-    end
-    vs_num = Vector{Float64}(undef, length(xs_g))
-    @inbounds for k in eachindex(xs_g)
-        x_sample = nudge_into_domain_x(xs_g[k] * Lx)
-        _, v = sample_phys_velocity_at_point(u_phys_form, domain, x_sample, 0.5*Ly)
-        vs_num[k] = v / U_lid
-    end
-
-    # Build masks that exclude the wall endpoints (y/L=0 and y/L=1 etc.)
-    # when computing L2 / max errors — those samples report a structural
-    # zero from the FEEC space, not a real solver disagreement.
-    interior_y = (ys_g .> 1e-6) .& (ys_g .< 1.0 - 1e-6)
-    interior_x = (xs_g .> 1e-6) .& (xs_g .< 1.0 - 1e-6)
-
-    # Trapezoidal L2 norm over the (irregular) reference grid, restricted
-    # to the interior indices.
-    function trapz_norm_interior(gs, vals, mask)
-        s = 0.0
-        idxs = findall(mask)
-        @inbounds for k in 1:length(idxs)-1
-            i, j = idxs[k], idxs[k+1]
-            s += 0.5 * (gs[j] - gs[i]) * (vals[i]^2 + vals[j]^2)
-        end
-        sqrt(s)
-    end
-
-    eu       = us_num .- us_g
-    ev       = vs_num .- vs_g
-    l2_u     = trapz_norm_interior(ys_g, eu, interior_y)
-    l2_v     = trapz_norm_interior(xs_g, ev, interior_x)
-    den_u    = trapz_norm_interior(ys_g, us_g, interior_y)
-    den_v    = trapz_norm_interior(xs_g, vs_g, interior_x)
-    rel_l2_u = l2_u / max(den_u, eps())
-    rel_l2_v = l2_v / max(den_v, eps())
-    max_u    = maximum(abs.(eu[interior_y]))
-    max_v    = maximum(abs.(ev[interior_x]))
-
-    ghia_csv_u = joinpath(output_dir, case_label * "_ghia_u_centerline.csv")
-    open(ghia_csv_u, "w") do io
-        println(io, "y_over_L,u_ghia,u_num,abs_err,rel_err,is_wall_endpoint")
-        for k in eachindex(ys_g)
-            rel = abs(us_num[k] - us_g[k]) / max(abs(us_g[k]), 1e-12)
-            is_wall = !interior_y[k]
-            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e,%d\n",
-                    ys_g[k], us_g[k], us_num[k],
-                    abs(us_num[k] - us_g[k]), rel, is_wall ? 1 : 0)
-        end
-    end
-    ghia_csv_v = joinpath(output_dir, case_label * "_ghia_v_centerline.csv")
-    open(ghia_csv_v, "w") do io
-        println(io, "x_over_L,v_ghia,v_num,abs_err,rel_err,is_wall_endpoint")
-        for k in eachindex(xs_g)
-            rel = abs(vs_num[k] - vs_g[k]) / max(abs(vs_g[k]), 1e-12)
-            is_wall = !interior_x[k]
-            @printf(io, "%.6f,%.6f,%.6f,%.6e,%.6e,%d\n",
-                    xs_g[k], vs_g[k], vs_num[k],
-                    abs(vs_num[k] - vs_g[k]), rel, is_wall ? 1 : 0)
-        end
-    end
-
-    ys_d, us_d, xs_d, vs_d = extract_centerline_profiles(u_coeffs, domain; n_samples=n_dense)
-    dense_u = joinpath(output_dir, case_label * "_centerline_u_dense.csv")
-    open(dense_u, "w") do io
-        println(io, "y,u_phys,u_over_U_lid")
-        for k in eachindex(ys_d)
-            @printf(io, "%.10e,%.10e,%.10e\n", ys_d[k], us_d[k], us_d[k] / U_lid)
-        end
-    end
-    dense_v = joinpath(output_dir, case_label * "_centerline_v_dense.csv")
-    open(dense_v, "w") do io
-        println(io, "x,v_phys,v_over_U_lid")
-        for k in eachindex(xs_d)
-            @printf(io, "%.10e,%.10e,%.10e\n", xs_d[k], vs_d[k], vs_d[k] / U_lid)
-        end
-    end
-
-    summary_path = joinpath(output_dir, case_label * "_ghia_summary.txt")
-    open(summary_path, "w") do io
-        println(io, @sprintf("Ghia (1982) benchmark validation for cavity Re=%.0f", Re))
-        println(io, "=" ^ 60)
-        println(io, "Errors are reported over INTERIOR Ghia points only.")
-        println(io, "The wall endpoints (y/L=0, y/L=1, x/L=0, x/L=1) are excluded")
-        println(io, "because the FEEC dy-form derivative space `D_y` has reduced")
-        println(io, "boundary multiplicity → physical u/v vanishes at y/x walls")
-        println(io, "by construction, regardless of the lid Brinkman stamping.")
-        println(io, "Endpoints are still listed in the per-point CSV with the")
-        println(io, "`is_wall_endpoint=1` flag for completeness.")
-        println(io, "")
-        println(io, "u along vertical centerline (x = L/2):")
-        println(io, @sprintf("  L2 error (relative) : %.4e", rel_l2_u))
-        println(io, @sprintf("  L2 error (absolute) : %.4e", l2_u))
-        println(io, @sprintf("  max pointwise error : %.4e", max_u))
-        println(io, "")
-        println(io, "v along horizontal centerline (y = L/2):")
-        println(io, @sprintf("  L2 error (relative) : %.4e", rel_l2_v))
-        println(io, @sprintf("  L2 error (absolute) : %.4e", l2_v))
-        println(io, @sprintf("  max pointwise error : %.4e", max_v))
-    end
-
-    println("")
-    @printf("  [Ghia Re=%.0f]  u centerline: rel_L2=%.3e  max=%.3e\n", Re, rel_l2_u, max_u)
-    @printf("  [Ghia Re=%.0f]  v centerline: rel_L2=%.3e  max=%.3e\n", Re, rel_l2_v, max_v)
-    println("  Saved: $ghia_csv_u")
-    println("  Saved: $ghia_csv_v")
-    println("  Saved: $dense_u")
-    println("  Saved: $dense_v")
-    println("  Saved: $summary_path")
-
-    return (rel_l2_u=rel_l2_u, rel_l2_v=rel_l2_v, max_u=max_u, max_v=max_v,
-            ys_g=ys_g, us_g=us_g, us_num=us_num,
-            xs_g=xs_g, vs_g=vs_g, vs_num=vs_num,
-            ghia_csv_u=ghia_csv_u, ghia_csv_v=ghia_csv_v,
-            dense_u=dense_u, dense_v=dense_v, summary_path=summary_path)
-end
-
-function test_lid_driven_cavity(;
-        output_dir::String       = joinpath(get(ENV, "OUTPUT_DIR", pwd()), "lid_cavity"),
-        nel::NTuple{2,Int}                 = (96, 96),
-        box_size::NTuple{2,Float64}        = (1.0, 1.0),
-        U_lid::Float64           = 1.0,
-        viscosity::Float64       = 0.01,
-        T_final::Float64         = 30.0,
-        lid_band_cells::Float64  = 2.0,
-        wall_band_cells::Float64 = 1.0,
-        particles_per_cell::Int  = 10,
-        save_vtk_every::Int      = 50,
-        target_cfl::Float64      = 0.5,
-        ss_record_every::Int     = 5,
-        validate_ghia::Bool      = true,
-        # Cavity-specific physics overrides (see notes below for the why):
-        enable_energy_correction::Bool = false,
-        ftle_threshold::Float64        = Inf,
-        max_longterm_delta_t::Float64  = 1.0e9,
-        pic_blend_alpha::Float64       = 0.05,
-        clear_memo_every::Int          = 1,
-        case_label::String       = "lid_re100",
-        # Restart support. When `restart_vtu` is set, particles are loaded from
-        # that .vtu instead of generated fresh, the run continues from
-        # `restart_step`+1 up to `final_step` (a fixed step count, so adaptive
-        # CFL shrinks dt but never changes how many steps run). `restart_dt`
-        # is the starting dt; leave it `nothing` to auto-set it from the CFL
-        # condition of the loaded state. The Ghia validation runs the same as
-        # a fresh case.
-        restart_vtu::Union{String,Nothing} = nothing,
-        restart_step::Int                  = 0,
-        final_step::Union{Int,Nothing}     = nothing,
-        restart_dt::Union{Float64,Nothing} = nothing,
-    )
-    mkpath(output_dir)
-    Re = U_lid * box_size[1] / viscosity
-
-    is_restart = restart_vtu !== nothing
-    if is_restart
-        final_step !== nothing && final_step > restart_step ||
-            error("test_lid_driven_cavity: restart requires final_step > restart_step " *
-                  "(got restart_step=$(restart_step), final_step=$(final_step))")
-        restart_dt === nothing || (isfinite(restart_dt) && restart_dt > 0) ||
-            error("test_lid_driven_cavity: restart_dt must be a finite positive Float64 when provided")
-    end
-    n_steps_override = is_restart ? (final_step - restart_step) : nothing
-
-    println("\n========== LID DRIVEN CAVITY ==========")
-    println(@sprintf("  nel=%s  L=%.3f  U_lid=%.3f  ν=%.4f  Re=%.1f  T=%.1f",
-                     nel, box_size[1], U_lid, viscosity, Re, T_final))
-    if is_restart
-        println(@sprintf("  RESTART from %s: step %d → %d (%d steps), dt0=%s",
-                         restart_vtu, restart_step, final_step, n_steps_override,
-                         restart_dt === nothing ? "auto-CFL" : @sprintf("%.4g", restart_dt)))
-    end
-    println(@sprintf("  Brinkman bands:  lid=%.2f cells  walls=%.2f cells",
-                     lid_band_cells, wall_band_cells))
-    println(@sprintf("  energy_correction=%s  ftle_threshold=%s  pic_blend=%.3f",
-                     enable_energy_correction, ftle_threshold, pic_blend_alpha))
-
-    cfg = SimulationConfig(;
-        nel                 = nel,
-        box_size            = box_size,
-        boundary_condition  = (:wall, :wall, :wall, :wall),
-        obstacle            = nothing,
-        flow_type           = :zero,
-        viscosity           = viscosity,
-        T_final             = T_final,
-        target_cfl          = target_cfl,
-        cfl_adaptive        = true,
-        particles_per_cell  = particles_per_cell,
-        min_particles_per_element = max(8, particles_per_cell ÷ 2),
-        max_particles_per_element = max(32, particles_per_cell * 2),
-        min_particles_per_quarter = 1,
-        output_every        = save_vtk_every,
-        enable_energy_correction = enable_energy_correction,
-        ftle_threshold      = ftle_threshold,
-        max_longterm_delta_t = max_longterm_delta_t,
-        pic_blend_alpha     = pic_blend_alpha,
-        clear_memo_every    = clear_memo_every,
-    )
-
-    step_hook = function (particles, domain, _cfg, step, t)
-        apply_lid_cavity_brinkman!(particles, domain, U_lid;
-                                   lid_band_cells=lid_band_cells,
-                                   wall_band_cells=wall_band_cells)
-    end
-
-    # Steady-state convergence tracking. probe_callback receives u_coeffs every
-    # step; we sample every `ss_record_every` steps and record the
-    # mass-weighted L2 norm of (u_h - u_h_prev). When this plateaus near
-    # round-off the cavity has reached steady state.
-    ss_records  = NamedTuple[]
-    u_prev_ref  = Ref{Vector{Float64}}(Float64[])
-    ss_probe_cb = function (t, u_coeffs, domain, step)
-        step == 0 && return  # first call is the initial state — no diff yet
-        step % max(1, ss_record_every) == 0 || return
-        u_prev = u_prev_ref[]
-        if length(u_prev) == length(u_coeffs)
-            diff       = u_coeffs .- u_prev
-            Mdiff      = domain.Mass_matrix * diff
-            Mu         = domain.Mass_matrix * u_coeffs
-            norm_diff  = sqrt(max(dot(diff,    Mdiff), 0.0))
-            norm_u     = sqrt(max(dot(u_coeffs, Mu),    0.0))
-            rel_diff   = norm_diff / max(norm_u, eps())
-            push!(ss_records, (t=t, step=step, abs_diff=norm_diff,
-                               norm_u=norm_u, rel_diff=rel_diff))
-            @printf("  [SS] t=%.3f  ||Δu||_M=%.3e  ||u||_M=%.3e  rel=%.3e\n",
-                    t, norm_diff, norm_u, rel_diff)
-        end
-        u_prev_ref[] = copy(u_coeffs)
-    end
-
-    result = run_diagnostic_simulation(cfg;
-        save_vtk         = true,
-        save_vtk_every   = save_vtk_every,
-        output_dir       = joinpath(output_dir, case_label * "_vtk"),
-        record_every     = max(1, save_vtk_every),
-        case_name        = case_label,
-        step_hook        = step_hook,
-        probe_callback   = ss_probe_cb,
-        save_particles   = true,
-        restart_vtu      = restart_vtu,
-        restart_step     = restart_step,
-        n_steps_override = n_steps_override,
-        initial_dt       = is_restart ? restart_dt : nothing,
-    )
-
-    history_csv = joinpath(output_dir, case_label * "_history.csv")
-    open(history_csv, "w") do io
-        println(io, "t,energy,enstrophy,circulation")
-        for hi in result.history
-            @printf(io, "%.10e,%.16e,%.16e,%.16e\n",
-                    hi.t, hi.energy, hi.enstrophy, hi.circulation)
-        end
-    end
-    println("Saved history CSV: $history_csv")
-
-    ss_csv = joinpath(output_dir, case_label * "_steady_state.csv")
-    open(ss_csv, "w") do io
-        println(io, "t,step,abs_diff_L2,norm_u_L2,rel_diff")
-        for r in ss_records
-            @printf(io, "%.10e,%d,%.16e,%.16e,%.16e\n",
-                    r.t, r.step, r.abs_diff, r.norm_u, r.rel_diff)
-        end
-    end
-    println("Saved steady-state CSV: $ss_csv")
-
-    ghia = nothing
-    if validate_ghia
-        ghia = validate_lid_cavity_against_ghia(
-            result.u_final, result.domain;
-            Re=Re, U_lid=U_lid,
-            output_dir=output_dir, case_label=case_label,
-        )
-    end
-
-    return (result=result, history_csv=history_csv, ss_csv=ss_csv,
-            ss_records=ss_records, ghia=ghia)
-end
-
-"""
-Dispatcher used by the bottom of this file when run as a script.
-
-Reads `COFLIP_CASE` from the environment and runs the matching test
-function. SLURM scripts set `COFLIP_CASE` plus the case-specific extra
-vars listed below. Returns `nothing`.
-
-Supported cases:
-  - `tg_convergence`   — uses `COFLIP_SWEEP_MODE` ∈ {`space`, `time`}
-                         and `COFLIP_SWEEP_IDX` (1-based).
-  - `shear_layer`      — double-shear-layer mesh/ppc sweep; uses
-                         `COFLIP_SWEEP_IDX` (1-based) into
-                         `SHEAR_LAYER_SWEEP` (1:6).
-  - `von_karman`       — Strouhal probe run, no extra vars (override
-                         defaults by editing the function call below).
-  - `von_karman_restart` — restart the Von Kármán case from a saved
-                         particle .vtu and run the full Strouhal / Cd-Cl
-                         analysis on completion. Requires
-                         `COFLIP_RESTART_VTU`, `COFLIP_RESTART_STEP`,
-                         `COFLIP_FINAL_STEP`; `COFLIP_DT` optional (0.01).
-  - `lid_cavity`       — lid-driven cavity, no extra vars.
-  - `lid_cavity_restart` — restart the lid-driven cavity from a saved
-                         particle .vtu and run the full Ghia comparison on
-                         completion. Requires `COFLIP_RESTART_VTU`,
-                         `COFLIP_RESTART_STEP`, `COFLIP_FINAL_STEP`;
-                         `COFLIP_DT` optional (auto-set from CFL if unset).
-  - `tg_validation`    — single-point viscous-decay validation (the
-                         legacy `test_decaying_taylor_green`).
-  - `main`             — the full-blown `main()` from this file.
-  - `restart`          — `restart_main` from a saved particle .vtu;
-                         requires `COFLIP_RESTART_VTU`,
-                         `COFLIP_RESTART_STEP`, `COFLIP_ADDITIONAL_STEPS`,
-                         `COFLIP_DT`.
-
-If `COFLIP_CASE` is unset or empty, the dispatcher does nothing (so
-`include(...)` from external scripts is safe). Use that for
-interactive sessions; call a specific test function manually.
-"""
-function coflip_dispatch_from_env()
-    case = get(ENV, "COFLIP_CASE", "")
-    if case == ""
-        println("(CO-FLIP_periodic.jl loaded; set ENV[\"COFLIP_CASE\"] to run a case.)")
-        return nothing
-    end
-
-    if case == "tg_convergence"
-        mode_str = get(ENV, "COFLIP_SWEEP_MODE", "space")
-        idx_str  = get(ENV, "COFLIP_SWEEP_IDX",  "1")
-        mode = Symbol(mode_str)
-        idx  = parse(Int, idx_str)
-        test_decaying_tg_convergence(; mode=mode, sweep_idx=idx)
-    elseif case == "shear_layer"
-        idx = parse(Int, get(ENV, "COFLIP_SWEEP_IDX", "1"))
-        test_shear_layer(; sweep_idx=idx)
-    elseif case == "von_karman"
-        test_von_karman_strouhal()
-    elseif case == "von_karman_restart"
-        # Restart the Von Kármán case from a saved particle .vtu and run the
-        # full probe / force / Strouhal / Cd-Cl analysis when it finishes.
-        # Requires COFLIP_RESTART_VTU, COFLIP_RESTART_STEP, COFLIP_FINAL_STEP;
-        # COFLIP_DT optional (default 0.01).
-        vtu        = get(ENV, "COFLIP_RESTART_VTU", "")
-        rstep      = parse(Int, get(ENV, "COFLIP_RESTART_STEP", "0"))
-        fstep      = parse(Int, get(ENV, "COFLIP_FINAL_STEP", "0"))
-        rdt        = parse(Float64, get(ENV, "COFLIP_DT", "0.01"))
-        vtu == "" && error("COFLIP_CASE=von_karman_restart requires COFLIP_RESTART_VTU env var")
-        test_von_karman_strouhal(;
-            restart_vtu  = vtu,
-            restart_step = rstep,
-            final_step   = fstep,
-            restart_dt   = rdt,
-        )
-    elseif case == "lid_cavity"
-        test_lid_driven_cavity()
-    elseif case == "lid_cavity_restart"
-        # Restart the lid-driven cavity from a saved particle .vtu and run the
-        # full steady-state + Ghia comparison when it finishes.
-        # Requires COFLIP_RESTART_VTU, COFLIP_RESTART_STEP, COFLIP_FINAL_STEP;
-        # COFLIP_DT optional (auto-set from CFL of the loaded state if unset).
-        vtu        = get(ENV, "COFLIP_RESTART_VTU", "")
-        vtu == "" && error("COFLIP_CASE=lid_cavity_restart requires COFLIP_RESTART_VTU env var")
-        rstep      = parse(Int, get(ENV, "COFLIP_RESTART_STEP", "0"))
-        fstep      = parse(Int, get(ENV, "COFLIP_FINAL_STEP", "0"))
-        rdt        = haskey(ENV, "COFLIP_DT") ? parse(Float64, ENV["COFLIP_DT"]) : nothing
-        test_lid_driven_cavity(;
-            restart_vtu  = vtu,
-            restart_step = rstep,
-            final_step   = fstep,
-            restart_dt   = rdt,
-        )
-    elseif case == "tg_validation"
-        test_decaying_taylor_green()
-    elseif case == "main"
-        main()
-    elseif case == "restart"
-        vtu  = get(ENV, "COFLIP_RESTART_VTU", "")
-        step = parse(Int, get(ENV, "COFLIP_RESTART_STEP",  "0"))
-        more = parse(Int, get(ENV, "COFLIP_ADDITIONAL_STEPS", "1000"))
-        dt   = parse(Float64, get(ENV, "COFLIP_DT", "0.05"))
-        vtu == "" && error("COFLIP_CASE=restart requires COFLIP_RESTART_VTU env var")
-        restart_main(SimulationConfig(), vtu;
-                     restart_step=step, additional_steps=more, dt=dt)
-    else
-        error("Unknown COFLIP_CASE=$case. " *
-              "Expected one of: tg_convergence, shear_layer, von_karman, " *
-              "lid_cavity, tg_validation, main, restart")
-    end
-    return nothing
-end
 
 """Run complete CO-FLIP simulation."""
 function main(cfg::SimulationConfig=SimulationConfig())
@@ -7008,23 +5564,19 @@ function with_run_logging(f; logdir::AbstractString=".", prefix::AbstractString=
 end
 
 
+# Running this file directly executes `main()` with the neutral default
+# SimulationConfig (periodic decaying Taylor-Green). The result/benchmark
+# cases each live in their own standalone file under `cases/` — run those
+# directly instead, e.g.
+#     julia --project=. CO-FLIP/cases/von_karman.jl
+#     julia --project=. CO-FLIP/cases/lid_cavity.jl
 if abspath(PROGRAM_FILE) == @__FILE__
     with_run_logging() do
-        if get(ENV, "COFLIP_CASE", "") != ""
-            # Env-driven dispatch (used by both the DelftBlue SLURM scripts and
-            # local runs that set COFLIP_CASE, e.g. von_karman_restart).
-            coflip_dispatch_from_env()
-        else
-            # Default when no case is selected: fresh Von Kármán shedding run.
-            test_von_karman_strouhal()
-            #test_decaying_tg_convergence()
-            #test_lid_driven_cavity()
-            #test_p2g_taylor_green_convergence()
-        end
+        main()
     end
 end
 
-# Legacy restart entry point (kept for reference; opt in via COFLIP_CASE=restart):
+# Legacy restart entry point (kept for reference; opt in by uncommenting):
 # cfg = SimulationConfig()
 # restart_main(cfg, "coflip_output/particles_0627.vtu";
 #              restart_step = 0627, additional_steps = 1000, dt = 0.048)

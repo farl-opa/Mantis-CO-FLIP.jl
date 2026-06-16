@@ -31,10 +31,10 @@ cd /home/opelegriartola/CO-FLIP/Mantis-CO-FLIP.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
 julia --project=. -e 'using Pkg; Pkg.develop(path="Mantis")'
 
-export COFLIP_CASE=von_karman_restart
+# (case selected by which cases/*.jl file is run)
 export COFLIP_RESTART_VTU=$OUTPUT_DIR/von_karman/vk_re150_vtk/particles_1398.vtu
 export COFLIP_RESTART_STEP=1398
 export COFLIP_FINAL_STEP=4901
 export COFLIP_DT=0.01
 
-julia --project=. CO-FLIP/CO-FLIP_solver.jl
+julia --project=. CO-FLIP/cases/von_karman.jl

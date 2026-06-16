@@ -33,10 +33,10 @@ julia --project=. -e 'using Pkg; Pkg.develop(path="Mantis")'
 
 # Path to the snapshot to restart from. "main directory" = the repo root here;
 # edit if particles_1550.vtu lives elsewhere on the cluster.
-export COFLIP_CASE=lid_cavity_restart
+# (case selected by which cases/*.jl file is run)
 export COFLIP_RESTART_VTU=/home/opelegriartola/CO-FLIP/Mantis-CO-FLIP.jl/particles_5100.vtu
 export COFLIP_RESTART_STEP=5100
 export COFLIP_FINAL_STEP=5760
 # export COFLIP_DT=0.01   # optional: omit to auto-set dt from CFL
 
-julia --project=. CO-FLIP/CO-FLIP_solver.jl
+julia --project=. CO-FLIP/cases/lid_cavity.jl
