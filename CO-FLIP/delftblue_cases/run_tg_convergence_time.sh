@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=3900M
-#SBATCH --time=24:00:00
+#SBATCH --time=6:00:00
 #SBATCH --array=1-5
 #SBATCH --output=coflip_tg_conv_time_%A_%a.out
 #SBATCH --error=coflip_tg_conv_time_%A_%a.err
