@@ -41,7 +41,7 @@ const CFG = SimulationConfig(
     viscosity                    = 0.05,
     # Strang split + Crank–Nicolson diffusion → 2nd-order time discretisation.
     viscosity_splitting          = :strang,
-    viscous_time_scheme          = :backward_euler,
+    viscous_time_scheme          = :crank_nicolson,
     max_fp_iter                  = 4,
     fp_tol                       = 1e-7,
     enable_energy_correction     = true,
